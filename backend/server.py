@@ -2285,6 +2285,198 @@ async def test_email_integration():
         "pending_provider": True
     }
 
+# ==================== AUTO-SUGGESTIONS ENDPOINTS ====================
+
+@api_router.get("/suggestions/follow-up")
+async def get_intelligent_suggestions(current_user: dict = Depends(get_current_user)):
+    """Generate intelligent follow-up recommendations"""
+    try:
+        campus_filter = get_campus_filter(current_user)
+        today = date.today()
+        
+        # Get members and their recent activities
+        members = await db.members.find(campus_filter, {"_id": 0}).to_list(1000)
+        recent_events = await db.care_events.find({**campus_filter}, {"_id": 0}).to_list(2000)
+        
+        suggestions = []
+        
+        for member in members:
+            member_events = [e for e in recent_events if e['member_id'] == member['id']]
+            last_contact = member.get('last_contact_date')
+            days_since = member.get('days_since_last_contact', 999)
+            
+            # AI-powered suggestions based on patterns
+            if days_since > 90:
+                suggestions.append({
+                    "member_id": member['id'],
+                    "member_name": member['name'],
+                    "member_photo_url": member.get('photo_url'),
+                    "priority": "high",
+                    "suggestion": "Urgent reconnection needed",
+                    "reason": f"No contact for {days_since} days - risk of disconnection",
+                    "recommended_action": "Personal visit or phone call",
+                    "urgency_score": min(100, days_since)
+                })
+            elif member.get('age', 0) > 65 and days_since > 30:
+                suggestions.append({
+                    "member_id": member['id'],
+                    "member_name": member['name'],
+                    "member_photo_url": member.get('photo_url'),
+                    "priority": "medium",
+                    "suggestion": "Senior care check-in",
+                    "reason": f"Senior member, {days_since} days since contact",
+                    "recommended_action": "Health and wellness check",
+                    "urgency_score": days_since + 20  # Boost for seniors
+                })
+            elif member.get('membership_status') == 'Visitor' and days_since > 14:
+                suggestions.append({
+                    "member_id": member['id'],
+                    "member_name": member['name'],
+                    "member_photo_url": member.get('photo_url'),
+                    "priority": "medium",
+                    "suggestion": "Visitor follow-up",
+                    "reason": "New visitor needs welcoming contact",
+                    "recommended_action": "Welcome visit or invitation to activities",
+                    "urgency_score": days_since + 10
+                })
+            elif len([e for e in member_events if e.get('event_type') == 'financial_aid']) > 0 and days_since > 60:
+                suggestions.append({
+                    "member_id": member['id'],
+                    "member_name": member['name'],
+                    "member_photo_url": member.get('photo_url'),
+                    "priority": "medium",
+                    "suggestion": "Financial aid follow-up",
+                    "reason": "Previous aid recipient, check on progress",
+                    "recommended_action": "Follow-up on aid effectiveness",
+                    "urgency_score": days_since + 15
+                })
+            elif member.get('marital_status') == 'Single' and member.get('age', 0) > 25 and days_since > 45:
+                suggestions.append({
+                    "member_id": member['id'],
+                    "member_name": member['name'],
+                    "member_photo_url": member.get('photo_url'),
+                    "priority": "low",
+                    "suggestion": "Single adult engagement",
+                    "reason": "Single adult may need community connection",
+                    "recommended_action": "Invite to small groups or social activities",
+                    "urgency_score": days_since
+                })
+        
+        # Sort by urgency score and return top suggestions
+        suggestions.sort(key=lambda x: x['urgency_score'], reverse=True)
+        return suggestions[:20]  # Top 20 suggestions
+        
+    except Exception as e:
+        logger.error(f"Error generating suggestions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/analytics/demographic-trends")
+async def get_demographic_trends(current_user: dict = Depends(get_current_user)):
+    """Analyze demographic trends and population shifts"""
+    try:
+        campus_filter = get_campus_filter(current_user)
+        members = await db.members.find(campus_filter, {"_id": 0}).to_list(1000)
+        events = await db.care_events.find({**campus_filter}, {"_id": 0}).to_list(2000)
+        
+        # Age group analysis
+        age_groups = {
+            'Children (0-12)': {'count': 0, 'care_events': 0},
+            'Teenagers (13-17)': {'count': 0, 'care_events': 0},
+            'Young Adults (18-30)': {'count': 0, 'care_events': 0},
+            'Adults (31-60)': {'count': 0, 'care_events': 0},
+            'Seniors (60+)': {'count': 0, 'care_events': 0}
+        }
+        
+        # Membership trends
+        membership_trends = {
+            'Member': {'count': 0, 'engagement_score': 0},
+            'Non Member': {'count': 0, 'engagement_score': 0},
+            'Visitor': {'count': 0, 'engagement_score': 0},
+            'Sympathizer': {'count': 0, 'engagement_score': 0}
+        }
+        
+        # Care needs by demographics
+        care_needs = {
+            'Financial aid by age': {},
+            'Grief support by age': {},
+            'Medical needs by age': {},
+            'Engagement by membership': {}
+        }
+        
+        for member in members:
+            age = member.get('age', 0)
+            membership = member.get('membership_status', 'Unknown')
+            days_since_contact = member.get('days_since_last_contact', 999)
+            
+            # Age group classification
+            if age <= 12:
+                age_group = 'Children (0-12)'
+            elif age <= 17:
+                age_group = 'Teenagers (13-17)'
+            elif age <= 30:
+                age_group = 'Young Adults (18-30)'
+            elif age <= 60:
+                age_group = 'Adults (31-60)'
+            else:
+                age_group = 'Seniors (60+)'
+            
+            age_groups[age_group]['count'] += 1
+            
+            # Engagement scoring (inverse of days since contact)
+            engagement_score = max(0, 100 - days_since_contact)
+            
+            if membership in membership_trends:
+                membership_trends[membership]['count'] += 1
+                membership_trends[membership]['engagement_score'] += engagement_score
+            
+            # Care event analysis for this member
+            member_events = [e for e in events if e['member_id'] == member['id']]
+            age_groups[age_group]['care_events'] += len(member_events)
+            
+            # Care needs analysis
+            financial_events = len([e for e in member_events if e.get('event_type') == 'financial_aid'])
+            grief_events = len([e for e in member_events if e.get('event_type') == 'grief_loss'])
+            medical_events = len([e for e in member_events if e.get('event_type') == 'accident_illness'])
+            
+            age_key = f"{age//10*10}s"  # 20s, 30s, 40s, etc.
+            care_needs['Financial aid by age'][age_key] = care_needs['Financial aid by age'].get(age_key, 0) + financial_events
+            care_needs['Grief support by age'][age_key] = care_needs['Grief support by age'].get(age_key, 0) + grief_events
+            care_needs['Medical needs by age'][age_key] = care_needs['Medical needs by age'].get(age_key, 0) + medical_events
+        
+        # Calculate averages for membership engagement
+        for status, data in membership_trends.items():
+            if data['count'] > 0:
+                data['avg_engagement'] = round(data['engagement_score'] / data['count'])
+            else:
+                data['avg_engagement'] = 0
+        
+        # Generate insights
+        insights = []
+        
+        # Age-based insights
+        highest_count_group = max(age_groups.items(), key=lambda x: x[1]['count'])
+        highest_care_group = max(age_groups.items(), key=lambda x: x[1]['care_events'])
+        
+        insights.append(f"Largest demographic: {highest_count_group[0]} ({highest_count_group[1]['count']} members)")
+        insights.append(f"Most care needed: {highest_care_group[0]} ({highest_care_group[1]['care_events']} events)")
+        
+        # Membership insights
+        lowest_engagement = min(membership_trends.items(), key=lambda x: x[1]['avg_engagement'])
+        insights.append(f"Lowest engagement: {lowest_engagement[0]} (avg score: {lowest_engagement[1]['avg_engagement']})")
+        
+        return {
+            "age_groups": [{"name": k, **v} for k, v in age_groups.items()],
+            "membership_trends": [{"status": k, **v} for k, v in membership_trends.items()],
+            "care_needs": care_needs,
+            "insights": insights,
+            "total_members": len(members),
+            "analysis_date": today.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing demographic trends: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== NOTIFICATION LOGS ENDPOINTS ====================
 
 @api_router.get("/notification-logs")
