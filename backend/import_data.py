@@ -66,7 +66,7 @@ async def import_campuses_and_data():
                     '8': 'Sympathizer',
                     '9': 'Member (Inactive)'
                 }
-                membership_id = row.get('membership_id', '').strip()
+                membership_id = row.get('membership_status', '').strip()
                 membership_status = membership_map.get(membership_id, 'Unknown')
                 
                 # Handle family grouping
