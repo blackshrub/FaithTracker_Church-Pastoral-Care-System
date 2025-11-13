@@ -455,9 +455,9 @@ export const Reminders = () => {
                 <div className="space-y-2">
                   {upcomingBirthdays.map(event => (
                     <div key={event.id} className="p-3 bg-purple-50 rounded flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold">{event.member_name}</p>
-                        <p className="text-sm text-muted-foreground">{formatDate(event.event_date)}</p>
+                      <div className="flex-1">
+                        <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
+                        <p className="text-sm text-muted-foreground ml-13">{formatDate(event.event_date)}</p>
                       </div>
                       <Badge variant="outline" className="text-purple-600">
                         {Math.ceil((new Date(event.event_date) - new Date()) / (1000 * 60 * 60 * 24))} days
