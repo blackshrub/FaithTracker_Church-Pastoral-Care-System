@@ -10,6 +10,7 @@ import { MembersList } from '@/pages/MembersList';
 import { MemberDetail } from '@/pages/MemberDetail';
 import { FinancialAid } from '@/pages/FinancialAid';
 import { Analytics } from '@/pages/Analytics';
+import { AdminDashboard } from '@/pages/AdminDashboard';
 import { IntegrationTest } from '@/components/IntegrationTest';
 import { Layout } from '@/components/Layout';
 
