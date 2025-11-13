@@ -1,42 +1,30 @@
 [
   {
-    "content": "Add edit/delete functionality for Members (individual + bulk)",
+    "content": "Update design system to teal/amber color scheme with Playfair Display",
     "status": "in_progress"
   },
   {
-    "content": "Add edit/delete functionality for Campuses",
+    "content": "Complete edit/delete UI for Members with bulk checkboxes",
     "status": "pending"
   },
   {
-    "content": "Add edit/delete functionality for Care Events",
+    "content": "Add edit/delete for Campuses and Care Events",
     "status": "pending"
   },
   {
-    "content": "Create Import/Export page (CSV upload, API sync, bulk export)",
+    "content": "Update routes for Import/Export, Settings, WhatsApp Logs pages",
     "status": "pending"
   },
   {
-    "content": "Create Settings/Configuration page (WhatsApp, grief stages, automation)",
+    "content": "Create Calendar View page",
     "status": "pending"
   },
   {
-    "content": "Add bulk selection checkboxes for members, events, grief stages",
+    "content": "Create Bulk Messaging page",
     "status": "pending"
   },
   {
-    "content": "Create Calendar View page (month/week/day with events)",
-    "status": "pending"
-  },
-  {
-    "content": "Create Bulk Messaging page (send to selected pastoral team)",
-    "status": "pending"
-  },
-  {
-    "content": "Enhance Analytics page (weekly/monthly reports, trends)",
-    "status": "pending"
-  },
-  {
-    "content": "Test all new features comprehensively",
+    "content": "Test all features",
     "status": "pending"
   }
 ]
