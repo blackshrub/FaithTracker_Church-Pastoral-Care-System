@@ -167,15 +167,68 @@ export const Reminders = () => {
           )}
         </TabsContent>
         
-        <TabsContent value="followup" className="space-y-4">
-          <Card className="card-border-left-blue">
+        <TabsContent value="at-risk" className="space-y-4">
+          {/* Members at Risk (30-59 days) */}
+          <Card className="card-border-left-amber">
             <CardHeader>
-              <CardTitle>Hospital Follow-ups</CardTitle>
+              <CardTitle>Members at Risk (30-59 days no contact)</CardTitle>
             </CardHeader>
             <CardContent>
-              {hospitalFollowUp.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">No hospital follow-ups due</p>
+              {atRiskMembers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No members at risk</p>
               ) : (
+                <div className="space-y-2">
+                  {atRiskMembers.map(member => (
+                    <div key={member.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">{member.name}</p>
+                        <p className="text-sm text-muted-foreground">{member.days_since_last_contact} days since contact</p>
+                      </div>
+                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white">
+                        Contact
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Members Disconnected (60+ days) */}
+          <Card className="card-border-left-red">
+            <CardHeader>
+              <CardTitle>Members Disconnected (60+ days no contact)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {disconnectedMembers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No disconnected members</p>
+              ) : (
+                <div className="space-y-2">
+                  {disconnectedMembers.slice(0, 15).map(member => (
+                    <div key={member.id} className="p-3 bg-red-50 rounded flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">{member.name}</p>
+                        <p className="text-sm text-muted-foreground">{member.days_since_last_contact} days since contact</p>
+                      </div>
+                      <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white">
+                        Reconnect
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="followup" className="space-y-4">
+          {/* Hospital Follow-ups */}
+          {hospitalFollowUp.length > 0 && (
+            <Card className="card-border-left-blue">
+              <CardHeader>
+                <CardTitle>Hospital Follow-ups</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2">
                   {hospitalFollowUp.map(event => (
                     <div key={event.id} className="p-3 bg-blue-50 rounded flex justify-between items-center">
@@ -189,32 +242,37 @@ export const Reminders = () => {
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="at-risk" className="space-y-4">
-          <Card className="card-border-left-amber">
-            <CardHeader>
-              <CardTitle>Members at Risk (30+ days no contact)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {atRiskMembers.map(member => (
-                  <div key={member.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.days_since_last_contact} days since contact</p>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Grief Support Follow-ups */}
+          {griefDue.length > 0 && (
+            <Card className="card-border-left-purple">
+              <CardHeader>
+                <CardTitle>Grief Support Follow-ups</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {griefDue.map(stage => (
+                    <div key={stage.id} className="p-3 bg-purple-50 rounded flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">{stage.member_name}</p>
+                        <p className="text-sm text-muted-foreground">{stage.stage.replace('_', ' ')} after mourning</p>
+                      </div>
+                      <Button size="sm" className="bg-purple-500 hover:bg-purple-600 text-white">
+                        Contact
+                      </Button>
                     </div>
-                    <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white">
-                      Contact
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {hospitalFollowUp.length === 0 && griefDue.length === 0 && (
+            <Card><CardContent className="p-6 text-center">No follow-ups needed today</CardContent></Card>
+          )}
         </TabsContent>
         
         <TabsContent value="upcoming" className="space-y-4">
