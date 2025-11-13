@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,36 @@ const formatPhoneForWhatsApp = (phone) => {
     formatted = formatted.substring(1);
   }
   return `https://wa.me/${formatted}`;
+};
+
+const markBirthdayComplete = async (eventId, loadReminders) => {
+  try {
+    await axios.post(`${API}/care-events/${eventId}/complete`);
+    toast.success('Birthday task completed!');
+    loadReminders();
+  } catch (error) {
+    toast.error('Failed to complete');
+  }
+};
+
+const markGriefStageComplete = async (stageId, loadReminders) => {
+  try {
+    await axios.post(`${API}/grief-support/${stageId}/complete`);
+    toast.success('Grief stage completed!');
+    loadReminders();
+  } catch (error) {
+    toast.error('Failed to complete');
+  }
+};
+
+const markAccidentComplete = async (eventId, loadReminders) => {
+  try {
+    await axios.post(`${API}/care-events/${eventId}/complete`);
+    toast.success('Accident follow-up completed!');
+    loadReminders();
+  } catch (error) {
+    toast.error('Failed to complete');
+  }
 };
 
 export const Reminders = () => {
