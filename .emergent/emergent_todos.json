@@ -1,50 +1,46 @@
 [
   {
-    "content": "Database Indexing (completed)",
+    "content": "API pagination to all list endpoints",
     "status": "completed"
   },
   {
-    "content": "Add API pagination to all list endpoints",
+    "content": "Image optimization for member photos",
+    "status": "completed"
+  },
+  {
+    "content": "React lazy loading for all routes",
+    "status": "completed"
+  },
+  {
+    "content": "Debounced search to MembersList",
+    "status": "completed"
+  },
+  {
+    "content": "React memoization to expensive components",
+    "status": "completed"
+  },
+  {
+    "content": "Virtual scrolling for member lists",
     "status": "in_progress"
   },
   {
-    "content": "Add Redis caching for member lists and stats",
+    "content": "Redis caching (requires setup)",
     "status": "pending"
   },
   {
-    "content": "Add MongoDB connection pooling",
+    "content": "MongoDB connection pooling (requires config)",
     "status": "pending"
   },
   {
-    "content": "Add image optimization for member photos",
+    "content": "Background jobs (requires task queue)",
     "status": "pending"
   },
   {
-    "content": "Implement React lazy loading for all routes",
+    "content": "Bundle analysis (requires analyzer)",
     "status": "pending"
   },
   {
-    "content": "Add debounced search to MembersList",
-    "status": "pending"
-  },
-  {
-    "content": "Add React memoization to expensive components",
-    "status": "pending"
-  },
-  {
-    "content": "Implement virtual scrolling for member lists",
-    "status": "pending"
-  },
-  {
-    "content": "Add code splitting and bundle analysis",
-    "status": "pending"
-  },
-  {
-    "content": "Add background jobs for heavy operations",
-    "status": "pending"
-  },
-  {
-    "content": "Test all performance optimizations",
+    "content": "CDN integration (requires CDN service)",
     "status": "pending"
   }
 ]
