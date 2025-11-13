@@ -43,9 +43,7 @@ export const Dashboard = () => {
     aid_type: 'education',
     aid_amount: '',
     grief_relationship: '',
-    mourning_service_date: '',
-    hospital_name: '',
-    admission_date: ''
+    hospital_name: ''
   });
   
   useEffect(() => {
