@@ -32,6 +32,11 @@ export const Layout = ({ children }) => {
     { name: t('integrations'), href: '/integrations', icon: Settings },
   ];
   
+  // Add Admin menu for full_admin only
+  if (user?.role === 'full_admin') {
+    navigation.splice(5, 0, { name: 'Admin', href: '/admin', icon: Settings });
+  }
+  
   const isActive = (href) => {
     if (href === '/dashboard') return location.pathname === '/' || location.pathname === '/dashboard';
     return location.pathname.startsWith(href);
