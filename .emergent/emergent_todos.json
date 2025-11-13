@@ -1,6 +1,22 @@
 [
   {
-    "content": "Run automated testing agent and fix bugs",
-    "status": "completed"
+    "content": "Fix dropdown/select styling - force light background with dark text",
+    "status": "in_progress"
+  },
+  {
+    "content": "Fix navigation routing - Dashboard and Grief Support going to same page",
+    "status": "pending"
+  },
+  {
+    "content": "Fix active menu state - change to dark text on light background",
+    "status": "pending"
+  },
+  {
+    "content": "Disable dark mode completely - force light mode only",
+    "status": "pending"
+  },
+  {
+    "content": "Test all fixes with screenshots",
+    "status": "pending"
   }
 ]
