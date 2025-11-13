@@ -563,61 +563,6 @@ export const Reminders = () => {
           )}
         </TabsContent>
         
-        <TabsContent value="financial" className="space-y-4">
-          <Card className="card-border-left-green">
-            <CardHeader>
-              <CardTitle>Financial Aid Due Today</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {financialAidDue.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">No financial aid scheduled for today</p>
-              ) : (
-                <div className="space-y-2">
-                  {financialAidDue.map(schedule => (
-                    <div key={schedule.id} className="p-3 bg-green-50 rounded flex justify-between items-center">
-                      <div className="flex-1">
-                        <MemberNameWithAvatar member={{name: schedule.member_name, photo_url: schedule.member_photo_url}} memberId={schedule.member_id} />
-                        <p className="text-sm text-muted-foreground ml-13">{schedule.frequency} - Rp {schedule.aid_amount?.toLocaleString('id-ID')} ({schedule.aid_type})</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white" asChild>
-                          <a href={formatPhoneForWhatsApp(schedule.member_phone)} target="_blank" rel="noopener noreferrer">Contact</a>
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={async () => {
-                          if (window.confirm(`Mark aid as distributed to ${schedule.member_name}?`)) {
-                            try {
-                              await axios.post(`${API}/care-events`, {
-                                member_id: schedule.member_id,
-                                campus_id: schedule.campus_id,
-                                event_type: 'financial_aid',
-                                event_date: new Date().toISOString().split('T')[0],
-                                title: `${schedule.title} - Scheduled Aid`,
-                                aid_type: schedule.aid_type,
-                                aid_amount: schedule.aid_amount
-                              });
-                              toast.success('Aid marked as distributed!');
-                              loadReminders();
-                            } catch (error) { toast.error('Failed'); }
-                          }
-                        }}>Mark Distributed</Button>
-                        <Button size="sm" variant="ghost" className="text-red-600" onClick={async () => {
-                          if (window.confirm(`Stop aid schedule for ${schedule.member_name}?`)) {
-                            try {
-                              await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
-                              toast.success('Schedule stopped');
-                              loadReminders();
-                            } catch (error) { toast.error('Failed'); }
-                          }
-                        }}>Stop</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         <TabsContent value="upcoming" className="space-y-4">
           <Card className="card-border-left-purple">
             <CardHeader>
