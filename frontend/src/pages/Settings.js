@@ -12,6 +12,7 @@ export const Settings = () => {
   const { user } = useAuth();
   const [atRiskDays, setAtRiskDays] = useState(60);
   const [inactiveDays, setInactiveDays] = useState(90);
+  const [campusCount, setCampusCount] = useState(0);
   const [griefStages, setGriefStages] = useState([
     { stage: '1_week', days: 7, name: '1 Week After' },
     { stage: '2_weeks', days: 14, name: '2 Weeks After' },
@@ -25,6 +26,19 @@ export const Settings = () => {
     { stage: 'second_followup', days: 7, name: 'Second Follow-up' },
     { stage: 'final_followup', days: 14, name: 'Final Follow-up' },
   ]);
+  
+  useEffect(() => {
+    loadCampusCount();
+  }, []);
+  
+  const loadCampusCount = async () => {
+    try {
+      const response = await axios.get(`${API}/campuses`);
+      setCampusCount(response.data.length);
+    } catch (error) {
+      console.error('Error loading campus count');
+    }
+  };
   
   const saveEngagementSettings = () => {
     // Would save to backend/database in production
