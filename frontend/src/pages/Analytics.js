@@ -176,7 +176,6 @@ export const Analytics = () => {
       });
       
       setGriefData(griefRes.data);
-      setTrendsData(trendsRes.data || {});
       
     } catch (error) {
       console.error('Error loading analytics:', error);
