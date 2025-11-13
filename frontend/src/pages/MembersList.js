@@ -227,6 +227,53 @@ export const MembersList = () => {
             </form>
           </DialogContent>
         </Dialog>
+        
+        {/* Edit Member Modal */}
+        <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+          <DialogContent data-testid="edit-member-modal">
+            <DialogHeader>
+              <DialogTitle>{t('edit_member')}</DialogTitle>
+            </DialogHeader>
+            {editingMember && (
+              <form onSubmit={handleEditMember} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit_name">{t('member_name')} *</Label>
+                  <Input
+                    id="edit_name"
+                    value={editingMember.name}
+                    onChange={(e) => setEditingMember({...editingMember, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_phone">{t('phone_number')} *</Label>
+                  <Input
+                    id="edit_phone"
+                    value={editingMember.phone}
+                    onChange={(e) => setEditingMember({...editingMember, phone: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_notes">{t('notes')}</Label>
+                  <Input
+                    id="edit_notes"
+                    value={editingMember.notes || ''}
+                    onChange={(e) => setEditingMember({...editingMember, notes: e.target.value})}
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)}>
+                    {t('cancel')}
+                  </Button>
+                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600">
+                    {t('save')}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
       
       {/* Filters */}
