@@ -576,4 +576,332 @@ async def get_family_group(group_id: str):
         logger.error(f"Error getting family group: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Continued in next message due to length...
+# ==================== CARE EVENT ENDPOINTS ====================
+
+@api_router.post("/care-events", response_model=CareEvent)
+async def create_care_event(event: CareEventCreate):
+    """Create a new care event"""
+    try:
+        care_event = CareEvent(
+            member_id=event.member_id,
+            event_type=event.event_type,
+            event_date=event.event_date,
+            title=event.title,
+            description=event.description,
+            grief_relationship=event.grief_relationship,
+            mourning_service_date=event.mourning_service_date,
+            hospital_name=event.hospital_name,
+            admission_date=event.admission_date,
+            discharge_date=event.discharge_date,
+            aid_type=event.aid_type,
+            aid_amount=event.aid_amount,
+            aid_notes=event.aid_notes
+        )
+        
+        # Add initial visitation log if hospital visit
+        if event.initial_visitation:
+            care_event.visitation_log = [event.initial_visitation.model_dump()]
+        
+        await db.care_events.insert_one(care_event.model_dump())
+        
+        # Update member's last contact date
+        await db.members.update_one(
+            {"id": event.member_id},
+            {"$set": {
+                "last_contact_date": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Auto-generate grief support timeline if grief/loss event
+        if event.event_type == EventType.GRIEF_LOSS and event.mourning_service_date:
+            timeline = generate_grief_timeline(
+                event.mourning_service_date,
+                care_event.id,
+                event.member_id
+            )
+            if timeline:
+                await db.grief_support.insert_many(timeline)
+        
+        return care_event
+    except Exception as e:
+        logger.error(f"Error creating care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/care-events", response_model=List[CareEvent])
+async def list_care_events(
+    event_type: Optional[EventType] = None,
+    member_id: Optional[str] = None,
+    completed: Optional[bool] = None
+):
+    """List care events with optional filters"""
+    try:
+        query = {}
+        
+        if event_type:
+            query["event_type"] = event_type
+        
+        if member_id:
+            query["member_id"] = member_id
+        
+        if completed is not None:
+            query["completed"] = completed
+        
+        events = await db.care_events.find(query, {"_id": 0}).sort("event_date", -1).to_list(1000)
+        return events
+    except Exception as e:
+        logger.error(f"Error listing care events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/care-events/{event_id}", response_model=CareEvent)
+async def get_care_event(event_id: str):
+    """Get care event by ID"""
+    try:
+        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        if not event:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        return event
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/care-events/{event_id}", response_model=CareEvent)
+async def update_care_event(event_id: str, update: CareEventUpdate):
+    """Update care event"""
+    try:
+        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        result = await db.care_events.update_one(
+            {"id": event_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        return await get_care_event(event_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/care-events/{event_id}")
+async def delete_care_event(event_id: str):
+    """Delete care event"""
+    try:
+        result = await db.care_events.delete_one({"id": event_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        # Also delete related grief support stages
+        await db.grief_support.delete_many({"care_event_id": event_id})
+        
+        return {"success": True, "message": "Care event deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/care-events/{event_id}/complete")
+async def complete_care_event(event_id: str):
+    """Mark care event as completed"""
+    try:
+        result = await db.care_events.update_one(
+            {"id": event_id},
+            {"$set": {
+                "completed": True,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        return {"success": True, "message": "Care event marked as completed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error completing care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/care-events/{event_id}/send-reminder")
+async def send_care_event_reminder(event_id: str):
+    """Send WhatsApp reminder for care event"""
+    try:
+        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        if not event:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
+        if not member:
+            raise HTTPException(status_code=404, detail="Member not found")
+        
+        church_name = os.environ.get('CHURCH_NAME', 'Church')
+        message = f"Reminder from {church_name}: {event['title']} for {member['name']} on {event['event_date']}"
+        if event.get('description'):
+            message += f". {event['description']}"
+        
+        result = await send_whatsapp_message(
+            member['phone'],
+            message,
+            care_event_id=event_id,
+            member_id=event['member_id']
+        )
+        
+        if result['success']:
+            await db.care_events.update_one(
+                {"id": event_id},
+                {"$set": {
+                    "reminder_sent": True,
+                    "reminder_sent_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending reminder: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/care-events/{event_id}/visitation-log")
+async def add_visitation_log(event_id: str, entry: VisitationLogEntry):
+    """Add visitation log entry to hospital visit"""
+    try:
+        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        if not event:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        log_entry = entry.model_dump()
+        log_entry['visit_date'] = log_entry['visit_date'].isoformat() if isinstance(log_entry['visit_date'], date) else log_entry['visit_date']
+        
+        await db.care_events.update_one(
+            {"id": event_id},
+            {
+                "$push": {"visitation_log": log_entry},
+                "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+            }
+        )
+        
+        return {"success": True, "message": "Visitation log added"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding visitation log: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/care-events/hospital/due-followup")
+async def get_hospital_followup_due():
+    """Get hospital events needing follow-up"""
+    try:
+        # Find hospital visits with discharge date but no completion
+        events = await db.care_events.find({
+            "event_type": EventType.HOSPITAL_VISIT,
+            "discharge_date": {"$ne": None},
+            "completed": False
+        }, {"_id": 0}).to_list(100)
+        
+        followup_due = []
+        today = date.today()
+        
+        for event in events:
+            discharge = event.get('discharge_date')
+            if isinstance(discharge, str):
+                discharge = date.fromisoformat(discharge)
+            
+            days_since_discharge = (today - discharge).days
+            
+            # Check if follow-up is due (3 days, 1 week, 2 weeks)
+            if days_since_discharge in [3, 7, 14]:
+                followup_due.append({
+                    **event,
+                    "days_since_discharge": days_since_discharge,
+                    "followup_reason": f"{days_since_discharge} days post-discharge"
+                })
+        
+        return followup_due
+    except Exception as e:
+        logger.error(f"Error getting hospital followup: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== GRIEF SUPPORT ENDPOINTS ====================
+
+@api_router.get("/grief-support", response_model=List[GriefSupport])
+async def list_grief_support(completed: Optional[bool] = None):
+    \"\"\"List all grief support stages\"\"\"
+    try:
+        query = {}
+        if completed is not None:
+            query[\"completed\"] = completed
+        
+        stages = await db.grief_support.find(query, {\"_id\": 0}).sort(\"scheduled_date\", 1).to_list(1000)
+        return stages
+    except Exception as e:
+        logger.error(f\"Error listing grief support: {str(e)}\")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/grief-support/member/{member_id}\", response_model=List[GriefSupport])
+async def get_member_grief_timeline(member_id: str):
+    \"\"\"Get grief timeline for specific member\"\"\"
+    try:
+        timeline = await db.grief_support.find(\n            {\"member_id\": member_id},\n            {\"_id\": 0}\n        ).sort(\"scheduled_date\", 1).to_list(100)\n        \n        return timeline\n    except Exception as e:\n        logger.error(f\"Error getting member grief timeline: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post(\"/grief-support/{stage_id}/complete\")\nasync def complete_grief_stage(stage_id: str, notes: Optional[str] = None):\n    \"\"\"Mark grief stage as completed with notes\"\"\"\n    try:\n        update_data = {\n            \"completed\": True,\n            \"completed_at\": datetime.now(timezone.utc).isoformat(),\n            \"updated_at\": datetime.now(timezone.utc).isoformat()\n        }\n        \n        if notes:\n            update_data[\"notes\"] = notes\n        \n        result = await db.grief_support.update_one(\n            {\"id\": stage_id},\n            {\"$set\": update_data}\n        )\n        \n        if result.matched_count == 0:\n            raise HTTPException(status_code=404, detail=\"Grief stage not found\")\n        \n        # Update member's last contact date\n        stage = await db.grief_support.find_one({\"id\": stage_id}, {\"_id\": 0})\n        if stage:\n            await db.members.update_one(\n                {\"id\": stage[\"member_id\"]},\n                {\"$set\": {\"last_contact_date\": datetime.now(timezone.utc).isoformat()}}\n            )\n        \n        return {\"success\": True, \"message\": \"Grief stage marked as completed\"}\n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Error completing grief stage: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post(\"/grief-support/{stage_id}/send-reminder\")\nasync def send_grief_reminder(stage_id: str):\n    \"\"\"Send WhatsApp reminder for grief stage\"\"\"\n    try:\n        stage = await db.grief_support.find_one({\"id\": stage_id}, {\"_id\": 0})\n        if not stage:\n            raise HTTPException(status_code=404, detail=\"Grief stage not found\")\n        \n        member = await db.members.find_one({\"id\": stage[\"member_id\"]}, {\"_id\": 0})\n        if not member:\n            raise HTTPException(status_code=404, detail=\"Member not found\")\n        \n        church_name = os.environ.get('CHURCH_NAME', 'Church')\n        stage_names = {\n            \"1_week\": \"1 week\",\n            \"2_weeks\": \"2 weeks\",\n            \"1_month\": \"1 month\",\n            \"3_months\": \"3 months\",\n            \"6_months\": \"6 months\",\n            \"1_year\": \"1 year\"\n        }\n        stage_name = stage_names.get(stage[\"stage\"], stage[\"stage\"])\n        \n        message = f\"{church_name} - Grief Support Check-in: It has been {stage_name} since your loss. We are thinking of you and praying for you. Please reach out if you need support.\"\n        \n        result = await send_whatsapp_message(\n            member['phone'],\n            message,\n            grief_support_id=stage_id,\n            member_id=stage['member_id']\n        )\n        \n        if result['success']:\n            await db.grief_support.update_one(\n                {\"id\": stage_id},\n                {\"$set\": {\"reminder_sent\": True, \"updated_at\": datetime.now(timezone.utc).isoformat()}}\n            )\n        \n        return result\n    except HTTPException:\n        raise\n    except Exception as e:\n        logger.error(f\"Error sending grief reminder: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== FINANCIAL AID ENDPOINTS ====================
+
+@api_router.get(\"/financial-aid/summary\")\nasync def get_financial_aid_summary(\n    start_date: Optional[str] = None,\n    end_date: Optional[str] = None\n):\n    \"\"\"Get financial aid summary by type and date range\"\"\"\n    try:\n        query = {\"event_type\": EventType.FINANCIAL_AID}\n        \n        if start_date:\n            query[\"event_date\"] = {\"$gte\": start_date}\n        if end_date:\n            if \"event_date\" in query:\n                query[\"event_date\"][\"$lte\"] = end_date\n            else:\n                query[\"event_date\"] = {\"$lte\": end_date}\n        \n        events = await db.care_events.find(query, {\"_id\": 0}).to_list(1000)\n        \n        # Calculate totals by type\n        totals_by_type = {}\n        total_amount = 0\n        \n        for event in events:\n            aid_type = event.get('aid_type', 'other')\n            amount = event.get('aid_amount', 0) or 0\n            \n            if aid_type not in totals_by_type:\n                totals_by_type[aid_type] = {\"count\": 0, \"total_amount\": 0}\n            \n            totals_by_type[aid_type][\"count\"] += 1\n            totals_by_type[aid_type][\"total_amount\"] += amount\n            total_amount += amount\n        \n        return {\n            \"total_amount\": total_amount,\n            \"total_count\": len(events),\n            \"by_type\": totals_by_type\n        }\n    except Exception as e:\n        logger.error(f\"Error getting financial aid summary: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/financial-aid/member/{member_id}\")\nasync def get_member_financial_aid(member_id: str):\n    \"\"\"Get all financial aid given to a member\"\"\"\n    try:\n        aid_events = await db.care_events.find({\n            \"member_id\": member_id,\n            \"event_type\": EventType.FINANCIAL_AID\n        }, {\"_id\": 0}).sort(\"event_date\", -1).to_list(100)\n        \n        total_amount = sum(event.get('aid_amount', 0) or 0 for event in aid_events)\n        \n        return {\n            \"member_id\": member_id,\n            \"total_amount\": total_amount,\n            \"aid_count\": len(aid_events),\n            \"aid_history\": aid_events\n        }\n    except Exception as e:\n        logger.error(f\"Error getting member financial aid: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== DASHBOARD ENDPOINTS ====================
+
+@api_router.get(\"/dashboard/stats\")\nasync def get_dashboard_stats():\n    \"\"\"Get overall dashboard statistics\"\"\"\n    try:\n        total_members = await db.members.count_documents({})\n        \n        # Active grief support count\n        active_grief = await db.grief_support.count_documents({\"completed\": False})\n        \n        # At-risk members\n        members = await db.members.find({}, {\"_id\": 0, \"last_contact_date\": 1}).to_list(1000)\n        at_risk_count = 0\n        for member in members:\n            last_contact = member.get('last_contact_date')\n            if last_contact and isinstance(last_contact, str):\n                last_contact = datetime.fromisoformat(last_contact)\n            status, _ = calculate_engagement_status(last_contact)\n            if status in [EngagementStatus.AT_RISK, EngagementStatus.INACTIVE]:\n                at_risk_count += 1\n        \n        # This month's financial aid\n        today = date.today()\n        month_start = today.replace(day=1).isoformat()\n        month_aid = await db.care_events.find({\n            \"event_type\": EventType.FINANCIAL_AID,\n            \"event_date\": {\"$gte\": month_start}\n        }, {\"_id\": 0, \"aid_amount\": 1}).to_list(1000)\n        \n        total_aid = sum(event.get('aid_amount', 0) or 0 for event in month_aid)\n        \n        return {\n            \"total_members\": total_members,\n            \"active_grief_support\": active_grief,\n            \"members_at_risk\": at_risk_count,\n            \"month_financial_aid\": total_aid\n        }\n    except Exception as e:\n        logger.error(f\"Error getting dashboard stats: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/dashboard/upcoming\")\nasync def get_upcoming_events(days: int = 7):\n    \"\"\"Get upcoming events for next N days\"\"\"\n    try:\n        today = date.today()\n        future_date = today + timedelta(days=days)\n        \n        events = await db.care_events.find({\n            \"event_date\": {\n                \"$gte\": today.isoformat(),\n                \"$lte\": future_date.isoformat()\n            },\n            \"completed\": False\n        }, {\"_id\": 0}).sort(\"event_date\", 1).to_list(100)\n        \n        # Get member info for each event\n        for event in events:\n            member = await db.members.find_one({\"id\": event[\"member_id\"]}, {\"_id\": 0, \"name\": 1, \"phone\": 1})\n            if member:\n                event[\"member_name\"] = member[\"name\"]\n        \n        return events\n    except Exception as e:\n        logger.error(f\"Error getting upcoming events: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/dashboard/grief-active\")\nasync def get_active_grief_support():\n    \"\"\"Get members currently in grief support timeline\"\"\"\n    try:\n        # Get all incomplete grief stages\n        stages = await db.grief_support.find(\n            {\"completed\": False},\n            {\"_id\": 0}\n        ).sort(\"scheduled_date\", 1).to_list(100)\n        \n        # Group by member\n        member_grief = {}\n        for stage in stages:\n            member_id = stage[\"member_id\"]\n            if member_id not in member_grief:\n                member = await db.members.find_one({\"id\": member_id}, {\"_id\": 0, \"name\": 1, \"phone\": 1})\n                member_grief[member_id] = {\n                    \"member_id\": member_id,\n                    \"member_name\": member[\"name\"] if member else \"Unknown\",\n                    \"stages\": []\n                }\n            \n            member_grief[member_id][\"stages\"].append(stage)\n        \n        return list(member_grief.values())\n    except Exception as e:\n        logger.error(f\"Error getting active grief support: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/dashboard/recent-activity\")\nasync def get_recent_activity(limit: int = 20):\n    \"\"\"Get recent care events\"\"\"\n    try:\n        events = await db.care_events.find(\n            {},\n            {\"_id\": 0}\n        ).sort(\"created_at\", -1).limit(limit).to_list(limit)\n        \n        # Add member names\n        for event in events:\n            member = await db.members.find_one({\"id\": event[\"member_id\"]}, {\"_id\": 0, \"name\": 1})\n            if member:\n                event[\"member_name\"] = member[\"name\"]\n        \n        return events\n    except Exception as e:\n        logger.error(f\"Error getting recent activity: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== ANALYTICS ENDPOINTS ====================
+
+@api_router.get(\"/analytics/engagement-trends\")\nasync def get_engagement_trends(days: int = 30):\n    \"\"\"Get engagement trends over time\"\"\"\n    try:\n        start_date = date.today() - timedelta(days=days)\n        \n        events = await db.care_events.find({\n            \"event_date\": {\"$gte\": start_date.isoformat()}\n        }, {\"_id\": 0, \"event_date\": 1}).to_list(1000)\n        \n        # Count by date\n        date_counts = {}\n        for event in events:\n            event_date = event.get('event_date')\n            if isinstance(event_date, str):\n                event_date = event_date[:10]  # Get just the date part\n            date_counts[event_date] = date_counts.get(event_date, 0) + 1\n        \n        # Format for chart\n        trends = [{\"date\": d, \"count\": c} for d, c in sorted(date_counts.items())]\n        \n        return trends\n    except Exception as e:\n        logger.error(f\"Error getting engagement trends: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/analytics/care-events-by-type\")\nasync def get_care_events_by_type():\n    \"\"\"Get distribution of care events by type\"\"\"\n    try:\n        events = await db.care_events.find({}, {\"_id\": 0, \"event_type\": 1}).to_list(10000)\n        \n        type_counts = {}\n        for event in events:\n            event_type = event.get('event_type')\n            type_counts[event_type] = type_counts.get(event_type, 0) + 1\n        \n        return [{\"type\": t, \"count\": c} for t, c in type_counts.items()]\n    except Exception as e:\n        logger.error(f\"Error getting events by type: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/analytics/grief-completion-rate\")\nasync def get_grief_completion_rate():\n    \"\"\"Get grief support completion rate\"\"\"\n    try:\n        total_stages = await db.grief_support.count_documents({})\n        completed_stages = await db.grief_support.count_documents({\"completed\": True})\n        \n        completion_rate = (completed_stages / total_stages * 100) if total_stages > 0 else 0\n        \n        return {\n            \"total_stages\": total_stages,\n            \"completed_stages\": completed_stages,\n            \"pending_stages\": total_stages - completed_stages,\n            \"completion_rate\": round(completion_rate, 2)\n        }\n    except Exception as e:\n        logger.error(f\"Error getting grief completion rate: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== IMPORT/EXPORT ENDPOINTS ====================
+
+@api_router.post(\"/import/members/csv\")\nasync def import_members_csv(file: UploadFile = File(...)):\n    \"\"\"Import members from CSV file\"\"\"\n    try:\n        contents = await file.read()\n        decoded = contents.decode('utf-8')\n        reader = csv.DictReader(io.StringIO(decoded))\n        \n        imported_count = 0\n        errors = []\n        \n        for row in reader:\n            try:\n                # Create member from CSV row\n                member = Member(\n                    name=row.get('name', ''),\n                    phone=row.get('phone', ''),\n                    external_member_id=row.get('external_member_id'),\n                    notes=row.get('notes')\n                )\n                \n                await db.members.insert_one(member.model_dump())\n                imported_count += 1\n            except Exception as e:\n                errors.append(f\"Row error: {str(e)}\")\n        \n        return {\n            \"success\": True,\n            \"imported_count\": imported_count,\n            \"errors\": errors\n        }\n    except Exception as e:\n        logger.error(f\"Error importing CSV: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post(\"/import/members/json\")\nasync def import_members_json(members: List[Dict[str, Any]]):\n    \"\"\"Import members from JSON array\"\"\"\n    try:\n        imported_count = 0\n        errors = []\n        \n        for member_data in members:\n            try:\n                member = Member(\n                    name=member_data.get('name', ''),\n                    phone=member_data.get('phone', ''),\n                    external_member_id=member_data.get('external_member_id'),\n                    notes=member_data.get('notes')\n                )\n                \n                await db.members.insert_one(member.model_dump())\n                imported_count += 1\n            except Exception as e:\n                errors.append(f\"Member error: {str(e)}\")\n        \n        return {\n            \"success\": True,\n            \"imported_count\": imported_count,\n            \"errors\": errors\n        }\n    except Exception as e:\n        logger.error(f\"Error importing JSON: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/export/members/csv\")\nasync def export_members_csv():\n    \"\"\"Export members to CSV file\"\"\"\n    try:\n        members = await db.members.find({}, {\"_id\": 0}).to_list(10000)\n        \n        output = io.StringIO()\n        if members:\n            fieldnames = ['id', 'name', 'phone', 'family_group_id', 'external_member_id', \n                         'last_contact_date', 'engagement_status', 'days_since_last_contact', 'notes']\n            writer = csv.DictWriter(output, fieldnames=fieldnames)\n            writer.writeheader()\n            \n            for member in members:\n                # Update engagement status\n                if member.get('last_contact_date'):\n                    if isinstance(member['last_contact_date'], str):\n                        member['last_contact_date'] = datetime.fromisoformat(member['last_contact_date'])\n                \n                status, days = calculate_engagement_status(member.get('last_contact_date'))\n                member['engagement_status'] = status\n                member['days_since_last_contact'] = days\n                \n                # Convert dates to strings\n                if member.get('last_contact_date'):\n                    member['last_contact_date'] = member['last_contact_date'].isoformat()\n                \n                writer.writerow({k: member.get(k, '') for k in fieldnames})\n        \n        output.seek(0)\n        return StreamingResponse(\n            iter([output.getvalue()]),\n            media_type=\"text/csv\",\n            headers={\"Content-Disposition\": \"attachment; filename=members.csv\"}\n        )\n    except Exception as e:\n        logger.error(f\"Error exporting members CSV: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get(\"/export/care-events/csv\")\nasync def export_care_events_csv():\n    \"\"\"Export care events to CSV file\"\"\"\n    try:\n        events = await db.care_events.find({}, {\"_id\": 0}).to_list(10000)\n        \n        output = io.StringIO()\n        if events:\n            fieldnames = ['id', 'member_id', 'event_type', 'event_date', 'title', 'description', \n                         'completed', 'aid_type', 'aid_amount', 'hospital_name']\n            writer = csv.DictWriter(output, fieldnames=fieldnames)\n            writer.writeheader()\n            \n            for event in events:\n                # Convert dates\n                if event.get('event_date'):\n                    event['event_date'] = str(event['event_date'])\n                \n                writer.writerow({k: event.get(k, '') for k in fieldnames})\n        \n        output.seek(0)\n        return StreamingResponse(\n            iter([output.getvalue()]),\n            media_type=\"text/csv\",\n            headers={\"Content-Disposition\": \"attachment; filename=care_events.csv\"}\n        )\n    except Exception as e:\n        logger.error(f\"Error exporting care events CSV: {str(e)}\")\n        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== INTEGRATION TEST ENDPOINTS ====================
+
+class WhatsAppTestRequest(BaseModel):
+    phone: str
+    message: str
+
+class WhatsAppTestResponse(BaseModel):
+    success: bool
+    message: str
+    details: Optional[dict] = None
+
+@api_router.post(\"/integrations/ping/whatsapp\", response_model=WhatsAppTestResponse)
+async def test_whatsapp_integration(request: WhatsAppTestRequest):
+    \"\"\"Test WhatsApp gateway integration by sending a test message\"\"\"
+    try:\n        result = await send_whatsapp_message(request.phone, request.message)\n        \n        if result['success']:\n            return WhatsAppTestResponse(\n                success=True,\n                message=f\"✅ WhatsApp message sent successfully to {request.phone}!\",\n                details=result\n            )\n        else:\n            return WhatsAppTestResponse(\n                success=False,\n                message=f\"❌ Failed to send WhatsApp message: {result.get('error', 'Unknown error')}\",\n                details=result\n            )\n    except Exception as e:\n        logger.error(f\"WhatsApp integration error: {str(e)}\")\n        return WhatsAppTestResponse(\n            success=False,\n            message=f\"❌ Error: {str(e)}\",\n            details={\"error\": str(e)}\n        )\n\n@api_router.get(\"/integrations/ping/email\")\nasync def test_email_integration():\n    \"\"\"Email integration test - currently pending provider configuration\"\"\"\n    return {\n        \"success\": False,\n        \"message\": \"📧 Email integration pending provider configuration. Currently WhatsApp-only mode.\",\n        \"pending_provider\": True\n    }\n\n# ==================== STATIC FILES ====================\n\n@api_router.get(\"/uploads/{filename}\")\nasync def get_uploaded_file(filename: str):\n    \"\"\"Serve uploaded files\"\"\"\n    filepath = Path(ROOT_DIR) / \"uploads\" / filename\n    if not filepath.exists():\n        raise HTTPException(status_code=404, detail=\"File not found\")\n    return FileResponse(filepath)\n\n# Include the router in the main app\napp.include_router(api_router)\n\napp.add_middleware(\n    CORSMiddleware,\n    allow_credentials=True,\n    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\n\n@app.on_event(\"shutdown\")\nasync def shutdown_db_client():\n    client.close()"
