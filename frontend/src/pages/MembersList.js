@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
+import { FixedSizeList as List } from 'react-window';
 import axios from 'axios';
 import { format } from 'date-fns';
 
