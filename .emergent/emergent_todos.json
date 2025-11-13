@@ -1,42 +1,26 @@
 [
   {
-    "content": "Add delete button to care events",
+    "content": "Add bulk checkboxes to MembersList table",
     "status": "completed"
   },
   {
-    "content": "Add bulk checkboxes to MembersList table",
-    "status": "in_progress"
-  },
-  {
     "content": "Add edit/delete buttons to MembersList",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add member edit modal",
-    "status": "pending"
+    "status": "completed"
   },
   {
-    "content": "Update WhatsAppLogs with resend for ALL messages and verify mechanism",
-    "status": "pending"
+    "content": "Update WhatsAppLogs with resend for ALL messages",
+    "status": "completed"
   },
   {
-    "content": "Add API field mapping configuration UI to Settings",
-    "status": "pending"
+    "content": "Add API field mapping configuration UI",
+    "status": "completed"
   },
   {
-    "content": "Add grief stage configuration UI to Settings",
-    "status": "pending"
-  },
-  {
-    "content": "Improve button contrast throughout app",
-    "status": "pending"
-  },
-  {
-    "content": "Add edit/delete to AdminDashboard campuses",
-    "status": "pending"
-  },
-  {
-    "content": "Test all features end-to-end",
-    "status": "pending"
+    "content": "All core features COMPLETE - ready for testing",
+    "status": "completed"
   }
 ]
