@@ -25,6 +25,8 @@ export const Layout = ({ children }) => {
     navigation.splice(5, 0, { name: 'Admin', href: '/admin', icon: Shield });
   }
   
+  const isActive = (href) => location.pathname === href || (href === '/dashboard' && location.pathname === '/');
+  
   return (
     <div className="min-h-screen">
       {/* Top Navigation Bar */}
