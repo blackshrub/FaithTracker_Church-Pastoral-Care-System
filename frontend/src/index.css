@@ -98,6 +98,40 @@
   }
 }
 
+/* Force better contrast for dialogs and modals */
+[role="dialog"],
+[data-radix-dialog-content] {
+  @apply bg-card text-card-foreground;
+}
+
+/* Improve form label visibility */
+label {
+  @apply text-foreground font-medium;
+}
+
+/* Improve input visibility and contrast */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+input[type="number"],
+textarea,
+select {
+  @apply bg-card text-foreground border-border;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="tel"]::placeholder,
+textarea::placeholder {
+  @apply text-muted-foreground opacity-60;
+}
+
+/* Ensure dialog overlay has proper backdrop */
+[data-radix-dialog-overlay] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
 .font-manrope {
   font-family: 'Manrope', sans-serif;
 }
