@@ -77,7 +77,6 @@ export const MembersList = () => {
     } finally {
       setLoading(false);
     }
-  };
       setMembers(response.data);
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
