@@ -220,7 +220,7 @@ export const MembersList = () => {
                 <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)}>
                   {t('cancel')}
                 </Button>
-                <Button type="submit" className="bg-primary-500 hover:bg-primary-600" data-testid="save-member-button">
+                <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white" data-testid="save-member-button">
                   {t('save')}
                 </Button>
               </div>
