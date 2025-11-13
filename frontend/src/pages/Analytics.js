@@ -26,6 +26,7 @@ export const Analytics = () => {
   const [financialData, setFinancialData] = useState({});
   const [engagementData, setEngagementData] = useState({});
   const [griefData, setGriefData] = useState({});
+  const [trendsData, setTrendsData] = useState({});
   const [timeRange, setTimeRange] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
