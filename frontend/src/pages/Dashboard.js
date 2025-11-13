@@ -802,26 +802,28 @@ export const Dashboard = () => {
       </div>
       
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="today">
-            <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefToday.length})
-          </TabsTrigger>
-          <TabsTrigger value="followup">
-            <Hospital className="w-4 h-4 mr-2" />Follow-up ({hospitalFollowUp.length + griefDue.length})
-          </TabsTrigger>
-          <TabsTrigger value="financial">
-            <DollarSign className="w-4 h-4 mr-2" />Financial Aid ({financialAidDue.length})
-          </TabsTrigger>
-          <TabsTrigger value="disconnected">
-            <Users className="w-4 h-4 mr-2" />Disconnected ({disconnectedMembers.length})
-          </TabsTrigger>
-          <TabsTrigger value="at-risk">
-            <AlertTriangle className="w-4 h-4 mr-2" />At Risk ({atRiskMembers.length})
-          </TabsTrigger>
-          <TabsTrigger value="upcoming">
-            <Heart className="w-4 h-4 mr-2" />Upcoming ({upcomingBirthdays.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex w-max min-w-full">
+            <TabsTrigger value="today" className="whitespace-nowrap">
+              <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefToday.length})
+            </TabsTrigger>
+            <TabsTrigger value="followup" className="whitespace-nowrap">
+              <Hospital className="w-4 h-4 mr-2" />Follow-up ({hospitalFollowUp.length + griefDue.length})
+            </TabsTrigger>
+            <TabsTrigger value="financial" className="whitespace-nowrap">
+              <DollarSign className="w-4 h-4 mr-2" />Aid ({financialAidDue.length})
+            </TabsTrigger>
+            <TabsTrigger value="disconnected" className="whitespace-nowrap">
+              <Users className="w-4 h-4 mr-2" />Disconnected ({disconnectedMembers.length})
+            </TabsTrigger>
+            <TabsTrigger value="at-risk" className="whitespace-nowrap">
+              <AlertTriangle className="w-4 h-4 mr-2" />At Risk ({atRiskMembers.length})
+            </TabsTrigger>
+            <TabsTrigger value="upcoming" className="whitespace-nowrap">
+              <Heart className="w-4 h-4 mr-2" />Upcoming ({upcomingBirthdays.length})
+            </TabsTrigger>
+          </TabsList>
+        </div>
         
         <TabsContent value="today" className="space-y-4">
           {birthdaysToday.length === 0 && griefToday.length === 0 ? (
