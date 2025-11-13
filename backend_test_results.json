@@ -1,0 +1,198 @@
+{
+  "timestamp": "2025-11-13T05:16:17.413745",
+  "total_tests": 27,
+  "passed": 27,
+  "failed": 0,
+  "success_rate": "100.0%",
+  "results": [
+    {
+      "test": "Create Member",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "List Members",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Get Member b84c953d-d603-4d85-bf96-ebac43548ea8",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Update Member b84c953d-d603-4d85-bf96-ebac43548ea8",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Get At-Risk Members",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Create Family Group",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "List Family Groups",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Get Family Group 8695db5b-d0ef-41bc-8d75-ecd112c39fac",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Create Regular Care Event",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Create Grief Event (Auto-generate Timeline)",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Create Hospital Visit Event",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Create Financial Aid Event",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "List Care Events",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Get Care Event 8fc28731-84bd-4ce1-836a-f8d5f7c0d409",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Complete Care Event 8fc28731-84bd-4ce1-836a-f8d5f7c0d409",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "List Grief Support Stages",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Get Member Grief Timeline b84c953d-d603-4d85-bf96-ebac43548ea8",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Complete Grief Stage c35d9b36-4a76-48a2-ace8-ada001a0f49a",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Dashboard Stats",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Dashboard Upcoming Events",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Dashboard Active Grief Support",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Dashboard Recent Activity",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Financial Aid Summary",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Get Member Financial Aid b84c953d-d603-4d85-bf96-ebac43548ea8",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Analytics: Care Events by Type",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "Analytics: Grief Completion Rate",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    },
+    {
+      "test": "WhatsApp Integration Test",
+      "passed": true,
+      "status_code": 200,
+      "error": null,
+      "details": null
+    }
+  ]
+}
