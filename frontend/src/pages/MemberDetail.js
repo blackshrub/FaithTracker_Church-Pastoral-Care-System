@@ -527,25 +527,20 @@ export const MemberDetail = () => {
           </Card>
         </TabsContent>
         
-        {/* Hospital Tab */}
-        <TabsContent value="hospital">
+        {/* Accident/Illness Tab */}
+        <TabsContent value="accident">
           <Card>
             <CardContent className="p-6">
-              {careEvents.filter(e => e.event_type === 'hospital_visit').length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No hospital visits recorded.</p>
+              {careEvents.filter(e => e.event_type === 'accident_illness').length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
               ) : (
-                careEvents.filter(e => e.event_type === 'hospital_visit').map(event => (
+                careEvents.filter(e => e.event_type === 'accident_illness').map(event => (
                   <div key={event.id} className="space-y-4 mb-6">
                     <div>
-                      <h4 className="font-semibold">{event.hospital_name}</h4>
+                      <h4 className="font-semibold">{event.hospital_name || 'Medical Event'}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Admitted: {event.admission_date && formatDate(event.admission_date, 'dd MMM yyyy')}
+                        Date: {formatDate(event.event_date, 'dd MMM yyyy')}
                       </p>
-                      {event.discharge_date && (
-                        <p className="text-sm text-muted-foreground">
-                          Discharged: {formatDate(event.discharge_date, 'dd MMM yyyy')}
-                        </p>
-                      )}
                     </div>
                     {event.visitation_log && event.visitation_log.length > 0 && (
                       <div className="space-y-2">
