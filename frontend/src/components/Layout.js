@@ -41,7 +41,7 @@ export const Layout = ({ children }) => {
             
             {/* Navigation Links */}
             <nav className="hidden md:flex items-center gap-1">
-              {navigation.map((item) => {
+              {mainNavigation.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link key={item.name} to={item.href}>
@@ -61,16 +61,44 @@ export const Layout = ({ children }) => {
               })}
             </nav>
             
-            {/* Right Side */}
+            {/* Right Side with Dropdown Menu */}
             <div className="flex items-center gap-3">
-              <div className="text-right hidden md:block">
-                <p className="text-sm font-semibold">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">Staff</p>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <div className="text-left hidden md:block">
+                      <p className="text-sm font-semibold">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">{user?.role === 'full_admin' ? 'Full Admin' : user?.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {user?.role === 'full_admin' && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={() => navigate('/import-export')}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import/Export
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Cog className="w-4 h-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => { logout(); navigate('/login'); }} className="text-red-600">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <LanguageToggle />
-              <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/login'); }}>
-                <LogOut className="w-4 h-4" />
-              </Button>
             </div>
           </div>
         </div>
