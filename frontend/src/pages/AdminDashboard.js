@@ -24,6 +24,297 @@ export const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  const [campusModalOpen, setCampusModalOpen] = useState(false);
+  const [newCampus, setNewCampus] = useState({ campus_name: '', location: '' });
+  
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: '',
+    password: '',
+    name: '',
+    phone: '',
+    role: 'pastor',
+    campus_id: ''
+  });
+  
+  useEffect(() => {
+    if (user?.role === 'full_admin') {
+      loadData();
+    }
+  }, [user]);
+  
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [campusesRes, usersRes] = await Promise.all([
+        axios.get(`${API}/campuses`),
+        axios.get(`${API}/users`)
+      ]);
+      setCampuses(campusesRes.data);
+      setUsers(usersRes.data);
+    } catch (error) {
+      toast.error('Failed to load data');
+      console.error('Error loading admin data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleAddCampus = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/campuses`, newCampus);
+      toast.success('Campus created successfully!');
+      setCampusModalOpen(false);
+      setNewCampus({ campus_name: '', location: '' });
+      loadData();
+    } catch (error) {
+      toast.error('Failed to create campus');
+    }
+  };
+  
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/auth/register`, newUser);
+      toast.success(`User ${newUser.name} created successfully!`);
+      setUserModalOpen(false);
+      setNewUser({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create user');
+    }
+  };
+  
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Delete user ${userName}?`)) return;
+    try {
+      await axios.delete(`${API}/users/${userId}`);
+      toast.success('User deleted');
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete user');
+    }
+  };
+  
+  if (user?.role !== 'full_admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+  
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-manrope font-bold">Admin Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Manage campuses, users, and system</p>
+      </div>
+      
+      <Tabs defaultValue="campuses">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="campuses">
+            <Building2 className="w-4 h-4 mr-2" />
+            Campuses ({campuses.length})
+          </TabsTrigger>
+          <TabsTrigger value="users">
+            <UsersIcon className="w-4 h-4 mr-2" />
+            Users ({users.length})
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Shield className="w-4 h-4 mr-2" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="campuses" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Campus Management</CardTitle>
+                <Dialog open={campusModalOpen} onOpenChange={setCampusModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-primary-500 hover:bg-primary-600">
+                      <Plus className="w-4 h-4 mr-2" />Add Campus
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Add New Campus</DialogTitle></DialogHeader>
+                    <form onSubmit={handleAddCampus} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Campus Name *</Label>
+                        <Input value={newCampus.campus_name} onChange={(e) => setNewCampus({...newCampus, campus_name: e.target.value})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Location</Label>
+                        <Input value={newCampus.location} onChange={(e) => setNewCampus({...newCampus, location: e.target.value})} />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="outline" onClick={() => setCampusModalOpen(false)}>Cancel</Button>
+                        <Button type="submit" className="bg-primary-500">Save</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campus Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {campuses.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.campus_name}</TableCell>
+                        <TableCell>{c.location || '-'}</TableCell>
+                        <TableCell><span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">Active</span></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>User Management</CardTitle>
+                <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-primary-500">
+                      <Plus className="w-4 h-4 mr-2" />Add User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Add Pastoral Team Member</DialogTitle></DialogHeader>
+                    <form onSubmit={handleAddUser} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Name *</Label>
+                        <Input value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email *</Label>
+                        <Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone *</Label>
+                        <Input value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} placeholder="628xxx" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Password *</Label>
+                        <Input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Role *</Label>
+                        <Select value={newUser.role} onValueChange={(v) => setNewUser({...newUser, role: v})}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="campus_admin">Campus Admin</SelectItem>
+                            <SelectItem value="pastor">Pastor</SelectItem>
+                            <SelectItem value="full_admin">Full Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {newUser.role !== 'full_admin' && (
+                        <div className="space-y-2">
+                          <Label>Campus *</Label>
+                          <Select value={newUser.campus_id} onValueChange={(v) => setNewUser({...newUser, campus_id: v})}>
+                            <SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger>
+                            <SelectContent className="max-h-[200px] overflow-y-auto">
+                              {campuses.map((c) => <SelectItem key={c.id} value={c.id}>{c.campus_name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="outline" onClick={() => setUserModalOpen(false)}>Cancel</Button>
+                        <Button type="submit" className="bg-primary-500">Create</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Campus</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.name}</TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{u.phone}</TableCell>
+                      <TableCell>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                          u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' :
+                          u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {u.role === 'full_admin' ? 'Full Admin' : u.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
+                        </span>
+                      </TableCell>
+                      <TableCell>{u.campus_name || 'All'}</TableCell>
+                      <TableCell className="text-right">
+                        {u.id !== user.id && (
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id, u.name)}>
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader><CardTitle>System Settings</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm font-medium">Daily Digest Info</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Every day at 8 AM, pastoral team receives a task list via WhatsApp including birthdays,
+                  grief support, hospital follow-ups, and at-risk members. Team then personally contacts each member.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default AdminDashboard;
+
+export const AdminDashboard = () => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const [campuses, setCampuses] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
   // Campus form
   const [campusModalOpen, setCampusModalOpen] = useState(false);
   const [newCampus, setNewCampus] = useState({ campus_name: '', location: '' });
