@@ -1,18 +1,18 @@
 [
   {
-    "content": "Update design system to teal/amber color scheme with Playfair Display",
+    "content": "Redesign Dashboard to match reference (Welcome message, colored borders, Quick Actions)",
     "status": "in_progress"
   },
   {
-    "content": "Complete edit/delete UI for Members with bulk checkboxes",
+    "content": "Redesign Layout/Navigation to horizontal top nav like reference",
     "status": "pending"
   },
   {
-    "content": "Add edit/delete for Campuses and Care Events",
+    "content": "Add edit/delete modals to MembersList with bulk checkboxes",
     "status": "pending"
   },
   {
-    "content": "Update routes for Import/Export, Settings, WhatsApp Logs pages",
+    "content": "Add edit/delete to AdminDashboard for campuses",
     "status": "pending"
   },
   {
@@ -24,7 +24,15 @@
     "status": "pending"
   },
   {
-    "content": "Test all features",
+    "content": "Update all cards to have colored left borders",
+    "status": "pending"
+  },
+  {
+    "content": "Update routes for WhatsApp Logs",
+    "status": "pending"
+  },
+  {
+    "content": "Final testing",
     "status": "pending"
   }
 ]
