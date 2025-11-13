@@ -317,7 +317,7 @@ export const ImportExport = () => {
               <CardDescription>Upload CSV file to bulk import members</CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4">
+              <div className="space-y-4">
                 <div>
                   <Label>Select CSV File</Label>
                   <Input type="file" accept=".csv" onChange={handleCsvSelect} />
