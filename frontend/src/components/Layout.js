@@ -31,7 +31,8 @@ export const Layout = ({ children }) => {
     { name: t('members'), href: '/members', icon: Users },
     { name: t('financial_aid'), href: '/financial-aid', icon: DollarSign },
     { name: t('analytics'), href: '/analytics', icon: BarChart3 },
-    { name: t('integrations'), href: '/integrations', icon: Settings },
+    { name: 'Import/Export', href: '/import-export', icon: Upload },
+    { name: 'Settings', href: '/settings', icon: Cog },
   ];
   
   // Add Admin menu for full_admin only
