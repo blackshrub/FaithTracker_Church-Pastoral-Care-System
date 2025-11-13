@@ -146,7 +146,68 @@ export const Dashboard = () => {
         </div>
       </div>
       
-      {/* Two Column Layout */}
+      {/* Two Column Layout - Priority Widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* At-Risk Members Widget */}
+        <Card className="card-border-left-amber shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-playfair flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              Members at Risk ({stats?.members_at_risk || 0})
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">30+ days since last contact</p>
+          </CardHeader>
+          <CardContent>
+            {atRiskMembers.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">All members recently contacted!</p>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {atRiskMembers.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors">
+                    <div className="flex-1">
+                      <p className="font-semibold">{member.name}</p>
+                      <p className="text-sm text-muted-foreground">{member.phone}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold text-amber-700">{member.days_since_last_contact} days</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Active Grief Support Widget */}
+        <Card className="card-border-left-pink shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl font-playfair flex items-center gap-2">
+              <Heart className="w-5 h-5 text-pink-600" />
+              Active Grief Support ({stats?.active_grief_support || 0})
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Members in grief care timeline</p>
+          </CardHeader>
+          <CardContent>
+            {activeGrief.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No active grief support</p>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {activeGrief.map((grief) => (
+                  <div key={grief.member_id} className="p-3 bg-pink-50 rounded-lg hover:bg-pink-100 transition-colors">
+                    <p className="font-semibold">{grief.member_name}</p>
+                    <p className="text-sm text-muted-foreground">{grief.stages.length} stages pending</p>
+                    <Link to={`/members/${grief.member_id}`}>
+                      <Button size="sm" variant="outline" className="mt-2">View Timeline</Button>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Two Column Layout - Recent & Upcoming */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Interactions */}
         <Card className="shadow-sm">
