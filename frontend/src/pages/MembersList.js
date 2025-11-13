@@ -262,69 +262,120 @@ export const MembersList = () => {
       
       {/* Members Table */}
       <Card className="border-border shadow-sm">
+        {selectedMembers.length > 0 && (
+          <div className="p-4 bg-amber-50 border-b flex items-center justify-between">
+            <span className="font-semibold">{selectedMembers.length} members selected</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>
+                Clear Selection
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                Delete Selected
+              </Button>
+            </div>
+          </div>
+        )}
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Family Group</TableHead>
-                <TableHead>{t('last_contact')}</TableHead>
-                <TableHead>{t('engagement_status')}</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMembers.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {t('empty_states.no_members')}
-                  </TableCell>
+                  <TableHead className="w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4"
+                    />
+                  </TableHead>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Family Group</TableHead>
+                  <TableHead>{t('last_contact')}</TableHead>
+                  <TableHead>{t('engagement_status')}</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filteredMembers.map((member) => (
-                  <TableRow key={member.id} className="hover:bg-muted/50 transition-colors" data-testid={`member-row-${member.id}`}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <MemberAvatar member={member} size="sm" />
-                        <span className="font-medium">{member.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{member.phone}</TableCell>
-                    <TableCell>
-                      {member.family_group_id && (
-                        <span className="text-sm text-muted-foreground">
-                          {familyGroups.find(g => g.id === member.family_group_id)?.group_name || 'Family'}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {member.last_contact_date ? (
-                        <span className="text-sm">
-                          {formatDate(member.last_contact_date, 'dd MMM yyyy')}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{t('never_contacted')}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <EngagementBadge 
-                        status={member.engagement_status} 
-                        days={member.days_since_last_contact} 
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link to={`/members/${member.id}`}>
-                        <Button size="sm" variant="outline" data-testid={`view-member-${member.id}`}>
-                          {t('view')}
-                        </Button>
-                      </Link>
+              </TableHeader>
+              <TableBody>
+                {filteredMembers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      {t('empty_states.no_members')}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredMembers.map((member) => (
+                    <TableRow key={member.id} className="hover:bg-muted/50 transition-colors" data-testid={`member-row-${member.id}`}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedMembers.includes(member.id)}
+                          onChange={() => toggleSelectMember(member.id)}
+                          className="w-4 h-4"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <MemberAvatar member={member} size="sm" />
+                          <span className="font-medium">{member.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{member.phone}</TableCell>
+                      <TableCell>
+                        {member.family_group_id && (
+                          <span className="text-sm text-muted-foreground">
+                            {familyGroups.find(g => g.id === member.family_group_id)?.group_name || 'Family'}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {member.last_contact_date ? (
+                          <span className="text-sm">
+                            {formatDate(member.last_contact_date, 'dd MMM yyyy')}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{t('never_contacted')}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <EngagementBadge 
+                          status={member.engagement_status} 
+                          days={member.days_since_last_contact} 
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <Link to={`/members/${member.id}`}>
+                            <Button size="sm" variant="outline" data-testid={`view-member-${member.id}`}>
+                              {t('view')}
+                            </Button>
+                          </Link>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingMember(member);
+                              setEditModalOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteMember(member.id, member.name)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
