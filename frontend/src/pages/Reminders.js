@@ -184,37 +184,11 @@ export const Reminders = () => {
           )}
         </TabsContent>
         
-        <TabsContent value="at-risk" className="space-y-4">
-          {/* Members at Risk (30-59 days) */}
-          <Card className="card-border-left-amber">
-            <CardHeader>
-              <CardTitle>Members at Risk (30-59 days no contact)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {atRiskMembers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No members at risk</p>
-              ) : (
-                <div className="space-y-2">
-                  {atRiskMembers.map(member => (
-                    <div key={member.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold">{member.name}</p>
-                        <p className="text-sm text-muted-foreground">{member.days_since_last_contact} days since contact</p>
-                      </div>
-                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white">
-                        Contact
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Members Disconnected (60+ days) */}
+        
+        <TabsContent value="disconnected" className="space-y-4">
           <Card className="card-border-left-red">
             <CardHeader>
-              <CardTitle>Members Disconnected (60+ days no contact)</CardTitle>
+              <CardTitle>Members Disconnected ({engagementSettings.inactiveDays}+ days no contact)</CardTitle>
             </CardHeader>
             <CardContent>
               {disconnectedMembers.length === 0 ? (
@@ -229,6 +203,33 @@ export const Reminders = () => {
                       </div>
                       <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white">
                         Reconnect
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="at-risk" className="space-y-4">
+          <Card className="card-border-left-amber">
+            <CardHeader>
+              <CardTitle>Members at Risk ({engagementSettings.atRiskDays}-{engagementSettings.inactiveDays-1} days no contact)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {atRiskMembers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No members at risk</p>
+              ) : (
+                <div className="space-y-2">
+                  {atRiskMembers.map(member => (
+                    <div key={member.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">{member.name}</p>
+                        <p className="text-sm text-muted-foreground">{member.days_since_last_contact} days since contact</p>
+                      </div>
+                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white">
+                        Contact
                       </Button>
                     </div>
                   ))}
