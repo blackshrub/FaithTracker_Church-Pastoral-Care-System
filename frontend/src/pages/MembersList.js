@@ -288,33 +288,57 @@ export const MembersList = () => {
         </Dialog>
       </div>
       
-      {/* Filters */}
+      {/* Filters and Column Visibility */}
       <Card className="border-border">
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder={t('search')}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                  data-testid="search-members-input"
-                />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t('search')}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10"
+                    data-testid="search-members-input"
+                  />
+                </div>
+              </div>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full md:w-48" data-testid="filter-status-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">{t('active')}</SelectItem>
+                  <SelectItem value="at_risk">{t('at_risk')}</SelectItem>
+                  <SelectItem value="inactive">{t('inactive')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Column Visibility Toggles */}
+            <div className="border-t pt-4">
+              <p className="text-sm font-semibold mb-2">Show Columns:</p>
+              <div className="flex flex-wrap gap-3">
+                {Object.entries({
+                  phone: 'Phone', age: 'Age', gender: 'Gender', membership: 'Membership',
+                  marital: 'Marital', category: 'Category', blood_type: 'Blood Type',
+                  family: 'Family', last_contact: 'Last Contact', engagement: 'Engagement'
+                }).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns[key]}
+                      onChange={(e) => setVisibleColumns({...visibleColumns, [key]: e.target.checked})}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">{label}</span>
+                  </label>
+                ))}
               </div>
             </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full md:w-48" data-testid="filter-status-select">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">{t('active')}</SelectItem>
-                <SelectItem value="at_risk">{t('at_risk')}</SelectItem>
-                <SelectItem value="inactive">{t('inactive')}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
