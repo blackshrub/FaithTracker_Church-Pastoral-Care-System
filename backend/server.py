@@ -464,6 +464,8 @@ def generate_accident_followup_timeline(event_date: date, care_event_id: str, me
         timeline.append(followup_stage)
     
     return timeline
+
+def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: str) -> List[Dict[str, Any]]:
     """Generate 6-stage grief support timeline"""
     stages = [
         (GriefStage.ONE_WEEK, 7),
