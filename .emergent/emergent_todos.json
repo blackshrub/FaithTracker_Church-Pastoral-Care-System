@@ -1,18 +1,18 @@
 [
   {
-    "content": "Add quick care event form to Dashboard (multi-member, auto-complete names)",
-    "status": "in_progress"
+    "content": "Quick care event form with all event types and clear search",
+    "status": "completed"
   },
   {
-    "content": "Expand API sync with: interval field, campus assignment, full field mapping",
-    "status": "pending"
+    "content": "API sync with interval, campus, full field mapping",
+    "status": "completed"
   },
   {
-    "content": "Add API sync status list showing active syncs with green/red lights",
-    "status": "pending"
+    "content": "API sync status list with green/red lights",
+    "status": "completed"
   },
   {
-    "content": "Test all final features",
-    "status": "pending"
+    "content": "Final comprehensive testing and verification",
+    "status": "completed"
   }
 ]
