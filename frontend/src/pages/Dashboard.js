@@ -625,4 +625,4 @@ export const Dashboard = () => {
   );
 };
 
-export default Reminders;
+export default Dashboard;
