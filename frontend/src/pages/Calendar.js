@@ -46,6 +46,24 @@ export const Calendar = () => {
   const days = getDaysInMonth(currentDate);
   const monthName = currentDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
   
+  const handleDateClick = (day, dayEvents) => {
+    if (dayEvents.length > 0) {
+      setSelectedDate(day);
+      setSelectedDateEvents(dayEvents);
+      setDetailsOpen(true);
+    }
+  };
+  
+  // Group events by type for better display
+  const groupEventsByType = (eventList) => {
+    const grouped = {};
+    eventList.forEach(e => {
+      if (!grouped[e.event_type]) grouped[e.event_type] = [];
+      grouped[e.event_type].push(e);
+    });
+    return grouped;
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
