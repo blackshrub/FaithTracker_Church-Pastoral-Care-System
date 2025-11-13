@@ -163,40 +163,6 @@ export const MembersList = () => {
     });
   }, [members, debouncedSearch, filterStatus]);
   
-  // Memoized row component for virtual scrolling
-  const MemberRow = React.memo(({ index, style }) => {
-    const member = filteredMembers[index];
-    if (!member) return null;
-
-    return (
-      <div style={style} className="border-b border-border">
-        <div className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors">
-          <input
-            type="checkbox"
-            checked={selectedMembers.includes(member.id)}
-            onChange={() => toggleSelectMember(member.id)}
-            className="w-4 h-4"
-          />
-          <div className="flex items-center gap-3 flex-1">
-            <MemberAvatar member={member} size="sm" />
-            <div>
-              <span className="font-medium">{member.name}</span>
-              <p className="text-sm text-muted-foreground">{member.phone || '-'}</p>
-            </div>
-          </div>
-          <div className="text-sm">{member.age || '-'}</div>
-          <div className="text-sm">{member.gender || '-'}</div>
-          <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
-          <div className="flex gap-1">
-            <Link to={`/members/${member.id}`}>
-              <Button size="sm" variant="outline">View</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  });
-  
   if (loading) {
     return (
       <div className="space-y-6">
