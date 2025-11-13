@@ -1,17 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from './LanguageToggle';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Church, LayoutDashboard, Users, DollarSign, BarChart3, Settings, Upload, Cog, LogOut, Shield, MessageSquare, Calendar as CalIcon, Bell, ChevronDown } from 'lucide-react';
+import { Church, LayoutDashboard, Users, DollarSign, BarChart3, Settings, Upload, Cog, LogOut, Shield, MessageSquare, Calendar as CalIcon, Bell, ChevronDown, Menu, X } from 'lucide-react';
 
 export const Layout = ({ children }) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const mainNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
