@@ -241,16 +241,63 @@ export const ImportExport = () => {
               <CardDescription>Upload CSV file to bulk import members</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleCsvImport} className="space-y-4">
+              <form className="space-y-4">
                 <div>
                   <Label>Select CSV File</Label>
-                  <Input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files[0])} />
+                  <Input type="file" accept=".csv" onChange={handleCsvSelect} />
                   <p className="text-xs text-muted-foreground mt-1">Required columns: name, phone</p>
                 </div>
-                <Button type="submit" disabled={!csvFile || importing}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  {importing ? 'Importing...' : 'Import CSV'}
-                </Button>
+                
+                {showPreview && csvPreview && (
+                  <div className="space-y-4 p-4 border rounded bg-blue-50">
+                    <h4 className="font-semibold">📋 CSV Preview & Validation</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium">File Info:</p>
+                        <p className="text-sm text-muted-foreground">{csvPreview.total} rows to import</p>
+                        <p className="text-sm text-muted-foreground">{csvPreview.headers.length} columns detected</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Validation:</p>
+                        {validationResults?.hasRequired ? (
+                          <p className="text-sm text-green-600">✅ Required fields found</p>
+                        ) : (
+                          <p className="text-sm text-red-600">❌ Missing: {validationResults?.missingFields.join(', ')}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="max-h-48 overflow-auto border rounded bg-white p-2">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr>{csvPreview.headers.map(h => <th key={h} className="border p-1 text-left">{h}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {csvPreview.preview.slice(0, 5).map((row, i) => (
+                            <tr key={i}>
+                              {csvPreview.headers.map(h => <td key={h} className="border p-1">{row[h] || '-'}</td>)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {validationResults?.hasRequired ? (
+                      <Button 
+                        onClick={async () => {
+                          if (window.confirm(`Import ${csvPreview.total} members? This will update existing and create new members.`)) {
+                            await handleCsvImport();
+                          }
+                        }}
+                        className="bg-teal-500 hover:bg-teal-600 text-white"
+                      >
+                        ✅ Confirm Import ({csvPreview.total} members)
+                      </Button>
+                    ) : (
+                      <p className="text-red-600 text-sm">Cannot import - missing required fields</p>
+                    )}
+                  </div>
+                )}
               </form>
             </CardContent>
           </Card>
