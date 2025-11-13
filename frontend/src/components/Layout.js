@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from './LanguageToggle';
 import { Button } from '@/components/ui/button';
 import { 
@@ -11,7 +12,9 @@ import {
   BarChart3,
   Settings,
   Menu,
-  X
+  X,
+  LogOut,
+  UserCircle
 } from 'lucide-react';
 
 export const Layout = ({ children }) => {
