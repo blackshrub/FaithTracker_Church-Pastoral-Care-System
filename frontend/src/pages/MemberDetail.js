@@ -457,24 +457,22 @@ export const MemberDetail = () => {
                             Rp {event.aid_amount.toLocaleString('id-ID')}
                           </p>
                         )}
-                        <div className="mt-2 flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => sendReminder(event.id)}
-                            data-testid={`send-reminder-${event.id}`}
-                          >
-                            <Send className="w-3 h-3 mr-1" />
-                            {t('send_reminder')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => handleDeleteEvent(event.id)}
-                          >
-                            Delete
-                          </Button>
+                        <div className="mt-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => sendReminder(event.id)}>
+                                <Send className="w-4 h-4 mr-2" />Send Reminder
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" />Delete Event
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </div>
