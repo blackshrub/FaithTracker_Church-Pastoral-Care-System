@@ -197,23 +197,108 @@ export const Dashboard = () => {
       {/* Quick Actions */}
       <div>
         <h2 className="text-2xl font-playfair font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Link to="/members">
             <Button className="w-full h-14 bg-teal-500 hover:bg-teal-600 text-white text-base font-semibold">
-              <Plus className="w-5 h-5 mr-2" />
-              Add New Member
+              <Plus className="w-5 h-5 mr-2" />Add New Member
             </Button>
           </Link>
           <Link to="/members">
             <Button className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white text-base font-semibold">
-              <Users className="w-5 h-5 mr-2" />
-              View All Members
+              <Users className="w-5 h-5 mr-2" />View All Members
             </Button>
           </Link>
+          <Dialog open={quickEventOpen} onOpenChange={setQuickEventOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full h-14 bg-pink-500 hover:bg-pink-600 text-white text-base font-semibold">
+                <Zap className="w-5 h-5 mr-2" />Quick Care Event
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Quick Care Event (Multi-Member)</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleQuickEvent} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Search and Select Members *</Label>
+                  <Input
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Type to search members..."
+                  />
+                  <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
+                    {filteredMembers.slice(0, 20).map(member => (
+                      <div key={member.id} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedMemberIds.includes(member.id)}
+                          onCheckedChange={() => toggleMemberSelection(member.id)}
+                        />
+                        <span className="text-sm">{member.name} ({member.phone})</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{selectedMemberIds.length} members selected</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Event Type *</Label>
+                    <Select value={quickEvent.event_type} onValueChange={(v) => setQuickEvent({...quickEvent, event_type: v})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="birthday">🎂 Birthday</SelectItem>
+                        <SelectItem value="financial_aid">💰 Financial Aid</SelectItem>
+                        <SelectItem value="grief_loss">💔 Grief/Loss</SelectItem>
+                        <SelectItem value="hospital_visit">🏥 Hospital Visit</SelectItem>
+                        <SelectItem value="regular_contact">📞 Regular Contact</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Date *</Label>
+                    <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label>Title *</Label>
+                  <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Financial assistance" required />
+                </div>
+                
+                {quickEvent.event_type === 'financial_aid' && (
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-green-50 rounded">
+                    <div>
+                      <Label>Aid Type *</Label>
+                      <Select value={quickEvent.aid_type} onValueChange={(v) => setQuickEvent({...quickEvent, aid_type: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="education">Education</SelectItem>
+                          <SelectItem value="medical">Medical</SelectItem>
+                          <SelectItem value="emergency">Emergency</SelectItem>
+                          <SelectItem value="housing">Housing</SelectItem>
+                          <SelectItem value="food">Food</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Amount (Rp) *</Label>
+                      <Input type="number" value={quickEvent.aid_amount} onChange={(e) => setQuickEvent({...quickEvent, aid_amount: e.target.value})} required />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => setQuickEventOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">Save for {selectedMemberIds.length} Members</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
           <Link to="/members">
-            <Button className="w-full h-14 bg-pink-500 hover:bg-pink-600 text-white text-base font-semibold">
-              <Bell className="w-5 h-5 mr-2" />
-              View Reminders
+            <Button className="w-full h-14 bg-purple-500 hover:bg-purple-600 text-white text-base font-semibold">
+              <Bell className="w-5 h-5 mr-2" />View Reminders
             </Button>
           </Link>
         </div>
