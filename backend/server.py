@@ -489,6 +489,66 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
             "error": str(e)
         }
 
+# ==================== CAMPUS ENDPOINTS ====================
+
+@api_router.post("/campuses", response_model=Campus)
+async def create_campus(campus: CampusCreate, current_admin: dict = Depends(get_full_admin)):
+    """Create a new campus (full admin only)"""
+    try:
+        campus_obj = Campus(
+            campus_name=campus.campus_name,
+            location=campus.location
+        )
+        await db.campuses.insert_one(campus_obj.model_dump())
+        return campus_obj
+    except Exception as e:
+        logger.error(f"Error creating campus: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/campuses", response_model=List[Campus])
+async def list_campuses():
+    """List all campuses (public for login selection)"""
+    try:
+        campuses = await db.campuses.find({"is_active": True}, {"_id": 0}).to_list(100)
+        return campuses
+    except Exception as e:
+        logger.error(f"Error listing campuses: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/campuses/{campus_id}", response_model=Campus)
+async def get_campus(campus_id: str):
+    """Get campus by ID"""
+    try:
+        campus = await db.campuses.find_one({"id": campus_id}, {"_id": 0})
+        if not campus:
+            raise HTTPException(status_code=404, detail="Campus not found")
+        return campus
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting campus: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/campuses/{campus_id}", response_model=Campus)
+async def update_campus(campus_id: str, update: CampusCreate, current_admin: dict = Depends(get_full_admin)):
+    """Update campus (full admin only)"""
+    try:
+        result = await db.campuses.update_one(
+            {"id": campus_id},
+            {"$set": {
+                **update.model_dump(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Campus not found")
+        return await get_campus(campus_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating campus: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
 @api_router.post("/auth/register", response_model=UserResponse)
