@@ -90,7 +90,7 @@ export const MemberDetail = () => {
     try {
       const eventData = {
         member_id: id,
-        campus_id: 'auto',
+        campus_id: member.campus_id,  // Use member's campus_id instead of 'auto'
         ...newEvent,
         aid_amount: newEvent.aid_amount ? parseFloat(newEvent.aid_amount) : null
       };
