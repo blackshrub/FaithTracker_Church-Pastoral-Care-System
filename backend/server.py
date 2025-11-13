@@ -264,12 +264,9 @@ class CareEventCreate(BaseModel):
     
     # Grief support fields
     grief_relationship: Optional[str] = None
-    mourning_service_date: Optional[date] = None
     
-    # Hospital visit fields
+    # Accident/illness fields (merged from hospital)
     hospital_name: Optional[str] = None
-    admission_date: Optional[date] = None
-    discharge_date: Optional[date] = None
     initial_visitation: Optional[VisitationLogEntry] = None
     
     # Financial aid fields
