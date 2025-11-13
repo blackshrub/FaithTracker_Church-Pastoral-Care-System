@@ -116,6 +116,63 @@ export const Layout = ({ children }) => {
         </div>
       </header>
       
+      {/* Mobile Navigation Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-b border-border">
+          <div className="container mx-auto px-6 py-4 space-y-1">
+            {mainNavigation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    isActive(item.href)
+                      ? 'bg-teal-50 text-teal-700 font-semibold'
+                      : 'text-gray-600 hover:bg-teal-50 hover:text-teal-700'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+            
+            {/* Mobile Admin/Settings Links */}
+            {user?.role === 'full_admin' && (
+              <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-teal-50 hover:text-teal-700">
+                <Shield className="w-5 h-5" />
+                <span>Admin</span>
+              </Link>
+            )}
+            <Link to="/import-export" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-teal-50 hover:text-teal-700">
+              <Upload className="w-5 h-5" />
+              <span>Import/Export</span>
+            </Link>
+            <Link to="/settings" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-teal-50 hover:text-teal-700">
+              <Cog className="w-5 h-5" />
+              <span>Settings</span>
+            </Link>
+            
+            <div className="border-t pt-2 mt-2">
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-red-600 hover:text-red-700"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <LogOut className="w-5 h-5 mr-3" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         {children}
