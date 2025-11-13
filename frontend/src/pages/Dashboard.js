@@ -236,6 +236,8 @@ export const Dashboard = () => {
       toast.error('Failed to mark as contacted');
     }
   };
+  
+  const handleQuickEvent = async (e) => {
     e.preventDefault();
     if (selectedMemberIds.length === 0) {
       toast.error('Select at least one member');
