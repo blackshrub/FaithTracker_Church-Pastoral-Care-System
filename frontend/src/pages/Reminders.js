@@ -352,17 +352,8 @@ export const Reminders = () => {
                           onClick={async () => {
                             if (window.confirm(`Mark financial aid as distributed to ${schedule.member_name}?`)) {
                               try {
-                                await axios.post(`${API}/care-events`, {
-                                  member_id: schedule.member_id,
-                                  campus_id: schedule.campus_id,
-                                  event_type: 'financial_aid',
-                                  event_date: schedule.next_occurrence,
-                                  title: `${schedule.title} - Scheduled Aid`,
-                                  aid_type: schedule.aid_type,
-                                  aid_amount: schedule.aid_amount,
-                                  aid_notes: `From schedule: ${schedule.frequency}`
-                                });
-                                toast.success('Financial aid marked as distributed!');
+                                await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                toast.success('Payment distributed! Schedule advanced to next occurrence.');
                                 loadReminders();
                               } catch (error) {
                                 toast.error('Failed to mark as distributed');
