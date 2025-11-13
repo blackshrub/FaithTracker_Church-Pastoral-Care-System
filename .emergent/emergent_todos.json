@@ -1,66 +1,38 @@
 [
   {
-    "content": "Update all backend models with campus_id (CareEvent, GriefSupport, NotificationLog)",
-    "status": "completed"
-  },
-  {
-    "content": "Create Campus CRUD endpoints",
-    "status": "completed"
-  },
-  {
-    "content": "Update auth endpoints for campus selection at login",
-    "status": "completed"
-  },
-  {
-    "content": "Download and parse core_jemaat.csv",
-    "status": "completed"
-  },
-  {
-    "content": "Create campus import script (extract from baptist_place)",
-    "status": "completed"
-  },
-  {
-    "content": "Create member import script with family grouping",
-    "status": "completed"
-  },
-  {
     "content": "Run data import - import 696 members and generate dummy data",
+    "status": "completed"
+  },
+  {
+    "content": "Update member and care event create endpoints to auto-get campus_id from user",
     "status": "in_progress"
   },
   {
-    "content": "Update member create endpoint to include campus_id",
+    "content": "Add campus filtering to all list endpoints (members, events, grief, etc)",
     "status": "pending"
   },
   {
-    "content": "Update care event create to include campus_id",
+    "content": "Redesign scheduler - send daily digest to PASTORAL TEAM WhatsApp, not members",
     "status": "pending"
   },
   {
-    "content": "Add campus filtering to all list endpoints",
+    "content": "Update frontend Auth to show campus selection dropdown at login",
     "status": "pending"
   },
   {
-    "content": "Redesign scheduler to send to PASTORAL TEAM, not members",
+    "content": "Create Admin Dashboard page (user + campus management UI)",
     "status": "pending"
   },
   {
-    "content": "Update frontend Auth to handle campus selection",
+    "content": "Create Calendar View page with month/week views",
     "status": "pending"
   },
   {
-    "content": "Create Admin Dashboard page (user + campus management)",
+    "content": "Create Bulk Messaging page for pastoral team",
     "status": "pending"
   },
   {
-    "content": "Create Calendar View page",
-    "status": "pending"
-  },
-  {
-    "content": "Create Bulk Messaging page",
-    "status": "pending"
-  },
-  {
-    "content": "Test multi-campus and run final testing",
+    "content": "Test multi-campus isolation and final comprehensive testing",
     "status": "pending"
   }
 ]
