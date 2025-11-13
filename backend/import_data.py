@@ -34,7 +34,7 @@ async def import_campuses_and_data():
     # Step 2: Import members
     print(f"\n2. Importing members to {campus_name}...")
     
-    family_groups_map = {}  # kk_name -> {campus_id -> family_group_id}
+    family_groups_map = {}  # kk_name -> family_group_id
     members_imported = 0
     members_skipped = 0
     
@@ -45,36 +45,29 @@ async def import_campuses_and_data():
                 name = row.get('name_full', '').strip()
                 phone = row.get('number_hp', '').strip()
                 
-                if not name or not phone:
+                if not name:
                     members_skipped += 1
                     continue
                 
                 # Format phone number properly
-                if phone.startswith('0'):
-                    phone = '62' + phone[1:]
-                elif phone.startswith('+'):
-                    phone = phone[1:]
-                # If no phone, set to empty (children, etc.)
-                if not phone or phone == '62':
-                    phone = ''
+                if phone:
+                    if phone.startswith('0'):
+                        phone = '62' + phone[1:]
+                    elif phone.startswith('+'):
+                        phone = phone[1:]
+                else:
+                    phone = ''  # Empty for children without phone
                 
                 # Parse membership status
                 membership_map = {
                     '1': 'Member',
-                    '2': 'Non Member', 
+                    '2': 'Non Member',
                     '7': 'Visitor',
                     '8': 'Sympathizer',
                     '9': 'Member (Inactive)'
                 }
-                membership_status = membership_map.get(row.get('membership_id', ''), 'Unknown')
-                
-                # Get campus
-                baptist_place = row.get('baptist_place', '').strip()
-                campus_id = campuses_map.get(baptist_place)
-                
-                if not campus_id:
-                    members_skipped += 1
-                    continue
+                membership_id = row.get('membership_id', '').strip()
+                membership_status = membership_map.get(membership_id, 'Unknown')
                 
                 # Handle family grouping
                 kk_name = row.get('kk_name', '').strip()
@@ -82,9 +75,6 @@ async def import_campuses_and_data():
                 
                 if kk_name:
                     if kk_name not in family_groups_map:
-                        family_groups_map[kk_name] = {}
-                    
-                    if campus_id not in family_groups_map[kk_name]:
                         # Create new family group
                         fg_id = str(uuid.uuid4())
                         family_group = {
@@ -95,9 +85,9 @@ async def import_campuses_and_data():
                             "updated_at": datetime.now(timezone.utc).isoformat()
                         }
                         await db.family_groups.insert_one(family_group)
-                        family_groups_map[kk_name][campus_id] = fg_id
+                        family_groups_map[kk_name] = fg_id
                     
-                    family_group_id = family_groups_map[kk_name][campus_id]
+                    family_group_id = family_groups_map[kk_name]
                 
                 # Parse birth date and calculate age
                 birth_date = None
