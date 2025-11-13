@@ -14,7 +14,9 @@ import {
   Menu,
   X,
   LogOut,
-  UserCircle
+  UserCircle,
+  Upload,
+  Cog
 } from 'lucide-react';
 
 export const Layout = ({ children }) => {
