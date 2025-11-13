@@ -1446,6 +1446,56 @@ async def send_grief_reminder(stage_id: str):
         logger.error(f"Error sending grief reminder: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/accident-followup/member/{member_id}")
+async def get_member_accident_timeline(member_id: str):
+    """Get accident follow-up timeline for specific member"""
+    try:
+        timeline = await db.accident_followup.find(
+            {"member_id": member_id},
+            {"_id": 0}
+        ).sort("scheduled_date", 1).to_list(100)
+        
+        return timeline
+    except Exception as e:
+        logger.error(f"Error getting member accident timeline: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/accident-followup/{stage_id}/complete")
+async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
+    """Mark accident follow-up stage as completed"""
+    try:
+        update_data = {
+            "completed": True,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        if notes:
+            update_data["notes"] = notes
+        
+        result = await db.accident_followup.update_one(
+            {"id": stage_id},
+            {"$set": update_data}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Accident follow-up stage not found")
+        
+        # Update member's last contact date
+        stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
+        if stage:
+            await db.members.update_one(
+                {"id": stage["member_id"]},
+                {"$set": {"last_contact_date": datetime.now(timezone.utc).isoformat()}}
+            )
+        
+        return {"success": True, "message": "Accident follow-up stage completed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error completing accident stage: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== FINANCIAL AID ENDPOINTS ====================
 
 @api_router.get("/financial-aid/summary")
