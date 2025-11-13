@@ -418,25 +418,25 @@ export const Dashboard = () => {
                 </div>
                 
                 {/* Event Details */}
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Event Type *</Label>
                     <Select value={quickEvent.event_type} onValueChange={(v) => setQuickEvent({...quickEvent, event_type: v})}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="birthday">🎂 Birthday</SelectItem>
                         <SelectItem value="childbirth">👶 Childbirth</SelectItem>
-                        <SelectItem value="financial_aid">💰 Financial Aid</SelectItem>
                         <SelectItem value="grief_loss">💔 Grief/Loss</SelectItem>
                         <SelectItem value="new_house">🏠 New House</SelectItem>
                         <SelectItem value="accident_illness">🚑 Accident/Illness</SelectItem>
+                        <SelectItem value="financial_aid">💰 Financial Aid</SelectItem>
                         <SelectItem value="regular_contact">📞 Regular Contact</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  
                   {quickEvent.event_type !== 'financial_aid' && (
                     <div>
-                      <Label>Date *</Label>
+                      <Label>Event Date *</Label>
                       <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
                     </div>
                   )}
@@ -446,6 +446,81 @@ export const Dashboard = () => {
                   <Label>Title *</Label>
                   <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Financial assistance" required />
                 </div>
+                
+                <div>
+                  <Label>Description</Label>
+                  <Input value={quickEvent.description} onChange={(e) => setQuickEvent({...quickEvent, description: e.target.value})} placeholder="Additional details..." />
+                </div>
+                
+                {/* Conditional Fields */}
+                {quickEvent.event_type === 'grief_loss' && (
+                  <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <p className="text-sm font-medium text-purple-900">⭐ Auto-generates 6-stage grief timeline</p>
+                    <div>
+                      <Label>Relationship to Deceased *</Label>
+                      <Select value={quickEvent.grief_relationship} onValueChange={(v) => setQuickEvent({...quickEvent, grief_relationship: v})} required>
+                        <SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="spouse">Spouse</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="child">Child</SelectItem>
+                          <SelectItem value="sibling">Sibling</SelectItem>
+                          <SelectItem value="friend">Friend</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+                
+                {quickEvent.event_type === 'accident_illness' && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div>
+                      <Label>Hospital/Medical Facility Name</Label>
+                      <Input
+                        value={quickEvent.hospital_name}
+                        onChange={(e) => setQuickEvent({...quickEvent, hospital_name: e.target.value})}
+                        placeholder="RSU Jakarta"
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {quickEvent.event_type === 'financial_aid' && (
+                  <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h4 className="font-semibold text-green-900">Financial Aid Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Aid Type *</Label>
+                        <Select value={quickEvent.aid_type} onValueChange={(v) => setQuickEvent({...quickEvent, aid_type: v})} required>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="education">Education Support</SelectItem>
+                            <SelectItem value="medical">Medical Bills</SelectItem>
+                            <SelectItem value="emergency">Emergency Relief</SelectItem>
+                            <SelectItem value="housing">Housing Assistance</SelectItem>
+                            <SelectItem value="food">Food Support</SelectItem>
+                            <SelectItem value="funeral_costs">Funeral Costs</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Amount (Rp) *</Label>
+                        <Input
+                          type="number"
+                          value={quickEvent.aid_amount}
+                          onChange={(e) => setQuickEvent({...quickEvent, aid_amount: e.target.value})}
+                          placeholder="1500000"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <p className="text-sm text-green-700">
+                      Total: Rp {((quickEvent.aid_amount || 0) * selectedMemberIds.length).toLocaleString('id-ID')} for {selectedMemberIds.length} members
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex gap-2 justify-end">
                   <Button type="button" variant="outline" onClick={() => setQuickEventOpen(false)}>Cancel</Button>
