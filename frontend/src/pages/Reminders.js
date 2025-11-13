@@ -59,7 +59,7 @@ const markAccidentComplete = async (eventId, loadReminders) => {
   }
 };
 
-const markMemberContacted = async (memberId, memberName) => {
+const markMemberContacted = async (memberId, memberName, user, loadReminders) => {
   try {
     // Create a regular contact event which updates last_contact_date
     await axios.post(`${API}/care-events`, {
