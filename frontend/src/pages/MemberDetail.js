@@ -530,70 +530,6 @@ export const MemberDetail = () => {
           </Card>
         </TabsContent>
         
-        {/* Accident Follow-up Timeline Tab */}
-        <TabsContent value="accident-timeline" className="space-y-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                {accidentTimeline.map((stage, index) => (
-                  <div key={stage.id} className="relative" data-testid={`accident-stage-${stage.id}`}>
-                    {index > 0 && <div className="absolute left-6 top-0 w-0.5 h-6 bg-primary-200 -mt-6"></div>}
-                    <div className="flex gap-4">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                        stage.completed ? 'bg-blue-500' : 'bg-blue-100'
-                      }`}>
-                        {stage.completed ? (
-                          <CheckCircle2 className="w-6 h-6 text-white" />
-                        ) : (
-                          <span className="text-sm font-bold text-blue-700">{index + 1}</span>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-playfair font-semibold text-foreground">
-                          {stage.stage === 'first_followup' ? 'First Follow-up' :
-                           stage.stage === 'second_followup' ? 'Second Follow-up' :
-                           'Final Follow-up'}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(stage.scheduled_date, 'dd MMM yyyy')}
-                        </p>
-                        {stage.notes && (
-                          <p className="text-sm text-muted-foreground mt-2 italic">
-                            Notes: {stage.notes}
-                          </p>
-                        )}
-                        {!stage.completed && (
-                          <div className="flex gap-2 mt-3">
-                            <Button
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  await axios.post(`${API}/accident-followup/${stage.id}/complete`);
-                                  toast.success('Follow-up completed');
-                                  loadMemberData();
-                                } catch (error) {
-                                  toast.error('Failed to complete');
-                                }
-                              }}
-                            >
-                              Mark Complete
-                            </Button>
-                          </div>
-                        )}
-                        {stage.completed && (
-                          <p className="text-xs text-blue-600 mt-2">
-                            Completed: {formatDate(stage.completed_at, 'dd MMM yyyy')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         {/* Accident/Illness Tab */}
         <TabsContent value="accident">
           <Card>
@@ -602,15 +538,63 @@ export const MemberDetail = () => {
                 <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
               ) : (
                 careEvents.filter(e => e.event_type === 'accident_illness').map(event => (
-                  <div key={event.id} className="space-y-4 mb-6">
+                  <div key={event.id} className="space-y-4 mb-6 p-4 border rounded-lg">
                     <div>
-                      <h4 className="font-semibold">{event.hospital_name || 'Medical Event'}</h4>
+                      <h4 className="font-semibold">{event.title}</h4>
                       <p className="text-sm text-muted-foreground">
                         Date: {formatDate(event.event_date, 'dd MMM yyyy')}
                       </p>
+                      {event.hospital_name && (
+                        <p className="text-sm text-muted-foreground">
+                          Facility: {event.hospital_name}
+                        </p>
+                      )}
                     </div>
+                    
+                    {/* Follow-up Timeline within each accident record */}
+                    <div className="mt-4">
+                      <h5 className="text-sm font-semibold mb-3">Follow-up Schedule:</h5>
+                      <div className="space-y-3">
+                        {accidentTimeline.filter(t => t.care_event_id === event.id).map((stage, index) => (
+                          <div key={stage.id} className="flex items-center gap-3 p-2 bg-blue-50 rounded">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              stage.completed ? 'bg-blue-500' : 'bg-blue-200'
+                            }`}>
+                              {stage.completed ? (
+                                <span className="text-white text-xs">✓</span>
+                              ) : (
+                                <span className="text-blue-700 text-xs font-bold">{index + 1}</span>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">
+                                {stage.stage === 'first_followup' ? 'First Follow-up' :
+                                 stage.stage === 'second_followup' ? 'Second Follow-up' : 'Final Follow-up'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(stage.scheduled_date, 'dd MMM')}
+                              </p>
+                            </div>
+                            {!stage.completed && (
+                              <Button size="sm" variant="outline" onClick={async () => {
+                                try {
+                                  await axios.post(`${API}/accident-followup/${stage.id}/complete`);
+                                  toast.success('Follow-up completed');
+                                  loadMemberData();
+                                } catch (error) {
+                                  toast.error('Failed');
+                                }
+                              }}>
+                                Complete
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
                     {event.visitation_log && event.visitation_log.length > 0 && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 mt-4">
                         <h5 className="text-sm font-medium">Visitation Log:</h5>
                         {event.visitation_log.map((log, idx) => (
                           <div key={idx} className="text-sm bg-muted/30 p-3 rounded">
