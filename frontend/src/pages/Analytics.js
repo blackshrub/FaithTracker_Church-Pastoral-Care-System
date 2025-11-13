@@ -81,22 +81,27 @@ export const Analytics = () => {
         engagementStatus[status]++;
       });
       
-      // Care Event Analysis
+      // Care Event Analysis (excluding birthdays for relevant insights)
       const eventTypeCount = {};
       const eventsByMonth = {};
       const currentYear = new Date().getFullYear();
       
       events.forEach(e => {
-        // Event types
-        eventTypeCount[e.event_type] = (eventTypeCount[e.event_type] || 0) + 1;
+        // Event types (exclude birthday for meaningful analysis)
+        if (e.event_type !== 'birthday') {
+          eventTypeCount[e.event_type] = (eventTypeCount[e.event_type] || 0) + 1;
+        }
         
-        // Events by month
+        // Events by month (all events including birthdays)
         const date = new Date(e.event_date);
         if (date.getFullYear() === currentYear) {
           const month = date.toLocaleDateString('en', { month: 'short' });
           eventsByMonth[month] = (eventsByMonth[month] || 0) + 1;
         }
       });
+      
+      // Calculate total non-birthday events for percentages
+      const totalNonBirthdayEvents = Object.values(eventTypeCount).reduce((sum, count) => sum + count, 0);
       
       // Financial Analysis
       const financialByType = aidSummaryRes.data.by_type || {};
