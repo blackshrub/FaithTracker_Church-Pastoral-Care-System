@@ -107,6 +107,47 @@ export const Calendar = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Event Details Dialog */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Events on {selectedDate && selectedDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {Object.entries(groupEventsByType(selectedDateEvents)).map(([type, typeEvents]) => (
+              <Card key={type} className="card-border-left-teal">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {type === 'birthday' && <Users className="w-5 h-5 text-amber-600" />}
+                    {type === 'grief_loss' && <Heart className="w-5 h-5 text-pink-600" />}
+                    {type === 'hospital_visit' && <Hospital className="w-5 h-5 text-blue-600" />}
+                    {type === 'financial_aid' && <DollarSign className="w-5 h-5 text-green-600" />}
+                    {type.replace('_', ' ').toUpperCase()} ({typeEvents.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {typeEvents.map(event => (
+                      <div key={event.id} className="p-3 bg-muted/30 rounded-lg">
+                        <p className="font-semibold">{event.title}</p>
+                        {event.member_name && (
+                          <p className="text-sm text-muted-foreground">Member: {event.member_name}</p>
+                        )}
+                        {event.description && (
+                          <p className="text-sm text-muted-foreground">{event.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
