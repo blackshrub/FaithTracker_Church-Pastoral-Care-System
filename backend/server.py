@@ -1349,7 +1349,7 @@ class WhatsAppTestResponse(BaseModel):
 async def test_whatsapp_integration(request: WhatsAppTestRequest):
     """Test WhatsApp gateway integration by sending a test message"""
     try:
-        result = await send_whatsapp_message(request.phone, request.message)
+        result = await send_whatsapp_message(request.phone, request.message, member_id="test")
         
         if result['success']:
             return WhatsAppTestResponse(
