@@ -48,8 +48,20 @@ export const BulkMessaging = () => {
         const user = users.find(u => u.id === userId);
         if (user) {
           try {
+            // Format phone for WhatsApp (add @s.whatsapp.net if not present)
+            let phone = user.phone;
+            if (phone && !phone.includes('@s.whatsapp.net')) {
+              // Ensure it starts with country code
+              if (phone.startsWith('0')) {
+                phone = '62' + phone.substring(1);
+              } else if (phone.startsWith('+')) {
+                phone = phone.substring(1);
+              }
+              phone = phone + '@s.whatsapp.net';
+            }
+            
             const response = await axios.post(`${API}/integrations/ping/whatsapp`, {
-              phone: user.phone,
+              phone: phone,
               message
             });
             if (response.data.success) sent++;
