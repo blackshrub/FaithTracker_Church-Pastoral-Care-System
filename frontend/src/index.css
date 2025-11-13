@@ -176,6 +176,30 @@ textarea::placeholder {
   color: hsl(0, 0%, 60%) !important;
 }
 
+/* Mobile table horizontal scroll fix */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  thead, tbody, tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+}
+
+/* Fix timeline display on mobile - ensure left padding */
+@media (max-width: 768px) {
+  .border-l-2 {
+    margin-left: 1rem !important;
+    padding-left: 1.5rem !important;
+  }
+}
+
 .font-manrope {
   font-family: 'Manrope', sans-serif;
 }
