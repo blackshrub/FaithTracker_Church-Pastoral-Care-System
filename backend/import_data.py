@@ -67,9 +67,24 @@ async def import_campuses_and_data():
                     members_skipped += 1
                     continue
                 
-                # Format phone number (remove leading 0, add 62)
+                # Format phone number properly
                 if phone.startswith('0'):
                     phone = '62' + phone[1:]
+                elif phone.startswith('+'):
+                    phone = phone[1:]
+                # If no phone, set to empty (children, etc.)
+                if not phone or phone == '62':
+                    phone = ''
+                
+                # Parse membership status
+                membership_map = {
+                    '1': 'Member',
+                    '2': 'Non Member', 
+                    '7': 'Visitor',
+                    '8': 'Sympathizer',
+                    '9': 'Member (Inactive)'
+                }
+                membership_status = membership_map.get(row.get('membership_id', ''), 'Unknown')
                 
                 # Get campus
                 baptist_place = row.get('baptist_place', '').strip()
