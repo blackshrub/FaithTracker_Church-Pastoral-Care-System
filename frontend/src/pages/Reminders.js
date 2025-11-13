@@ -70,19 +70,20 @@ export const Reminders = () => {
       // Filter birthdays for today with member names
       const todayBirthdays = eventsRes.data.filter(e => 
         e.event_type === 'birthday' && e.event_date === today
-      ).map(e => ({...e, member_name: memberMap[e.member_id]}));
+      ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone}));
       
       // Get upcoming birthdays with member names
       const upcoming = eventsRes.data.filter(e => 
         e.event_type === 'birthday' && 
         e.event_date > today && 
         e.event_date <= weekAhead
-      ).map(e => ({...e, member_name: memberMap[e.member_id]}));
+      ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone}));
       
       // Filter grief stages due today with member names
       const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
         ...g,
-        member_name: memberMap[g.member_id]
+        member_name: memberMap[g.member_id]?.name,
+        member_phone: memberMap[g.member_id]?.phone
       }));
       
       // Separate at-risk and disconnected based on Settings thresholds
@@ -97,7 +98,7 @@ export const Reminders = () => {
       setBirthdaysToday(todayBirthdays);
       setUpcomingBirthdays(upcoming);
       setGriefDue(griefToday);
-      setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]})));
+      setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone})));
       setAtRiskMembers(atRisk);
       setDisconnectedMembers(disconnected);
     } catch (error) {
