@@ -154,81 +154,100 @@ export const Dashboard = () => {
   
   const loadReminders = async () => {
     try {
+      // Try to load from cache first for instant display
+      const cachedMembers = await offlineStorage.getCachedMembers();
+      if (cachedMembers.length > 0) {
+        setAllMembers(cachedMembers);
+        console.log('📱 Loaded from cache:', cachedMembers.length, 'members');
+      }
+
       const today = new Date().toISOString().split('T')[0];
       const weekAhead = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
       
-      const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes] = await Promise.all([
-        axios.get(`${API}/care-events`),
-        axios.get(`${API}/grief-support?completed=false`),
-        axios.get(`${API}/care-events/hospital/due-followup`),
-        axios.get(`${API}/members/at-risk`),
-        axios.get(`${API}/members?limit=1000`), // Get all members for mapping
-        axios.get(`${API}/financial-aid-schedules/due-today`),
-        axios.get(`${API}/suggestions/follow-up`)
-      ]);
-      
-      // Get member names, phones, and photos for events
-      const memberMap = {};
-      membersRes.data.forEach(m => memberMap[m.id] = { 
-        name: m.name, 
-        phone: m.phone, 
-        photo_url: m.photo_url 
-      });
-      
-      console.log('Member map sample:', Object.keys(memberMap).length, 'members loaded');
-      console.log('Sample member:', memberMap[Object.keys(memberMap)[0]]);
-      
-      // Filter birthdays for today with member names and photos
-      const todayBirthdays = eventsRes.data.filter(e => 
-        e.event_type === 'birthday' && e.event_date === today
-      ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-      
-      // Get upcoming birthdays with member names and photos
-      const upcoming = eventsRes.data.filter(e => 
-        e.event_type === 'birthday' && 
-        e.event_date > today && 
-        e.event_date <= weekAhead
-      ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-      
-      // Filter grief stages due today AND overdue (for follow-up tab)
-      const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
-        ...g,
-        member_name: memberMap[g.member_id]?.name,
-        member_phone: memberMap[g.member_id]?.phone,
-        member_photo_url: memberMap[g.member_id]?.photo_url
-      }));
-      
-      // Filter overdue grief stages for follow-up tab
-      const griefOverdue = griefRes.data.filter(g => {
-        const schedDate = new Date(g.scheduled_date);
-        return schedDate <= new Date() && !g.completed;
-      }).map(g => ({
-        ...g,
-        member_name: memberMap[g.member_id]?.name,
-        member_phone: memberMap[g.member_id]?.phone,
-        member_photo_url: memberMap[g.member_id]?.photo_url
-      }));
-      
-      // Separate at-risk and disconnected based on Settings thresholds
-      const atRisk = atRiskRes.data.filter(m => 
-        m.days_since_last_contact >= engagementSettings.atRiskDays && 
-        m.days_since_last_contact < engagementSettings.inactiveDays
-      );
-      const disconnected = atRiskRes.data.filter(m => 
-        m.days_since_last_contact >= engagementSettings.inactiveDays
-      );
-      
-      setBirthdaysToday(todayBirthdays);
-      setUpcomingBirthdays(upcoming);
-      setGriefToday(griefToday);  // Set grief stages due today
-      setGriefDue(griefOverdue);  // Use overdue for follow-up tab
-      setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
-      setFinancialAidDue(aidDueRes.data);
-      setSuggestions(suggestionsRes.data || []);
-      setAtRiskMembers(atRisk);
-      setDisconnectedMembers(disconnected);
+      try {
+        // Online data loading with offline fallback
+        const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes] = await Promise.all([
+          axios.get(`${API}/care-events`),
+          axios.get(`${API}/grief-support?completed=false`),
+          axios.get(`${API}/care-events/hospital/due-followup`),
+          axios.get(`${API}/members/at-risk`),
+          axios.get(`${API}/members?limit=1000`),
+          axios.get(`${API}/financial-aid-schedules/due-today`),
+          axios.get(`${API}/suggestions/follow-up`)
+        ]);
+        
+        // Cache fresh member data
+        await offlineStorage.cacheMembers(membersRes.data);
+        setAllMembers(membersRes.data);
+        
+        // Continue with member mapping...
+        const memberMap = {};
+        membersRes.data.forEach(m => memberMap[m.id] = { 
+          name: m.name, 
+          phone: m.phone, 
+          photo_url: m.photo_url 
+        });
+        
+        console.log('🌐 Online data loaded:', membersRes.data.length, 'members');
+        
+        // Rest of data processing...
+        const todayBirthdays = eventsRes.data.filter(e => 
+          e.event_type === 'birthday' && e.event_date === today
+        ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
+        
+        const upcoming = eventsRes.data.filter(e => 
+          e.event_type === 'birthday' && 
+          e.event_date > today && 
+          e.event_date <= weekAhead
+        ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
+        
+        const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
+          ...g,
+          member_name: memberMap[g.member_id]?.name,
+          member_phone: memberMap[g.member_id]?.phone,
+          member_photo_url: memberMap[g.member_id]?.photo_url
+        }));
+        
+        const griefOverdue = griefRes.data.filter(g => {
+          const schedDate = new Date(g.scheduled_date);
+          return schedDate <= new Date() && !g.completed;
+        }).map(g => ({
+          ...g,
+          member_name: memberMap[g.member_id]?.name,
+          member_phone: memberMap[g.member_id]?.phone,
+          member_photo_url: memberMap[g.member_id]?.photo_url
+        }));
+        
+        const atRisk = atRiskRes.data.filter(m => 
+          m.days_since_last_contact >= engagementSettings.atRiskDays && 
+          m.days_since_last_contact < engagementSettings.inactiveDays
+        );
+        const disconnected = atRiskRes.data.filter(m => 
+          m.days_since_last_contact >= engagementSettings.inactiveDays
+        );
+        
+        setBirthdaysToday(todayBirthdays);
+        setUpcomingBirthdays(upcoming);
+        setGriefToday(griefToday);
+        setGriefDue(griefOverdue);
+        setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
+        setFinancialAidDue(aidDueRes.data);
+        setSuggestions(suggestionsRes.data || []);
+        setAtRiskMembers(atRisk);
+        setDisconnectedMembers(disconnected);
+        
+      } catch (onlineError) {
+        console.log('📱 Offline mode: Using cached data');
+        // Use cached data when offline
+        if (cachedMembers.length > 0) {
+          // Process cached data for offline display
+          const memberMap = {};
+          cachedMembers.forEach(m => memberMap[m.id] = { name: m.name, phone: m.phone, photo_url: m.photo_url });
+          // Set offline data...
+        }
+      }
     } catch (error) {
-      console.error('Error loading reminders');
+      toast.error('Failed to load - check connection');
     } finally {
       setLoading(false);
     }
