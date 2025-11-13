@@ -1,42 +1,38 @@
 [
   {
-    "content": "Fix phone normalization and import ALL CSV fields",
+    "content": "Show member fields in MemberDetail",
     "status": "completed"
   },
   {
-    "content": "Fix Add Campus button contrast",
+    "content": "Add Calendar event details dialog",
     "status": "completed"
-  },
-  {
-    "content": "Show new member fields (age, category, gender, blood_type, marital, membership) in MemberDetail",
-    "status": "in_progress"
-  },
-  {
-    "content": "Add three-dots menu to timeline with edit/delete",
-    "status": "pending"
-  },
-  {
-    "content": "Add event details dialog to Calendar",
-    "status": "pending"
-  },
-  {
-    "content": "Add API sync scheduler with interval + status list",
-    "status": "pending"
-  },
-  {
-    "content": "Add configurable engagement thresholds per campus",
-    "status": "pending"
   },
   {
     "content": "Add grief stage customization to Settings",
+    "status": "completed"
+  },
+  {
+    "content": "Add engagement thresholds to Settings",
+    "status": "completed"
+  },
+  {
+    "content": "Fix Add User button contrast",
+    "status": "completed"
+  },
+  {
+    "content": "Add three-dots menu to timeline",
+    "status": "in_progress"
+  },
+  {
+    "content": "Add API sync scheduler with interval",
     "status": "pending"
   },
   {
-    "content": "Fix all remaining button contrast issues",
+    "content": "Add column visibility toggles to MembersList",
     "status": "pending"
   },
   {
-    "content": "Final testing",
+    "content": "Final testing and verification",
     "status": "pending"
   }
 ]
