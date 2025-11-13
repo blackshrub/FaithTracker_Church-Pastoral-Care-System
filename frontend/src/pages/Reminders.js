@@ -114,6 +114,7 @@ export const Reminders = () => {
   const [atRiskMembers, setAtRiskMembers] = useState([]);
   const [disconnectedMembers, setDisconnectedMembers] = useState([]);
   const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
+  const [financialAidDue, setFinancialAidDue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [engagementSettings, setEngagementSettings] = useState({
     atRiskDays: 60,
