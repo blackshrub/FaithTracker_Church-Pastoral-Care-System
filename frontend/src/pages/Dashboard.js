@@ -146,6 +146,7 @@ export const Dashboard = () => {
     if (savedSettings) {
       setEngagementSettings(JSON.parse(savedSettings));
     }
+    loadMembers();
     loadReminders();
   }, []);
   
