@@ -67,15 +67,17 @@ export const MemberDetail = () => {
   const loadMemberData = async () => {
     try {
       setLoading(true);
-      const [memberRes, eventsRes, griefRes] = await Promise.all([
+      const [memberRes, eventsRes, griefRes, accidentRes] = await Promise.all([
         axios.get(`${API}/members/${id}`),
         axios.get(`${API}/care-events?member_id=${id}`),
-        axios.get(`${API}/grief-support/member/${id}`)
+        axios.get(`${API}/grief-support/member/${id}`),
+        axios.get(`${API}/accident-followup/member/${id}`)
       ]);
       
       setMember(memberRes.data);
       setCareEvents(eventsRes.data);
       setGriefTimeline(griefRes.data);
+      setAccidentTimeline(accidentRes.data);
     } catch (error) {
       toast.error(t('error_messages.member_not_found'));
       console.error('Error loading member:', error);
