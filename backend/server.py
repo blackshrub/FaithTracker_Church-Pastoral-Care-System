@@ -2310,6 +2310,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
                 suggestions.append({
                     "member_id": member['id'],
                     "member_name": member['name'],
+                    "member_phone": member['phone'],
                     "member_photo_url": member.get('photo_url'),
                     "priority": "high",
                     "suggestion": "Urgent reconnection needed",
@@ -2321,6 +2322,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
                 suggestions.append({
                     "member_id": member['id'],
                     "member_name": member['name'],
+                    "member_phone": member['phone'],
                     "member_photo_url": member.get('photo_url'),
                     "priority": "medium",
                     "suggestion": "Senior care check-in",
@@ -2332,6 +2334,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
                 suggestions.append({
                     "member_id": member['id'],
                     "member_name": member['name'],
+                    "member_phone": member['phone'],
                     "member_photo_url": member.get('photo_url'),
                     "priority": "medium",
                     "suggestion": "Visitor follow-up",
@@ -2343,6 +2346,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
                 suggestions.append({
                     "member_id": member['id'],
                     "member_name": member['name'],
+                    "member_phone": member['phone'],
                     "member_photo_url": member.get('photo_url'),
                     "priority": "medium",
                     "suggestion": "Financial aid follow-up",
@@ -2354,6 +2358,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
                 suggestions.append({
                     "member_id": member['id'],
                     "member_name": member['name'],
+                    "member_phone": member['phone'],
                     "member_photo_url": member.get('photo_url'),
                     "priority": "low",
                     "suggestion": "Single adult engagement",
