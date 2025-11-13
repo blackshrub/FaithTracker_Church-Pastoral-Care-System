@@ -1,30 +1,22 @@
 [
   {
-    "content": "Debug care event frontend save error (backend works)",
-    "status": "completed"
-  },
-  {
-    "content": "Merge hospital_visit into accident_illness everywhere",
-    "status": "completed"
-  },
-  {
-    "content": "Remove redundant dates (use only event_date)",
-    "status": "completed"
-  },
-  {
     "content": "Add Accident/Illness support config to Settings (3, 7, 14 days)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
-    "content": "Add photo thumbnails to all reminders",
-    "status": "pending"
+    "content": "Fix MemberDetail tabs to show only when data exists",
+    "status": "completed"
+  },
+  {
+    "content": "Add photo thumbnails to reminders (Avatar import added)",
+    "status": "completed"
   },
   {
     "content": "Add photo_url to API sync field mapping",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test all features",
-    "status": "pending"
+    "status": "completed"
   }
 ]
