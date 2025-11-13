@@ -430,6 +430,131 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
             "error": str(e)
         }
 
+# ==================== AUTHENTICATION ENDPOINTS ====================
+
+@api_router.post("/auth/register", response_model=UserResponse)
+async def register_user(user_data: UserCreate, current_admin: dict = Depends(get_current_admin)):
+    """Register a new user (admin only)"""
+    try:
+        # Check if email already exists
+        existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        user = User(
+            email=user_data.email,
+            name=user_data.name,
+            role=user_data.role,
+            hashed_password=get_password_hash(user_data.password)
+        )
+        
+        await db.users.insert_one(user.model_dump())
+        
+        return UserResponse(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(user_data: UserLogin):
+    """Login and get access token"""
+    try:
+        user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password"
+            )
+        
+        if not verify_password(user_data.password, user["hashed_password"]):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password"
+            )
+        
+        if not user.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is disabled"
+            )
+        
+        access_token = create_access_token(data={"sub": user["id"]})
+        
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserResponse(
+                id=user["id"],
+                email=user["email"],
+                name=user["name"],
+                role=user["role"],
+                is_active=user.get("is_active", True),
+                created_at=user["created_at"]
+            )
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current logged-in user info"""
+    return UserResponse(
+        id=current_user["id"],
+        email=current_user["email"],
+        name=current_user["name"],
+        role=current_user["role"],
+        is_active=current_user.get("is_active", True),
+        created_at=current_user["created_at"]
+    )
+
+@api_router.get("/users", response_model=List[UserResponse])
+async def list_users(current_admin: dict = Depends(get_current_admin)):
+    """List all users (admin only)"""
+    try:
+        users = await db.users.find({}, {"_id": 0}).to_list(100)
+        return [UserResponse(
+            id=u["id"],
+            email=u["email"],
+            name=u["name"],
+            role=u["role"],
+            is_active=u.get("is_active", True),
+            created_at=u["created_at"]
+        ) for u in users]
+    except Exception as e:
+        logger.error(f"Error listing users: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_admin: dict = Depends(get_current_admin)):
+    """Delete a user (admin only)"""
+    try:
+        # Prevent deleting self
+        if user_id == current_admin["id"]:
+            raise HTTPException(status_code=400, detail="Cannot delete your own account")
+        
+        result = await db.users.delete_one({"id": user_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"success": True, "message": "User deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting user: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== MEMBER ENDPOINTS ====================
 
 @api_router.post("/members", response_model=Member)
