@@ -1,34 +1,14 @@
 [
   {
-    "content": "Update member and care event create endpoints to auto-get campus_id from user",
+    "content": "Redesign scheduler - send DAILY DIGEST to PASTORAL TEAM WhatsApp (CRITICAL)",
     "status": "completed"
   },
   {
-    "content": "Redesign scheduler - send DAILY DIGEST to PASTORAL TEAM WhatsApp (CRITICAL)",
+    "content": "Build all remaining frontend pages in one bulk operation",
     "status": "in_progress"
   },
   {
-    "content": "Add campus filtering to dashboard and list endpoints",
-    "status": "pending"
-  },
-  {
-    "content": "Update frontend: campus selection at login + display campus info",
-    "status": "pending"
-  },
-  {
-    "content": "Create Admin Dashboard page (user + campus management)",
-    "status": "pending"
-  },
-  {
-    "content": "Create Calendar View page",
-    "status": "pending"
-  },
-  {
-    "content": "Create Bulk Messaging page",
-    "status": "pending"
-  },
-  {
-    "content": "Test and verify multi-campus system",
+    "content": "Test complete multi-campus system",
     "status": "pending"
   }
 ]
