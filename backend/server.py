@@ -1042,7 +1042,7 @@ async def delete_member(member_id: str):
 
 @api_router.post("/members/{member_id}/photo")
 async def upload_member_photo(member_id: str, file: UploadFile = File(...)):
-    """Upload member profile photo"""
+    """Upload member profile photo with optimization"""
     try:
         # Check member exists
         member = await db.members.find_one({"id": member_id}, {"_id": 0})
@@ -1057,23 +1057,46 @@ async def upload_member_photo(member_id: str, file: UploadFile = File(...)):
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         
-        # Resize to 400x400
+        # Optimize image: resize and compress
         image = image.convert('RGB')
-        image.thumbnail((400, 400), Image.Resampling.LANCZOS)
         
-        # Save
-        filename = f"{member_id}.jpg"
-        filepath = Path(ROOT_DIR) / "uploads" / filename
-        image.save(filepath, "JPEG", quality=85)
+        # Resize to multiple sizes for different contexts
+        sizes = {
+            'thumbnail': (100, 100),  # For lists and small avatars
+            'medium': (300, 300),     # For profile views
+            'large': (600, 600)       # For detailed views
+        }
         
-        # Update member record
-        photo_url = f"/uploads/{filename}"
+        base_filename = f"{member_id}"
+        photo_urls = {}
+        
+        for size_name, (width, height) in sizes.items():
+            # Create optimized version
+            resized = image.copy()
+            resized.thumbnail((width, height), Image.Resampling.LANCZOS)
+            
+            # Save with optimization
+            filename = f"{base_filename}_{size_name}.jpg"
+            filepath = Path(ROOT_DIR) / "uploads" / filename
+            resized.save(filepath, "JPEG", quality=85, optimize=True)
+            
+            photo_urls[size_name] = f"/uploads/{filename}"
+        
+        # Update member record with optimized photo URLs
         await db.members.update_one(
             {"id": member_id},
-            {"$set": {"photo_url": photo_url, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {
+                "photo_url": photo_urls['medium'],  # Default medium size
+                "photo_urls": photo_urls,  # All sizes available
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
         )
         
-        return {"success": True, "photo_url": photo_url}
+        return {
+            "success": True, 
+            "photo_urls": photo_urls,
+            "default_url": photo_urls['medium']
+        }
     except HTTPException:
         raise
     except Exception as e:
