@@ -928,22 +928,10 @@ async def list_members(
             member['engagement_status'] = status
             member['days_since_last_contact'] = days
         
-        # Add pagination metadata
-        total_pages = (total + limit - 1) // limit
-        has_next = page < total_pages
-        has_prev = page > 1
+        # Add pagination metadata as headers (keep response as array)
+        # This maintains compatibility while providing pagination info
         
-        return {
-            "members": members,
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total": total,
-                "total_pages": total_pages,
-                "has_next": has_next,
-                "has_prev": has_prev
-            }
-        }
+        return members
         
     except Exception as e:
         logger.error(f"Error listing members: {str(e)}")
