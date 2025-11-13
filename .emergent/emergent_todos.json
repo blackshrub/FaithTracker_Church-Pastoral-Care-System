@@ -1,14 +1,10 @@
 [
   {
-    "content": "Redesign scheduler - send DAILY DIGEST to PASTORAL TEAM WhatsApp (CRITICAL)",
+    "content": "Build all remaining frontend pages in one bulk operation",
     "status": "completed"
   },
   {
-    "content": "Build all remaining frontend pages in one bulk operation",
+    "content": "Test complete multi-campus system with login and dashboard",
     "status": "in_progress"
-  },
-  {
-    "content": "Test complete multi-campus system",
-    "status": "pending"
   }
 ]
