@@ -226,6 +226,66 @@ export const Dashboard = () => {
     }
   };
   
+  const loadMembers = async () => {
+    try {
+      const response = await axios.get(`${API}/members`);
+      setAllMembers(response.data);
+    } catch (error) {
+      console.error('Error loading members');
+    }
+  };
+  
+  const handleQuickEvent = async (e) => {
+    e.preventDefault();
+    if (selectedMemberIds.length === 0) {
+      toast.error('Select at least one member');
+      return;
+    }
+    
+    try {
+      let success = 0;
+      for (const memberId of selectedMemberIds) {
+        const member = allMembers.find(m => m.id === memberId);
+        await axios.post(`${API}/care-events`, {
+          member_id: memberId,
+          campus_id: member.campus_id,
+          ...quickEvent,
+          aid_amount: quickEvent.aid_amount ? parseFloat(quickEvent.aid_amount) : null
+        });
+        success++;
+      }
+      toast.success(`Added care event for ${success} members!`);
+      setQuickEventOpen(false);
+      setSelectedMemberIds([]);
+      setMemberSearch('');
+      setQuickEvent({
+        event_type: 'regular_contact',
+        event_date: new Date().toISOString().split('T')[0],
+        title: '',
+        description: '',
+        aid_type: 'education',
+        aid_amount: '',
+        grief_relationship: '',
+        hospital_name: ''
+      });
+      loadDashboardData();
+    } catch (error) {
+      toast.error('Failed to add events');
+    }
+  };
+  
+  const toggleMemberSelection = (memberId) => {
+    setSelectedMemberIds(prev => 
+      prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId]
+    );
+    setMemberSearch('');
+  };
+  
+  const filteredMembers = allMembers.filter(m => 
+    m.name.toLowerCase().includes(memberSearch.toLowerCase())
+  );
+
+  
   if (loading) return <div>Loading...</div>;
   
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
