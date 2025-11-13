@@ -396,6 +396,41 @@ export const ImportExport = () => {
               )}
             </CardContent>
           </Card>
+          
+          {/* Edit Sync Dialog */}
+          <Dialog open={editSyncOpen} onOpenChange={setEditSyncOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Edit API Sync Job</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleUpdateSync} className="space-y-4">
+                <div>
+                  <Label>API URL</Label>
+                  <Input value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Sync Interval (minutes)</Label>
+                  <Input type="number" value={syncInterval} onChange={(e) => setSyncInterval(parseInt(e.target.value))} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(fieldMapping).map(([key, value]) => (
+                    <div key={key}>
+                      <Label className="text-xs">{key.replace('_', ' ')}:</Label>
+                      <Input 
+                        value={value}
+                        onChange={(e) => setFieldMapping({...fieldMapping, [key]: e.target.value})}
+                        className="text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => setEditSyncOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">Update Sync</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>
