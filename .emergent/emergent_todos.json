@@ -1,26 +1,26 @@
 [
   {
     "content": "Design comprehensive analytics with member demographics, care trends, financial insights",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add engagement analytics (at-risk trends, contact frequency)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add financial aid analytics (spending patterns, aid effectiveness)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add grief support analytics (completion rates, stage timings)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add predictive analytics (at-risk prediction, aid need forecasting)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Create interactive charts with drill-down capability",
-    "status": "pending"
+    "status": "completed"
   }
 ]
