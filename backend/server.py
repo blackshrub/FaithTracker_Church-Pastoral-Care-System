@@ -195,12 +195,18 @@ class MemberCreate(BaseModel):
     phone: str
     campus_id: str
     family_group_id: Optional[str] = None
-    family_group_name: Optional[str] = None  # For creating new family group
+    family_group_name: Optional[str] = None
     external_member_id: Optional[str] = None
     notes: Optional[str] = None
     birth_date: Optional[date] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    category: Optional[str] = None
+    gender: Optional[str] = None
+    blood_type: Optional[str] = None
+    marital_status: Optional[str] = None
+    membership_status: Optional[str] = None
+    age: Optional[int] = None
 
 class MemberUpdate(BaseModel):
     name: Optional[str] = None
@@ -211,6 +217,11 @@ class MemberUpdate(BaseModel):
     birth_date: Optional[date] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    category: Optional[str] = None
+    gender: Optional[str] = None
+    blood_type: Optional[str] = None
+    marital_status: Optional[str] = None
+    membership_status: Optional[str] = None
 
 class Member(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -229,6 +240,12 @@ class Member(BaseModel):
     birth_date: Optional[date] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    category: Optional[str] = None
+    gender: Optional[str] = None
+    blood_type: Optional[str] = None
+    marital_status: Optional[str] = None
+    membership_status: Optional[str] = None
+    age: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
