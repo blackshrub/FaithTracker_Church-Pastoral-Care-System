@@ -117,15 +117,20 @@ async def import_campuses_and_data():
                     
                     family_group_id = family_groups_map[kk_name][campus_id]
                 
-                # Parse birth date
+                # Parse birth date and calculate age
                 birth_date = None
+                age = None
                 if row.get('birth_date'):
                     try:
                         birth_date = row['birth_date']
+                        # Calculate age if birth date exists
+                        birth_dt = datetime.fromisoformat(birth_date).date() if isinstance(birth_date, str) else birth_date
+                        today = date.today()
+                        age = today.year - birth_dt.year - ((today.month, today.day) < (birth_dt.month, birth_dt.day))
                     except:
                         pass
                 
-                # Create member
+                # Create member with all fields
                 member = {
                     "id": str(uuid.uuid4()),
                     "name": name,
@@ -134,12 +139,18 @@ async def import_campuses_and_data():
                     "family_group_id": family_group_id,
                     "external_member_id": row.get('identity_jemaat', '').strip(),
                     "birth_date": birth_date,
+                    "age": age,
                     "email": row.get('email', '').strip() or None,
                     "address": row.get('address', '').strip() or None,
+                    "category": row.get('category', '').strip() or None,
+                    "gender": row.get('gender', '').strip() or None,
+                    "blood_type": row.get('blood_type', '').strip() or None,
+                    "marital_status": row.get('marital', '').strip() or None,
+                    "membership_status": membership_status,
                     "notes": None,
                     "photo_url": None,
                     "last_contact_date": None,
-                    "engagement_status": "inactive",  # Will be updated by care events
+                    "engagement_status": "inactive",
                     "days_since_last_contact": 999,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat()
