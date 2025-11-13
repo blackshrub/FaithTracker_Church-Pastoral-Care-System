@@ -1,6 +1,14 @@
 [
   {
-    "content": "Test complete multi-campus system with login and dashboard",
-    "status": "completed"
+    "content": "Create Admin Dashboard page with Campus Management and User Management",
+    "status": "in_progress"
+  },
+  {
+    "content": "Add Admin menu item (only visible to full_admin)",
+    "status": "pending"
+  },
+  {
+    "content": "Test admin features end-to-end",
+    "status": "pending"
   }
 ]
