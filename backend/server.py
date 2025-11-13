@@ -602,7 +602,17 @@ async def create_care_event(event: CareEventCreate):
         if event.initial_visitation:
             care_event.visitation_log = [event.initial_visitation.model_dump()]
         
-        await db.care_events.insert_one(care_event.model_dump())
+        # Serialize for MongoDB
+        event_dict = care_event.model_dump()
+        event_dict['event_date'] = event_dict['event_date'].isoformat() if isinstance(event_dict['event_date'], date) else event_dict['event_date']
+        if event_dict.get('mourning_service_date'):
+            event_dict['mourning_service_date'] = event_dict['mourning_service_date'].isoformat() if isinstance(event_dict['mourning_service_date'], date) else event_dict['mourning_service_date']
+        if event_dict.get('admission_date'):
+            event_dict['admission_date'] = event_dict['admission_date'].isoformat() if isinstance(event_dict['admission_date'], date) else event_dict['admission_date']
+        if event_dict.get('discharge_date'):
+            event_dict['discharge_date'] = event_dict['discharge_date'].isoformat() if isinstance(event_dict['discharge_date'], date) else event_dict['discharge_date']
+        
+        await db.care_events.insert_one(event_dict)
         
         # Update member's last contact date
         await db.members.update_one(
@@ -622,6 +632,7 @@ async def create_care_event(event: CareEventCreate):
             )
             if timeline:
                 await db.grief_support.insert_many(timeline)
+                logger.info(f"Generated {len(timeline)} grief support stages for member {event.member_id}")
         
         return care_event
     except Exception as e:
