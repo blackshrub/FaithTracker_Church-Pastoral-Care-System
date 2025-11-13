@@ -127,6 +127,8 @@ export const Dashboard = () => {
     setSelectedMemberIds(prev => 
       prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId]
     );
+    // Clear search field after selection
+    setMemberSearch('');
   };
   
   const filteredMembers = allMembers.filter(m => 
