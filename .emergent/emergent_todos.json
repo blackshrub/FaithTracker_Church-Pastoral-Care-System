@@ -1,26 +1,34 @@
 [
   {
-    "content": "Add bulk checkboxes to MembersList table",
-    "status": "completed"
+    "content": "Fix phone normalization and import ALL CSV fields (birthday, category, gender, blood_type, marital, membership_status)",
+    "status": "in_progress"
   },
   {
-    "content": "Add edit/delete buttons to MembersList",
-    "status": "completed"
+    "content": "Update Member model to include all new fields",
+    "status": "pending"
   },
   {
-    "content": "Add member edit modal",
-    "status": "completed"
+    "content": "Add three-dots menu to timeline items with edit/delete",
+    "status": "pending"
   },
   {
-    "content": "Update WhatsAppLogs with resend for ALL messages",
-    "status": "completed"
+    "content": "Test digest send to 6281290080025",
+    "status": "pending"
   },
   {
-    "content": "Add API field mapping configuration UI",
-    "status": "completed"
+    "content": "Add event details dialog to Calendar on date click",
+    "status": "pending"
   },
   {
-    "content": "All core features COMPLETE - ready for testing",
-    "status": "completed"
+    "content": "Add grief stage customization to Settings",
+    "status": "pending"
+  },
+  {
+    "content": "Add API sync scheduler with interval and status list",
+    "status": "pending"
+  },
+  {
+    "content": "Final comprehensive testing",
+    "status": "pending"
   }
 ]
