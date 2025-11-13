@@ -889,12 +889,14 @@ async def create_member(member: MemberCreate, current_user: dict = Depends(get_c
 
 @api_router.get("/members", response_model=List[Member])
 async def list_members(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
     engagement_status: Optional[EngagementStatus] = None,
     family_group_id: Optional[str] = None,
     search: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """List all members with optional filters"""
+    """List all members with pagination"""
     try:
         query = get_campus_filter(current_user)
         
@@ -905,12 +907,16 @@ async def list_members(
             query["family_group_id"] = family_group_id
         
         if search:
-            query["$or"] = [
-                {"name": {"$regex": search, "$options": "i"}},
-                {"phone": {"$regex": search, "$options": "i"}}
-            ]
+            query["$text"] = {"$search": search}  # Use text index for fast search
         
-        members = await db.members.find(query, {"_id": 0}).to_list(2000)
+        # Calculate skip for pagination
+        skip = (page - 1) * limit
+        
+        # Get total count for pagination metadata
+        total = await db.members.count_documents(query)
+        
+        # Get paginated members
+        members = await db.members.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
         
         # Update engagement status for each member
         for member in members:
@@ -922,7 +928,23 @@ async def list_members(
             member['engagement_status'] = status
             member['days_since_last_contact'] = days
         
-        return members
+        # Add pagination metadata
+        total_pages = (total + limit - 1) // limit
+        has_next = page < total_pages
+        has_prev = page > 1
+        
+        return {
+            "members": members,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_prev": has_prev
+            }
+        }
+        
     except Exception as e:
         logger.error(f"Error listing members: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
