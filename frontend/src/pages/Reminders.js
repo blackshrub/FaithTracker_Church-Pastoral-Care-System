@@ -152,7 +152,7 @@ export const Reminders = () => {
         </TabsList>
         
         <TabsContent value="today" className="space-y-4">
-          {birthdaysToday.length === 0 && griefDue.length === 0 ? (
+          {birthdaysToday.length === 0 && griefToday.length === 0 ? (
             <Card><CardContent className="p-6 text-center">No urgent tasks for today! 🎉</CardContent></Card>
           ) : (
             <>
@@ -183,16 +183,16 @@ export const Reminders = () => {
                 </Card>
               )}
               
-              {griefDue.length > 0 && (
+              {griefToday.length > 0 && (
                 <Card className="card-border-left-pink">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      💔 Grief Support Due ({griefDue.length})
+                      💔 Grief Support Due Today ({griefToday.length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {griefDue.map(stage => (
+                      {griefToday.map(stage => (
                         <div key={stage.id} className="p-3 bg-pink-50 rounded flex justify-between items-center">
                           <div>
                             <p className="font-semibold">{stage.member_name}</p>
