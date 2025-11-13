@@ -11,6 +11,8 @@ import { MemberDetail } from '@/pages/MemberDetail';
 import { FinancialAid } from '@/pages/FinancialAid';
 import { Analytics } from '@/pages/Analytics';
 import { AdminDashboard } from '@/pages/AdminDashboard';
+import { ImportExport } from '@/pages/ImportExport';
+import { Settings as SettingsPage } from '@/pages/Settings';
 import { IntegrationTest } from '@/components/IntegrationTest';
 import { Layout } from '@/components/Layout';
 
@@ -41,6 +43,8 @@ function AppRoutes() {
       <Route path="/financial-aid" element={<ProtectedRoute><Layout><FinancialAid /></Layout></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
+      <Route path="/import-export" element={<ProtectedRoute><Layout><ImportExport /></Layout></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
       <Route path="/integrations" element={<ProtectedRoute><Layout><IntegrationTest /></Layout></ProtectedRoute>} />
     </Routes>
   );
