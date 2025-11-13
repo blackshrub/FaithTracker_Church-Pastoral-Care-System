@@ -18,6 +18,12 @@ export const ImportExport = () => {
   const [jsonData, setJsonData] = useState('');
   const [apiUrl, setApiUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [fieldMapping, setFieldMapping] = useState({
+    name: 'name',
+    phone: 'phone',
+    email: 'email',
+    external_id: 'id'
+  });
   const [importing, setImporting] = useState(false);
   
   const handleCsvImport = async (e) => {
