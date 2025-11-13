@@ -1,18 +1,22 @@
 [
   {
-    "content": "Add accident follow-up timeline display to MemberDetail (3 stages like grief)",
-    "status": "completed"
+    "content": "Add CSV preview with field mapping validation before import",
+    "status": "in_progress"
   },
   {
-    "content": "Update MemberDetail to load accident timeline data",
-    "status": "completed"
+    "content": "Add API connection test and preview before sync setup",
+    "status": "pending"
   },
   {
-    "content": "Restart backend and test accident event creation generates 3 stages",
-    "status": "completed"
+    "content": "Add data quality checks (phone validation, duplicate detection)",
+    "status": "pending"
   },
   {
-    "content": "Final system verification",
-    "status": "completed"
+    "content": "Add confirmation dialogs for all import operations",
+    "status": "pending"
+  },
+  {
+    "content": "Test enterprise validation features",
+    "status": "pending"
   }
 ]
