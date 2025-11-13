@@ -75,10 +75,13 @@ export const Layout = ({ children }) => {
             <div className="flex items-center gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <div className="text-left hidden md:block">
+                  <Button variant="ghost" size="sm" className="gap-2 border-0 hover:bg-teal-50">
+                    <div className="text-right hidden md:block">
                       <p className="text-sm font-semibold">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground">{user?.role === 'full_admin' ? 'Full Admin' : user?.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.role === 'full_admin' ? 'Full Administrator' : 
+                         user?.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
+                      </p>
                     </div>
                     <ChevronDown className="w-4 h-4" />
                   </Button>
