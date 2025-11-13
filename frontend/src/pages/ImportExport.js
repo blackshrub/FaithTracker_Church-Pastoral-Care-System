@@ -57,6 +57,28 @@ export const ImportExport = () => {
     }
   };
   
+  const handleApiSync = async (e) => {
+    e.preventDefault();
+    if (!apiUrl) return;
+    
+    try {
+      setImporting(true);
+      const response = await axios.post(`${API}/sync/members/from-api`, null, {
+        params: { api_url: apiUrl, api_key: apiKey || undefined }
+      });
+      toast.success(`Synced ${response.data.synced_count} members from API!`);
+      if (response.data.errors.length > 0) {
+        toast.warning(`${response.data.errors.length} errors occurred`);
+      }
+      setApiUrl('');
+      setApiKey('');
+    } catch (error) {
+      toast.error('API sync failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+  
   const handleExportMembers = async () => {
     try {
       const response = await axios.get(`${API}/export/members/csv`, { responseType: 'blob' });
