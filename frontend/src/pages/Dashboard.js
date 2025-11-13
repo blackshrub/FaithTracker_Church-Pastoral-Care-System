@@ -243,19 +243,71 @@ export const Dashboard = () => {
       return;
     }
     
+    // Auto-generate title based on event type (except financial aid)
+    const eventTypeNames = {
+      birthday: 'Birthday Celebration',
+      childbirth: 'New Baby Celebration',
+      grief_loss: 'Grief Support',
+      new_house: 'New Home Visit',
+      accident_illness: 'Medical Support',
+      regular_contact: 'Regular Contact',
+      financial_aid: quickEvent.title // Use custom title for financial aid
+    };
+    
+    const autoTitle = eventTypeNames[quickEvent.event_type] || quickEvent.title;
+    
     try {
       let success = 0;
       for (const memberId of selectedMemberIds) {
         const member = allMembers.find(m => m.id === memberId);
-        await axios.post(`${API}/care-events`, {
-          member_id: memberId,
-          campus_id: member.campus_id,
-          ...quickEvent,
-          aid_amount: quickEvent.aid_amount ? parseFloat(quickEvent.aid_amount) : null
-        });
+        
+        if (quickEvent.event_type === 'financial_aid') {
+          if (quickEvent.schedule_frequency === 'one_time') {
+            // One-time aid: Create care event
+            await axios.post(`${API}/care-events`, {
+              member_id: memberId,
+              campus_id: member.campus_id,
+              event_type: 'financial_aid',
+              event_date: quickEvent.payment_date || quickEvent.event_date,
+              title: autoTitle,
+              description: quickEvent.description,
+              aid_type: quickEvent.aid_type,
+              aid_amount: parseFloat(quickEvent.aid_amount)
+            });
+          } else {
+            // Scheduled aid: Create schedule
+            await axios.post(`${API}/financial-aid-schedules`, {
+              member_id: memberId,
+              campus_id: member.campus_id,
+              title: autoTitle,
+              aid_type: quickEvent.aid_type,
+              aid_amount: parseFloat(quickEvent.aid_amount),
+              frequency: quickEvent.schedule_frequency,
+              start_date: quickEvent.schedule_start_date,
+              end_date: quickEvent.schedule_end_date || null,
+              day_of_week: quickEvent.day_of_week,
+              day_of_month: quickEvent.day_of_month,
+              month_of_year: quickEvent.month_of_year,
+              notes: quickEvent.description
+            });
+          }
+        } else {
+          // Other events: Create normal care event with auto title
+          await axios.post(`${API}/care-events`, {
+            member_id: memberId,
+            campus_id: member.campus_id,
+            event_type: quickEvent.event_type,
+            event_date: quickEvent.event_date,
+            title: autoTitle,
+            description: quickEvent.description,
+            grief_relationship: quickEvent.grief_relationship,
+            hospital_name: quickEvent.hospital_name
+          });
+        }
         success++;
       }
-      toast.success(`Added care event for ${success} members!`);
+      
+      toast.success(`Added ${quickEvent.event_type.replace('_', ' ')} for ${success} members!`);
       setQuickEventOpen(false);
       setSelectedMemberIds([]);
       setMemberSearch('');
@@ -267,7 +319,8 @@ export const Dashboard = () => {
         aid_type: 'education',
         aid_amount: '',
         grief_relationship: '',
-        hospital_name: ''
+        hospital_name: '',
+        schedule_frequency: 'one_time'
       });
       loadReminders();
     } catch (error) {
