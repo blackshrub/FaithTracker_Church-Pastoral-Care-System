@@ -294,7 +294,86 @@ export const Dashboard = () => {
               <DialogHeader>
                 <DialogTitle>Quick Care Event (Multi-Member)</DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground">Add same event to multiple members at once</p>
+              <form onSubmit={handleQuickEvent} className="space-y-6">
+                {/* Member Selection */}
+                <div className="space-y-3">
+                  <Label>Select Members *</Label>
+                  <Input
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Type member name to search..."
+                  />
+                  
+                  {selectedMemberIds.length > 0 && (
+                    <div className="p-3 bg-teal-50 rounded border">
+                      <p className="font-semibold text-sm mb-2">Selected Members ({selectedMemberIds.length}):</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedMemberIds.map(id => {
+                          const member = allMembers.find(m => m.id === id);
+                          return member ? (
+                            <span key={id} className="bg-teal-100 text-teal-800 px-2 py-1 rounded text-xs flex items-center gap-1">
+                              {member.name}
+                              <button type="button" onClick={() => toggleMemberSelection(id)} className="ml-1 text-teal-600">×</button>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {memberSearch && (
+                    <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
+                      {filteredMembers.slice(0, 15).map(member => (
+                        <div key={member.id} className="flex items-center gap-2 p-1 hover:bg-muted rounded">
+                          <Checkbox
+                            checked={selectedMemberIds.includes(member.id)}
+                            onCheckedChange={() => toggleMemberSelection(member.id)}
+                          />
+                          <span className="text-sm">{member.name}</span>
+                          <span className="text-xs text-muted-foreground">({member.phone})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Event Details */}
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label>Event Type *</Label>
+                    <Select value={quickEvent.event_type} onValueChange={(v) => setQuickEvent({...quickEvent, event_type: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="childbirth">👶 Childbirth</SelectItem>
+                        <SelectItem value="financial_aid">💰 Financial Aid</SelectItem>
+                        <SelectItem value="grief_loss">💔 Grief/Loss</SelectItem>
+                        <SelectItem value="new_house">🏠 New House</SelectItem>
+                        <SelectItem value="accident_illness">🚑 Accident/Illness</SelectItem>
+                        <SelectItem value="regular_contact">📞 Regular Contact</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {quickEvent.event_type !== 'financial_aid' && (
+                    <div>
+                      <Label>Date *</Label>
+                      <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <Label>Title *</Label>
+                  <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Financial assistance" required />
+                </div>
+                
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={() => setQuickEventOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white" disabled={selectedMemberIds.length === 0}>
+                    Save for {selectedMemberIds.length} Member{selectedMemberIds.length !== 1 ? 's' : ''}
+                  </Button>
+                </div>
+              </form>
             </DialogContent>
           </Dialog>
           <Link to="/members">
