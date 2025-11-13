@@ -535,6 +535,70 @@ export const MemberDetail = () => {
           </Card>
         </TabsContent>
         
+        {/* Accident Follow-up Timeline Tab */}
+        <TabsContent value="accident-timeline" className="space-y-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                {accidentTimeline.map((stage, index) => (
+                  <div key={stage.id} className="relative" data-testid={`accident-stage-${stage.id}`}>
+                    {index > 0 && <div className="absolute left-6 top-0 w-0.5 h-6 bg-primary-200 -mt-6"></div>}
+                    <div className="flex gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        stage.completed ? 'bg-blue-500' : 'bg-blue-100'
+                      }`}>
+                        {stage.completed ? (
+                          <CheckCircle2 className="w-6 h-6 text-white" />
+                        ) : (
+                          <span className="text-sm font-bold text-blue-700">{index + 1}</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-playfair font-semibold text-foreground">
+                          {stage.stage === 'first_followup' ? 'First Follow-up' :
+                           stage.stage === 'second_followup' ? 'Second Follow-up' :
+                           'Final Follow-up'}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(stage.scheduled_date, 'dd MMM yyyy')}
+                        </p>
+                        {stage.notes && (
+                          <p className="text-sm text-muted-foreground mt-2 italic">
+                            Notes: {stage.notes}
+                          </p>
+                        )}
+                        {!stage.completed && (
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  await axios.post(`${API}/accident-followup/${stage.id}/complete`);
+                                  toast.success('Follow-up completed');
+                                  loadMemberData();
+                                } catch (error) {
+                                  toast.error('Failed to complete');
+                                }
+                              }}
+                            >
+                              Mark Complete
+                            </Button>
+                          </div>
+                        )}
+                        {stage.completed && (
+                          <p className="text-xs text-blue-600 mt-2">
+                            Completed: {formatDate(stage.completed_at, 'dd MMM yyyy')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         {/* Accident/Illness Tab */}
         <TabsContent value="accident">
           <Card>
