@@ -52,9 +52,7 @@ export const MemberDetail = () => {
     title: '',
     description: '',
     grief_relationship: '',
-    mourning_service_date: '',
     hospital_name: '',
-    admission_date: '',
     aid_type: 'education',
     aid_amount: ''
   });
