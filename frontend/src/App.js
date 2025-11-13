@@ -1,24 +1,26 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import './i18n';
 import '@/App.css';
 import LoginPage from '@/pages/LoginPage';
-import { Dashboard } from '@/pages/Dashboard';
-import { MembersList } from '@/pages/MembersList';
-import { MemberDetail } from '@/pages/MemberDetail';
-import { FinancialAid } from '@/pages/FinancialAid';
-import { Analytics } from '@/pages/Analytics';
-import { AdminDashboard } from '@/pages/AdminDashboard';
-import { ImportExport } from '@/pages/ImportExport';
-import { Settings as SettingsPage } from '@/pages/Settings';
-import { WhatsAppLogs } from '@/pages/WhatsAppLogs';
-import { Calendar } from '@/pages/Calendar';
-import { BulkMessaging } from '@/pages/BulkMessaging';
-import { Reminders } from '@/pages/Reminders';
-import { IntegrationTest } from '@/components/IntegrationTest';
-import { Layout } from '@/components/Layout';
+
+// Lazy load components
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const MembersList = lazy(() => import('@/pages/MembersList'));
+const MemberDetail = lazy(() => import('@/pages/MemberDetail'));
+const FinancialAid = lazy(() => import('@/pages/FinancialAid'));
+const Analytics = lazy(() => import('@/pages/Analytics'));
+const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
+const ImportExport = lazy(() => import('@/pages/ImportExport'));
+const Settings = lazy(() => import('@/pages/Settings'));
+const WhatsAppLogs = lazy(() => import('@/pages/WhatsAppLogs'));
+const Calendar = lazy(() => import('@/pages/Calendar'));
+const BulkMessaging = lazy(() => import('@/pages/BulkMessaging'));
+const Reminders = lazy(() => import('@/pages/Reminders'));
+const IntegrationTest = lazy(() => import('@/components/IntegrationTest'));
+const Layout = lazy(() => import('@/components/Layout'));
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
