@@ -121,7 +121,30 @@ export const AdminDashboard = () => {
                 <Table>
                   <TableHeader><TableRow><TableHead>Campus</TableHead><TableHead>Location</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {campuses.map(c => <TableRow key={c.id}><TableCell>{c.campus_name}</TableCell><TableCell>{c.location || '-'}</TableCell></TableRow>)}
+                    {campuses.map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell>{c.campus_name}</TableCell>
+                        <TableCell>{c.location || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => {
+                              setNewCampus({campus_name: c.campus_name, location: c.location || ''});
+                              setCampusModalOpen(true);
+                            }}>Edit</Button>
+                            <Button size="sm" variant="ghost" className="text-red-600" onClick={async () => {
+                              if (!window.confirm(`Delete ${c.campus_name}?`)) return;
+                              try {
+                                await axios.delete(`${API}/campuses/${c.id}`);
+                                toast.success('Deleted');
+                                loadData();
+                              } catch (e) {
+                                toast.error('Cannot delete - has members');
+                              }
+                            }}>Delete</Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
