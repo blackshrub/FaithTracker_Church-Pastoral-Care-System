@@ -381,9 +381,14 @@ export const ImportExport = () => {
                       <div className="text-right">
                         <p className="text-sm font-semibold text-green-600">✅ Synced</p>
                         <p className="text-xs text-muted-foreground">Last: {sync.last_sync.toLocaleTimeString()}</p>
-                        <Button size="sm" variant="outline" className="mt-2">
-                          Stop Sync
-                        </Button>
+                        <div className="flex gap-2 mt-2">
+                          <Button size="sm" variant="outline" onClick={() => handleEditSync(sync.id)}>
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            Stop
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
