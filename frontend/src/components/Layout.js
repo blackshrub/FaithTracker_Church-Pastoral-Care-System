@@ -15,10 +15,15 @@ export const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Members', href: '/members', icon: Users },
-    { name: 'Reminders', href: '/dashboard', icon: MessageSquare },
+    { name: 'Financial Aid', href: '/financial-aid', icon: DollarSign },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Import/Export', href: '/import-export', icon: Upload },
+    { name: 'Settings', href: '/settings', icon: Cog },
   ];
   
-  const isActive = (href) => location.pathname === href || (href === '/dashboard' && location.pathname === '/');
+  if (user?.role === 'full_admin') {
+    navigation.splice(5, 0, { name: 'Admin', href: '/admin', icon: Shield });
+  }
   
   return (
     <div className="min-h-screen">
