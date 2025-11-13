@@ -1,38 +1,26 @@
 [
   {
-    "content": "Redesign Dashboard to match reference (Welcome message, colored borders, Quick Actions)",
+    "content": "Fix duplicate Admin menu and Aid tab overflow",
+    "status": "completed"
+  },
+  {
+    "content": "Add API sync endpoint for continuous member sync",
     "status": "in_progress"
   },
   {
-    "content": "Redesign Layout/Navigation to horizontal top nav like reference",
+    "content": "Complete MembersList with edit/delete/bulk operations",
     "status": "pending"
   },
   {
-    "content": "Add edit/delete modals to MembersList with bulk checkboxes",
+    "content": "Complete AdminDashboard with campus edit/delete",
     "status": "pending"
   },
   {
-    "content": "Add edit/delete to AdminDashboard for campuses",
+    "content": "Build Calendar, Bulk Messaging, WhatsApp Logs pages",
     "status": "pending"
   },
   {
-    "content": "Create Calendar View page",
-    "status": "pending"
-  },
-  {
-    "content": "Create Bulk Messaging page",
-    "status": "pending"
-  },
-  {
-    "content": "Update all cards to have colored left borders",
-    "status": "pending"
-  },
-  {
-    "content": "Update routes for WhatsApp Logs",
-    "status": "pending"
-  },
-  {
-    "content": "Final testing",
+    "content": "Test everything",
     "status": "pending"
   }
 ]
