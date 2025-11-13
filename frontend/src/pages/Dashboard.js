@@ -516,6 +516,110 @@ export const Dashboard = () => {
                         />
                       </div>
                     </div>
+                    
+                    {/* Financial Aid Scheduling */}
+                    <div className="space-y-4 border-t pt-4">
+                      <h5 className="font-semibold text-green-800">📅 Payment Type</h5>
+                      <div>
+                        <Label>Frequency *</Label>
+                        <Select value={quickEvent.schedule_frequency || 'one_time'} onValueChange={(v) => setQuickEvent({...quickEvent, schedule_frequency: v})}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="one_time">One-time Payment (already given)</SelectItem>
+                            <SelectItem value="weekly">Weekly Schedule (future payments)</SelectItem>
+                            <SelectItem value="monthly">Monthly Schedule (future payments)</SelectItem>
+                            <SelectItem value="annually">Annual Schedule (future payments)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {quickEvent.schedule_frequency === 'one_time' && (
+                        <div>
+                          <Label>Payment Date *</Label>
+                          <Input
+                            type="date"
+                            value={quickEvent.payment_date || quickEvent.event_date}
+                            onChange={(e) => setQuickEvent({...quickEvent, payment_date: e.target.value})}
+                            required
+                          />
+                        </div>
+                      )}
+                      
+                      {quickEvent.schedule_frequency === 'weekly' && (
+                        <div className="grid grid-cols-3 gap-3 p-3 bg-blue-50 rounded">
+                          <div>
+                            <Label className="text-xs">Start Date</Label>
+                            <Input type="date" value={quickEvent.schedule_start_date || ''} onChange={(e) => setQuickEvent({...quickEvent, schedule_start_date: e.target.value})} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Day of Week</Label>
+                            <Select value={quickEvent.day_of_week || 'monday'} onValueChange={(v) => setQuickEvent({...quickEvent, day_of_week: v})}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="monday">Monday</SelectItem>
+                                <SelectItem value="tuesday">Tuesday</SelectItem>
+                                <SelectItem value="wednesday">Wednesday</SelectItem>
+                                <SelectItem value="thursday">Thursday</SelectItem>
+                                <SelectItem value="friday">Friday</SelectItem>
+                                <SelectItem value="saturday">Saturday</SelectItem>
+                                <SelectItem value="sunday">Sunday</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">End Date</Label>
+                            <Input type="date" value={quickEvent.schedule_end_date || ''} onChange={(e) => setQuickEvent({...quickEvent, schedule_end_date: e.target.value})} />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {quickEvent.schedule_frequency === 'monthly' && (
+                        <div className="grid grid-cols-3 gap-3 p-3 bg-purple-50 rounded">
+                          <div>
+                            <Label className="text-xs">Start Month</Label>
+                            <Input type="month" value={quickEvent.schedule_start_date ? quickEvent.schedule_start_date.substring(0, 7) : ''} onChange={(e) => setQuickEvent({...quickEvent, schedule_start_date: e.target.value + '-01'})} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Day of Month</Label>
+                            <Input type="number" min="1" max="31" value={quickEvent.day_of_month || ''} onChange={(e) => setQuickEvent({...quickEvent, day_of_month: parseInt(e.target.value) || 1})} placeholder="13" />
+                          </div>
+                          <div>
+                            <Label className="text-xs">End Month</Label>
+                            <Input type="month" value={quickEvent.schedule_end_date ? quickEvent.schedule_end_date.substring(0, 7) : ''} onChange={(e) => setQuickEvent({...quickEvent, schedule_end_date: e.target.value + '-01'})} />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {quickEvent.schedule_frequency === 'annually' && (
+                        <div className="grid grid-cols-2 gap-3 p-3 bg-orange-50 rounded">
+                          <div>
+                            <Label className="text-xs">Month of Year</Label>
+                            <Select value={(quickEvent.month_of_year || 1).toString()} onValueChange={(v) => setQuickEvent({...quickEvent, month_of_year: parseInt(v)})}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">January</SelectItem>
+                                <SelectItem value="2">February</SelectItem>
+                                <SelectItem value="3">March</SelectItem>
+                                <SelectItem value="4">April</SelectItem>
+                                <SelectItem value="5">May</SelectItem>
+                                <SelectItem value="6">June</SelectItem>
+                                <SelectItem value="7">July</SelectItem>
+                                <SelectItem value="8">August</SelectItem>
+                                <SelectItem value="9">September</SelectItem>
+                                <SelectItem value="10">October</SelectItem>
+                                <SelectItem value="11">November</SelectItem>
+                                <SelectItem value="12">December</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">End Year</Label>
+                            <Input type="number" min={new Date().getFullYear()} value={quickEvent.schedule_end_date ? new Date(quickEvent.schedule_end_date).getFullYear() : ''} onChange={(e) => setQuickEvent({...quickEvent, schedule_end_date: e.target.value ? `${e.target.value}-12-31` : ''})} placeholder="2030" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
                     <p className="text-sm text-green-700">
                       Total: Rp {((quickEvent.aid_amount || 0) * selectedMemberIds.length).toLocaleString('id-ID')} for {selectedMemberIds.length} members
                     </p>
