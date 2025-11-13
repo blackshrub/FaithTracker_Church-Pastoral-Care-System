@@ -1,42 +1,46 @@
 [
   {
     "content": "Update all backend models with campus_id (CareEvent, GriefSupport, NotificationLog)",
-    "status": "in_progress"
-  },
-  {
-    "content": "Add campus filtering to all existing endpoints",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Create Campus CRUD endpoints",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update auth endpoints for campus selection at login",
+    "status": "completed"
+  },
+  {
+    "content": "Download and parse core_jemaat.csv",
+    "status": "completed"
+  },
+  {
+    "content": "Create campus import script (extract from baptist_place)",
+    "status": "completed"
+  },
+  {
+    "content": "Create member import script with family grouping",
+    "status": "completed"
+  },
+  {
+    "content": "Run data import - import 696 members and generate dummy data",
+    "status": "in_progress"
+  },
+  {
+    "content": "Update member create endpoint to include campus_id",
+    "status": "pending"
+  },
+  {
+    "content": "Update care event create to include campus_id",
+    "status": "pending"
+  },
+  {
+    "content": "Add campus filtering to all list endpoints",
     "status": "pending"
   },
   {
     "content": "Redesign scheduler to send to PASTORAL TEAM, not members",
-    "status": "pending"
-  },
-  {
-    "content": "Create daily digest aggregation function",
-    "status": "pending"
-  },
-  {
-    "content": "Download and parse core_jemaat.csv",
-    "status": "pending"
-  },
-  {
-    "content": "Create campus import script (extract from baptist_place)",
-    "status": "pending"
-  },
-  {
-    "content": "Create member import script with family grouping",
-    "status": "pending"
-  },
-  {
-    "content": "Generate realistic dummy pastoral care data",
     "status": "pending"
   },
   {
@@ -48,7 +52,7 @@
     "status": "pending"
   },
   {
-    "content": "Create Calendar View page (month/week/day)",
+    "content": "Create Calendar View page",
     "status": "pending"
   },
   {
@@ -56,23 +60,7 @@
     "status": "pending"
   },
   {
-    "content": "Create Advanced Analytics page",
-    "status": "pending"
-  },
-  {
-    "content": "Create Daily Digest UI",
-    "status": "pending"
-  },
-  {
-    "content": "Test multi-campus isolation",
-    "status": "pending"
-  },
-  {
-    "content": "Test notification redesign (to team)",
-    "status": "pending"
-  },
-  {
-    "content": "Run final comprehensive testing",
+    "content": "Test multi-campus and run final testing",
     "status": "pending"
   }
 ]
