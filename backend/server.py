@@ -87,8 +87,9 @@ class NotificationStatus(str, Enum):
     PENDING = "pending"
 
 class UserRole(str, Enum):
-    ADMIN = "admin"
-    PASTOR = "pastor"
+    FULL_ADMIN = "full_admin"  # Can access all campuses
+    CAMPUS_ADMIN = "campus_admin"  # Can manage their campus only
+    PASTOR = "pastor"  # Regular pastoral care staff
 
 # ==================== AUTH CONFIGURATION ====================
 
