@@ -120,17 +120,16 @@ export const WhatsAppLogs = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        {log.status === 'failed' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => retryFailed(log)}
-                            disabled={retrying === log.id}
-                          >
-                            <Send className="w-3 h-3 mr-1" />
-                            {retrying === log.id ? 'Retrying...' : 'Retry'}
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-teal-500 text-white hover:bg-teal-600"
+                          onClick={() => retryFailed(log)}
+                          disabled={retrying === log.id}
+                        >
+                          <Send className="w-3 h-3 mr-1" />
+                          {retrying === log.id ? 'Sending...' : 'Resend'}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
