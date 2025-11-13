@@ -16,6 +16,8 @@ export const ImportExport = () => {
   const { user } = useAuth();
   const [csvFile, setCsvFile] = useState(null);
   const [jsonData, setJsonData] = useState('');
+  const [apiUrl, setApiUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [importing, setImporting] = useState(false);
   
   const handleCsvImport = async (e) => {
