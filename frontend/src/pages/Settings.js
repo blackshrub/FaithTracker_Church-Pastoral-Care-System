@@ -235,7 +235,7 @@ export const Settings = () => {
               </div>
               <div>
                 <Label>Total Campuses</Label>
-                <Input value="115" disabled />
+                <Input value={campusCount.toString()} disabled />
               </div>
               <div>
                 <Label>Your Role</Label>
