@@ -125,7 +125,7 @@ export const LoginPage = () => {
             
             <Button 
               type="submit" 
-              className="w-full bg-primary-500 hover:bg-primary-600"
+              className="w-full bg-teal-500 hover:bg-teal-600 text-white"
               disabled={loading}
               data-testid="login-button"
             >
