@@ -1,46 +1,14 @@
 [
   {
-    "content": "API pagination to all list endpoints",
-    "status": "completed"
-  },
-  {
-    "content": "Image optimization for member photos",
-    "status": "completed"
-  },
-  {
-    "content": "React lazy loading for all routes",
-    "status": "completed"
-  },
-  {
-    "content": "Debounced search to MembersList",
-    "status": "completed"
-  },
-  {
-    "content": "React memoization to expensive components",
-    "status": "completed"
-  },
-  {
     "content": "Virtual scrolling for member lists",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
-    "content": "Redis caching (requires setup)",
-    "status": "pending"
+    "content": "All frontend optimizations complete",
+    "status": "completed"
   },
   {
-    "content": "MongoDB connection pooling (requires config)",
-    "status": "pending"
-  },
-  {
-    "content": "Background jobs (requires task queue)",
-    "status": "pending"
-  },
-  {
-    "content": "Bundle analysis (requires analyzer)",
-    "status": "pending"
-  },
-  {
-    "content": "CDN integration (requires CDN service)",
+    "content": "Infrastructure optimizations (Redis, pooling, background jobs, CDN)",
     "status": "pending"
   }
 ]
