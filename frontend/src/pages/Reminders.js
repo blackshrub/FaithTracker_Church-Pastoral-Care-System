@@ -425,6 +425,40 @@ export const Reminders = () => {
           </Card>
         </TabsContent>
         
+        <TabsContent value="disconnected" className="space-y-4">
+          <Card className="card-border-left-red">
+            <CardHeader>
+              <CardTitle>Members Disconnected ({engagementSettings.inactiveDays}+ days no contact)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {disconnectedMembers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No disconnected members</p>
+              ) : (
+                <div className="space-y-2">
+                  {disconnectedMembers.slice(0, 15).map(member => (
+                    <div key={member.id} className="p-3 bg-red-50 rounded flex justify-between items-center">
+                      <div className="flex-1">
+                        <MemberNameWithAvatar member={member} memberId={member.id} />
+                        <p className="text-sm text-muted-foreground ml-13">{member.days_since_last_contact} days since contact</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" asChild>
+                          <a href={formatPhoneForWhatsApp(member.phone)} target="_blank" rel="noopener noreferrer">
+                            Contact
+                          </a>
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders)}>
+                          Mark Contacted
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="at-risk" className="space-y-4">
           <Card className="card-border-left-amber">
             <CardHeader>
