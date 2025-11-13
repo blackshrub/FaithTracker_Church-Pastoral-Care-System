@@ -1551,16 +1551,55 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
 async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_current_user)):
     """Create a financial aid schedule"""
     try:
-        # Calculate next occurrence based on frequency
+        # Calculate next occurrence based on frequency - must be TODAY or FUTURE
+        today = date.today()
         start_date = date.fromisoformat(schedule['start_date']) if isinstance(schedule['start_date'], str) else schedule['start_date']
-        next_occurrence = start_date
+        next_occurrence = today  # Start from today
         
         if schedule['frequency'] == 'weekly' and schedule.get('day_of_week'):
-            # Find next occurrence of the specified weekday
+            # Find next occurrence of the specified weekday from today onward
             days_ahead = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6}
             target_weekday = days_ahead[schedule['day_of_week']]
-            days_to_add = (target_weekday - start_date.weekday()) % 7
-            next_occurrence = start_date + timedelta(days=days_to_add)
+            current_weekday = today.weekday()
+            
+            if target_weekday >= current_weekday:
+                # This week
+                days_to_add = target_weekday - current_weekday
+            else:
+                # Next week
+                days_to_add = 7 - current_weekday + target_weekday
+            
+            next_occurrence = today + timedelta(days=days_to_add)
+            
+        elif schedule['frequency'] == 'monthly' and schedule.get('day_of_month'):
+            # Find next occurrence of this day of month from today onward
+            day_of_month = schedule['day_of_month']
+            
+            # Try this month first
+            try:
+                next_occurrence = today.replace(day=day_of_month)
+                if next_occurrence < today:
+                    # This month's day has passed, go to next month
+                    if today.month == 12:
+                        next_occurrence = next_occurrence.replace(year=today.year + 1, month=1)
+                    else:
+                        next_occurrence = next_occurrence.replace(month=today.month + 1)
+            except ValueError:
+                # Day doesn't exist in this month (e.g., Feb 31), go to next month
+                if today.month == 12:
+                    next_occurrence = date(today.year + 1, 1, min(day_of_month, 31))
+                else:
+                    next_occurrence = date(today.year, today.month + 1, min(day_of_month, 31))
+                    
+        elif schedule['frequency'] == 'annually' and schedule.get('month_of_year'):
+            # Find next occurrence of this month from today onward
+            month_of_year = schedule['month_of_year']
+            
+            # Try this year first
+            next_occurrence = date(today.year, month_of_year, 1)
+            if next_occurrence < today:
+                # This year's month has passed, go to next year
+                next_occurrence = date(today.year + 1, month_of_year, 1)
         
         aid_schedule = FinancialAidSchedule(
             member_id=schedule['member_id'],
