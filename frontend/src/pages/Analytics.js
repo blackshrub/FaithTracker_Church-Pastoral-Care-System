@@ -26,6 +26,8 @@ export const Analytics = () => {
   const [engagementData, setEngagementData] = useState({});
   const [griefData, setGriefData] = useState({});
   const [timeRange, setTimeRange] = useState('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
