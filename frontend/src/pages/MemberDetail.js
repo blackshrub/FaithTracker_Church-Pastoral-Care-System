@@ -467,9 +467,6 @@ export const MemberDetail = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => sendReminder(event.id)}>
-                                <Send className="w-4 h-4 mr-2" />Send Reminder
-                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
                                 <Trash2 className="w-4 h-4 mr-2" />Delete
                               </DropdownMenuItem>
