@@ -1058,10 +1058,10 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
             }}
         )
         
-        # Auto-generate grief support timeline if grief/loss event
-        if event.event_type == EventType.GRIEF_LOSS and event.mourning_service_date:
+        # Auto-generate grief support timeline if grief/loss event (use event_date as mourning date)
+        if event.event_type == EventType.GRIEF_LOSS:
             timeline = generate_grief_timeline(
-                event.mourning_service_date,
+                event.event_date,  # Use event_date as mourning date
                 care_event.id,
                 event.member_id
             )
