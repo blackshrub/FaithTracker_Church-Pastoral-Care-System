@@ -1,26 +1,22 @@
 [
   {
-    "content": "Design comprehensive analytics with member demographics, care trends, financial insights",
-    "status": "completed"
+    "content": "Add Auto-Suggestions backend endpoint (intelligent follow-up recommendations)",
+    "status": "in_progress"
   },
   {
-    "content": "Add engagement analytics (at-risk trends, contact frequency)",
-    "status": "completed"
+    "content": "Add Demographic Trend Analysis backend endpoint",
+    "status": "pending"
   },
   {
-    "content": "Add financial aid analytics (spending patterns, aid effectiveness)",
-    "status": "completed"
+    "content": "Add Auto-Suggestions widget to Dashboard",
+    "status": "pending"
   },
   {
-    "content": "Add grief support analytics (completion rates, stage timings)",
-    "status": "completed"
+    "content": "Add Demographic Trends to Analytics page",
+    "status": "pending"
   },
   {
-    "content": "Add predictive analytics (at-risk prediction, aid need forecasting)",
-    "status": "completed"
-  },
-  {
-    "content": "Create interactive charts with drill-down capability",
-    "status": "completed"
+    "content": "Test AI-powered pastoral recommendations",
+    "status": "pending"
   }
 ]
