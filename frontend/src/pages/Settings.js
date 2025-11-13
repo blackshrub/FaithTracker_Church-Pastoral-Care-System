@@ -129,6 +129,44 @@ export const Settings = () => {
           </Card>
         </TabsContent>
         
+        <TabsContent value="accident">
+          <Card>
+            <CardHeader>
+              <CardTitle>Accident/Illness Follow-up Configuration</CardTitle>
+              <CardDescription>Customize the follow-up schedule for hospital discharges</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {accidentFollowUp.map((stage, index) => (
+                <div key={stage.stage} className="flex items-center gap-4 p-3 bg-muted/30 rounded">
+                  <span className="font-medium w-32">{stage.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={stage.days}
+                      onChange={(e) => {
+                        const updated = [...accidentFollowUp];
+                        updated[index].days = parseInt(e.target.value);
+                        setAccidentFollowUp(updated);
+                      }}
+                      className="w-20"
+                    />
+                    <span className="text-sm text-muted-foreground">days after discharge</span>
+                  </div>
+                </div>
+              ))}
+              <Button onClick={saveAccidentFollowUp} className="bg-teal-500 hover:bg-teal-600 text-white">
+                Save Accident/Illness Follow-up Configuration
+              </Button>
+              <div className="p-4 bg-blue-50 rounded-lg mt-4">
+                <p className="text-sm font-medium">🏥 Note:</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Changes will apply to NEW accident/illness events. Existing timelines remain unchanged.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="engagement">
           <Card>
             <CardHeader>
