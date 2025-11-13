@@ -86,7 +86,8 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             if member:
                 event_date = datetime.fromisoformat(event['event_date']).date() if isinstance(event['event_date'], str) else event['event_date']
                 days_until = (event_date - today).days
-                birthday_week_members.append(f"  • {member['name']} ({days_until} hari lagi) - {member['phone']}")
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                birthday_week_members.append(f"  • {member['name']} ({days_until} hari lagi)\n    📱 wa.me/{phone_clean}")
         
         # 3. Grief stages due today
         grief_due = await db.grief_support.find({
@@ -108,7 +109,8 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                     "1_year": "1 tahun"
                 }
                 stage_name = stage_names.get(stage["stage"], stage["stage"])
-                grief_members.append(f"  • {member['name']} ({stage_name} setelah dukacita) - {member['phone']}")
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                grief_members.append(f"  • {member['name']} ({stage_name} setelah dukacita)\n    📱 wa.me/{phone_clean}")
         
         # 4. Hospital follow-ups due
         followup_days = [3, 7, 14]
@@ -125,7 +127,8 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             for event in events:
                 member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
                 if member:
-                    hospital_followups.append(f"  • {member['name']} ({days_after} hari setelah pulang dari {event.get('hospital_name', 'RS')}) - {member['phone']}")
+                    phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                    hospital_followups.append(f"  • {member['name']} ({days_after} hari setelah pulang dari {event.get('hospital_name', 'RS')})\n    📱 wa.me/{phone_clean}")
         
         # 5. Members at risk (30+ days no contact) - top 10
         members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(1000)
@@ -146,6 +149,10 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         
         at_risk_list.sort(key=lambda x: x[1], reverse=True)
         at_risk_top = at_risk_list[:10]
+        at_risk_formatted = []
+        for name, days, phone in at_risk_top:
+            phone_clean = phone.replace('@s.whatsapp.net', '')
+            at_risk_formatted.append(f"  • {name} ({days} hari)\n    📱 wa.me/{phone_clean}")
         
         # Build digest message
         digest_parts = []
