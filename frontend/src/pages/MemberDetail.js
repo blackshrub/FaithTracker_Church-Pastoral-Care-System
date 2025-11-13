@@ -352,24 +352,22 @@ export const MemberDetail = () => {
       
       {/* Tabbed Content */}
       <Tabs defaultValue="timeline" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5">
-          <TabsTrigger value="timeline" data-testid="tab-timeline">
-            <Calendar className="w-4 h-4 mr-2" />
-            Timeline
-          </TabsTrigger>
-          <TabsTrigger value="grief" data-testid="tab-grief">
-            <Heart className="w-4 h-4 mr-2" />
-            Grief ({griefTimeline.length})
-          </TabsTrigger>
-          <TabsTrigger value="hospital" data-testid="tab-hospital">
-            <Hospital className="w-4 h-4 mr-2" />
-            Hospital
-          </TabsTrigger>
-          <TabsTrigger value="aid" data-testid="tab-aid">
-            <DollarSign className="w-4 h-4 mr-2" />
-            Aid
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex w-auto min-w-full">
+            <TabsTrigger value="timeline" data-testid="tab-timeline">
+              <Calendar className="w-4 h-4 mr-2" />Timeline
+            </TabsTrigger>
+            <TabsTrigger value="grief" data-testid="tab-grief">
+              <Heart className="w-4 h-4 mr-2" />Grief ({griefTimeline.length})
+            </TabsTrigger>
+            <TabsTrigger value="hospital" data-testid="tab-hospital">
+              <Hospital className="w-4 h-4 mr-2" />Hospital
+            </TabsTrigger>
+            <TabsTrigger value="aid" data-testid="tab-aid">
+              <DollarSign className="w-4 h-4 mr-2" />Aid
+            </TabsTrigger>
+          </TabsList>
+        </div>
         
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="space-y-4">
