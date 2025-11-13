@@ -1,22 +1,18 @@
 [
   {
-    "content": "Add Accident/Illness support config to Settings (3, 7, 14 days)",
-    "status": "completed"
+    "content": "Add accident follow-up timeline display to MemberDetail (3 stages like grief)",
+    "status": "in_progress"
   },
   {
-    "content": "Fix MemberDetail tabs to show only when data exists",
-    "status": "completed"
+    "content": "Update MemberDetail to load accident timeline data",
+    "status": "pending"
   },
   {
-    "content": "Add photo thumbnails to reminders (Avatar import added)",
-    "status": "completed"
+    "content": "Restart backend and test accident event creation generates 3 stages",
+    "status": "pending"
   },
   {
-    "content": "Add photo_url to API sync field mapping",
-    "status": "completed"
-  },
-  {
-    "content": "Test all features",
-    "status": "completed"
+    "content": "Final system verification",
+    "status": "pending"
   }
 ]
