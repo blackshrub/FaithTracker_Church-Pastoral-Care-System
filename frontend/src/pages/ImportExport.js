@@ -308,7 +308,8 @@ export const ImportExport = () => {
                       blood_type: 'Blood Type Field',
                       marital_status: 'Marital Field',
                       membership_status: 'Membership Field',
-                      address: 'Address Field'
+                      address: 'Address Field',
+                      photo_url: 'Photo URL Field'
                     }).map(([key, label]) => (
                       <div key={key}>
                         <Label className="text-xs">{label}:</Label>
