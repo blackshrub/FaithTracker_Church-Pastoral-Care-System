@@ -260,67 +260,221 @@ export const Analytics = () => {
           <TabsTrigger value="care"><Heart className="w-4 h-4 mr-2" />Care Events</TabsTrigger>
           <TabsTrigger value="predictive"><Target className="w-4 h-4 mr-2" />Predictive</TabsTrigger>
         </TabsList>
-      
-      {/* Grief Completion Stats */}
-      {griefCompletion && griefCompletion.total_stages > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Grief Support Completion Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Stages</p>
-                <p className="text-2xl font-bold">{griefCompletion.total_stages}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{griefCompletion.completed_stages}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{griefCompletion.pending_stages}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Completion Rate</p>
-                <p className="text-2xl font-bold text-primary-600">{griefCompletion.completion_rate}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Care Events Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Care Events by Type</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="count"
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+        
+        {/* Demographics Tab */}
+        <TabsContent value="demographics" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Age Distribution</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={demographicData.ageGroups}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" fill={COLORS.demographic[0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Membership Status</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={demographicData.membership} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}>
+                      {demographicData.membership?.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS.demographic[index % COLORS.demographic.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Gender Distribution</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie data={demographicData.gender} cx="50%" cy="50%" outerRadius={60} dataKey="value">
+                      {demographicData.gender?.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS.primary[index]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Member Categories</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={demographicData.category}>
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" fill={COLORS.primary[2]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* Engagement Tab */}
+        <TabsContent value="engagement" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Member Engagement Status</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={demographicData.engagement} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({name, value}) => `${name}: ${value}`}>
+                      <Cell fill="#059669" /> {/* Active - Green */}
+                      <Cell fill="#f59e0b" /> {/* At Risk - Amber */}
+                      <Cell fill="#ef4444" /> {/* Inactive - Red */}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Care Events by Month ({new Date().getFullYear()})</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={engagementData.trends}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="events" stroke={COLORS.primary[0]} fill={COLORS.primary[0]} fillOpacity={0.3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* Financial Analytics Tab */}
+        <TabsContent value="financial" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Financial Aid by Type</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={financialData.byType}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `Rp ${value.toLocaleString('id-ID')}`} />
+                    <Bar dataKey="amount" fill={COLORS.financial[0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Aid Distribution Summary</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-green-50 rounded">
+                    <p className="text-2xl font-bold text-green-700">Rp {financialData?.totalAid?.toLocaleString('id-ID') || 0}</p>
+                    <p className="text-sm text-muted-foreground">Total Distributed</p>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded">
+                    <p className="text-2xl font-bold text-blue-700">Rp {financialData?.scheduledAmount?.toLocaleString('id-ID') || 0}</p>
+                    <p className="text-sm text-muted-foreground">Total Scheduled</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Average Aid by Type</h4>
+                  {financialData.byType?.map(type => (
+                    <div key={type.name} className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                      <span className="text-sm">{type.name}</span>
+                      <span className="font-semibold">Rp {type.avg?.toLocaleString('id-ID')}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-12">No care events data</p>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* Care Events Tab */}
+        <TabsContent value="care" className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle>Care Events Distribution</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <PieChart>
+                  <Pie data={eventsByType} cx="50%" cy="50%" outerRadius={120} dataKey="value" label={({name, percentage}) => `${name}: ${percentage}%`}>
+                    {eventsByType.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS.primary[index % COLORS.primary.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Predictive Analytics Tab */}
+        <TabsContent value="predictive" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Member Care Insights</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="p-3 bg-red-50 rounded">
+                    <p className="font-semibold text-red-700">High Priority ({demographicData.engagement?.find(e => e.name === 'inactive')?.value || 0} members)</p>
+                    <p className="text-sm text-muted-foreground">Members disconnected - need immediate attention</p>
+                  </div>
+                  
+                  <div className="p-3 bg-amber-50 rounded">
+                    <p className="font-semibold text-amber-700">Medium Priority ({demographicData.engagement?.find(e => e.name === 'at_risk')?.value || 0} members)</p>
+                    <p className="text-sm text-muted-foreground">At-risk members - follow up needed</p>
+                  </div>
+                  
+                  <div className="p-3 bg-green-50 rounded">
+                    <p className="font-semibold text-green-700">Active Members ({demographicData.engagement?.find(e => e.name === 'active')?.value || 0} members)</p>
+                    <p className="text-sm text-muted-foreground">Regular contact maintained</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Financial Aid Effectiveness</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {financialData.byType?.slice(0, 4).map(type => (
+                    <div key={type.name} className="flex items-center justify-between p-3 bg-green-50 rounded">
+                      <div>
+                        <p className="font-semibold text-green-700">{type.name}</p>
+                        <p className="text-sm text-muted-foreground">{type.count} recipients</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-green-700">Rp {type.amount?.toLocaleString('id-ID')}</p>
+                        <p className="text-xs text-muted-foreground">avg: Rp {type.avg?.toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
