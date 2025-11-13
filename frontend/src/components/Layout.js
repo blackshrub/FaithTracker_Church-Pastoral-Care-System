@@ -97,6 +97,14 @@ export const Layout = ({ children }) => {
                     <Upload className="w-4 h-4 mr-2" />
                     Import/Export
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/messaging')}>
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Messaging
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/whatsapp-logs')}>
+                    <Bell className="w-4 h-4 mr-2" />
+                    WhatsApp Logs
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Cog className="w-4 h-4 mr-2" />
                     Settings
