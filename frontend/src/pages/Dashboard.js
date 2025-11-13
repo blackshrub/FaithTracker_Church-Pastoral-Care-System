@@ -21,6 +21,8 @@ export const Dashboard = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [atRiskMembers, setAtRiskMembers] = useState([]);
+  const [activeGrief, setActiveGrief] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,14 +33,18 @@ export const Dashboard = () => {
   
   const loadDashboardData = async () => {
     try {
-      const [statsRes, recentRes, upcomingRes] = await Promise.all([
+      const [statsRes, atRiskRes, griefRes, recentRes, upcomingRes] = await Promise.all([
         axios.get(`${API}/dashboard/stats`),
-        axios.get(`${API}/dashboard/recent-activity?limit=5`),
+        axios.get(`${API}/members/at-risk`),
+        axios.get(`${API}/dashboard/grief-active`),
+        axios.get(`${API}/dashboard/recent-activity?limit=8`),
         axios.get(`${API}/dashboard/upcoming?days=7`)
       ]);
       setStats(statsRes.data);
+      setAtRiskMembers(atRiskRes.data.slice(0, 10));
+      setActiveGrief(griefRes.data.slice(0, 5));
       setRecentActivity(recentRes.data);
-      setUpcomingEvents(upcomingRes.data);
+      setUpcomingEvents(upcomingRes.data.slice(0, 8));
     } catch (error) {
       toast.error('Failed to load');
     } finally {
