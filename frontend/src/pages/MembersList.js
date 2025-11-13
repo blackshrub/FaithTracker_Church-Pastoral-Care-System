@@ -77,7 +77,7 @@ export const MembersList = () => {
   const handleAddMember = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API}/members`, newMember);
+      await axios.post(`${API}/members`, {...newMember, campus_id: 'auto'});
       toast.success(t('success_messages.member_created'));
       setAddModalOpen(false);
       setNewMember({ name: '', phone: '', family_group_name: '', notes: '' });
@@ -85,7 +85,58 @@ export const MembersList = () => {
       loadFamilyGroups();
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
-      console.error('Error adding member:', error);
+    }
+  };
+  
+  const handleEditMember = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.put(`${API}/members/${editingMember.id}`, editingMember);
+      toast.success('Member updated!');
+      setEditModalOpen(false);
+      setEditingMember(null);
+      loadMembers();
+    } catch (error) {
+      toast.error('Failed to update');
+    }
+  };
+  
+  const handleDeleteMember = async (id, name) => {
+    if (!window.confirm(`Delete ${name}?`)) return;
+    try {
+      await axios.delete(`${API}/members/${id}`);
+      toast.success('Member deleted');
+      loadMembers();
+    } catch (error) {
+      toast.error('Failed to delete');
+    }
+  };
+  
+  const handleBulkDelete = async () => {
+    if (selectedMembers.length === 0) return;
+    if (!window.confirm(`Delete ${selectedMembers.length} members?`)) return;
+    
+    try {
+      await Promise.all(selectedMembers.map(id => axios.delete(`${API}/members/${id}`)));
+      toast.success(`${selectedMembers.length} members deleted`);
+      setSelectedMembers([]);
+      loadMembers();
+    } catch (error) {
+      toast.error('Bulk delete failed');
+    }
+  };
+  
+  const toggleSelectMember = (id) => {
+    setSelectedMembers(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+  
+  const toggleSelectAll = () => {
+    if (selectedMembers.length === filteredMembers.length) {
+      setSelectedMembers([]);
+    } else {
+      setSelectedMembers(filteredMembers.map(m => m.id));
     }
   };
   
