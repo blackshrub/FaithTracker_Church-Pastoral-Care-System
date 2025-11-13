@@ -231,7 +231,6 @@ export const ImportExport = () => {
                     placeholder="https://your-church-system.com/api/members"
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">API endpoint that returns member data JSON</p>
                 </div>
                 <div>
                   <Label>API Key (optional)</Label>
@@ -242,58 +241,64 @@ export const ImportExport = () => {
                     placeholder="Bearer token if required"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Sync Interval (minutes) *</Label>
+                    <Input
+                      type="number"
+                      value={syncInterval}
+                      onChange={(e) => setSyncInterval(parseInt(e.target.value))}
+                      min="1"
+                      placeholder="60"
+                    />
+                    <p className="text-xs text-muted-foreground">Auto-sync every X minutes</p>
+                  </div>
+                  <div>
+                    <Label>Assign to Campus *</Label>
+                    <Select value={selectedCampusId} onValueChange={setSelectedCampusId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select campus" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {campuses.map(campus => (
+                          <SelectItem key={campus.id} value={campus.id}>{campus.campus_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-3">
                   <Label className="font-semibold">Field Mapping (map your API fields to our system)</Label>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Name field in your API:</Label>
-                      <Input
-                        value={fieldMapping.name}
-                        onChange={(e) => setFieldMapping({...fieldMapping, name: e.target.value})}
-                        placeholder="name"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Phone field:</Label>
-                      <Input
-                        value={fieldMapping.phone}
-                        onChange={(e) => setFieldMapping({...fieldMapping, phone: e.target.value})}
-                        placeholder="phone"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Email field (optional):</Label>
-                      <Input
-                        value={fieldMapping.email}
-                        onChange={(e) => setFieldMapping({...fieldMapping, email: e.target.value})}
-                        placeholder="email"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">ID field:</Label>
-                      <Input
-                        value={fieldMapping.external_id}
-                        onChange={(e) => setFieldMapping({...fieldMapping, external_id: e.target.value})}
-                        placeholder="id"
-                        className="text-sm"
-                      />
-                    </div>
+                    {Object.entries({
+                      name: 'Name Field',
+                      phone: 'Phone Field', 
+                      email: 'Email Field',
+                      external_id: 'ID Field',
+                      birth_date: 'Birthday Field',
+                      category: 'Category Field',
+                      gender: 'Gender Field',
+                      blood_type: 'Blood Type Field',
+                      marital_status: 'Marital Field',
+                      membership_status: 'Membership Field',
+                      address: 'Address Field'
+                    }).map(([key, label]) => (
+                      <div key={key}>
+                        <Label className="text-xs">{label}:</Label>
+                        <Input
+                          value={fieldMapping[key]}
+                          onChange={(e) => setFieldMapping({...fieldMapping, [key]: e.target.value})}
+                          placeholder={key}
+                          className="text-sm"
+                        />
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Example: If your API returns {`{full_name: "John", mobile: "628xxx"}`}, map name→full_name, phone→mobile
-                  </p>
                 </div>
-                <Button type="submit" disabled={!apiUrl || importing} className="bg-teal-500 hover:bg-teal-600">
+                <Button type="submit" disabled={!apiUrl || importing} className="bg-teal-500 hover:bg-teal-600 text-white">
                   <FileJson className="w-4 h-4 mr-2" />
-                  {importing ? 'Syncing...' : 'Sync from API'}
+                  {importing ? 'Syncing...' : 'Create Sync Job'}
                 </Button>
-                <div className="p-3 bg-blue-50 rounded text-sm">
-                  <p className="font-medium">💡 How it works:</p>
-                  <p className="text-muted-foreground mt-1">System will fetch members from your external API and sync to this database. Existing members (matched by external_member_id) will be updated, new ones will be created.</p>
-                </div>
               </form>
             </CardContent>
           </Card>
