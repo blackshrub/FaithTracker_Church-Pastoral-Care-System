@@ -1,22 +1,30 @@
 [
   {
-    "content": "Fix phone normalization and import ALL CSV fields (birthday, category, gender, blood_type, marital, membership_status)",
+    "content": "Fix phone normalization and import ALL CSV fields",
+    "status": "completed"
+  },
+  {
+    "content": "Fix Add Campus button contrast",
+    "status": "completed"
+  },
+  {
+    "content": "Show new member fields (age, category, gender, blood_type, marital, membership) in MemberDetail",
     "status": "in_progress"
   },
   {
-    "content": "Update Member model to include all new fields",
+    "content": "Add three-dots menu to timeline with edit/delete",
     "status": "pending"
   },
   {
-    "content": "Add three-dots menu to timeline items with edit/delete",
+    "content": "Add event details dialog to Calendar",
     "status": "pending"
   },
   {
-    "content": "Test digest send to 6281290080025",
+    "content": "Add API sync scheduler with interval + status list",
     "status": "pending"
   },
   {
-    "content": "Add event details dialog to Calendar on date click",
+    "content": "Add configurable engagement thresholds per campus",
     "status": "pending"
   },
   {
@@ -24,11 +32,11 @@
     "status": "pending"
   },
   {
-    "content": "Add API sync scheduler with interval and status list",
+    "content": "Fix all remaining button contrast issues",
     "status": "pending"
   },
   {
-    "content": "Final comprehensive testing",
+    "content": "Final testing",
     "status": "pending"
   }
 ]
