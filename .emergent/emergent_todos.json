@@ -1,38 +1,38 @@
 [
   {
-    "content": "Create Service Worker for offline app resources",
-    "status": "in_progress"
+    "content": "Service Worker for offline app resources",
+    "status": "completed"
   },
   {
-    "content": "Add PWA manifest for app-like experience",
-    "status": "pending"
+    "content": "PWA manifest for app-like experience",
+    "status": "completed"
   },
   {
-    "content": "Implement IndexedDB for offline member data storage",
-    "status": "pending"
+    "content": "IndexedDB for offline member data storage",
+    "status": "completed"
   },
   {
-    "content": "Add offline form queue for care events",
-    "status": "pending"
+    "content": "Offline form queue for care events",
+    "status": "completed"
   },
   {
-    "content": "Implement image lazy loading with placeholders",
-    "status": "pending"
+    "content": "Image lazy loading with placeholders",
+    "status": "completed"
   },
   {
-    "content": "Add touch optimizations and gesture support",
-    "status": "pending"
+    "content": "Touch optimizations and gesture support",
+    "status": "completed"
   },
   {
-    "content": "Create advanced caching strategy",
-    "status": "pending"
+    "content": "Advanced caching strategy",
+    "status": "completed"
   },
   {
-    "content": "Add push notification system",
-    "status": "pending"
+    "content": "Push notification system",
+    "status": "completed"
   },
   {
-    "content": "Test offline-first functionality",
-    "status": "pending"
+    "content": "Offline-first functionality",
+    "status": "completed"
   }
 ]
