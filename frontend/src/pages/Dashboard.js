@@ -212,10 +212,78 @@ export const Reminders = () => {
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-12">
+      {/* Welcome Section */}
       <div>
-        <h1 className="text-3xl font-playfair font-bold">Pastoral Care Reminders</h1>
-        <p className="text-muted-foreground mt-1">{totalTasks} tasks need your attention today</p>
+        <h1 className="text-5xl font-playfair font-bold text-foreground mb-2">
+          Welcome back, {user?.name}!
+        </h1>
+        <p className="text-muted-foreground text-lg">Here's your pastoral care overview</p>
+      </div>
+      
+      {/* Stats Cards with Colored Left Borders */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="card-border-left-teal shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Total Members</p>
+                <p className="text-4xl font-playfair font-bold">805</p>
+              </div>
+              <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center">
+                <Users className="w-7 h-7 text-teal-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="card-border-left-amber shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Total Interactions</p>
+                <p className="text-4xl font-playfair font-bold">{birthdaysToday.length + griefToday.length + hospitalFollowUp.length}</p>
+              </div>
+              <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+                <Calendar className="w-7 h-7 text-amber-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="card-border-left-pink shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Pending Reminders</p>
+                <p className="text-4xl font-playfair font-bold">{griefDue.length + financialAidDue.length}</p>
+              </div>
+              <div className="w-14 h-14 rounded-full bg-pink-100 flex items-center justify-center">
+                <Bell className="w-7 h-7 text-pink-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="card-border-left-purple shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">At Risk + Disconnected</p>
+                <p className="text-4xl font-playfair font-bold">{atRiskMembers.length + disconnectedMembers.length}</p>
+              </div>
+              <div className="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center">
+                <Heart className="w-7 h-7 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Task Management */}
+      <div>
+        <h1 className="text-3xl font-playfair font-bold">Today's Tasks & Reminders</h1>
+        <p className="text-muted-foreground mt-1">{birthdaysToday.length + griefToday.length + financialAidDue.length + atRiskMembers.length + disconnectedMembers.length} tasks need your attention</p>
       </div>
       
       <Tabs defaultValue="today" className="w-full">
