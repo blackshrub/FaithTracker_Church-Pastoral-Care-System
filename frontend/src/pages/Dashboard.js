@@ -174,6 +174,9 @@ export const Dashboard = () => {
         photo_url: m.photo_url 
       });
       
+      console.log('Member map sample:', Object.keys(memberMap).length, 'members loaded');
+      console.log('Sample member:', memberMap[Object.keys(memberMap)[0]]);
+      
       // Filter birthdays for today with member names and photos
       const todayBirthdays = eventsRes.data.filter(e => 
         e.event_type === 'birthday' && e.event_date === today
