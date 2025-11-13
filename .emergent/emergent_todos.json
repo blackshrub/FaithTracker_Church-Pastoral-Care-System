@@ -1,23 +1,23 @@
 [
   {
-    "content": "Add FinancialAidSchedule model with frequency options (one-time, weekly, monthly, annual)",
-    "status": "in_progress"
+    "content": "Add FinancialAidSchedule model with frequency options",
+    "status": "completed"
   },
   {
-    "content": "Update financial aid event form with scheduling UI",
-    "status": "pending"
-  },
-  {
-    "content": "Create scheduled aid management endpoints (create, stop, list)",
-    "status": "pending"
+    "content": "Create scheduled aid management endpoints",
+    "status": "completed"
   },
   {
     "content": "Add Financial Aid tab to Reminders page",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add manual stop functionality for aid schedules",
-    "status": "pending"
+    "status": "completed"
+  },
+  {
+    "content": "Update financial aid event form with scheduling UI",
+    "status": "in_progress"
   },
   {
     "content": "Test financial aid scheduling system",
