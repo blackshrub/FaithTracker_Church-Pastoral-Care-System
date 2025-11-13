@@ -270,7 +270,7 @@ export const Dashboard = () => {
                 </div>
                 
                 {/* Event Details */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <Label>Event Type *</Label>
                     <Select value={quickEvent.event_type} onValueChange={(v) => setQuickEvent({...quickEvent, event_type: v})}>
@@ -287,10 +287,13 @@ export const Dashboard = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label>Date *</Label>
-                    <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
-                  </div>
+                  
+                  {quickEvent.event_type !== 'financial_aid' && (
+                    <div>
+                      <Label>Date *</Label>
+                      <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
+                    </div>
+                  )}
                 </div>
                 
                 <div>
