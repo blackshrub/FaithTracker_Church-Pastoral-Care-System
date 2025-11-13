@@ -760,7 +760,7 @@ export const Dashboard = () => {
                             description: `Acted on AI suggestion: ${suggestion.suggestion}`
                           });
                           toast.success(`${suggestion.member_name} marked as contacted!`);
-                          loadDashboardData(); // Refresh to remove from suggestions
+                          loadReminders(); // Refresh to remove from suggestions
                         } catch (error) {
                           toast.error('Failed to mark as completed');
                         }
