@@ -261,52 +261,33 @@ export const MemberDetail = () => {
                     <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
                       ⭐ {t('success_messages.grief_timeline_generated')}
                     </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Relationship to Deceased *</Label>
-                        <Select value={newEvent.grief_relationship} onValueChange={(v) => setNewEvent({...newEvent, grief_relationship: v})} required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select relationship" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="spouse">Spouse</SelectItem>
-                            <SelectItem value="parent">Parent</SelectItem>
-                            <SelectItem value="child">Child</SelectItem>
-                            <SelectItem value="sibling">Sibling</SelectItem>
-                            <SelectItem value="friend">Friend</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Mourning Service Date *</Label>
-                        <Input
-                          type="date"
-                          value={newEvent.mourning_service_date}
-                          onChange={(e) => setNewEvent({...newEvent, mourning_service_date: e.target.value})}
-                          required
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label>Relationship to Deceased *</Label>
+                      <Select value={newEvent.grief_relationship} onValueChange={(v) => setNewEvent({...newEvent, grief_relationship: v})} required>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select relationship" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="spouse">Spouse</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="child">Child</SelectItem>
+                          <SelectItem value="sibling">Sibling</SelectItem>
+                          <SelectItem value="friend">Friend</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 )}
                 
-                {newEvent.event_type === 'hospital_visit' && (
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200">
+                {newEvent.event_type === 'accident_illness' && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200">
                     <div className="space-y-2">
-                      <Label>Hospital Name</Label>
+                      <Label>Hospital/Medical Facility Name</Label>
                       <Input
                         value={newEvent.hospital_name}
                         onChange={(e) => setNewEvent({...newEvent, hospital_name: e.target.value})}
                         placeholder="RSU Jakarta"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Admission Date</Label>
-                      <Input
-                        type="date"
-                        value={newEvent.admission_date}
-                        onChange={(e) => setNewEvent({...newEvent, admission_date: e.target.value})}
                       />
                     </div>
                   </div>
