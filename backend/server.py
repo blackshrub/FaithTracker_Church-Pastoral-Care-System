@@ -1545,6 +1545,124 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
         logger.error(f"Error completing accident stage: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== FINANCIAL AID SCHEDULE ENDPOINTS ====================
+
+@api_router.post("/financial-aid-schedules", response_model=FinancialAidSchedule)
+async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_current_user)):
+    """Create a financial aid schedule"""
+    try:
+        # Calculate next occurrence based on frequency
+        start_date = date.fromisoformat(schedule['start_date']) if isinstance(schedule['start_date'], str) else schedule['start_date']
+        next_occurrence = start_date
+        
+        if schedule['frequency'] == 'weekly' and schedule.get('day_of_week'):
+            # Find next occurrence of the specified weekday
+            days_ahead = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6}
+            target_weekday = days_ahead[schedule['day_of_week']]
+            days_to_add = (target_weekday - start_date.weekday()) % 7
+            next_occurrence = start_date + timedelta(days=days_to_add)
+        
+        aid_schedule = FinancialAidSchedule(
+            member_id=schedule['member_id'],
+            campus_id=schedule['campus_id'],
+            title=schedule['title'],
+            aid_type=schedule['aid_type'],
+            aid_amount=schedule['aid_amount'],
+            frequency=schedule['frequency'],
+            start_date=start_date,
+            end_date=schedule.get('end_date'),
+            day_of_week=schedule.get('day_of_week'),
+            day_of_month=schedule.get('day_of_month'),
+            month_of_year=schedule.get('month_of_year'),
+            next_occurrence=next_occurrence,
+            created_by=current_user['id'],
+            notes=schedule.get('notes')
+        )
+        
+        # Serialize dates for MongoDB
+        schedule_dict = aid_schedule.model_dump()
+        schedule_dict['start_date'] = schedule_dict['start_date'].isoformat()
+        if schedule_dict.get('end_date'):
+            schedule_dict['end_date'] = schedule_dict['end_date'].isoformat()
+        schedule_dict['next_occurrence'] = schedule_dict['next_occurrence'].isoformat()
+        
+        await db.financial_aid_schedules.insert_one(schedule_dict)
+        
+        return aid_schedule
+    except Exception as e:
+        logger.error(f"Error creating aid schedule: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/financial-aid-schedules")
+async def list_aid_schedules(
+    member_id: Optional[str] = None,
+    active_only: bool = True,
+    current_user: dict = Depends(get_current_user)
+):
+    """List financial aid schedules"""
+    try:
+        query = get_campus_filter(current_user)
+        
+        if member_id:
+            query['member_id'] = member_id
+        
+        if active_only:
+            query['is_active'] = True
+        
+        schedules = await db.financial_aid_schedules.find(query, {"_id": 0}).to_list(1000)
+        return schedules
+    except Exception as e:
+        logger.error(f"Error listing aid schedules: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/financial-aid-schedules/{schedule_id}/stop")
+async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Manually stop a financial aid schedule"""
+    try:
+        result = await db.financial_aid_schedules.update_one(
+            {"id": schedule_id},
+            {"$set": {
+                "is_active": False,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        return {"success": True, "message": "Financial aid schedule stopped"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error stopping aid schedule: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/financial-aid-schedules/due-today")
+async def get_aid_due_today(current_user: dict = Depends(get_current_user)):
+    """Get financial aid schedules due today"""
+    try:
+        today = date.today().isoformat()
+        query = get_campus_filter(current_user)
+        query.update({
+            "next_occurrence": today,
+            "is_active": True
+        })
+        
+        schedules = await db.financial_aid_schedules.find(query, {"_id": 0}).to_list(100)
+        
+        # Add member info
+        for schedule in schedules:
+            member = await db.members.find_one({"id": schedule["member_id"]}, {"_id": 0, "name": 1, "phone": 1, "photo_url": 1})
+            if member:
+                schedule["member_name"] = member["name"]
+                schedule["member_phone"] = member["phone"]
+                schedule["member_photo_url"] = member.get("photo_url")
+        
+        return schedules
+    except Exception as e:
+        logger.error(f"Error getting aid due today: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== FINANCIAL AID ENDPOINTS ====================
 
 @api_router.get("/financial-aid/summary")
