@@ -1,38 +1,34 @@
 [
   {
-    "content": "Run data import - import 696 members and generate dummy data",
+    "content": "Update member and care event create endpoints to auto-get campus_id from user",
     "status": "completed"
   },
   {
-    "content": "Update member and care event create endpoints to auto-get campus_id from user",
+    "content": "Redesign scheduler - send DAILY DIGEST to PASTORAL TEAM WhatsApp (CRITICAL)",
     "status": "in_progress"
   },
   {
-    "content": "Add campus filtering to all list endpoints (members, events, grief, etc)",
+    "content": "Add campus filtering to dashboard and list endpoints",
     "status": "pending"
   },
   {
-    "content": "Redesign scheduler - send daily digest to PASTORAL TEAM WhatsApp, not members",
+    "content": "Update frontend: campus selection at login + display campus info",
     "status": "pending"
   },
   {
-    "content": "Update frontend Auth to show campus selection dropdown at login",
+    "content": "Create Admin Dashboard page (user + campus management)",
     "status": "pending"
   },
   {
-    "content": "Create Admin Dashboard page (user + campus management UI)",
+    "content": "Create Calendar View page",
     "status": "pending"
   },
   {
-    "content": "Create Calendar View page with month/week views",
+    "content": "Create Bulk Messaging page",
     "status": "pending"
   },
   {
-    "content": "Create Bulk Messaging page for pastoral team",
-    "status": "pending"
-  },
-  {
-    "content": "Test multi-campus isolation and final comprehensive testing",
+    "content": "Test and verify multi-campus system",
     "status": "pending"
   }
 ]
