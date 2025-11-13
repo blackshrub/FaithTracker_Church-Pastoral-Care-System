@@ -378,6 +378,38 @@ class NotificationLog(BaseModel):
     response_data: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class FinancialAidSchedule(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    member_id: str
+    campus_id: str
+    title: str
+    aid_type: AidType
+    aid_amount: float
+    frequency: ScheduleFrequency
+    
+    # Date fields
+    start_date: date
+    end_date: Optional[date] = None  # None means no end
+    
+    # Weekly specific
+    day_of_week: Optional[WeekDay] = None
+    
+    # Monthly specific
+    day_of_month: Optional[int] = None  # 1-31
+    
+    # Annual specific
+    month_of_year: Optional[int] = None  # 1-12
+    
+    is_active: bool = True
+    next_occurrence: date
+    occurrences_completed: int = 0
+    created_by: str  # User ID who created the schedule
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # User Authentication Models
 class UserCreate(BaseModel):
     email: EmailStr
