@@ -145,22 +145,7 @@ export const Layout = ({ children }) => {
               );
             })}
             
-            {/* Mobile Admin/Settings Links */}
-            {user?.role === 'full_admin' && (
-              <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-teal-50 hover:text-teal-700">
-                <Shield className="w-5 h-5" />
-                <span>Admin</span>
-              </Link>
-            )}
-            <Link to="/import-export" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-teal-50 hover:text-teal-700">
-              <Upload className="w-5 h-5" />
-              <span>Import/Export</span>
-            </Link>
-            <Link to="/settings" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-teal-50 hover:text-teal-700">
-              <Cog className="w-5 h-5" />
-              <span>Settings</span>
-            </Link>
-            
+            {/* Mobile Admin/Settings Links - REMOVED duplicates */}
             <div className="border-t pt-2 mt-2">
               <Button
                 variant="ghost"
