@@ -388,7 +388,19 @@ def calculate_engagement_status(last_contact: Optional[datetime]) -> tuple[Engag
     if not last_contact:
         return EngagementStatus.INACTIVE, 999
     
-    days_since = (datetime.now(timezone.utc) - last_contact).days
+    # Handle string dates
+    if isinstance(last_contact, str):
+        try:
+            last_contact = datetime.fromisoformat(last_contact)
+        except:
+            return EngagementStatus.INACTIVE, 999
+    
+    # Make timezone-aware if needed
+    if last_contact.tzinfo is None:
+        last_contact = last_contact.replace(tzinfo=timezone.utc)
+    
+    now = datetime.now(timezone.utc)
+    days_since = (now - last_contact).days
     
     if days_since < 30:
         return EngagementStatus.ACTIVE, days_since
