@@ -738,11 +738,32 @@ export const Dashboard = () => {
                       <p className="text-xs text-muted-foreground ml-13">{suggestion.reason}</p>
                       <p className="text-xs text-green-700 ml-13 mt-1">💡 {suggestion.recommended_action}</p>
                     </div>
-                    <Button size="sm" className="bg-purple-500 hover:bg-purple-600 text-white" asChild>
-                      <a href={formatPhoneForWhatsApp(suggestion.member_phone)} target="_blank" rel="noopener noreferrer">
-                        Contact
-                      </a>
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="bg-purple-500 hover:bg-purple-600 text-white" asChild>
+                        <a href={formatPhoneForWhatsApp(suggestion.member_phone)} target="_blank" rel="noopener noreferrer">
+                          Contact
+                        </a>
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        try {
+                          // Mark suggestion as acted upon by creating contact event
+                          await axios.post(`${API}/care-events`, {
+                            member_id: suggestion.member_id,
+                            campus_id: user?.campus_id || '2b3f9094-eef4-4af4-a3ff-730ef4adeb8a',
+                            event_type: 'regular_contact',
+                            event_date: new Date().toISOString().split('T')[0],
+                            title: 'AI Suggestion Follow-up',
+                            description: `Acted on AI suggestion: ${suggestion.suggestion}`
+                          });
+                          toast.success(`${suggestion.member_name} marked as contacted!`);
+                          loadDashboardData(); // Refresh to remove from suggestions
+                        } catch (error) {
+                          toast.error('Failed to mark as completed');
+                        }
+                      }}>
+                        Mark Completed
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
