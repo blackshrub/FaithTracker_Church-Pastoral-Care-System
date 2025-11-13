@@ -321,10 +321,13 @@ class UserCreate(BaseModel):
     password: str
     name: str
     role: UserRole = UserRole.PASTOR
+    campus_id: Optional[str] = None  # Required for campus_admin and pastor, null for full_admin
+    phone: str  # Pastoral team member's phone for receiving reminders
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    campus_id: Optional[str] = None  # Campus selection at login
 
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -333,6 +336,8 @@ class User(BaseModel):
     email: EmailStr
     name: str
     role: UserRole
+    campus_id: Optional[str] = None
+    phone: str  # For receiving pastoral care task reminders
     hashed_password: str
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -343,6 +348,9 @@ class UserResponse(BaseModel):
     email: EmailStr
     name: str
     role: UserRole
+    campus_id: Optional[str] = None
+    campus_name: Optional[str] = None
+    phone: str
     is_active: bool
     created_at: datetime
 
