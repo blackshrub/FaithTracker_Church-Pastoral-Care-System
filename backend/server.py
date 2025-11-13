@@ -1100,6 +1100,18 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
                 await db.grief_support.insert_many(timeline)
                 logger.info(f"Generated {len(timeline)} grief support stages for member {event.member_id}")
         
+        # Auto-generate accident/illness follow-up timeline
+        if event.event_type == EventType.ACCIDENT_ILLNESS:
+            timeline = generate_accident_followup_timeline(
+                event.event_date,
+                care_event.id,
+                event.member_id,
+                campus_id
+            )
+            if timeline:
+                await db.accident_followup.insert_many(timeline)
+                logger.info(f"Generated {len(timeline)} accident follow-up stages for member {event.member_id}")
+        
         return care_event
     except Exception as e:
         logger.error(f"Error creating care event: {str(e)}")
