@@ -1,14 +1,38 @@
 [
   {
-    "content": "Virtual scrolling for member lists",
-    "status": "completed"
+    "content": "Create Service Worker for offline app resources",
+    "status": "in_progress"
   },
   {
-    "content": "All frontend optimizations complete",
-    "status": "completed"
+    "content": "Add PWA manifest for app-like experience",
+    "status": "pending"
   },
   {
-    "content": "Infrastructure optimizations (Redis, pooling, background jobs, CDN)",
+    "content": "Implement IndexedDB for offline member data storage",
+    "status": "pending"
+  },
+  {
+    "content": "Add offline form queue for care events",
+    "status": "pending"
+  },
+  {
+    "content": "Implement image lazy loading with placeholders",
+    "status": "pending"
+  },
+  {
+    "content": "Add touch optimizations and gesture support",
+    "status": "pending"
+  },
+  {
+    "content": "Create advanced caching strategy",
+    "status": "pending"
+  },
+  {
+    "content": "Add push notification system",
+    "status": "pending"
+  },
+  {
+    "content": "Test offline-first functionality",
     "status": "pending"
   }
 ]
