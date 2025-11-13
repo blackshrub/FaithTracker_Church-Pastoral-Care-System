@@ -76,7 +76,12 @@
   }
 }
 
-/* Force better contrast for dialogs and modals */
+/* Force light mode only - disable dark mode completely */
+* {
+  color-scheme: light only !important;
+}
+
+/* Force better contrast for ALL dialogs and modals */
 [role="dialog"],
 [data-radix-dialog-content],
 .fixed.inset-0 + div[role="dialog"] {
@@ -84,19 +89,16 @@
   color: hsl(0, 0%, 10%) !important;
 }
 
-/* Force light background for dialog content */
 [data-radix-dialog-content] {
   background: white !important;
 }
 
-/* Improve form label visibility - force dark text */
 [role="dialog"] label,
 [data-radix-dialog-content] label {
   color: hsl(0, 0%, 15%) !important;
   font-weight: 500 !important;
 }
 
-/* Improve input visibility and contrast - force light background */
 [role="dialog"] input[type="text"],
 [role="dialog"] input[type="email"],
 [role="dialog"] input[type="tel"],
@@ -120,16 +122,58 @@
   opacity: 1 !important;
 }
 
-/* Dialog title */
 [role="dialog"] h2,
 [data-radix-dialog-content] h2,
 [data-radix-dialog-title] {
   color: hsl(0, 0%, 10%) !important;
 }
 
-/* Ensure dialog overlay has proper backdrop */
 [data-radix-dialog-overlay] {
   background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Force light background for ALL select/dropdown components */
+[role="combobox"],
+[data-radix-select-trigger],
+[data-radix-select-content],
+[data-radix-select-viewport],
+[data-radix-select-item],
+select,
+button[role="combobox"] {
+  background-color: hsl(0, 0%, 100%) !important;
+  color: hsl(0, 0%, 10%) !important;
+  border-color: hsl(0, 0%, 85%) !important;
+}
+
+/* Select dropdown options */
+[data-radix-select-item] {
+  background-color: hsl(0, 0%, 100%) !important;
+  color: hsl(0, 0%, 10%) !important;
+}
+
+[data-radix-select-item][data-highlighted] {
+  background-color: hsl(140, 32%, 95%) !important;
+  color: hsl(0, 0%, 10%) !important;
+}
+
+[data-radix-select-item][data-state="checked"] {
+  background-color: hsl(140, 32%, 90%) !important;
+  color: hsl(0, 0%, 10%) !important;
+  font-weight: 600 !important;
+}
+
+/* Force all inputs and selects to have proper styling */
+input,
+textarea,
+select {
+  background-color: hsl(0, 0%, 100%) !important;
+  color: hsl(0, 0%, 10%) !important;
+  border: 1px solid hsl(0, 0%, 85%) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: hsl(0, 0%, 60%) !important;
 }
 
 .font-manrope {
