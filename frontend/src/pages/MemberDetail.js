@@ -87,7 +87,9 @@ export const MemberDetail = () => {
       setCareEvents(eventsRes.data);
       setGriefTimeline(griefRes.data);
       setAccidentTimeline(accidentRes.data);
-      setAidSchedules(aidSchedulesRes.data);
+      setAidSchedules(aidSchedulesRes.data || []);
+      
+      console.log('Aid schedules loaded:', aidSchedulesRes.data);
     } catch (error) {
       toast.error(t('error_messages.member_not_found'));
       console.error('Error loading member:', error);
