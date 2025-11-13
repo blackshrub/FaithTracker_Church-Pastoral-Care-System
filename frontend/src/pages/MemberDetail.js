@@ -293,17 +293,6 @@ export const MemberDetail = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Title *</Label>
-                  <Input
-                    value={newEvent.title}
-                    onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
-                    placeholder="e.g., Birthday Celebration"
-                    required
-                    data-testid="event-title-input"
-                  />
-                </div>
-                
-                <div className="space-y-2">
                   <Label>Description</Label>
                   <Textarea
                     value={newEvent.description}
@@ -312,6 +301,20 @@ export const MemberDetail = () => {
                     data-testid="event-description-input"
                   />
                 </div>
+                
+                {/* Title only for Financial Aid */}
+                {newEvent.event_type === 'financial_aid' && (
+                  <div className="space-y-2">
+                    <Label>Aid Name/Title *</Label>
+                    <Input
+                      value={newEvent.title}
+                      onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                      placeholder="e.g., Monthly Education Support"
+                      required
+                      data-testid="event-title-input"
+                    />
+                  </div>
+                )}
                 
                 {/* Conditional Fields */}
                 {newEvent.event_type === 'grief_loss' && (
