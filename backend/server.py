@@ -1722,6 +1722,66 @@ async def get_aid_due_today(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error getting aid due today: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/financial-aid-schedules/{schedule_id}/mark-distributed")
+async def mark_aid_distributed(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark scheduled aid as distributed and advance to next occurrence"""
+    try:
+        # Get the schedule
+        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        if not schedule:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        # Create care event for this payment
+        await db.care_events.insert_one({
+            "id": str(uuid.uuid4()),
+            "member_id": schedule["member_id"],
+            "campus_id": schedule["campus_id"],
+            "event_type": "financial_aid",
+            "event_date": schedule["next_occurrence"],
+            "title": f"{schedule['title']} - Scheduled Payment",
+            "aid_type": schedule["aid_type"],
+            "aid_amount": schedule["aid_amount"],
+            "aid_notes": f"From {schedule['frequency']} schedule",
+            "completed": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Calculate next occurrence
+        current_date = date.fromisoformat(schedule["next_occurrence"])
+        today = date.today()
+        
+        if schedule["frequency"] == "weekly":
+            next_date = current_date + timedelta(weeks=1)
+        elif schedule["frequency"] == "monthly":
+            if current_date.month == 12:
+                next_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                next_date = current_date.replace(month=current_date.month + 1)
+        elif schedule["frequency"] == "annually":
+            next_date = current_date.replace(year=current_date.year + 1)
+        else:
+            next_date = current_date
+        
+        # Update schedule with new next occurrence
+        await db.financial_aid_schedules.update_one(
+            {"id": schedule_id},
+            {"$set": {
+                "next_occurrence": next_date.isoformat(),
+                "occurrences_completed": (schedule.get("occurrences_completed", 0) + 1),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": "Payment marked as distributed and schedule advanced",
+            "next_occurrence": next_date.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error marking aid distributed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== FINANCIAL AID ENDPOINTS ====================
 
 @api_router.get("/financial-aid/summary")
