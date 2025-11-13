@@ -108,15 +108,18 @@ export const Reminders = () => {
       </div>
       
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="today">
             <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefDue.length})
           </TabsTrigger>
           <TabsTrigger value="followup">
             <Hospital className="w-4 h-4 mr-2" />Follow-up ({hospitalFollowUp.length + griefDue.length})
           </TabsTrigger>
+          <TabsTrigger value="disconnected">
+            <Users className="w-4 h-4 mr-2" />Disconnected ({disconnectedMembers.length})
+          </TabsTrigger>
           <TabsTrigger value="at-risk">
-            <AlertTriangle className="w-4 h-4 mr-2" />At Risk ({atRiskMembers.length + disconnectedMembers.length})
+            <AlertTriangle className="w-4 h-4 mr-2" />At Risk ({atRiskMembers.length})
           </TabsTrigger>
           <TabsTrigger value="upcoming">
             <Heart className="w-4 h-4 mr-2" />Upcoming ({upcomingBirthdays.length})
