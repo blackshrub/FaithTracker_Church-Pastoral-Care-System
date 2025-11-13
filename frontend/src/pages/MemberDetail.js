@@ -598,9 +598,9 @@ export const MemberDetail = () => {
                 <Hospital className="w-4 h-4 mr-2" />Accident/Illness ({careEvents.filter(e => e.event_type === 'accident_illness').length})
               </TabsTrigger>
             )}
-            {careEvents.filter(e => e.event_type === 'financial_aid').length > 0 && (
+            {(careEvents.filter(e => e.event_type === 'financial_aid').length > 0 || aidSchedules.length > 0) && (
               <TabsTrigger value="aid" data-testid="tab-aid">
-                <DollarSign className="w-4 h-4 mr-2" />Aid ({careEvents.filter(e => e.event_type === 'financial_aid').length})
+                <DollarSign className="w-4 h-4 mr-2" />Aid ({careEvents.filter(e => e.event_type === 'financial_aid').length + aidSchedules.length})
               </TabsTrigger>
             )}
           </TabsList>
