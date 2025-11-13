@@ -408,7 +408,7 @@ export const MembersList = () => {
             height={600}
             itemCount={filteredMembers.length}
             itemSize={80}
-            itemData={filteredMembers}
+            width="100%"
           >
             {MemberRow}
           </List>
