@@ -391,12 +391,7 @@ export const MembersList = () => {
                   filteredMembers.map((member) => (
                     <TableRow key={member.id} className="hover:bg-muted/50 transition-colors" data-testid={`member-row-${member.id}`}>
                       <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedMembers.includes(member.id)}
-                          onChange={() => toggleSelectMember(member.id)}
-                          className="w-4 h-4"
-                        />
+                        <input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={() => toggleSelectMember(member.id)} className="w-4 h-4" />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -404,54 +399,43 @@ export const MembersList = () => {
                           <span className="font-medium">{member.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{member.phone}</TableCell>
-                      <TableCell>
-                        {member.family_group_id && (
-                          <span className="text-sm text-muted-foreground">
-                            {familyGroups.find(g => g.id === member.family_group_id)?.group_name || 'Family'}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {member.last_contact_date ? (
-                          <span className="text-sm">
-                            {formatDate(member.last_contact_date, 'dd MMM yyyy')}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">{t('never_contacted')}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <EngagementBadge 
-                          status={member.engagement_status} 
-                          days={member.days_since_last_contact} 
-                        />
-                      </TableCell>
+                      {visibleColumns.phone && <TableCell>{member.phone || '-'}</TableCell>}
+                      {visibleColumns.age && <TableCell>{member.age || '-'}</TableCell>}
+                      {visibleColumns.gender && <TableCell>{member.gender || '-'}</TableCell>}
+                      {visibleColumns.membership && <TableCell><span className="text-xs px-2 py-1 bg-teal-100 text-teal-700 rounded">{member.membership_status || '-'}</span></TableCell>}
+                      {visibleColumns.marital && <TableCell>{member.marital_status || '-'}</TableCell>}
+                      {visibleColumns.category && <TableCell>{member.category || '-'}</TableCell>}
+                      {visibleColumns.blood_type && <TableCell>{member.blood_type || '-'}</TableCell>}
+                      {visibleColumns.family && (
+                        <TableCell>
+                          {member.family_group_id && (
+                            <span className="text-sm text-muted-foreground">
+                              {familyGroups.find(g => g.id === member.family_group_id)?.group_name || 'Family'}
+                            </span>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.last_contact && (
+                        <TableCell>
+                          {member.last_contact_date ? (
+                            <span className="text-sm">{formatDate(member.last_contact_date, 'dd MMM yyyy')}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">{t('never_contacted')}</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.engagement && (
+                        <TableCell>
+                          <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
                           <Link to={`/members/${member.id}`}>
-                            <Button size="sm" variant="outline" data-testid={`view-member-${member.id}`}>
-                              {t('view')}
-                            </Button>
+                            <Button size="sm" variant="outline" data-testid={`view-member-${member.id}`}>{t('view')}</Button>
                           </Link>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingMember(member);
-                              setEditModalOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => handleDeleteMember(member.id, member.name)}
-                          >
-                            Delete
-                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditingMember(member); setEditModalOpen(true); }}>Edit</Button>
+                          <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteMember(member.id, member.name)}>Delete</Button>
                         </div>
                       </TableCell>
                     </TableRow>
