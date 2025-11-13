@@ -133,7 +133,7 @@ export const Reminders = () => {
       <Tabs defaultValue="today" className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="today">
-            <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefDue.length})
+            <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefToday.length})
           </TabsTrigger>
           <TabsTrigger value="followup">
             <Hospital className="w-4 h-4 mr-2" />Follow-up ({hospitalFollowUp.length + griefDue.length})
