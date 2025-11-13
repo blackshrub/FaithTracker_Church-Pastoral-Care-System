@@ -36,6 +36,9 @@ export const MembersList = () => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [selectedMembers, setSelectedMembers] = useState([]);
   
   const [newMember, setNewMember] = useState({
     name: '',
