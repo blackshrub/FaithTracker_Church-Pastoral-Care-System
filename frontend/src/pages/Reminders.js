@@ -142,9 +142,13 @@ export const Reminders = () => {
         axios.get(`${API}/members`)
       ]);
       
-      // Get member names and phones for events
+      // Get member names, phones, and photos for events
       const memberMap = {};
-      membersRes.data.forEach(m => memberMap[m.id] = { name: m.name, phone: m.phone });
+      membersRes.data.forEach(m => memberMap[m.id] = { 
+        name: m.name, 
+        phone: m.phone, 
+        photo_url: m.photo_url 
+      });
       
       // Filter birthdays for today with member names
       const todayBirthdays = eventsRes.data.filter(e => 
