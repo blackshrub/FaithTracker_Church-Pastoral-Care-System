@@ -436,40 +436,42 @@ export const MemberDetail = () => {
               ) : (
                 <div className="space-y-4">
                   {careEvents.map((event) => (
-                    <div key={event.id} className="flex gap-4 pb-4 border-l-2 border-primary-200 pl-6 ml-3 relative" data-testid={`care-event-${event.id}`}>
+                    <div key={event.id} className="flex gap-4 pb-4 border-l-2 border-primary-200 pl-6 ml-3 relative timeline-item" data-testid={`care-event-${event.id}`}>
                       <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary-500 border-2 border-background"></div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <EventTypeBadge type={event.event_type} />
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(event.event_date, 'dd MMM yyyy')}
-                          </span>
-                          {event.completed && (
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          )}
-                        </div>
-                        <h5 className="font-manrope font-semibold text-sm text-foreground mb-1">{event.title}</h5>
-                        {event.description && (
-                          <p className="text-sm text-muted-foreground">{event.description}</p>
-                        )}
-                        {event.aid_amount && (
-                          <p className="text-sm text-green-700 font-medium mt-1">
-                            Rp {event.aid_amount.toLocaleString('id-ID')}
-                          </p>
-                        )}
-                        <div className="mt-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <EventTypeBadge type={event.event_type} />
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(event.event_date, 'dd MMM yyyy')}
+                              </span>
+                              {event.completed && (
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                              )}
+                            </div>
+                            <h5 className="font-playfair font-semibold text-sm text-foreground mb-1">{event.title}</h5>
+                            {event.description && (
+                              <p className="text-sm text-muted-foreground">{event.description}</p>
+                            )}
+                            {event.aid_amount && (
+                              <p className="text-sm text-green-700 font-medium mt-1">
+                                Rp {event.aid_amount.toLocaleString('id-ID')}
+                              </p>
+                            )}
+                          </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="ghost">
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent>
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => sendReminder(event.id)}>
                                 <Send className="w-4 h-4 mr-2" />Send Reminder
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
-                                <Trash2 className="w-4 h-4 mr-2" />Delete Event
+                                <Trash2 className="w-4 h-4 mr-2" />Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
