@@ -1,10 +1,18 @@
 [
   {
-    "content": "Add database indexes for performance (member_id, campus_id, event_date)",
+    "content": "Database Indexing (completed)",
+    "status": "completed"
+  },
+  {
+    "content": "Add API pagination to all list endpoints",
     "status": "in_progress"
   },
   {
-    "content": "Implement API pagination for large datasets",
+    "content": "Add Redis caching for member lists and stats",
+    "status": "pending"
+  },
+  {
+    "content": "Add MongoDB connection pooling",
     "status": "pending"
   },
   {
@@ -12,7 +20,7 @@
     "status": "pending"
   },
   {
-    "content": "Implement lazy loading for React routes",
+    "content": "Implement React lazy loading for all routes",
     "status": "pending"
   },
   {
@@ -24,11 +32,19 @@
     "status": "pending"
   },
   {
-    "content": "Implement virtual scrolling for large member lists",
+    "content": "Implement virtual scrolling for member lists",
     "status": "pending"
   },
   {
-    "content": "Test performance improvements",
+    "content": "Add code splitting and bundle analysis",
+    "status": "pending"
+  },
+  {
+    "content": "Add background jobs for heavy operations",
+    "status": "pending"
+  },
+  {
+    "content": "Test all performance optimizations",
     "status": "pending"
   }
 ]
