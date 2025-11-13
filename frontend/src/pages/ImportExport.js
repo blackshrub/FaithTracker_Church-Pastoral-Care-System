@@ -96,7 +96,40 @@ export const ImportExport = () => {
     loadActiveSyncs();
   };
   
-  const handleCsvImport = async (e) => {
+  const handleCsvSelect = async (e) => {
+    const file = e.target.files[0];
+    setCsvFile(file);
+    
+    if (file) {
+      // Parse CSV for preview
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      if (lines.length > 0) {
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+        const preview = lines.slice(1, 11).map(line => {
+          const values = line.split(',').map(v => v.replace(/"/g, '').trim());
+          const row = {};
+          headers.forEach((h, i) => row[h] = values[i] || '');
+          return row;
+        });
+        
+        // Validate required fields
+        const requiredFields = ['name', 'phone'];
+        const hasRequired = requiredFields.every(field => 
+          headers.some(h => h.toLowerCase().includes(field.toLowerCase()))
+        );
+        
+        setCsvPreview({ headers, preview, total: lines.length - 1 });
+        setValidationResults({
+          hasRequired,
+          missingFields: requiredFields.filter(field => 
+            !headers.some(h => h.toLowerCase().includes(field.toLowerCase()))
+          )
+        });
+        setShowPreview(true);
+      }
+    }
+  };
     e.preventDefault();
     if (!csvFile) return;
     
