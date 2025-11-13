@@ -74,9 +74,14 @@ export const Reminders = () => {
         member_name: memberMap[g.member_id]
       }));
       
-      // Separate at-risk (30-59 days) and disconnected (60+ days)
-      const atRisk = atRiskRes.data.filter(m => m.days_since_last_contact >= 30 && m.days_since_last_contact < 60);
-      const disconnected = atRiskRes.data.filter(m => m.days_since_last_contact >= 60);
+      // Separate at-risk and disconnected based on Settings thresholds
+      const atRisk = atRiskRes.data.filter(m => 
+        m.days_since_last_contact >= engagementSettings.atRiskDays && 
+        m.days_since_last_contact < engagementSettings.inactiveDays
+      );
+      const disconnected = atRiskRes.data.filter(m => 
+        m.days_since_last_contact >= engagementSettings.inactiveDays
+      );
       
       setBirthdaysToday(todayBirthdays);
       setUpcomingBirthdays(upcoming);
