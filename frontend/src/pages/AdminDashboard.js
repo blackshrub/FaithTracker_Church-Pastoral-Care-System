@@ -100,7 +100,7 @@ export const AdminDashboard = () => {
                 <CardTitle>Manage Campuses</CardTitle>
                 <Dialog open={campusModalOpen} onOpenChange={setCampusModalOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-primary-500"><Plus className="w-4 h-4 mr-2" />Add Campus</Button>
+                    <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />Add Campus</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader><DialogTitle>Add Campus</DialogTitle></DialogHeader>
