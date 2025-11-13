@@ -372,6 +372,86 @@ export const Analytics = () => {
           </div>
         </TabsContent>
         
+        {/* Demographic Trends Tab */}
+        <TabsContent value="trends" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Population Analysis by Age Group</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={trendsData.age_groups}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill={COLORS.demographic[0]} name="Members" />
+                    <Bar dataKey="care_events" fill={COLORS.demographic[1]} name="Care Events" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Engagement by Membership Status</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={trendsData.membership_trends}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="status" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="avg_engagement" fill={COLORS.primary[2]} name="Engagement Score" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <Card>
+            <CardHeader><CardTitle>AI Insights & Recommendations</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-blue-50 rounded">
+                    <p className="font-semibold text-blue-900">📊 Population Insights</p>
+                    <div className="mt-2 space-y-1">
+                      {trendsData.insights?.slice(0, 3).map((insight, i) => (
+                        <p key={i} className="text-sm text-blue-700">• {insight}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-green-50 rounded">
+                    <p className="font-semibold text-green-900">💡 Care Adaptations</p>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm text-green-700">• Focus senior care programs for 60+ age group</p>
+                      <p className="text-sm text-green-700">• Increase visitor engagement initiatives</p>
+                      <p className="text-sm text-green-700">• Develop young adult retention strategies</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 bg-purple-50 rounded">
+                  <p className="font-semibold text-purple-900">🎯 Strategic Recommendations</p>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">High Priority</p>
+                      <p className="text-sm text-purple-600">Members with 90+ days no contact need immediate attention</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">Medium Priority</p>
+                      <p className="text-sm text-purple-600">Seniors and visitors require specialized care programs</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">Long Term</p>
+                      <p className="text-sm text-purple-600">Develop demographic-specific ministry approaches</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         {/* Engagement Tab */}
         <TabsContent value="engagement" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
