@@ -24,7 +24,7 @@ export const MemberAvatar = ({ member, size = 'md' }) => {
   
   return (
     <Avatar className={sizeClasses[size]} data-testid="member-avatar">
-      {photoUrl && <AvatarImage src={photoUrl} alt={member.name} />}
+      {photoUrl && <AvatarImage src={photoUrl} alt={member.name} className="object-cover" />}
       <AvatarFallback className="bg-primary-100 text-primary-700 font-semibold">
         {getInitials(member.name)}
       </AvatarFallback>
