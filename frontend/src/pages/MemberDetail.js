@@ -37,7 +37,13 @@ export const MemberDetail = () => {
   const [careEvents, setCareEvents] = useState([]);
   const [griefTimeline, setGriefTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editEventModalOpen, setEditEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   
   const [newEvent, setNewEvent] = useState({
     event_type: 'regular_contact',
