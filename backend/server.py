@@ -1622,6 +1622,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def create_default_admin():
+    """Create default admin user if none exists"""
+    try:
+        admin_count = await db.users.count_documents({"role": UserRole.ADMIN})
+        if admin_count == 0:
+            default_admin = User(
+                email="admin@gkbj.church",
+                name="Admin GKBJ",
+                role=UserRole.ADMIN,
+                hashed_password=get_password_hash("admin123"),
+                is_active=True
+            )
+            await db.users.insert_one(default_admin.model_dump())
+            logger.info("Default admin user created: admin@gkbj.church / admin123")
+    except Exception as e:
+        logger.error(f"Error creating default admin: {str(e)}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
