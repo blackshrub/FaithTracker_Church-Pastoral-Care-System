@@ -201,6 +201,50 @@ export const ImportExport = () => {
                     placeholder="Bearer token if required"
                   />
                 </div>
+                <div className="space-y-3">
+                  <Label className="font-semibold">Field Mapping (map your API fields to our system)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Name field in your API:</Label>
+                      <Input
+                        value={fieldMapping.name}
+                        onChange={(e) => setFieldMapping({...fieldMapping, name: e.target.value})}
+                        placeholder="name"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone field:</Label>
+                      <Input
+                        value={fieldMapping.phone}
+                        onChange={(e) => setFieldMapping({...fieldMapping, phone: e.target.value})}
+                        placeholder="phone"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Email field (optional):</Label>
+                      <Input
+                        value={fieldMapping.email}
+                        onChange={(e) => setFieldMapping({...fieldMapping, email: e.target.value})}
+                        placeholder="email"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">ID field:</Label>
+                      <Input
+                        value={fieldMapping.external_id}
+                        onChange={(e) => setFieldMapping({...fieldMapping, external_id: e.target.value})}
+                        placeholder="id"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Example: If your API returns {`{full_name: "John", mobile: "628xxx"}`}, map name→full_name, phone→mobile
+                  </p>
+                </div>
                 <Button type="submit" disabled={!apiUrl || importing} className="bg-teal-500 hover:bg-teal-600">
                   <FileJson className="w-4 h-4 mr-2" />
                   {importing ? 'Syncing...' : 'Sync from API'}
