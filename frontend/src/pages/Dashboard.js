@@ -275,7 +275,7 @@ export const Dashboard = () => {
                         <SelectItem value="financial_aid">💰 Financial Aid</SelectItem>
                         <SelectItem value="grief_loss">💔 Grief/Loss</SelectItem>
                         <SelectItem value="new_house">🏠 New House</SelectItem>
-                        <SelectItem value="accident_illness">🚑 Accident/Illness/Hospital</SelectItem>
+                        <SelectItem value="accident_illness">🚑 Accident/Illness</SelectItem>
                         <SelectItem value="regular_contact">📞 Regular Contact</SelectItem>
                       </SelectContent>
                     </Select>
