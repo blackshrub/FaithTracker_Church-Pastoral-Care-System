@@ -1,6 +1,110 @@
 [
   {
-    "content": "Test WhatsApp integration end-to-end and document response shape",
-    "status": "completed"
+    "content": "Install backend dependencies (Pillow for photo processing, python-multipart for file upload)",
+    "status": "pending"
+  },
+  {
+    "content": "Create database models: Member, FamilyGroup, CareEvent, GriefSupport, NotificationLog",
+    "status": "pending"
+  },
+  {
+    "content": "Create utility functions: engagement calculator, grief timeline generator, photo upload handler",
+    "status": "pending"
+  },
+  {
+    "content": "Implement Member CRUD endpoints with family grouping support",
+    "status": "pending"
+  },
+  {
+    "content": "Implement CareEvent CRUD with auto-grief-timeline generation",
+    "status": "pending"
+  },
+  {
+    "content": "Implement GriefSupport endpoints for timeline management",
+    "status": "pending"
+  },
+  {
+    "content": "Implement Dashboard endpoints (stats, at-risk, active grief, hospital follow-up)",
+    "status": "pending"
+  },
+  {
+    "content": "Implement photo upload endpoint and storage",
+    "status": "pending"
+  },
+  {
+    "content": "Implement CSV/JSON import and CSV export endpoints",
+    "status": "pending"
+  },
+  {
+    "content": "Install frontend dependencies (react-i18next, date-fns, recharts)",
+    "status": "pending"
+  },
+  {
+    "content": "Set up design tokens and Google Fonts in index.css",
+    "status": "pending"
+  },
+  {
+    "content": "Set up react-i18next with ID/EN translation files",
+    "status": "pending"
+  },
+  {
+    "content": "Create reusable components (LanguageToggle, EngagementBadge, EventTypeBadge, MemberAvatar, GriefTimeline)",
+    "status": "pending"
+  },
+  {
+    "content": "Build Dashboard with stats and priority widgets",
+    "status": "pending"
+  },
+  {
+    "content": "Build Members List with search, filter, and sorting",
+    "status": "pending"
+  },
+  {
+    "content": "Build Member Detail with tabbed interface",
+    "status": "pending"
+  },
+  {
+    "content": "Build Add/Edit Member Form with photo upload",
+    "status": "pending"
+  },
+  {
+    "content": "Build Add/Edit Care Event Form with conditional fields",
+    "status": "pending"
+  },
+  {
+    "content": "Build Grief Support Timeline visualization",
+    "status": "pending"
+  },
+  {
+    "content": "Build Financial Aid Dashboard with charts",
+    "status": "pending"
+  },
+  {
+    "content": "Build Analytics Dashboard with multiple charts",
+    "status": "pending"
+  },
+  {
+    "content": "Build Import/Export interface",
+    "status": "pending"
+  },
+  {
+    "content": "Test grief support flow end-to-end",
+    "status": "pending"
+  },
+  {
+    "content": "Test hospital care flow with visitation logs",
+    "status": "pending"
+  },
+  {
+    "content": "Test financial aid tracking and analytics",
+    "status": "pending"
+  },
+  {
+    "content": "Test multi-language switching throughout app",
+    "status": "pending"
+  },
+  {
+    "content": "Run automated testing agent and fix bugs",
+    "status": "pending"
   }
 ]
