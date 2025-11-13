@@ -105,7 +105,7 @@ const markMemberContacted = async (memberId, memberName, user, loadReminders) =>
   }
 };
 
-export const Reminders = () => {
+export const Dashboard = () => {
   const { user } = useAuth();
   const [birthdaysToday, setBirthdaysToday] = useState([]);
   const [griefDue, setGriefDue] = useState([]);
