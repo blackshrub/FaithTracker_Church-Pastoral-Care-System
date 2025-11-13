@@ -259,6 +259,7 @@ class CareEvent(BaseModel):
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     member_id: str
+    campus_id: str
     event_type: EventType
     event_date: date
     title: str
