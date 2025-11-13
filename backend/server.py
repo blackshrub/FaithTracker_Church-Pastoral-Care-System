@@ -1305,12 +1305,11 @@ async def add_visitation_log(event_id: str, entry: VisitationLogEntry):
 
 @api_router.get("/care-events/hospital/due-followup")
 async def get_hospital_followup_due():
-    """Get hospital events needing follow-up"""
+    """Get accident/illness events needing follow-up"""
     try:
-        # Find hospital visits with discharge date but no completion
+        # Find accident/illness events (merged from hospital) with discharge date but no completion
         events = await db.care_events.find({
-            "event_type": EventType.HOSPITAL_VISIT,
-            "discharge_date": {"$ne": None},
+            "event_type": "accident_illness",  # Updated from hospital_visit
             "completed": False
         }, {"_id": 0}).to_list(100)
         
@@ -1318,18 +1317,19 @@ async def get_hospital_followup_due():
         today = date.today()
         
         for event in events:
-            discharge = event.get('discharge_date')
-            if isinstance(discharge, str):
-                discharge = date.fromisoformat(discharge)
+            # Use event_date instead of discharge_date for follow-up calculation
+            event_date = event.get('event_date')
+            if isinstance(event_date, str):
+                event_date = date.fromisoformat(event_date)
             
-            days_since_discharge = (today - discharge).days
+            days_since_event = (today - event_date).days
             
-            # Check if follow-up is due (3 days, 1 week, 2 weeks)
-            if days_since_discharge in [3, 7, 14]:
+            # Check if follow-up is due (3 days, 7 days, 14 days after event)
+            if days_since_event in [3, 7, 14]:
                 followup_due.append({
                     **event,
-                    "days_since_discharge": days_since_discharge,
-                    "followup_reason": f"{days_since_discharge} days post-discharge"
+                    "days_since_event": days_since_event,
+                    "followup_reason": f"{days_since_event} days after accident/illness"
                 })
         
         return followup_due
