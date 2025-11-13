@@ -380,107 +380,36 @@ export const MembersList = () => {
         </CardContent>
       </Card>
       
-      {/* Members Table */}
+      {/* Virtual Scrolled Members Table */}
       <Card className="border-border shadow-sm">
         {selectedMembers.length > 0 && (
           <div className="p-4 bg-amber-50 border-b flex items-center justify-between">
             <span className="font-semibold">{selectedMembers.length} members selected</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>
-                Clear Selection
-              </Button>
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
-                Delete Selected
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>Clear Selection</Button>
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>Delete Selected</Button>
             </div>
           </div>
         )}
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <input type="checkbox" checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0} onChange={toggleSelectAll} className="w-4 h-4" />
-                  </TableHead>
-                  <TableHead>Name</TableHead>
-                  {visibleColumns.phone && <TableHead>Phone</TableHead>}
-                  {visibleColumns.age && <TableHead>Age</TableHead>}
-                  {visibleColumns.gender && <TableHead>Gender</TableHead>}
-                  {visibleColumns.membership && <TableHead>Membership</TableHead>}
-                  {visibleColumns.marital && <TableHead>Marital</TableHead>}
-                  {visibleColumns.category && <TableHead>Category</TableHead>}
-                  {visibleColumns.blood_type && <TableHead>Blood</TableHead>}
-                  {visibleColumns.family && <TableHead>Family</TableHead>}
-                  {visibleColumns.last_contact && <TableHead>Last Contact</TableHead>}
-                  {visibleColumns.engagement && <TableHead>Status</TableHead>}
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMembers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {t('empty_states.no_members')}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredMembers.map((member) => (
-                    <TableRow key={member.id} className="hover:bg-muted/50 transition-colors" data-testid={`member-row-${member.id}`}>
-                      <TableCell>
-                        <input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={() => toggleSelectMember(member.id)} className="w-4 h-4" />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <MemberAvatar member={member} size="sm" />
-                          <span className="font-medium">{member.name}</span>
-                        </div>
-                      </TableCell>
-                      {visibleColumns.phone && <TableCell>{member.phone || '-'}</TableCell>}
-                      {visibleColumns.age && <TableCell>{member.age || '-'}</TableCell>}
-                      {visibleColumns.gender && <TableCell>{member.gender || '-'}</TableCell>}
-                      {visibleColumns.membership && <TableCell><span className="text-xs px-2 py-1 bg-teal-100 text-teal-700 rounded">{member.membership_status || '-'}</span></TableCell>}
-                      {visibleColumns.marital && <TableCell>{member.marital_status || '-'}</TableCell>}
-                      {visibleColumns.category && <TableCell>{member.category || '-'}</TableCell>}
-                      {visibleColumns.blood_type && <TableCell>{member.blood_type || '-'}</TableCell>}
-                      {visibleColumns.family && (
-                        <TableCell>
-                          {member.family_group_id && (
-                            <span className="text-sm text-muted-foreground">
-                              {familyGroups.find(g => g.id === member.family_group_id)?.group_name || 'Family'}
-                            </span>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.last_contact && (
-                        <TableCell>
-                          {member.last_contact_date ? (
-                            <span className="text-sm">{formatDate(member.last_contact_date, 'dd MMM yyyy')}</span>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">{t('never_contacted')}</span>
-                          )}
-                        </TableCell>
-                      )}
-                      {visibleColumns.engagement && (
-                        <TableCell>
-                          <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          <Link to={`/members/${member.id}`}>
-                            <Button size="sm" variant="outline" data-testid={`view-member-${member.id}`}>{t('view')}</Button>
-                          </Link>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditingMember(member); setEditModalOpen(true); }}>Edit</Button>
-                          <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteMember(member.id, member.name)}>Delete</Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+          <div className="p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-4 font-semibold text-sm">
+              <input type="checkbox" checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0} onChange={toggleSelectAll} className="w-4 h-4" />
+              <span className="flex-1">Member</span>
+              <span className="w-20">Age</span>
+              <span className="w-20">Gender</span>
+              <span className="w-32">Status</span>
+              <span className="w-24">Actions</span>
+            </div>
           </div>
+          <List
+            height={600}
+            itemCount={filteredMembers.length}
+            itemSize={80}
+            itemData={filteredMembers}
+          >
+            {MemberRow}
+          </List>
         </CardContent>
       </Card>
     </div>
