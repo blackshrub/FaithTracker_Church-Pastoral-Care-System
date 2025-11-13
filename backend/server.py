@@ -286,6 +286,42 @@ class NotificationLog(BaseModel):
     response_data: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# User Authentication Models
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: UserRole = UserRole.PASTOR
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    name: str
+    role: UserRole
+    hashed_password: str
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserResponse(BaseModel):
+    id: str
+    email: EmailStr
+    name: str
+    role: UserRole
+    is_active: bool
+    created_at: datetime
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
 # ==================== UTILITY FUNCTIONS ====================
 
 def calculate_engagement_status(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
