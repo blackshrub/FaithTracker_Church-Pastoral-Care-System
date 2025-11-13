@@ -384,22 +384,28 @@ export const MemberDetail = () => {
         </CardContent>
       </Card>
       
-      {/* Tabbed Content */}
+      {/* Tabbed Content - Dynamic tabs based on data */}
       <Tabs defaultValue="timeline" className="w-full">
         <div className="overflow-x-auto">
           <TabsList className="inline-flex w-auto min-w-full">
             <TabsTrigger value="timeline" data-testid="tab-timeline">
               <Calendar className="w-4 h-4 mr-2" />Timeline
             </TabsTrigger>
-            <TabsTrigger value="grief" data-testid="tab-grief">
-              <Heart className="w-4 h-4 mr-2" />Grief ({griefTimeline.length})
-            </TabsTrigger>
-            <TabsTrigger value="hospital" data-testid="tab-hospital">
-              <Hospital className="w-4 h-4 mr-2" />Hospital
-            </TabsTrigger>
-            <TabsTrigger value="aid" data-testid="tab-aid">
-              <DollarSign className="w-4 h-4 mr-2" />Aid
-            </TabsTrigger>
+            {griefTimeline.length > 0 && (
+              <TabsTrigger value="grief" data-testid="tab-grief">
+                <Heart className="w-4 h-4 mr-2" />Grief ({griefTimeline.length})
+              </TabsTrigger>
+            )}
+            {careEvents.filter(e => e.event_type === 'accident_illness').length > 0 && (
+              <TabsTrigger value="accident" data-testid="tab-accident">
+                <Hospital className="w-4 h-4 mr-2" />Accident/Illness ({careEvents.filter(e => e.event_type === 'accident_illness').length})
+              </TabsTrigger>
+            )}
+            {careEvents.filter(e => e.event_type === 'financial_aid').length > 0 && (
+              <TabsTrigger value="aid" data-testid="tab-aid">
+                <DollarSign className="w-4 h-4 mr-2" />Aid ({careEvents.filter(e => e.event_type === 'financial_aid').length})
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
         
