@@ -399,6 +399,11 @@ export const MemberDetail = () => {
                 <Heart className="w-4 h-4 mr-2" />Grief ({griefTimeline.length})
               </TabsTrigger>
             )}
+            {accidentTimeline.length > 0 && (
+              <TabsTrigger value="accident-timeline" data-testid="tab-accident-timeline">
+                <Hospital className="w-4 h-4 mr-2" />Accident Follow-up ({accidentTimeline.length})
+              </TabsTrigger>
+            )}
             {careEvents.filter(e => e.event_type === 'accident_illness').length > 0 && (
               <TabsTrigger value="accident" data-testid="tab-accident">
                 <Hospital className="w-4 h-4 mr-2" />Accident/Illness ({careEvents.filter(e => e.event_type === 'accident_illness').length})
