@@ -130,7 +130,7 @@ export const ImportExport = () => {
       }
     }
   };
-    e.preventDefault();
+  const handleCsvImport = async () => {
     if (!csvFile) return;
     
     try {
@@ -144,6 +144,8 @@ export const ImportExport = () => {
         toast.warning(`${response.data.errors.length} errors occurred`);
       }
       setCsvFile(null);
+      setShowPreview(false);
+      setCsvPreview(null);
     } catch (error) {
       toast.error('Import failed');
     } finally {
