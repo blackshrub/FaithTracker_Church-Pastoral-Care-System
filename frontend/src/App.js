@@ -13,6 +13,7 @@ import { Analytics } from '@/pages/Analytics';
 import { AdminDashboard } from '@/pages/AdminDashboard';
 import { ImportExport } from '@/pages/ImportExport';
 import { Settings as SettingsPage } from '@/pages/Settings';
+import { WhatsAppLogs } from '@/pages/WhatsAppLogs';
 import { IntegrationTest } from '@/components/IntegrationTest';
 import { Layout } from '@/components/Layout';
 
