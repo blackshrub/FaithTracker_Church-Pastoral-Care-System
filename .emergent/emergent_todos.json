@@ -1,10 +1,26 @@
 [
   {
-    "content": "Add data quality checks (phone validation, duplicate detection)",
-    "status": "completed"
+    "content": "Add FinancialAidSchedule model with frequency options (one-time, weekly, monthly, annual)",
+    "status": "in_progress"
   },
   {
-    "content": "Test enterprise validation features",
-    "status": "completed"
+    "content": "Update financial aid event form with scheduling UI",
+    "status": "pending"
+  },
+  {
+    "content": "Create scheduled aid management endpoints (create, stop, list)",
+    "status": "pending"
+  },
+  {
+    "content": "Add Financial Aid tab to Reminders page",
+    "status": "pending"
+  },
+  {
+    "content": "Add manual stop functionality for aid schedules",
+    "status": "pending"
+  },
+  {
+    "content": "Test financial aid scheduling system",
+    "status": "pending"
   }
 ]
