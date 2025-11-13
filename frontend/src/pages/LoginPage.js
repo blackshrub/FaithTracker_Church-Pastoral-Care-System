@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
+import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Heart, LogIn, Loader2 } from 'lucide-react';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 export const LoginPage = () => {
   const { t } = useTranslation();
@@ -16,8 +21,26 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [campusId, setCampusId] = useState('');
+  const [campuses, setCampuses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingCampuses, setLoadingCampuses] = useState(true);
   const [error, setError] = useState('');
+  
+  useEffect(() => {
+    loadCampuses();
+  }, []);
+  
+  const loadCampuses = async () => {
+    try {
+      const response = await axios.get(`${API}/campuses`);
+      setCampuses(response.data);
+    } catch (error) {
+      console.error('Error loading campuses:', error);
+    } finally {
+      setLoadingCampuses(false);
+    }
+  };
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,7 +48,7 @@ export const LoginPage = () => {
     setLoading(true);
     
     try {
-      await login(email, password);
+      await login(email, password, campusId || null);
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (err) {
@@ -52,6 +75,27 @@ export const LoginPage = () => {
                 <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="campus">Campus / Gereja</Label>
+              {loadingCampuses ? (
+                <div className="text-sm text-muted-foreground">Loading campuses...</div>
+              ) : (
+                <Select value={campusId} onValueChange={setCampusId}>
+                  <SelectTrigger data-testid="campus-select">
+                    <SelectValue placeholder="Select your campus (optional for full admin)" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px] overflow-y-auto">
+                    {campuses.map((campus) => (
+                      <SelectItem key={campus.id} value={campus.id}>
+                        {campus.campus_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">Select campus (required for campus admin/pastor)</p>
+            </div>
             
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -93,7 +137,8 @@ export const LoginPage = () => {
             </Button>
             
             <div className="text-center text-sm text-muted-foreground mt-4">
-              <p>Default admin: admin@gkbj.church / admin123</p>
+              <p>Full Admin: admin@gkbj.church / admin123</p>
+              <p className="text-xs mt-1">Full admin can access all campuses</p>
             </div>
           </form>
         </CardContent>

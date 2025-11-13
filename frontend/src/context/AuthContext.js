@@ -29,8 +29,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   };
   
-  const login = async (email, password) => {
-    const response = await axios.post(`${API}/auth/login`, { email, password });
+  const login = async (email, password, campusId = null) => {
+    const response = await axios.post(`${API}/auth/login`, { 
+      email, 
+      password,
+      campus_id: campusId
+    });
     const { access_token, user: userData } = response.data;
     
     localStorage.setItem('token', access_token);
