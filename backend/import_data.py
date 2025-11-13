@@ -386,7 +386,7 @@ async def import_campuses_and_data():
     print("\n" + "="*60)
     print("IMPORT SUMMARY")
     print("="*60)
-    print(f"✅ Campuses created: {len(campuses_map)}")
+    print(f"✅ Campus: {campus_name}")
     print(f"✅ Members imported: {members_imported}")
     print(f"✅ Family groups created: {len(family_groups_map)}")
     print(f"✅ Birthday events: {birthday_count}")
