@@ -261,11 +261,11 @@ export const Reminders = () => {
         </TabsContent>
         
         <TabsContent value="followup" className="space-y-4">
-          {/* Hospital Follow-ups */}
+          {/* Accident/Illness Follow-ups */}
           {hospitalFollowUp.length > 0 && (
             <Card className="card-border-left-blue">
               <CardHeader>
-                <CardTitle>Hospital Follow-ups</CardTitle>
+                <CardTitle>Accident/Illness Follow-ups</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
