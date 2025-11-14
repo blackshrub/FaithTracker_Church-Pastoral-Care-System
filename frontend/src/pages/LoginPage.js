@@ -145,7 +145,7 @@ export const LoginPage = () => {
             
             <div className="text-center text-sm text-muted-foreground mt-4">
               <p>Full Admin: admin@gkbj.church / admin123</p>
-              <p className="text-xs mt-1">Full admin can access all campuses</p>
+              <p className="text-xs mt-1">Select campus to manage specific location</p>
             </div>
           </form>
         </CardContent>
