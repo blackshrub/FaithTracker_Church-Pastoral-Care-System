@@ -8,6 +8,7 @@
   "analytics": "Analitik",
   "settings": "Pengaturan",
   "integrations": "Integrasi",
+  "calendar": "Kalender",
   
   "add_member": "Tambah Jemaat",
   "edit_member": "Edit Jemaat",
@@ -23,16 +24,30 @@
   "view": "Lihat",
   "search": "Cari",
   "filter": "Filter",
+  "description": "Deskripsi",
+  "date": "Tanggal",
+  "amount": "Jumlah",
+  "type": "Jenis",
+  "status": "Status",
   
+  "welcome_back": "Selamat Datang Kembali",
   "total_members": "Total Jemaat",
+  "total_interactions": "Total Interaksi",
+  "pending_reminders": "Pengingat Tertunda",
   "active_grief_support": "Dukungan Dukacita Aktif",
   "members_at_risk": "Jemaat Berisiko",
+  "at_risk_disconnected": "Berisiko + Terputus",
   "month_financial_aid": "Bantuan Bulan Ini",
+  "quick_actions": "Aksi Cepat",
+  "view_all_members": "Lihat Semua Jemaat",
+  "ai_pastoral_recommendations": "Rekomendasi Pastoral AI",
+  "intelligent_followup": "Saran tindak lanjut cerdas berdasarkan pola jemaat",
   
   "engagement_status": "Status Keterlibatan",
   "active": "Aktif",
   "at_risk": "Berisiko",
   "inactive": "Tidak Aktif",
+  "disconnected": "Terputus",
   "last_contact": "Kontak Terakhir",
   "days_ago": "hari lalu",
   "never_contacted": "Belum pernah dihubungi",
@@ -70,9 +85,16 @@
   
   "send_reminder": "Kirim Pengingat",
   "mark_complete": "Tandai Selesai",
+  "mark_completed": "Tandai Selesai",
   "upload_photo": "Unggah Foto",
   "export_csv": "Ekspor CSV",
   "import_data": "Impor Data",
+  "contact": "Hubungi",
+  "urgent_reconnection_needed": "Perlu Koneksi Ulang Mendesak",
+  "no_contact_for": "Tidak ada kontak selama",
+  "days_risk": "hari - risiko terputus",
+  "personal_visit_or_call": "Kunjungan pribadi atau panggilan telepon",
+  "high_priority": "PRIORITAS TINGGI",
   
   "success_messages": {
     "member_created": "Jemaat berhasil ditambahkan",
@@ -81,18 +103,30 @@
     "care_event_created": "Kejadian perawatan berhasil ditambahkan",
     "grief_timeline_generated": "Timeline dukacita otomatis dibuat (6 tahap)",
     "reminder_sent": "Pengingat WhatsApp berhasil dikirim",
-    "stage_completed": "Tahap dukacita ditandai selesai"
+    "stage_completed": "Tahap dukacita ditandai selesai",
+    "login_successful": "Login berhasil!"
   },
   
   "error_messages": {
     "member_not_found": "Jemaat tidak ditemukan",
     "failed_to_save": "Gagal menyimpan data",
-    "failed_to_send": "Gagal mengirim pesan"
+    "failed_to_send": "Gagal mengirim pesan",
+    "incorrect_credentials": "Email atau kata sandi salah"
   },
   
   "empty_states": {
     "no_members": "Belum ada jemaat. Tambahkan jemaat pertama Anda.",
     "no_care_events": "Belum ada kejadian perawatan.",
-    "no_grief_support": "Tidak ada dukungan dukacita aktif."
-  }
+    "no_grief_support": "Tidak ada dukungan dukacita aktif.",
+    "no_financial_aid": "Belum ada bantuan keuangan yang dicatat."
+  },
+  
+  "login": "Masuk",
+  "logout": "Keluar",
+  "email": "Email",
+  "password": "Kata Sandi",
+  "sign_in": "Masuk",
+  "full_admin": "Administrator Penuh",
+  "campus_admin": "Admin Kampus",
+  "pastor": "Pastor"
 }
