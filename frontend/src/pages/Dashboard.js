@@ -176,6 +176,7 @@ export const Dashboard = () => {
       // Set all state from pre-calculated data
       setBirthdaysToday(data.birthdays_today || []);
       setUpcomingBirthdays(data.upcoming_birthdays || []);
+      setUpcomingTasks(data.upcoming_tasks || []);
       setGriefToday(data.grief_today || []);
       setGriefDue(data.grief_today || []); // Same as grief_today
       setAccidentFollowUp(data.accident_followup || []);
