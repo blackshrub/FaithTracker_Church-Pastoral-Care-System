@@ -43,6 +43,7 @@ export const MembersList = () => {
   const [debouncedSearch] = useDebounce(search, 2000); // 2 second debounce for smooth UX
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchLoading, setSearchLoading] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && search.length >= 1) {
