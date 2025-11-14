@@ -1062,7 +1062,7 @@ export const Dashboard = () => {
           {hospitalFollowUp.length > 0 && (
             <Card className="card-border-left-blue">
               <CardHeader>
-                <CardTitle>Accident/Illness Follow-ups</CardTitle>
+                <CardTitle>Hospital Visit Follow-ups</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1079,6 +1079,45 @@ export const Dashboard = () => {
                           </a>
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => markAccidentComplete(event.id, loadReminders)}>
+                          Mark Complete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Accident/Illness Recovery Follow-ups */}
+          {accidentFollowUp.length > 0 && (
+            <Card className="card-border-left-teal">
+              <CardHeader>
+                <CardTitle>Accident/Illness Recovery Follow-ups</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {accidentFollowUp.map(followup => (
+                    <div key={followup.id} className="p-3 bg-teal-50 rounded flex justify-between items-center">
+                      <div className="flex-1">
+                        <MemberNameWithAvatar member={{name: followup.member_name, photo_url: followup.member_photo_url}} memberId={followup.member_id} />
+                        <p className="text-sm text-muted-foreground ml-13">{followup.stage.replace('_', ' ')} - Due: {formatDate(followup.scheduled_date)}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-teal-500 hover:bg-teal-600 text-white" asChild>
+                          <a href={formatPhoneForWhatsApp(followup.member_phone)} target="_blank" rel="noopener noreferrer">
+                            Contact
+                          </a>
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          try {
+                            await axios.post(`${API}/accident-followup/${followup.id}/complete`);
+                            toast.success('Accident follow-up completed!');
+                            loadReminders();
+                          } catch (error) {
+                            toast.error('Failed to complete');
+                          }
+                        }}>
                           Mark Complete
                         </Button>
                       </div>
