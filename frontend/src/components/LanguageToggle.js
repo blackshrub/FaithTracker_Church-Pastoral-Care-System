@@ -1,15 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 
 export const LanguageToggle = () => {
   const { i18n } = useTranslation();
+  const [currentLang, setCurrentLang] = useState(i18n.language);
   
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'id' ? 'en' : 'id';
-    i18n.changeLanguage(newLang);
+  useEffect(() => {
+    // Update local state when language changes
+    const handleLanguageChange = (lng) => {
+      setCurrentLang(lng);
+    };
+    
+    i18n.on('languageChanged', handleLanguageChange);
+    
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
+  }, [i18n]);
+  
+  const toggleLanguage = async () => {
+    const newLang = currentLang === 'id' ? 'en' : 'id';
+    await i18n.changeLanguage(newLang);
     localStorage.setItem('language', newLang);
+    setCurrentLang(newLang);
   };
   
   return (
@@ -22,7 +37,7 @@ export const LanguageToggle = () => {
     >
       <Globe className="w-4 h-4" />
       <span className="text-sm font-medium">
-        {i18n.language === 'id' ? '🇮🇩 ID' : '🇬🇧 EN'}
+        {currentLang === 'id' ? '🇮🇩 ID' : '🇬🇧 EN'}
       </span>
     </Button>
   );
