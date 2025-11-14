@@ -295,14 +295,16 @@ export const Analytics = () => {
       </div>
       
       <Tabs defaultValue="demographics" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="demographics"><Users className="w-4 h-4 mr-2" />Demographics</TabsTrigger>
-          <TabsTrigger value="trends"><TrendingUp className="w-4 h-4 mr-2" />Trends</TabsTrigger>
-          <TabsTrigger value="engagement"><TrendingUp className="w-4 h-4 mr-2" />Engagement</TabsTrigger>
-          <TabsTrigger value="financial"><DollarSign className="w-4 h-4 mr-2" />Financial</TabsTrigger>
-          <TabsTrigger value="care"><Heart className="w-4 h-4 mr-2" />Care Events</TabsTrigger>
-          <TabsTrigger value="predictive"><Target className="w-4 h-4 mr-2" />Predictive</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex w-max min-w-full">
+            <TabsTrigger value="demographics" className="whitespace-nowrap"><Users className="w-4 h-4 mr-2" />Demographics</TabsTrigger>
+            <TabsTrigger value="trends" className="whitespace-nowrap"><TrendingUp className="w-4 h-4 mr-2" />Trends</TabsTrigger>
+            <TabsTrigger value="engagement" className="whitespace-nowrap"><TrendingUp className="w-4 h-4 mr-2" />Engagement</TabsTrigger>
+            <TabsTrigger value="financial" className="whitespace-nowrap"><DollarSign className="w-4 h-4 mr-2" />Financial</TabsTrigger>
+            <TabsTrigger value="care" className="whitespace-nowrap"><Heart className="w-4 h-4 mr-2" />Care Events</TabsTrigger>
+            <TabsTrigger value="predictive" className="whitespace-nowrap"><Target className="w-4 h-4 mr-2" />Predictive</TabsTrigger>
+          </TabsList>
+        </div>
         
         {/* Demographics Tab */}
         <TabsContent value="demographics" className="space-y-6">
