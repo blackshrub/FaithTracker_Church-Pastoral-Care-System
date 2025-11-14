@@ -268,7 +268,6 @@ export const MemberDetail = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="birthday">🎂 {t('event_types.birthday')}</SelectItem>
                         <SelectItem value="childbirth">👶 {t('event_types.childbirth')}</SelectItem>
                         <SelectItem value="grief_loss">💔 {t('event_types.grief_loss')}</SelectItem>
                         <SelectItem value="new_house">🏠 {t('event_types.new_house')}</SelectItem>
