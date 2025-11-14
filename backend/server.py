@@ -1196,13 +1196,13 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         at_risk = [m for m in members if m.get("engagement_status") == "at_risk"]
         disconnected = [m for m in members if m.get("engagement_status") == "disconnected"]
         
-        # Financial aid due (today and overdue)
+        # Financial aid - categorize by date
         aid_schedules = await db.financial_aid_schedules.find(
             {"campus_id": campus_id, "is_active": True, "ignored": {"$ne": True}},
             {"_id": 0}
         ).to_list(None)
         
-        aid_due = []
+        aid_due = []  # OVERDUE only (past due)
         for schedule in aid_schedules:
             # Use the pre-calculated next_occurrence field from schedule
             next_occurrence = schedule.get("next_occurrence")
@@ -1212,8 +1212,20 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             try:
                 next_date = datetime.strptime(next_occurrence, '%Y-%m-%d').date()
                 
-                # Check if payment is due (today or overdue)
-                if next_date <= today:
+                # Due TODAY - add to today_tasks
+                if next_date == today:
+                    today_tasks.append({
+                        "type": "financial_aid",
+                        "date": next_occurrence,
+                        "member_id": schedule["member_id"],
+                        "member_name": member_map.get(schedule["member_id"], {}).get("name"),
+                        "member_phone": member_map.get(schedule["member_id"], {}).get("phone"),
+                        "member_photo_url": member_map.get(schedule["member_id"], {}).get("photo_url"),
+                        "details": f"{schedule['frequency'].title()} - Rp {schedule['aid_amount']:,}",
+                        "data": schedule
+                    })
+                # OVERDUE - add to aid_due (Aid tab)
+                elif next_date < today:
                     days_overdue = (today - next_date).days
                     aid_due.append({
                         **schedule,
@@ -1222,6 +1234,19 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                         "member_name": member_map.get(schedule["member_id"], {}).get("name"),
                         "member_phone": member_map.get(schedule["member_id"], {}).get("phone"),
                         "member_photo_url": member_map.get(schedule["member_id"], {}).get("photo_url")
+                    })
+                # UPCOMING (1-7 days ahead) - add to upcoming_tasks
+                elif tomorrow <= next_date <= week_ahead:
+                    days_until = (next_date - today).days
+                    upcoming_tasks.append({
+                        "type": "financial_aid",
+                        "date": next_occurrence,
+                        "member_id": schedule["member_id"],
+                        "member_name": member_map.get(schedule["member_id"], {}).get("name"),
+                        "member_phone": member_map.get(schedule["member_id"], {}).get("phone"),
+                        "member_photo_url": member_map.get(schedule["member_id"], {}).get("photo_url"),
+                        "details": f"{schedule['frequency'].title()} - Rp {schedule['aid_amount']:,}",
+                        "data": schedule
                     })
             except:
                 continue
