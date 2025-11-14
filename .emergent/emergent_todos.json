@@ -1,10 +1,14 @@
 [
   {
     "content": "Update Layout/Navigation to use translation keys",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update Dashboard to use translation keys for all text",
+    "status": "in_progress"
+  },
+  {
+    "content": "Add remaining Dashboard translation keys and text",
     "status": "pending"
   },
   {
