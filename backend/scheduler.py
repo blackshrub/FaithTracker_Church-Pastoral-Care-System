@@ -287,12 +287,61 @@ async def send_daily_digest_to_pastoral_team():
     except Exception as e:
         logger.error(f"Error sending daily digest: {str(e)}")
 
+async def refresh_all_dashboard_caches():
+    """Refresh dashboard cache for all active campuses"""
+    try:
+        from server import db, calculate_dashboard_reminders, get_campus_timezone, get_date_in_timezone
+        
+        # Get all active campuses
+        campuses = await db.campuses.find({"is_active": True}, {"_id": 0, "id": 1, "campus_name": 1, "timezone": 1}).to_list(None)
+        
+        logger.info(f"Refreshing dashboard cache for {len(campuses)} campuses...")
+        
+        for campus in campuses:
+            campus_id = campus["id"]
+            campus_tz = campus.get("timezone", "Asia/Jakarta")
+            today_date = get_date_in_timezone(campus_tz)
+            
+            # Calculate fresh data
+            data = await calculate_dashboard_reminders(campus_id, campus_tz, today_date)
+            
+            # Update cache
+            cache_key = f"dashboard_reminders_{campus_id}_{today_date}"
+            await db.dashboard_cache.update_one(
+                {"cache_key": cache_key},
+                {
+                    "$set": {
+                        "cache_key": cache_key,
+                        "data": data,
+                        "calculated_at": datetime.now(timezone.utc),
+                        "expires_at": datetime.now(timezone.utc) + timedelta(hours=24)  # Cache for full day
+                    }
+                },
+                upsert=True
+            )
+            
+            logger.info(f"✅ Dashboard cache refreshed for {campus['campus_name']} - {data['total_tasks']} tasks")
+        
+        # Clean up old cache entries (older than 2 days)
+        two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        await db.dashboard_cache.delete_many({"calculated_at": {"$lt": two_days_ago}})
+        
+        logger.info("Dashboard cache refresh complete")
+        
+    except Exception as e:
+        logger.error(f"Error refreshing dashboard caches: {str(e)}")
+
+
 async def daily_reminder_job():
     """Main daily reminder job - sends digest to pastoral team"""
     logger.info("==" * 30)
     logger.info("DAILY PASTORAL CARE DIGEST - Sending to Team")
     logger.info("==" * 30)
     
+    # Refresh dashboard cache for all campuses first
+    await refresh_all_dashboard_caches()
+    
+    # Send WhatsApp digests
     await send_daily_digest_to_pastoral_team()
     
     logger.info("Daily digest job completed")
