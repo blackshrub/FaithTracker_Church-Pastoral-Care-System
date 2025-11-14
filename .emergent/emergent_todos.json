@@ -1,18 +1,18 @@
 [
   {
     "content": "Add ignore button to financial aid schedules in Dashboard",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Exclude deleted/archived members from all calculations",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update API sync to archive members not in source",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Complete translation audit - Dashboard and MemberDetail pages",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
