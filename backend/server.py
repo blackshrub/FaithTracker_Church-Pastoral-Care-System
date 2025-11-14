@@ -67,6 +67,7 @@ class EngagementStatus(str, Enum):
     ACTIVE = "active"
     AT_RISK = "at_risk"
     INACTIVE = "inactive"
+    DISCONNECTED = "disconnected"
 
 class EventType(str, Enum):
     BIRTHDAY = "birthday"
