@@ -1456,6 +1456,37 @@ def get_date_in_timezone(timezone_str: str) -> str:
         return datetime.now(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d')
 
 
+@api_router.post("/care-events/{event_id}/ignore")
+async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user)):
+    """Mark a care event as ignored/dismissed"""
+    try:
+        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        if not event:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        # Update event to mark as ignored
+        await db.care_events.update_one(
+            {"id": event_id},
+            {"$set": {
+                "ignored": True,
+                "ignored_at": datetime.now(timezone.utc).isoformat(),
+                "ignored_by": user.get("id"),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Invalidate dashboard cache
+        await invalidate_dashboard_cache(event["campus_id"])
+        
+        return {"success": True, "message": "Care event ignored"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error ignoring care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/members/at-risk", response_model=List[Member])
 async def list_at_risk_members():
     """Get members with no contact in 30+ days"""
