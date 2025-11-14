@@ -245,10 +245,48 @@ export const Settings = () => {
         </TabsContent>
         
         <TabsContent value="system">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Information</CardTitle>
-            </CardHeader>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Campus Timezone Configuration</CardTitle>
+                <CardDescription>Set the timezone for date/time operations across the system</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="timezone">Campus Timezone</Label>
+                  <Select value={campusTimezone} onValueChange={setCampusTimezone}>
+                    <SelectTrigger id="timezone">
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Asia/Jakarta">Asia/Jakarta (UTC+7) - Jakarta, Indonesia</SelectItem>
+                      <SelectItem value="Asia/Singapore">Asia/Singapore (UTC+8) - Singapore</SelectItem>
+                      <SelectItem value="Asia/Kuala_Lumpur">Asia/Kuala_Lumpur (UTC+8) - Malaysia</SelectItem>
+                      <SelectItem value="Asia/Manila">Asia/Manila (UTC+8) - Philippines</SelectItem>
+                      <SelectItem value="Asia/Bangkok">Asia/Bangkok (UTC+7) - Thailand</SelectItem>
+                      <SelectItem value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (UTC+7) - Vietnam</SelectItem>
+                      <SelectItem value="Australia/Sydney">Australia/Sydney (UTC+10/+11) - Sydney</SelectItem>
+                      <SelectItem value="Pacific/Auckland">Pacific/Auckland (UTC+12/+13) - New Zealand</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This timezone will be used for:
+                  </p>
+                  <ul className="text-xs text-muted-foreground mt-1 space-y-1 ml-4">
+                    <li>• Daily reminder scheduling</li>
+                    <li>• Birthday notifications</li>
+                    <li>• Grief support timeline dates</li>
+                    <li>• All date displays in the application</li>
+                  </ul>
+                </div>
+                <Button onClick={saveTimezoneSettings}>Save Timezone Settings</Button>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>System Information</CardTitle>
+              </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label>Church Name</Label>
