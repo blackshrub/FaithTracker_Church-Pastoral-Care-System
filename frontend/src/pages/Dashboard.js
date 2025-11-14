@@ -849,7 +849,8 @@ export const Dashboard = () => {
                                   </DropdownMenu>
                                 </>
                               ) : (
-                                // Grief/Accident: Mark Complete button only
+                                // Grief/Accident: Mark Complete + Ignore button
+                                <>
                               <Button size="sm" variant="outline" onClick={async () => {
                                 try {
                                   if (task.type === 'grief_support') {
@@ -866,6 +867,32 @@ export const Dashboard = () => {
                               }}>
                                 {t('mark_completed')}
                               </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="ghost">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={async () => {
+                                    try {
+                                      if (task.type === 'grief_support') {
+                                        await axios.post(`${API}/grief-support/${task.data.id}/ignore`);
+                                        toast.success('Grief stage ignored');
+                                      } else if (task.type === 'accident_followup') {
+                                        await axios.post(`${API}/accident-followup/${task.data.id}/ignore`);
+                                        toast.success('Accident follow-up ignored');
+                                      }
+                                      setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                    } catch (error) {
+                                      toast.error('Failed to ignore');
+                                    }
+                                  }}>
+                                    {t('ignore')}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              </>
                               )}
                             </div>
                           </div>
