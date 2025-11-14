@@ -207,7 +207,7 @@ export const FinancialAid = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Aid Types</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('aid_types_label')}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
