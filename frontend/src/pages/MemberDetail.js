@@ -1042,19 +1042,39 @@ export const MemberDetail = () => {
                               }}>
                                 Mark Distributed
                               </Button>
-                              <Button size="sm" variant="ghost" className="text-red-600" onClick={async () => {
-                                if (window.confirm('Stop this aid schedule?')) {
-                                  try {
-                                    await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
-                                    toast.success('Schedule stopped');
-                                    loadMemberData();
-                                  } catch (error) {
-                                    toast.error('Failed to stop schedule');
-                                  }
-                                }
-                              }}>
-                                Stop Schedule
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="ghost">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={async () => {
+                                    if (window.confirm('Stop this aid schedule?')) {
+                                      try {
+                                        await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
+                                        toast.success('Schedule stopped');
+                                        loadMemberData();
+                                      } catch (error) {
+                                        toast.error('Failed to stop schedule');
+                                      }
+                                    }
+                                  }}>
+                                    Stop Schedule
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={async () => {
+                                    try {
+                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/ignore`);
+                                      toast.success('Aid schedule ignored');
+                                      loadMemberData();
+                                    } catch (error) {
+                                      toast.error('Failed to ignore');
+                                    }
+                                  }}>
+                                    Ignore
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
                         </div>
