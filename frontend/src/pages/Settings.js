@@ -129,6 +129,7 @@ export const Settings = () => {
           <TabsTrigger value="grief"><Heart className="w-4 h-4 mr-2" />Grief Support</TabsTrigger>
           <TabsTrigger value="accident"><Zap className="w-4 h-4 mr-2" />Accident/Illness</TabsTrigger>
           <TabsTrigger value="engagement"><Users className="w-4 h-4 mr-2" />Engagement</TabsTrigger>
+          <TabsTrigger value="writeoff"><Clock className="w-4 h-4 mr-2" />Write-off Policy</TabsTrigger>
           <TabsTrigger value="system"><SettingsIcon className="w-4 h-4 mr-2" />System</TabsTrigger>
         </TabsList>
         
