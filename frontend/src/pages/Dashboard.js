@@ -244,6 +244,7 @@ export const Dashboard = () => {
         setGriefToday(griefToday);
         setGriefDue(griefOverdue);
         setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
+        setAccidentFollowUp(accidentRes.data.map(a => ({...a, member_name: memberMap[a.member_id]?.name, member_phone: memberMap[a.member_id]?.phone, member_photo_url: memberMap[a.member_id]?.photo_url})));
         setFinancialAidDue(aidDueRes.data);
         setSuggestions(suggestionsRes.data || []);
         setAtRiskMembers(atRisk);
