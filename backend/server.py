@@ -1157,9 +1157,12 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         # Build member map for quick lookup
         member_map = {m["id"]: m for m in members}
         
-        # Initialize arrays
+        # Initialize all arrays at the beginning
         birthdays_today = []
         upcoming_birthdays = []
+        today_tasks = []
+        overdue_birthdays = []
+        upcoming_tasks = []
         
         # Grief support due (today and overdue)
         grief_stages = await db.grief_support.find(
