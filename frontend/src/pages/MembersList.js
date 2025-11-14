@@ -39,8 +39,17 @@ export const MembersList = () => {
   const [familyGroups, setFamilyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebounce(search, 500); // Debounce search for usability
+  const [debouncedSearch] = useDebounce(search, 500); // Debounce for auto-search
+  const [manualSearch, setManualSearch] = useState(''); // For Enter key search
   const [filterStatus, setFilterStatus] = useState('all');
+  
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && search.length >= 1) {
+      setManualSearch(search);
+      setCurrentPage(1);
+      loadMembers(1, search);
+    }
+  };
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
