@@ -767,11 +767,28 @@ async def login(user_data: UserLogin):
                     detail="You don't have access to this campus"
                 )
         
+        # For full admins, use the selected campus_id from login
+        active_campus_id = user.get("campus_id")
+        if user.get("role") == UserRole.FULL_ADMIN:
+            if user_data.campus_id:
+                # Full admin selected a specific campus
+                active_campus_id = user_data.campus_id
+                # Update user's active campus
+                await db.users.update_one(
+                    {"id": user["id"]},
+                    {"$set": {"campus_id": user_data.campus_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Please select a campus to continue"
+                )
+        
         access_token = create_access_token(data={"sub": user["id"]})
         
         campus_name = None
-        if user.get("campus_id"):
-            campus = await db.campuses.find_one({"id": user["campus_id"]}, {"_id": 0})
+        if active_campus_id:
+            campus = await db.campuses.find_one({"id": active_campus_id}, {"_id": 0})
             campus_name = campus["campus_name"] if campus else None
         
         return TokenResponse(
@@ -782,7 +799,7 @@ async def login(user_data: UserLogin):
                 email=user["email"],
                 name=user["name"],
                 role=user["role"],
-                campus_id=user.get("campus_id"),
+                campus_id=active_campus_id,
                 campus_name=campus_name,
                 phone=user["phone"],
                 is_active=user.get("is_active", True),
