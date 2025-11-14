@@ -134,14 +134,14 @@ export const FinancialAid = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-manrope font-bold text-foreground">{t('financial_aid')}</h1>
-        <p className="text-muted-foreground mt-1">Financial assistance tracking and analytics</p>
+        <p className="text-muted-foreground mt-1">{t('financial_assistance_tracking')}</p>
       </div>
       
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Total Aid (All Time)</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('total_aid')}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
@@ -156,7 +156,7 @@ export const FinancialAid = () => {
               <CardHeader>
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Total Recipients
+                  {t('total_recipients')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -167,7 +167,7 @@ export const FinancialAid = () => {
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Financial Aid Recipients</DialogTitle>
+              <DialogTitle>{t('total_recipients')}</DialogTitle>
             </DialogHeader>
             {loadingRecipients ? (
               <div className="space-y-2">
@@ -176,7 +176,7 @@ export const FinancialAid = () => {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : recipients.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No recipients found.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('empty_states.no_results_found')}</p>
             ) : (
               <div className="space-y-2">
                 {recipients.map((recipient) => (
@@ -221,7 +221,7 @@ export const FinancialAid = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Aid Distribution by Type</CardTitle>
+            <CardTitle>{t('aid_distribution')}</CardTitle>
           </CardHeader>
           <CardContent>
             {chartData.length > 0 ? (
@@ -232,18 +232,18 @@ export const FinancialAid = () => {
                 formatValue={(value) => `Rp ${value.toLocaleString('id-ID')}`}
               />
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">No financial aid data</p>
+              <p className="text-sm text-muted-foreground text-center py-12">{t('empty_states.no_financial_aid')}</p>
             )}
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader>
-            <CardTitle>Recent Financial Aid</CardTitle>
+            <CardTitle>{t('recent_aid')}</CardTitle>
           </CardHeader>
           <CardContent>
             {aidEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No financial aid recorded.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('empty_states.no_financial_aid')}</p>
             ) : (
               <div className="space-y-3 max-h-80 overflow-y-auto">
                 {aidEvents.map((event) => (
