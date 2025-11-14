@@ -834,7 +834,9 @@ export const Dashboard = () => {
                         <div key={event.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
                           <div className="flex-1">
                             <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
-                            <p className="text-sm text-muted-foreground ml-13">Call to wish happy birthday</p>
+                            <p className="text-sm text-muted-foreground ml-13">
+                              {event.completed ? "Birthday contact completed ✅" : "Call to wish happy birthday"}
+                            </p>
                           </div>
                           <div className="flex gap-2">
                             <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" asChild>
@@ -842,9 +844,16 @@ export const Dashboard = () => {
                                 Contact
                               </a>
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => markBirthdayComplete(event.id, loadReminders)}>
-                              Mark Complete
-                            </Button>
+                            {event.completed ? (
+                              <Button size="sm" variant="outline" disabled className="bg-green-100 text-green-700 border-green-300">
+                                <Check className="w-4 h-4" />
+                                Completed
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => markBirthdayComplete(event.id, loadReminders)}>
+                                Mark Complete
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
