@@ -1110,7 +1110,7 @@ export const Dashboard = () => {
                               memberId={task.member_id} 
                             />
                             <p className="text-sm text-muted-foreground">{config.label}: {task.details}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(task.date)}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(task.date, 'dd MMM yyyy')}</p>
                           </div>
                           <div className={`px-3 py-1 bg-${config.color}-100 text-${config.color}-700 rounded-full text-sm font-medium`}>
                             {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
