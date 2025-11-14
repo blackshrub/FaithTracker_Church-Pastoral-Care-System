@@ -203,6 +203,17 @@ export const MemberDetail = () => {
     }
   };
   
+  const handleCompleteBirthday = async (eventId) => {
+    try {
+      await axios.patch(`${API}/care-events/${eventId}/complete`);
+      toast.success('Birthday marked as completed!');
+      loadMemberData();
+    } catch (error) {
+      toast.error('Failed to mark birthday complete');
+      console.error('Error completing birthday:', error);
+    }
+  };
+  
   const completeGriefStage = async (stageId) => {
     try {
       await axios.post(`${API}/grief-support/${stageId}/complete`);
