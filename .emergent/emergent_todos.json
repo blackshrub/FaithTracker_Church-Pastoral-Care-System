@@ -1,18 +1,18 @@
 [
   {
     "content": "Remove Grief Support section from Today's tab (duplicate)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Fix and verify Accident/Illness follow-up calculation logic",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Verify Financial Aid tab data accuracy",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Sort Upcoming tab by date (nearest to furthest)",
-    "status": "pending"
+    "status": "completed"
   }
 ]
