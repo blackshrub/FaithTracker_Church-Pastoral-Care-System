@@ -84,17 +84,21 @@ export const MembersList = () => {
     setCurrentPage(1);
   }, [debouncedSearch, filterStatus]);
   
-  const loadMembers = async (page = 1) => {
+  const loadMembers = async (page = 1, searchQuery = null) => {
     try {
       setLoading(true);
+      
+      // Use provided search query or debounced search
+      const activeSearch = searchQuery !== null ? searchQuery : debouncedSearch;
       
       // Build query parameters properly
       const params = new URLSearchParams();
       params.append('page', page.toString());
       params.append('limit', pageSize.toString());
       
-      if (debouncedSearch && debouncedSearch.trim()) {
-        params.append('search', debouncedSearch.trim());
+      // Allow single character search (minimum 1 character)
+      if (activeSearch && activeSearch.trim().length >= 1) {
+        params.append('search', activeSearch.trim());
       }
       
       if (filterStatus && filterStatus !== 'all') {
