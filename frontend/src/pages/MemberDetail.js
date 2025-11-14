@@ -756,8 +756,15 @@ export const MemberDetail = () => {
                 </p>
               ) : (
                 <div className="space-y-6">
-                  {griefTimeline.map((stage, index) => (
-                    <div key={stage.id} className="relative" data-testid={`grief-stage-${stage.id}`}>
+                  {griefTimeline.map((stage, index) => {
+                    const isIgnored = stage.ignored === true;
+                    return (
+                    <div key={stage.id} className={`relative ${isIgnored ? 'opacity-60' : ''}`} data-testid={`grief-stage-${stage.id}`}>
+                      {isIgnored && (
+                        <div className="absolute top-0 right-0 z-10">
+                          <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>
+                        </div>
+                      )}
                       {index > 0 && <div className="absolute left-6 top-0 w-0.5 h-6 bg-primary-200 -mt-6"></div>}
                       <div className="flex gap-4">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
