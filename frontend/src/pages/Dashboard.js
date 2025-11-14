@@ -224,7 +224,7 @@ export const Dashboard = () => {
   const handleQuickEvent = async (e) => {
     e.preventDefault();
     if (selectedMemberIds.length === 0) {
-      toast.error('Select at least one member');
+      toast.error(t('select_at_least_one_member'));
       return;
     }
     
@@ -326,7 +326,7 @@ export const Dashboard = () => {
   );
 
   
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('loading')}</div>;
   
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   
@@ -411,16 +411,16 @@ export const Dashboard = () => {
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Quick Care Event (Multi-Member)</DialogTitle>
+                <DialogTitle>{t('quick_care_event_multi')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleQuickEvent} className="space-y-6">
                 {/* Member Selection */}
                 <div className="space-y-3">
-                  <Label>Select Members *</Label>
+                  <Label>{t('select_members_required')}</Label>
                   <Input
                     value={memberSearch}
                     onChange={(e) => setMemberSearch(e.target.value)}
-                    placeholder="Type member name to search..."
+                    placeholder={t('type_member_name_search')}
                   />
                   
                   {selectedMemberIds.length > 0 && (
@@ -459,7 +459,7 @@ export const Dashboard = () => {
                 {/* Event Details */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Event Type *</Label>
+                    <Label>{t('event_type_required')}</Label>
                     <Select value={quickEvent.event_type} onValueChange={(v) => setQuickEvent({...quickEvent, event_type: v})}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -474,7 +474,7 @@ export const Dashboard = () => {
                   </div>
                   {quickEvent.event_type !== 'financial_aid' && (
                     <div>
-                      <Label>Event Date *</Label>
+                      <Label>{t('event_date_required')}</Label>
                       <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
                     </div>
                   )}
@@ -482,7 +482,7 @@ export const Dashboard = () => {
                 
                 <div>
                   <Label>Description</Label>
-                  <Input value={quickEvent.description} onChange={(e) => setQuickEvent({...quickEvent, description: e.target.value})} placeholder="Additional details..." />
+                  <Input value={quickEvent.description} onChange={(e) => setQuickEvent({...quickEvent, description: e.target.value})} placeholder={t('additional_details')} />
                 </div>
                 
                 {/* Title only for Financial Aid */}
