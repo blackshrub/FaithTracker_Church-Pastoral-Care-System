@@ -1325,6 +1325,17 @@ async def list_care_events(
             query["completed"] = completed
         
         events = await db.care_events.find(query, {"_id": 0}).sort("event_date", -1).to_list(1000)
+        
+        # Enrich events with member names
+        for event in events:
+            if event.get("member_id"):
+                member = await db.members.find_one(
+                    {"member_id": event["member_id"]}, 
+                    {"_id": 0, "name": 1}
+                )
+                if member:
+                    event["member_name"] = member.get("name")
+        
         return events
     except Exception as e:
         logger.error(f"Error listing care events: {str(e)}")
