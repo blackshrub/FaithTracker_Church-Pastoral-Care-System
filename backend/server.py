@@ -2338,6 +2338,17 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
             last_contact = member.get('last_contact_date')
             days_since = member.get('days_since_last_contact', 999)
             
+            # Skip members contacted in last 48 hours (recently contacted)
+            if last_contact:
+                if isinstance(last_contact, str):
+                    last_contact_date = datetime.fromisoformat(last_contact)
+                else:
+                    last_contact_date = last_contact
+                
+                # If contacted in last 2 days, don't suggest
+                if (datetime.now(timezone.utc) - last_contact_date).days <= 2:
+                    continue
+            
             # AI-powered suggestions based on patterns
             if days_since > 90:
                 suggestions.append({
