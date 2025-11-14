@@ -45,10 +45,17 @@ export const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    // Validate campus selection
+    if (!campusId) {
+      setError('Please select a campus');
+      return;
+    }
+    
     setLoading(true);
     
     try {
-      await login(email, password, campusId || null);
+      await login(email, password, campusId);
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (err) {
