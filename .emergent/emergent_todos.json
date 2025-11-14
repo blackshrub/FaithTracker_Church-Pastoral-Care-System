@@ -1,18 +1,18 @@
 [
   {
     "content": "Add birthdays back to Upcoming tab (1-7 days ahead)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Create new Birthday tab for overdue birthdays",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update Today tab to only show birthdays due today",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test all birthday flows across tabs",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
