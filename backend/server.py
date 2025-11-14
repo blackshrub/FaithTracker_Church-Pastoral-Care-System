@@ -1383,6 +1383,7 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         
         return {
             "birthdays_today": birthdays_today,
+            "overdue_birthdays": overdue_birthdays,
             "upcoming_birthdays": upcoming_birthdays,
             "today_tasks": today_tasks,
             "grief_today": grief_today,
