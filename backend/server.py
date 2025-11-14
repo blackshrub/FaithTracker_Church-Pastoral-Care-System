@@ -66,7 +66,6 @@ logger = logging.getLogger(__name__)
 class EngagementStatus(str, Enum):
     ACTIVE = "active"
     AT_RISK = "at_risk"
-    INACTIVE = "inactive"
     DISCONNECTED = "disconnected"
 
 class EventType(str, Enum):
@@ -484,14 +483,14 @@ class TokenResponse(BaseModel):
 def calculate_engagement_status(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
     """Calculate engagement status and days since last contact"""
     if not last_contact:
-        return EngagementStatus.INACTIVE, 999
+        return EngagementStatus.DISCONNECTED, 999
     
     # Handle string dates
     if isinstance(last_contact, str):
         try:
             last_contact = datetime.fromisoformat(last_contact)
         except:
-            return EngagementStatus.INACTIVE, 999
+            return EngagementStatus.DISCONNECTED, 999
     
     # Make timezone-aware if needed
     if last_contact.tzinfo is None:
@@ -504,8 +503,6 @@ def calculate_engagement_status(last_contact: Optional[datetime]) -> tuple[Engag
         return EngagementStatus.ACTIVE, days_since
     elif days_since < 60:
         return EngagementStatus.AT_RISK, days_since
-    elif days_since < 90:
-        return EngagementStatus.INACTIVE, days_since
     else:
         return EngagementStatus.DISCONNECTED, days_since
 
