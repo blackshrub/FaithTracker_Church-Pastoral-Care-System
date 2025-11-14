@@ -1,6 +1,18 @@
 [
   {
-    "content": "Fix LazyImage full-screen teal loading state when scrolling fast",
-    "status": "completed"
+    "content": "Configure webpack-bundle-analyzer for build analysis",
+    "status": "in_progress"
+  },
+  {
+    "content": "Implement production build optimizations",
+    "status": "pending"
+  },
+  {
+    "content": "Add compression and caching strategies",
+    "status": "pending"
+  },
+  {
+    "content": "Optimize image loading and reduce initial bundle",
+    "status": "pending"
   }
 ]
