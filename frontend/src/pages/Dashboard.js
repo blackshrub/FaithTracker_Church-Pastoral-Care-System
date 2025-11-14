@@ -144,7 +144,9 @@ export const Dashboard = () => {
     aid_type: 'education',
     aid_amount: '',
     grief_relationship: '',
-    hospital_name: ''
+    hospital_name: '',
+    schedule_frequency: 'one_time',
+    payment_date: new Date().toISOString().split('T')[0]
   });
   const [engagementSettings, setEngagementSettings] = useState({
     atRiskDays: 60,
