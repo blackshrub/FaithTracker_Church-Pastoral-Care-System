@@ -801,11 +801,12 @@ export const Dashboard = () => {
                               <Button size="sm" variant="outline" onClick={async () => {
                                 try {
                                   if (task.type === 'grief_support') {
-                                    await markGriefStageComplete(task.data.id, loadReminders);
+                                    await markGriefStageComplete(task.data.id, setGriefDue);
                                   } else if (task.type === 'accident_followup') {
                                     await axios.post(`${API}/accident-followup/${task.data.id}/complete`);
                                     toast.success('Follow-up marked complete');
-                                    loadReminders();
+                                    // Update local state
+                                    setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                   }
                                 } catch (error) {
                                   toast.error('Failed to mark as completed');
