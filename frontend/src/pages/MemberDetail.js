@@ -913,12 +913,15 @@ export const MemberDetail = () => {
                                   try {
                                     await axios.post(`${API}/accident-followup/${stage.id}/complete`);
                                     toast.success('Follow-up completed');
-                                    loadMemberData();
+                                    // Update local state
+                                    setAccidentTimeline(prev => prev.map(s => 
+                                      s.id === stage.id ? {...s, completed: true} : s
+                                    ));
                                   } catch (error) {
                                     toast.error('Failed');
                                   }
                                 }}>
-                                  Complete
+                                  Mark Complete
                                 </Button>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -931,7 +934,10 @@ export const MemberDetail = () => {
                                       try {
                                         await axios.post(`${API}/accident-followup/${stage.id}/ignore`);
                                         toast.success('Follow-up ignored');
-                                        loadMemberData();
+                                        // Update local state
+                                        setAccidentTimeline(prev => prev.map(s => 
+                                          s.id === stage.id ? {...s, ignored: true} : s
+                                        ));
                                       } catch (error) {
                                         toast.error('Failed to ignore');
                                       }
