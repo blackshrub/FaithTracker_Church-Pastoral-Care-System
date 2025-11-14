@@ -196,6 +196,8 @@
   "accident_illness_recovery_followups": "Accident/Illness Recovery Follow-ups",
   "hospital_visit_followups": "Hospital Visit Follow-ups",
   "financial_aid_due_today": "Financial Aid Due Today",
+  "grief_support_followups": "Grief Support Follow-ups",
+  "accident_followup_label": "Accident Follow-up",
   "no_urgent_tasks_today": "No urgent tasks for today! 🎉",
   "no_overdue_financial_aid": "No overdue financial aid schedules",
   "no_at_risk_members": "No members at risk",
