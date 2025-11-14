@@ -8,7 +8,11 @@
     "status": "completed"
   },
   {
-    "content": "Test birthday removal and verify forms work correctly",
+    "content": "Fix Calendar birthday date display (UTC timezone issue)",
+    "status": "completed"
+  },
+  {
+    "content": "Test all fixes - birthday forms, calendar dates, translations",
     "status": "in_progress"
   }
 ]
