@@ -1035,6 +1035,60 @@ export const Dashboard = () => {
           </Card>
         </TabsContent>
         
+
+        {/* Birthday Tab - Overdue Birthdays */}
+        <TabsContent value="birthday" className="space-y-4">
+          {overdueBirthdays.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No overdue birthdays - all caught up! 🎉
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-amber-200">
+              <CardHeader>
+                <CardTitle>🎂 Overdue Birthdays ({overdueBirthdays.length})</CardTitle>
+                <CardDescription>Birthdays that passed but haven't been acknowledged yet</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {overdueBirthdays
+                    .sort((a, b) => (b.days_overdue || 0) - (a.days_overdue || 0))
+                    .map(event => (
+                    <div key={event.id} className="p-4 bg-amber-50 rounded-lg border border-amber-200 flex justify-between items-center">
+                      <div className="flex-1">
+                        <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
+                        <p className="text-sm text-muted-foreground ml-13">
+                          {formatDate(event.event_date, 'dd MMM yyyy')} 
+                          <span className="ml-2 text-red-600 font-medium">({event.days_overdue} days ago)</span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" asChild>
+                          <a href={formatPhoneForWhatsApp(event.member_phone)} target="_blank" rel="noopener noreferrer">
+                            {t('contact')}
+                          </a>
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={async () => {
+                          try {
+                            await axios.post(`${API}/care-events/${event.id}/complete`);
+                            toast.success('Birthday marked as completed!');
+                            loadReminders();
+                          } catch (error) {
+                            toast.error('Failed to mark as completed');
+                          }
+                        }}>
+                          {t('mark_completed')}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="followup" className="space-y-4">
           {/* Accident/Illness Follow-ups */}
           {hospitalFollowUp.length > 0 && (
