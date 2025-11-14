@@ -36,7 +36,9 @@ export const FinancialAid = () => {
   const { t } = useTranslation();
   const [summary, setSummary] = useState(null);
   const [aidEvents, setAidEvents] = useState([]);
+  const [recipients, setRecipients] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
   
   useEffect(() => {
     loadFinancialAidData();
