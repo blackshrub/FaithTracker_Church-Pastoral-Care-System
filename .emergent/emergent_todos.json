@@ -1,26 +1,14 @@
 [
   {
-    "content": "Add comprehensive translation keys to id.json",
+    "content": "Update Financial Aid page to use translation keys",
     "status": "in_progress"
   },
   {
-    "content": "Translate Dashboard tabs, buttons, and care event form",
+    "content": "Update Analytics page to use translation keys",
     "status": "pending"
   },
   {
-    "content": "Translate Members page (search, placeholders, headers)",
-    "status": "pending"
-  },
-  {
-    "content": "Translate Financial Aid page completely",
-    "status": "pending"
-  },
-  {
-    "content": "Translate Analytics page completely",
-    "status": "pending"
-  },
-  {
-    "content": "Translate Calendar page completely",
+    "content": "Test translations on both pages",
     "status": "pending"
   }
 ]
