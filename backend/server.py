@@ -480,6 +480,46 @@ class TokenResponse(BaseModel):
 
 # ==================== UTILITY FUNCTIONS ====================
 
+async def get_engagement_settings():
+    """Get engagement threshold settings from database"""
+    try:
+        settings = await db.settings.find_one({"key": "engagement_thresholds"}, {"_id": 0})
+        if settings:
+            return settings.get("data", {"atRiskDays": 60, "disconnectedDays": 90})
+        return {"atRiskDays": 60, "disconnectedDays": 90}
+    except:
+        return {"atRiskDays": 60, "disconnectedDays": 90}
+
+async def calculate_engagement_status_async(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
+    """Calculate engagement status using configurable thresholds"""
+    settings = await get_engagement_settings()
+    at_risk_days = settings.get("atRiskDays", 60)
+    disconnected_days = settings.get("disconnectedDays", 90)
+    
+    if not last_contact:
+        return EngagementStatus.DISCONNECTED, 999
+    
+    # Handle string dates
+    if isinstance(last_contact, str):
+        try:
+            last_contact = datetime.fromisoformat(last_contact)
+        except:
+            return EngagementStatus.DISCONNECTED, 999
+    
+    # Make timezone-aware if needed
+    if last_contact.tzinfo is None:
+        last_contact = last_contact.replace(tzinfo=timezone.utc)
+    
+    now = datetime.now(timezone.utc)
+    days_since = (now - last_contact).days
+    
+    if days_since < at_risk_days:
+        return EngagementStatus.ACTIVE, days_since
+    elif days_since < disconnected_days:
+        return EngagementStatus.AT_RISK, days_since
+    else:
+        return EngagementStatus.DISCONNECTED, days_since
+
 def calculate_engagement_status(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
     """Calculate engagement status and days since last contact"""
     if not last_contact:
