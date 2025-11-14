@@ -907,7 +907,10 @@ async def list_members(
             query["family_group_id"] = family_group_id
         
         if search:
-            query["$text"] = {"$search": search}  # Use text index for fast search
+            query["$or"] = [
+                {"name": {"$regex": search, "$options": "i"}},  # Partial name match
+                {"phone": {"$regex": search, "$options": "i"}}  # Partial phone match
+            ]
         
         # Calculate skip for pagination
         skip = (page - 1) * limit
