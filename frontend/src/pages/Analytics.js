@@ -192,8 +192,8 @@ export const Analytics = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-playfair font-bold text-foreground">Advanced Analytics</h1>
-          <p className="text-muted-foreground mt-1">Comprehensive pastoral care insights and trends</p>
+          <h1 className="text-3xl font-playfair font-bold text-foreground">{t('analytics')}</h1>
+          <p className="text-muted-foreground mt-1">{t('pastoral_care_analytics')}</p>
         </div>
         <div className="flex items-center gap-4">
           <Select value={timeRange} onValueChange={setTimeRange}>
@@ -245,7 +245,7 @@ export const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Members</p>
+                <p className="text-sm text-muted-foreground">{t('total_members')}</p>
                 <p className="text-3xl font-bold">{memberStats?.total || 0}</p>
                 <p className="text-xs text-muted-foreground">{memberStats?.withPhotos || 0} with photos</p>
               </div>
@@ -258,7 +258,7 @@ export const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Financial Aid</p>
+                <p className="text-sm text-muted-foreground">{t('total_aid')}</p>
                 <p className="text-2xl font-bold">Rp {financialData?.totalAid?.toLocaleString('id-ID') || 0}</p>
                 <p className="text-xs text-muted-foreground">{financialData?.schedules || 0} active schedules</p>
               </div>
@@ -271,7 +271,7 @@ export const Analytics = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Grief Support</p>
+                <p className="text-sm text-muted-foreground">{t('grief_support')}</p>
                 <p className="text-3xl font-bold">{griefData?.completion_rate || 0}%</p>
                 <p className="text-xs text-muted-foreground">completion rate</p>
               </div>
@@ -310,21 +310,21 @@ export const Analytics = () => {
         <TabsContent value="demographics" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle>Age Distribution</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('age_distribution')}</CardTitle></CardHeader>
               <CardContent>
                 <BarChart data={demographicData.ageGroups || []} color={COLORS.demographic[0]} height={300} />
               </CardContent>
             </Card>
             
             <Card>
-              <CardHeader><CardTitle>Membership Status</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('membership_status')}</CardTitle></CardHeader>
               <CardContent>
                 <PieChart data={demographicData.membership || []} colors={COLORS.demographic} height={300} />
               </CardContent>
             </Card>
             
             <Card>
-              <CardHeader><CardTitle>Gender Distribution</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t('gender_distribution')}</CardTitle></CardHeader>
               <CardContent>
                 <PieChart data={demographicData.gender || []} colors={COLORS.primary} height={250} />
               </CardContent>
