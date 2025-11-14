@@ -87,11 +87,12 @@ const markBirthdayComplete = async (eventId, setBirthdaysToday) => {
   }
 };
 
-const markGriefStageComplete = async (stageId, loadReminders) => {
+const markGriefStageComplete = async (stageId, setGriefDue) => {
   try {
     await axios.post(`${API}/grief-support/${stageId}/complete`);
     toast.success('Grief stage completed!');
-    loadReminders();
+    // Update local state
+    setGriefDue(prev => prev.filter(s => s.id !== stageId));
   } catch (error) {
     toast.error('Failed to complete');
   }
