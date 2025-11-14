@@ -1023,6 +1023,8 @@ async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
 async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: str):
     """Calculate all dashboard reminder data - optimized query"""
     try:
+        logger.info(f"Calculating dashboard reminders for campus {campus_id}, date {today_date}")
+        
         today = datetime.strptime(today_date, '%Y-%m-%d').date()
         week_ahead = today + timedelta(days=7)
         
@@ -1032,6 +1034,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             {"_id": 0, "id": 1, "name": 1, "phone": 1, "photo_url": 1, "birth_date": 1, 
              "engagement_status": 1, "days_since_last_contact": 1}
         ).to_list(None)
+        
+        logger.info(f"Found {len(members)} members for campus {campus_id}")
         
         # Build member map for quick lookup
         member_map = {m["id"]: m for m in members}
