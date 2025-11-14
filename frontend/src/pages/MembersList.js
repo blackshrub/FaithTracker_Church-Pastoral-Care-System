@@ -350,9 +350,10 @@ export const MembersList = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder={t('search')}
+                    placeholder="Type name/phone (min 1 char) - Press Enter to search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
                     className="pl-10"
                     data-testid="search-members-input"
                   />
