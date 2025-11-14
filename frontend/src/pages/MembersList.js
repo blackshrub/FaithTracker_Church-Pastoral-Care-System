@@ -39,9 +39,9 @@ export const MembersList = () => {
   const [familyGroups, setFamilyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebounce(search, 500); // Debounce for auto-search
-  const [manualSearch, setManualSearch] = useState(''); // For Enter key search
+  const [debouncedSearch] = useDebounce(search, 2000); // 2 second debounce for smooth UX
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchLoading, setSearchLoading] = useState(false);
   
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && search.length >= 1) {
