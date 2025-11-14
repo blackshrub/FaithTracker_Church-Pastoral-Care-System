@@ -760,6 +760,9 @@ export const Dashboard = () => {
             <TabsTrigger value="today" className="whitespace-nowrap">
               <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefToday.length})
             </TabsTrigger>
+            <TabsTrigger value="birthday" className="whitespace-nowrap">
+              🎂 Birthdays ({overdueBirthdays.length})
+            </TabsTrigger>
             <TabsTrigger value="followup" className="whitespace-nowrap">
               <Hospital className="w-4 h-4 mr-2" />Follow-up ({hospitalFollowUp.length + griefDue.length + accidentFollowUp.length})
             </TabsTrigger>
