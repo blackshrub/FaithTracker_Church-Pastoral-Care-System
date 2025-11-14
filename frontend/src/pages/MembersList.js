@@ -87,7 +87,12 @@ export const MembersList = () => {
   
   const loadMembers = async (page = 1, searchQuery = null) => {
     try {
-      setLoading(true);
+      // Use tableLoading for pagination/search, loading for initial load only
+      if (currentPage > 0) {
+        setTableLoading(true);
+      } else {
+        setLoading(true);
+      }
       
       // Use provided search query or debounced search
       const activeSearch = searchQuery !== null ? searchQuery : debouncedSearch;
@@ -124,6 +129,7 @@ export const MembersList = () => {
       console.error('Error loading members:', error);
     } finally {
       setLoading(false);
+      setTableLoading(false);
     }
   };
 
