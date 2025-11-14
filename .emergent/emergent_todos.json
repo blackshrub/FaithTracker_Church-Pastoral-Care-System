@@ -1,14 +1,18 @@
 [
   {
-    "content": "Add cache invalidation after user actions (mark complete, add event)",
-    "status": "completed"
+    "content": "Update login page to show campus selector for full admins",
+    "status": "in_progress"
   },
   {
-    "content": "Add midnight cache refresh job (separate from 8 AM digest)",
-    "status": "completed"
+    "content": "Update login endpoint to accept selected campus_id",
+    "status": "pending"
   },
   {
-    "content": "Test cache invalidation and refresh timing",
-    "status": "completed"
+    "content": "Store selected campus in user token/session",
+    "status": "pending"
+  },
+  {
+    "content": "Test full admin login with campus selection",
+    "status": "pending"
   }
 ]
