@@ -1,22 +1,26 @@
 [
   {
-    "content": "Update Layout/Navigation to use translation keys",
-    "status": "completed"
-  },
-  {
-    "content": "Update Dashboard to use translation keys for all text",
-    "status": "completed"
-  },
-  {
-    "content": "Add remaining Dashboard translation keys and text",
-    "status": "completed"
-  },
-  {
-    "content": "Test translations on Dashboard",
+    "content": "Add comprehensive translation keys to id.json",
     "status": "in_progress"
   },
   {
-    "content": "Update other pages to use translation keys",
+    "content": "Translate Dashboard tabs, buttons, and care event form",
+    "status": "pending"
+  },
+  {
+    "content": "Translate Members page (search, placeholders, headers)",
+    "status": "pending"
+  },
+  {
+    "content": "Translate Financial Aid page completely",
+    "status": "pending"
+  },
+  {
+    "content": "Translate Analytics page completely",
+    "status": "pending"
+  },
+  {
+    "content": "Translate Calendar page completely",
     "status": "pending"
   }
 ]
