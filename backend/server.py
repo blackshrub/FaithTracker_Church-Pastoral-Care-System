@@ -1132,6 +1132,9 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         today = datetime.strptime(today_date, '%Y-%m-%d').date()
         week_ahead = today + timedelta(days=7)
         
+        # Get writeoff settings
+        writeoff_settings = await get_writeoff_settings()
+        
         # Fetch only necessary data with projection
         members = await db.members.find(
             {"campus_id": campus_id},
