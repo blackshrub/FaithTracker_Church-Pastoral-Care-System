@@ -224,15 +224,45 @@ export const AdminDashboard = () => {
         </TabsContent>
         
         <TabsContent value="settings">
-          <Card>
-            <CardHeader><CardTitle>Daily Digest System</CardTitle></CardHeader>
-            <CardContent>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="font-medium">📋 How It Works:</p>
-                <p className="text-sm mt-2">Every day at 8 AM Jakarta time, pastoral team receives WhatsApp with task list: birthdays, grief support, hospital follow-ups, at-risk members. Team then personally contacts each member.</p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Recalculate Engagement Status</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Recalculate engagement status for all members using current threshold settings (At-Risk: 60 days, Disconnected: 90 days).
+                    This is useful after changing engagement thresholds or when deploying to production.
+                  </p>
+                  <Button 
+                    onClick={async () => {
+                      if (window.confirm('Recalculate engagement status for all members? This may take a few seconds.')) {
+                        try {
+                          const response = await axios.post(`${API}/admin/recalculate-engagement`);
+                          toast.success(`Updated ${response.data.updated_count} members! Active: ${response.data.stats.active}, At-Risk: ${response.data.stats.at_risk}, Disconnected: ${response.data.stats.disconnected}`);
+                          loadStats();
+                        } catch (error) {
+                          toast.error('Failed to recalculate engagement status');
+                        }
+                      }
+                    }}
+                    className="bg-teal-500 hover:bg-teal-600 text-white"
+                  >
+                    Recalculate All Members
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Daily Digest System</CardTitle></CardHeader>
+              <CardContent>
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="font-medium">📋 How It Works:</p>
+                  <p className="text-sm mt-2">Every day at 8 AM Jakarta time, pastoral team receives WhatsApp with task list: birthdays, grief support, hospital follow-ups, at-risk members. Team then personally contacts each member.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
