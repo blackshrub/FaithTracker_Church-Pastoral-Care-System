@@ -451,17 +451,19 @@ export const MembersList = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMembers.length === 0 ? (
+                {tableLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
+                        <span className="text-muted-foreground">Searching members...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredMembers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {tableLoading ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Searching members...</span>
-                        </div>
-                      ) : (
-                        search ? 'No members found matching your search.' : t('empty_states.no_members')
-                      )}
+                      {search ? 'No members found matching your search.' : t('empty_states.no_members')}
                     </TableCell>
                   </TableRow>
                 ) : (
