@@ -1122,6 +1122,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             {"_id": 0}
         ).to_list(None)
         
+        logger.info(f"Found {len(grief_stages)} incomplete grief stages")
+        
         grief_today = []
         for stage in grief_stages:
             sched_date = datetime.strptime(stage["scheduled_date"], '%Y-%m-%d').date()
@@ -1132,6 +1134,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     "member_phone": member_map.get(stage["member_id"], {}).get("phone"),
                     "member_photo_url": member_map.get(stage["member_id"], {}).get("photo_url")
                 })
+        
+        logger.info(f"Grief stages due/overdue: {len(grief_today)}")
         
         # Accident follow-ups due
         accident_followups = await db.accident_followup.find(
