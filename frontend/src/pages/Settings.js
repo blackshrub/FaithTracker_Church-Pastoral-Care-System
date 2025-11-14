@@ -312,6 +312,7 @@ export const Settings = () => {
               )}
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
