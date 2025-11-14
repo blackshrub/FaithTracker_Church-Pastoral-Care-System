@@ -161,7 +161,6 @@ export const Dashboard = () => {
     if (savedSettings) {
       setEngagementSettings(JSON.parse(savedSettings));
     }
-    loadMembers();
     loadReminders();
   }, []);
   
@@ -204,14 +203,7 @@ export const Dashboard = () => {
     }
   };
   
-  const loadMembers = async () => {
-    try {
-      const response = await axios.get(`${API}/members`);
-      setAllMembers(response.data);
-    } catch (error) {
-      console.error('Error loading members');
-    }
-  };
+
   
   const handleQuickEvent = async (e) => {
     e.preventDefault();
