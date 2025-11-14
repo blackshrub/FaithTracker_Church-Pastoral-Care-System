@@ -1266,6 +1266,61 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         
         # TODAY TASKS (due exactly today, all types mixed)
         today_tasks = []
+        overdue_birthdays = []
+        
+        # Process all birthdays
+        for member in members:
+            if not member.get("birth_date"):
+                continue
+                
+            birth_date = datetime.strptime(member["birth_date"], '%Y-%m-%d').date()
+            this_year_birthday = birth_date.replace(year=today.year)
+            
+            # Find birthday event if exists
+            event = await db.care_events.find_one(
+                {"member_id": member["id"], "event_type": "birthday"},
+                {"_id": 0}
+            )
+            
+            if not event:
+                continue
+            
+            if this_year_birthday == today:
+                # Birthday today
+                birthdays_today.append({
+                    **event,
+                    "member_name": member["name"],
+                    "member_phone": member["phone"],
+                    "member_photo_url": member.get("photo_url")
+                })
+            elif this_year_birthday < today and not event.get("completed"):
+                # Overdue birthday (past but not completed)
+                overdue_birthdays.append({
+                    **event,
+                    "member_name": member["name"],
+                    "member_phone": member["phone"],
+                    "member_photo_url": member.get("photo_url"),
+                    "days_overdue": (today - this_year_birthday).days
+                })
+            elif tomorrow <= this_year_birthday <= week_ahead:
+                # Upcoming birthday (1-7 days ahead)
+                days_until = (this_year_birthday - today).days
+                upcoming_tasks.append({
+                    "type": "birthday",
+                    "date": this_year_birthday.isoformat(),
+                    "member_id": member["id"],
+                    "member_name": member["name"],
+                    "member_phone": member["phone"],
+                    "member_photo_url": member.get("photo_url"),
+                    "details": f"Birthday celebration",
+                    "data": event
+                })
+                upcoming_birthdays.append({
+                    **event,
+                    "member_name": member["name"],
+                    "member_phone": member["phone"],
+                    "member_photo_url": member.get("photo_url")
+                })
         
         # Today's grief stages (not overdue, exactly today)
         for stage in grief_stages:
