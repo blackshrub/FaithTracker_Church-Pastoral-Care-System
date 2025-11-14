@@ -1166,15 +1166,21 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         ).to_list(None)
         
         accident_today = []
+        accident_writeoff = writeoff_settings.get("accident_illness", 14)
+        
         for followup in accident_followups:
             sched_date = datetime.strptime(followup["scheduled_date"], '%Y-%m-%d').date()
             if sched_date <= today:
-                accident_today.append({
-                    **followup,
-                    "member_name": member_map.get(followup["member_id"], {}).get("name"),
-                    "member_phone": member_map.get(followup["member_id"], {}).get("phone"),
-                    "member_photo_url": member_map.get(followup["member_id"], {}).get("photo_url")
-                })
+                days_overdue = (today - sched_date).days
+                # Only include if within writeoff threshold (0 = never writeoff)
+                if accident_writeoff == 0 or days_overdue <= accident_writeoff:
+                    accident_today.append({
+                        **followup,
+                        "member_name": member_map.get(followup["member_id"], {}).get("name"),
+                        "member_phone": member_map.get(followup["member_id"], {}).get("phone"),
+                        "member_photo_url": member_map.get(followup["member_id"], {}).get("photo_url"),
+                        "days_overdue": days_overdue
+                    })
         
         # At-risk and disconnected members
         at_risk = [m for m in members if m.get("engagement_status") == "at_risk"]
