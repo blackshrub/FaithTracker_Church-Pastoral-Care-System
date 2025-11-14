@@ -1031,7 +1031,8 @@ export const Dashboard = () => {
                               try {
                                 await axios.post(`${API}/care-events/${event.id}/ignore`);
                                 toast.success('Birthday ignored');
-                                loadReminders();
+                                // Update local state
+                                setOverdueBirthdays(prev => prev.filter(b => b.id !== event.id));
                               } catch (error) {
                                 toast.error('Failed to ignore');
                               }
