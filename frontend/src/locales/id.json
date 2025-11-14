@@ -128,5 +128,53 @@
   "sign_in": "Masuk",
   "full_admin": "Administrator Penuh",
   "campus_admin": "Admin Kampus",
-  "pastor": "Pastor"
+  "pastor": "Pastor",
+  "admin_dashboard": "Dasbor Admin",
+  "import_export": "Impor/Ekspor",
+  "messaging": "Pesan",
+  "whatsapp_logs": "Log WhatsApp",
+  
+  "today": "Hari Ini",
+  "this_week": "Minggu Ini",
+  "this_month": "Bulan Ini",
+  "all": "Semua",
+  "pending": "Tertunda",
+  "completed": "Selesai",
+  "overdue": "Terlambat",
+  
+  "birthdays": "Ulang Tahun",
+  "grief_reminders": "Pengingat Dukacita",
+  "hospital_followups": "Tindak Lanjut Rumah Sakit",
+  "at_risk_members": "Jemaat Berisiko",
+  "upcoming_events": "Acara Mendatang",
+  "recent_activity": "Aktivitas Terkini",
+  
+  "add_new_care_event": "Tambah Kejadian Perawatan Baru",
+  "select_members": "Pilih Jemaat",
+  "event_type": "Jenis Kejadian",
+  "event_date": "Tanggal Kejadian",
+  "title": "Judul",
+  "hospital_name": "Nama Rumah Sakit",
+  "relationship": "Hubungan",
+  "aid_amount": "Jumlah Bantuan",
+  "schedule_frequency": "Frekuensi Jadwal",
+  "payment_date": "Tanggal Pembayaran",
+  "schedule_start_date": "Tanggal Mulai Jadwal",
+  
+  "frequency_options": {
+    "one_time": "Sekali",
+    "weekly": "Mingguan",
+    "monthly": "Bulanan",
+    "annual": "Tahunan"
+  },
+  
+  "relationship_options": {
+    "parent": "Orang Tua",
+    "child": "Anak",
+    "sibling": "Saudara Kandung",
+    "spouse": "Pasangan",
+    "grandparent": "Kakek/Nenek",
+    "other_family": "Keluarga Lainnya",
+    "friend": "Teman"
+  }
 }
