@@ -723,7 +723,10 @@ export const MemberDetail = () => {
                                 try {
                                   await axios.post(`${API}/care-events/${event.id}/ignore`);
                                   toast.success('Event ignored');
-                                  loadMemberData();
+                                  // Update local state
+                                  setCareEvents(prev => prev.map(e => 
+                                    e.id === event.id ? {...e, ignored: true} : e
+                                  ));
                                 } catch (error) {
                                   toast.error('Failed to ignore event');
                                 }
