@@ -1047,9 +1047,16 @@ async def delete_care_event(event_id: str):
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Care event not found")
         
-        # Recalculate member's last contact date from remaining events
+        # Recalculate member's last contact date from remaining NON-BIRTHDAY events
+        # Birthday events don't count as contact unless completed (marked as contacted)
         remaining_events = await db.care_events.find(
-            {"member_id": member_id},
+            {
+                "member_id": member_id,
+                "$or": [
+                    {"event_type": {"$ne": "birthday"}},  # Non-birthday events
+                    {"event_type": "birthday", "completed": True}  # Completed birthday events
+                ]
+            },
             {"_id": 0, "created_at": 1}
         ).sort("created_at", -1).limit(1).to_list(1)
         
