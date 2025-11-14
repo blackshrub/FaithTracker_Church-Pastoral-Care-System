@@ -131,6 +131,7 @@ export const Dashboard = () => {
   const [atRiskMembers, setAtRiskMembers] = useState([]);
   const [disconnectedMembers, setDisconnectedMembers] = useState([]);
   const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
+  const [upcomingTasks, setUpcomingTasks] = useState([]);
   const [financialAidDue, setFinancialAidDue] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
