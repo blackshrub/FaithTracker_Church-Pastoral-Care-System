@@ -1343,6 +1343,7 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             "disconnected_members": disconnected,
             "financial_aid_due": aid_due,
             "ai_suggestions": suggestions_list,
+            "upcoming_tasks": upcoming_tasks,
             "total_tasks": len(birthdays_today) + len(grief_today) + len(accident_today) + len(at_risk) + len(disconnected)
         }
         
