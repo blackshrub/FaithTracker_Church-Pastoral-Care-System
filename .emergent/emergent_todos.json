@@ -1,10 +1,10 @@
 [
   {
     "content": "Move Stop Schedule to three-dots menu in MemberDetail Financial Aid",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add archived members toggle filter in Members page",
-    "status": "pending"
+    "status": "completed"
   }
 ]
