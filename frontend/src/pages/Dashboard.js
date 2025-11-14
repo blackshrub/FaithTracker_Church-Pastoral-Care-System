@@ -1177,7 +1177,8 @@ export const Dashboard = () => {
                               try {
                                 await axios.post(`${API}/grief-support/${stage.id}/ignore`);
                                 toast.success('Grief stage ignored');
-                                loadReminders();
+                                // Update local state
+                                setGriefDue(prev => prev.filter(s => s.id !== stage.id));
                               } catch (error) {
                                 toast.error('Failed to ignore');
                               }
