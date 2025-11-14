@@ -157,14 +157,15 @@ export const Dashboard = () => {
       const today = new Date().toISOString().split('T')[0];
       const weekAhead = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
       
-      const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes] = await Promise.all([
+      const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes, accidentRes] = await Promise.all([
         axios.get(`${API}/care-events`),
         axios.get(`${API}/grief-support?completed=false`),
         axios.get(`${API}/care-events/hospital/due-followup`),
         axios.get(`${API}/members/at-risk`),
         axios.get(`${API}/members?limit=1000`),
         axios.get(`${API}/financial-aid-schedules/due-today`),
-        axios.get(`${API}/suggestions/follow-up`)
+        axios.get(`${API}/suggestions/follow-up`),
+        axios.get(`${API}/accident-followup?completed=false`)
       ]);
       
       setAllMembers(membersRes.data);
@@ -230,6 +231,7 @@ export const Dashboard = () => {
       setGriefToday(griefToday);
       setGriefDue(griefOverdue);
       setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
+      setAccidentFollowUp(accidentRes.data.map(a => ({...a, member_name: memberMap[a.member_id]?.name, member_phone: memberMap[a.member_id]?.phone, member_photo_url: memberMap[a.member_id]?.photo_url})));
       setFinancialAidDue(aidDueRes.data);
       setSuggestions(suggestionsRes.data || []);
       setAtRiskMembers(atRisk);
