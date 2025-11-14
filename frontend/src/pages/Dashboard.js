@@ -1081,6 +1081,26 @@ export const Dashboard = () => {
                         }}>
                           {t('mark_completed')}
                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={async () => {
+                              try {
+                                await axios.post(`${API}/care-events/${event.id}/ignore`);
+                                toast.success('Birthday ignored');
+                                loadReminders();
+                              } catch (error) {
+                                toast.error('Failed to ignore');
+                              }
+                            }}>
+                              Ignore
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))}
