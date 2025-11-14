@@ -77,8 +77,8 @@ export const Layout = ({ children }) => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="group gap-2 border-0 hover:bg-teal-50 hover:text-teal-700">
                     <div className="text-right hidden md:block">
-                      <p className="text-sm font-semibold text-gray-700 group-hover:text-teal-700">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground group-hover:text-teal-600">
+                      <p className="text-sm font-semibold text-gray-700 hover:text-teal-700 transition-colors">{user?.name}</p>
+                      <p className="text-xs text-gray-500 hover:text-teal-600 transition-colors">
                         {user?.role === 'full_admin' ? 'Full Administrator' : 
                          user?.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
                       </p>
