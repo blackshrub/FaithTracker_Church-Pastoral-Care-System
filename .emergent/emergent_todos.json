@@ -1,14 +1,18 @@
 [
   {
     "content": "Run bundle analyzer to identify optimization opportunities",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Replace recharts with lightweight Chart.js",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Implement date-fns tree-shaking",
-    "status": "pending"
+    "status": "completed"
+  },
+  {
+    "content": "Rebuild and measure bundle size improvements",
+    "status": "in_progress"
   }
 ]
