@@ -1,10 +1,10 @@
 [
   {
     "content": "Fix missing profile photos in Financial Aid Recipients dialog",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Test and verify photos display correctly across all pages",
-    "status": "pending"
+    "status": "completed"
   }
 ]
