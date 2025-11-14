@@ -698,7 +698,7 @@ export const Dashboard = () => {
                           suggestion.priority === 'medium' ? 'bg-amber-100 text-amber-700' :
                           'bg-blue-100 text-blue-700'
                         }`}>
-                          {suggestion.priority.toUpperCase()} PRIORITY
+                          {suggestion.priority?.toUpperCase() || 'MEDIUM'} PRIORITY
                         </span>
                       </div>
                       <p className="font-semibold text-sm ml-13">{suggestion.suggestion}</p>
