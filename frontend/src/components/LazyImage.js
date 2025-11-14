@@ -43,31 +43,21 @@ export const LazyImage = ({
   };
 
   return (
-    <div ref={imgRef} className={className}>
-      {!isIntersecting ? (
-        <div className={`w-full h-full ${placeholderClassName}`}>
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            📷
-          </div>
-        </div>
-      ) : (
+    <div ref={imgRef} className={`relative ${className}`}>
+      {!isIntersecting || isLoading ? (
+        <div className={`w-full h-full ${placeholderClassName}`} />
+      ) : null}
+      {isIntersecting && (
         <>
-          {isLoading && (
-            <div className={`absolute inset-0 ${placeholderClassName}`}>
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                Loading...
-              </div>
-            </div>
-          )}
           {hasError ? (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
               ❌
             </div>
           ) : (
             <img
               src={src}
               alt={alt}
-              className={`w-full h-full object-cover transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+              className={`w-full h-full object-cover transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
               onLoad={handleLoad}
               onError={handleError}
             />
