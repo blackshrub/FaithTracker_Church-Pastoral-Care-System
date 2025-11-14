@@ -154,111 +154,89 @@ export const Dashboard = () => {
   
   const loadReminders = async () => {
     try {
-      // Try to load from cache first for instant display
-      const cachedMembers = await offlineStorage.getCachedMembers();
-      if (cachedMembers.length > 0) {
-        setAllMembers(cachedMembers);
-        console.log('📱 Loaded from cache:', cachedMembers.length, 'members');
-      }
-
       const today = new Date().toISOString().split('T')[0];
       const weekAhead = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
       
-      try {
-        // Online data loading with offline fallback
-        const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes] = await Promise.all([
-          axios.get(`${API}/care-events`),
-          axios.get(`${API}/grief-support?completed=false`),
-          axios.get(`${API}/care-events/hospital/due-followup`),
-          axios.get(`${API}/members/at-risk`),
-          axios.get(`${API}/members?limit=1000`),
-          axios.get(`${API}/financial-aid-schedules/due-today`),
-          axios.get(`${API}/suggestions/follow-up`)
-        ]);
+      const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes] = await Promise.all([
+        axios.get(`${API}/care-events`),
+        axios.get(`${API}/grief-support?completed=false`),
+        axios.get(`${API}/care-events/hospital/due-followup`),
+        axios.get(`${API}/members/at-risk`),
+        axios.get(`${API}/members?limit=1000`),
+        axios.get(`${API}/financial-aid-schedules/due-today`),
+        axios.get(`${API}/suggestions/follow-up`)
+      ]);
+      
+      setAllMembers(membersRes.data);
+      
+      // Get member names, phones, and photos for events
+      const memberMap = {};
+      membersRes.data.forEach(m => memberMap[m.id] = { 
+        name: m.name, 
+        phone: m.phone, 
+        photo_url: m.photo_url 
+      });
+      
+      console.log('🌐 Fresh data loaded:', membersRes.data.length, 'members');
+      
+      // Filter birthdays for today (recurring annually - month/day match)
+      const todayBirthdays = eventsRes.data.filter(e => {
+        if (e.event_type !== 'birthday') return false;
+        const eventDate = new Date(e.event_date);
+        const todayDate = new Date(today);
+        return eventDate.getMonth() === todayDate.getMonth() && eventDate.getDate() === todayDate.getDate();
+      }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
+      
+      // Get upcoming birthdays (next 7 days, recurring annually)
+      const upcoming = eventsRes.data.filter(e => {
+        if (e.event_type !== 'birthday') return false;
+        const eventDate = new Date(e.event_date);
+        const todayDate = new Date(today);
+        const weekAheadDate = new Date(weekAhead);
         
-        // Cache fresh member data
-        await offlineStorage.cacheMembers(membersRes.data);
-        setAllMembers(membersRes.data);
+        // Create this year's birthday date
+        const thisYearBirthday = new Date(todayDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
         
-        // Continue with member mapping...
-        const memberMap = {};
-        membersRes.data.forEach(m => memberMap[m.id] = { 
-          name: m.name, 
-          phone: m.phone, 
-          photo_url: m.photo_url 
-        });
-        
-        console.log('🌐 Online data loaded:', membersRes.data.length, 'members');
-        
-        // Rest of data processing...
-        // Filter birthdays for today (recurring annually - month/day match)
-        const todayBirthdays = eventsRes.data.filter(e => {
-          if (e.event_type !== 'birthday') return false;
-          const eventDate = new Date(e.event_date);
-          const todayDate = new Date(today);
-          return eventDate.getMonth() === todayDate.getMonth() && eventDate.getDate() === todayDate.getDate();
-        }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-        
-        // Get upcoming birthdays (next 7 days, recurring annually)
-        const upcoming = eventsRes.data.filter(e => {
-          if (e.event_type !== 'birthday') return false;
-          const eventDate = new Date(e.event_date);
-          const todayDate = new Date(today);
-          const weekAheadDate = new Date(weekAhead);
-          
-          // Create this year's birthday date
-          const thisYearBirthday = new Date(todayDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-          
-          return thisYearBirthday > todayDate && thisYearBirthday <= weekAheadDate;
-        }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-        
-        const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
-          ...g,
-          member_name: memberMap[g.member_id]?.name,
-          member_phone: memberMap[g.member_id]?.phone,
-          member_photo_url: memberMap[g.member_id]?.photo_url
-        }));
-        
-        const griefOverdue = griefRes.data.filter(g => {
-          const schedDate = new Date(g.scheduled_date);
-          return schedDate <= new Date() && !g.completed;
-        }).map(g => ({
-          ...g,
-          member_name: memberMap[g.member_id]?.name,
-          member_phone: memberMap[g.member_id]?.phone,
-          member_photo_url: memberMap[g.member_id]?.photo_url
-        }));
-        
-        const atRisk = atRiskRes.data.filter(m => 
-          m.days_since_last_contact >= engagementSettings.atRiskDays && 
-          m.days_since_last_contact < engagementSettings.inactiveDays
-        );
-        const disconnected = atRiskRes.data.filter(m => 
-          m.days_since_last_contact >= engagementSettings.inactiveDays
-        );
-        
-        setBirthdaysToday(todayBirthdays);
-        setUpcomingBirthdays(upcoming);
-        setGriefToday(griefToday);
-        setGriefDue(griefOverdue);
-        setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
-        setFinancialAidDue(aidDueRes.data);
-        setSuggestions(suggestionsRes.data || []);
-        setAtRiskMembers(atRisk);
-        setDisconnectedMembers(disconnected);
-        
-      } catch (onlineError) {
-        console.log('📱 Offline mode: Using cached data');
-        // Use cached data when offline
-        if (cachedMembers.length > 0) {
-          // Process cached data for offline display
-          const memberMap = {};
-          cachedMembers.forEach(m => memberMap[m.id] = { name: m.name, phone: m.phone, photo_url: m.photo_url });
-          // Set offline data...
-        }
-      }
+        return thisYearBirthday > todayDate && thisYearBirthday <= weekAheadDate;
+      }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
+      
+      const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
+        ...g,
+        member_name: memberMap[g.member_id]?.name,
+        member_phone: memberMap[g.member_id]?.phone,
+        member_photo_url: memberMap[g.member_id]?.photo_url
+      }));
+      
+      const griefOverdue = griefRes.data.filter(g => {
+        const schedDate = new Date(g.scheduled_date);
+        return schedDate <= new Date() && !g.completed;
+      }).map(g => ({
+        ...g,
+        member_name: memberMap[g.member_id]?.name,
+        member_phone: memberMap[g.member_id]?.phone,
+        member_photo_url: memberMap[g.member_id]?.photo_url
+      }));
+      
+      const atRisk = atRiskRes.data.filter(m => 
+        m.days_since_last_contact >= engagementSettings.atRiskDays && 
+        m.days_since_last_contact < engagementSettings.inactiveDays
+      );
+      const disconnected = atRiskRes.data.filter(m => 
+        m.days_since_last_contact >= engagementSettings.inactiveDays
+      );
+      
+      setBirthdaysToday(todayBirthdays);
+      setUpcomingBirthdays(upcoming);
+      setGriefToday(griefToday);
+      setGriefDue(griefOverdue);
+      setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
+      setFinancialAidDue(aidDueRes.data);
+      setSuggestions(suggestionsRes.data || []);
+      setAtRiskMembers(atRisk);
+      setDisconnectedMembers(disconnected);
+      
     } catch (error) {
-      toast.error('Failed to load - check connection');
+      toast.error('Failed to load');
     } finally {
       setLoading(false);
     }
