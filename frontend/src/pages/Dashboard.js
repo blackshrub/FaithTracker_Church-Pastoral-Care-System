@@ -20,8 +20,11 @@ import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr, format = 'short') => {
   try {
+    if (format === 'dd MMM yyyy') {
+      return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
     return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
   } catch { return dateStr; }
 };
