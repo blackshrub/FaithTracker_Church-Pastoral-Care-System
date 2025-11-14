@@ -503,8 +503,10 @@ def calculate_engagement_status(last_contact: Optional[datetime]) -> tuple[Engag
         return EngagementStatus.ACTIVE, days_since
     elif days_since < 60:
         return EngagementStatus.AT_RISK, days_since
-    else:
+    elif days_since < 90:
         return EngagementStatus.INACTIVE, days_since
+    else:
+        return EngagementStatus.DISCONNECTED, days_since
 
 def generate_accident_followup_timeline(event_date: date, care_event_id: str, member_id: str, campus_id: str) -> List[Dict[str, Any]]:
     """Generate 3-stage accident/illness follow-up timeline"""
