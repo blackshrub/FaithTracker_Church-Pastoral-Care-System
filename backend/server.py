@@ -1908,32 +1908,6 @@ async def update_care_event(event_id: str, update: CareEventUpdate):
         logger.error(f"Error updating care event: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@api_router.delete("/care-events/{event_id}")
-async def delete_care_event(event_id: str):
-    """Delete care event"""
-    try:
-        # Get the care event first to access campus_id
-        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
-        if not event:
-            raise HTTPException(status_code=404, detail="Care event not found")
-        
-        result = await db.care_events.delete_one({"id": event_id})
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Care event not found")
-        
-        # Also delete related grief support stages
-        await db.grief_support.delete_many({"care_event_id": event_id})
-        
-        # Invalidate dashboard cache
-        await invalidate_dashboard_cache(event["campus_id"])
-        
-        return {"success": True, "message": "Care event deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @api_router.post("/care-events/{event_id}/complete")
 async def complete_care_event(event_id: str):
     """Mark care event as completed and update member engagement"""
