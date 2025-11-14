@@ -2056,16 +2056,18 @@ async def get_financial_aid_recipients():
         
         recipients_data = await db.care_events.aggregate(pipeline).to_list(1000)
         
-        # Fetch member names
+        # Fetch member names and photos
         recipients = []
         for data in recipients_data:
             member_id = data["_id"]
             if member_id:
-                member = await db.members.find_one({"member_id": member_id}, {"_id": 0, "name": 1})
+                member = await db.members.find_one({"member_id": member_id}, {"_id": 0, "name": 1, "photo_url": 1})
                 member_name = "Unknown"
+                photo_url = None
                 
                 if member:
                     member_name = member.get("name", "Unknown")
+                    photo_url = member.get("photo_url")
                 else:
                     # Try to get name from the first event's title
                     event = await db.care_events.find_one(
@@ -2080,6 +2082,7 @@ async def get_financial_aid_recipients():
                 recipients.append({
                     "member_id": member_id,
                     "member_name": member_name,
+                    "photo_url": photo_url,
                     "total_amount": data["total_amount"],
                     "aid_count": data["aid_count"]
                 })
