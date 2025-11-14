@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { DollarSign, Users } from 'lucide-react';
 import LazyImage from '@/components/LazyImage';
-import { format } from 'date-fns';
+import PieChart from '@/components/charts/PieChart';
+import { format } from 'date-fns/format';
 
 // Safe date formatter
 const formatDate = (dateStr, formatStr = 'dd MMM yyyy') => {
