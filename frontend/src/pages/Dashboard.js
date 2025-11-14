@@ -759,7 +759,7 @@ export const Dashboard = () => {
         <div className="overflow-x-auto">
           <TabsList className="inline-flex w-max min-w-full">
             <TabsTrigger value="today" className="whitespace-nowrap">
-              <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefToday.length})
+              <Bell className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + todayTasks.length})
             </TabsTrigger>
             <TabsTrigger value="birthday" className="whitespace-nowrap">
               🎂 Birthdays ({overdueBirthdays.length})
