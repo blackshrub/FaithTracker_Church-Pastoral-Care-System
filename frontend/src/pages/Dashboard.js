@@ -1068,7 +1068,7 @@ export const Dashboard = () => {
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markAccidentComplete(event.id, loadReminders)}>
+                        <Button size="sm" variant="outline" onClick={() => markAccidentComplete(event.id, setAccidentFollowUp)}>
                           Mark Complete
                         </Button>
                       </div>
