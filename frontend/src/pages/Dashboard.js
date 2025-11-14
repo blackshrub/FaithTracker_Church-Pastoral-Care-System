@@ -166,91 +166,41 @@ export const Dashboard = () => {
   
   const loadReminders = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const weekAhead = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
+      setLoading(true);
       
-      const [eventsRes, griefRes, atRiskRes, membersRes, aidDueRes, suggestionsRes, accidentRes] = await Promise.all([
-        axios.get(`${API}/care-events`),
-        axios.get(`${API}/grief-support?completed=false`),
-        axios.get(`${API}/members/at-risk`),
-        axios.get(`${API}/members?limit=1000`),
-        axios.get(`${API}/financial-aid-schedules/due-today`),
-        axios.get(`${API}/suggestions/follow-up`),
-        axios.get(`${API}/accident-followup?completed=false`)
-      ]);
+      // Use optimized pre-calculated endpoint
+      const response = await axios.get(`${API}/dashboard/reminders`);
+      const data = response.data;
       
-      setAllMembers(membersRes.data);
-      
-      // Get member names, phones, and photos for events
-      const memberMap = {};
-      membersRes.data.forEach(m => memberMap[m.id] = { 
-        name: m.name, 
-        phone: m.phone, 
-        photo_url: m.photo_url 
-      });
-      
-      // Filter birthdays for today (recurring annually - month/day match)
-      const todayBirthdays = eventsRes.data.filter(e => {
-        if (e.event_type !== 'birthday') return false;
-        const eventDate = new Date(e.event_date);
-        const todayDate = new Date(today);
-        return eventDate.getMonth() === todayDate.getMonth() && eventDate.getDate() === todayDate.getDate();
-      }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-      
-      // Get upcoming birthdays (next 7 days, recurring annually)
-      const upcoming = eventsRes.data.filter(e => {
-        if (e.event_type !== 'birthday') return false;
-        const eventDate = new Date(e.event_date);
-        const todayDate = new Date(today);
-        const weekAheadDate = new Date(weekAhead);
-        
-        // Create this year's birthday date
-        const thisYearBirthday = new Date(todayDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-        
-        return thisYearBirthday > todayDate && thisYearBirthday <= weekAheadDate;
-      }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-      
-      const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
-        ...g,
-        member_name: memberMap[g.member_id]?.name,
-        member_phone: memberMap[g.member_id]?.phone,
-        member_photo_url: memberMap[g.member_id]?.photo_url
-      }));
-      
-      const griefOverdue = griefRes.data.filter(g => {
-        const schedDate = new Date(g.scheduled_date);
-        return schedDate <= new Date() && !g.completed;
-      }).map(g => ({
-        ...g,
-        member_name: memberMap[g.member_id]?.name,
-        member_phone: memberMap[g.member_id]?.phone,
-        member_photo_url: memberMap[g.member_id]?.photo_url
-      }));
-      
-      const atRisk = atRiskRes.data.filter(m => 
-        m.days_since_last_contact >= engagementSettings.atRiskDays && 
-        m.days_since_last_contact < engagementSettings.inactiveDays
-      );
-      const disconnected = atRiskRes.data.filter(m => 
-        m.days_since_last_contact >= engagementSettings.inactiveDays
-      );
-      
-      setBirthdaysToday(todayBirthdays);
-      setUpcomingBirthdays(upcoming);
-      setGriefToday(griefToday);
-      setGriefDue(griefOverdue);
+      // Set all state from pre-calculated data
+      setBirthdaysToday(data.birthdays_today || []);
+      setUpcomingBirthdays(data.upcoming_birthdays || []);
+      setGriefToday(data.grief_today || []);
+      setGriefDue(data.grief_today || []); // Same as grief_today
+      setAccidentFollowUp(data.accident_followup || []);
       setHospitalFollowUp([]);
-      setAccidentFollowUp(accidentRes.data.map(a => ({...a, member_name: memberMap[a.member_id]?.name, member_phone: memberMap[a.member_id]?.phone, member_photo_url: memberMap[a.member_id]?.photo_url})));
-      setFinancialAidDue(aidDueRes.data);
-      setSuggestions(suggestionsRes.data || []);
-      setAtRiskMembers(atRisk);
-      setDisconnectedMembers(disconnected);
+      setAtRiskMembers(data.at_risk_members || []);
+      setDisconnectedMembers(data.disconnected_members || []);
+      setFinancialAidDue(data.financial_aid_due || []);
+      setSuggestions(data.ai_suggestions || []);
       
-      setLoading(false);
+      // Also load all members for the quick event form (in background, non-blocking)
+      loadAllMembersForForm();
+      
     } catch (error) {
       console.error('Error loading reminders:', error);
       toast.error('Failed to load dashboard data');
+    } finally {
       setLoading(false);
+    }
+  };
+  
+  const loadAllMembersForForm = async () => {
+    try {
+      const membersRes = await axios.get(`${API}/members?limit=1000`);
+      setAllMembers(membersRes.data);
+    } catch (error) {
+      console.error('Error loading members for form:', error);
     }
   };
   
