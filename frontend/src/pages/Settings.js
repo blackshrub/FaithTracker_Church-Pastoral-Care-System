@@ -274,6 +274,99 @@ export const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="writeoff">
+          <Card>
+            <CardHeader>
+              <CardTitle>Overdue Write-off Policy</CardTitle>
+              <CardDescription>
+                Configure how long overdue tasks remain visible before being auto-hidden.
+                Set to 0 for tasks that should never be hidden.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="writeoff-birthday">Birthday (days)</Label>
+                  <Input 
+                    id="writeoff-birthday"
+                    type="number" 
+                    min="0"
+                    max="365"
+                    value={writeoffBirthday} 
+                    onChange={(e) => setWriteoffBirthday(e.target.value)} 
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default: 7 days. Birthday greetings older than this will be hidden.
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="writeoff-grief">Grief Support (days)</Label>
+                  <Input 
+                    id="writeoff-grief"
+                    type="number" 
+                    min="0"
+                    max="365"
+                    value={writeoffGrief} 
+                    onChange={(e) => setWriteoffGrief(e.target.value)} 
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default: 14 days. Grief stages overdue by more than this will be hidden.
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="writeoff-accident">Accident/Illness Recovery (days)</Label>
+                  <Input 
+                    id="writeoff-accident"
+                    type="number" 
+                    min="0"
+                    max="365"
+                    value={writeoffAccident} 
+                    onChange={(e) => setWriteoffAccident(e.target.value)} 
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default: 14 days. Accident follow-ups overdue by more than this will be hidden.
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="writeoff-aid">Financial Aid (days)</Label>
+                  <Input 
+                    id="writeoff-aid"
+                    type="number" 
+                    min="0"
+                    max="365"
+                    value={writeoffFinancialAid} 
+                    onChange={(e) => setWriteoffFinancialAid(e.target.value)} 
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Default: 0 (never hide). Set to 0 to always show overdue financial aid.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-sm mb-2">How Write-off Works:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Tasks overdue beyond the threshold are automatically hidden from overdue tabs</li>
+                  <li>• Set to <strong>0</strong> to never hide (task stays visible forever)</li>
+                  <li>• Hidden tasks can still be manually ignored using the "Ignore" button</li>
+                  <li>• Write-off helps keep dashboard focused on actionable items</li>
+                  <li>• <strong>Note:</strong> At-Risk and Disconnected status are open-ended (no write-off)</li>
+                </ul>
+              </div>
+              
+              <Button onClick={saveWriteoffSettings}>Save Write-off Settings</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         
         <TabsContent value="system">
           <div className="space-y-6">
