@@ -724,7 +724,7 @@ export const Dashboard = () => {
           </Dialog>
           <Link to="/members">
             <Button className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white text-base font-semibold">
-              <Users className="w-5 h-5 mr-2" />View All Members
+              <Users className="w-5 h-5 mr-2" />{t('view_all_members')}
             </Button>
           </Link>
         </div>
@@ -735,9 +735,9 @@ export const Dashboard = () => {
         <Card className="card-border-left-purple shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl font-playfair flex items-center gap-2">
-              🤖 AI Pastoral Recommendations ({suggestions.length})
+              🤖 {t('ai_pastoral_recommendations')} ({suggestions.length})
             </CardTitle>
-            <p className="text-sm text-muted-foreground">Intelligent follow-up suggestions based on member patterns</p>
+            <p className="text-sm text-muted-foreground">{t('intelligent_followup')}</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
@@ -789,7 +789,7 @@ export const Dashboard = () => {
                           toast.error('Failed to mark as completed');
                         }
                       }}>
-                        Mark Completed
+                        {t('mark_completed')}
                       </Button>
                     </div>
                   </div>
