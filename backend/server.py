@@ -1119,42 +1119,9 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         # Build member map for quick lookup
         member_map = {m["id"]: m for m in members}
         
-        # Birthdays today (month/day match)
+        # Initialize arrays
         birthdays_today = []
         upcoming_birthdays = []
-        
-        for member in members:
-            if not member.get("birth_date"):
-                continue
-                
-            birth_date = datetime.strptime(member["birth_date"], '%Y-%m-%d').date()
-            this_year_birthday = birth_date.replace(year=today.year)
-            
-            if this_year_birthday == today:
-                # Find birthday event if exists
-                event = await db.care_events.find_one(
-                    {"member_id": member["id"], "event_type": "birthday"},
-                    {"_id": 0}
-                )
-                if event:
-                    birthdays_today.append({
-                        **event,
-                        "member_name": member["name"],
-                        "member_phone": member["phone"],
-                        "member_photo_url": member.get("photo_url")
-                    })
-            elif today < this_year_birthday <= week_ahead:
-                event = await db.care_events.find_one(
-                    {"member_id": member["id"], "event_type": "birthday"},
-                    {"_id": 0}
-                )
-                if event:
-                    upcoming_birthdays.append({
-                        **event,
-                        "member_name": member["name"],
-                        "member_phone": member["phone"],
-                        "member_photo_url": member.get("photo_url")
-                    })
         
         # Grief support due (today and overdue)
         grief_stages = await db.grief_support.find(
