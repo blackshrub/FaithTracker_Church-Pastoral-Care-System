@@ -127,6 +127,7 @@ export const Dashboard = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [birthdaysToday, setBirthdaysToday] = useState([]);
+  const [todayTasks, setTodayTasks] = useState([]);
   const [griefDue, setGriefDue] = useState([]);
   const [griefToday, setGriefToday] = useState([]);
   const [hospitalFollowUp, setHospitalFollowUp] = useState([]);
