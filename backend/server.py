@@ -964,6 +964,22 @@ async def list_members(
         logger.error(f"Error listing members: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+async def invalidate_dashboard_cache(campus_id: str):
+    """Invalidate dashboard cache for a specific campus - call after any data change"""
+    try:
+        # Get campus timezone to determine today's date
+        campus_tz = await get_campus_timezone(campus_id)
+        today_date = get_date_in_timezone(campus_tz)
+        
+        # Delete today's cache
+        cache_key = f"dashboard_reminders_{campus_id}_{today_date}"
+        await db.dashboard_cache.delete_one({"cache_key": cache_key})
+        
+        logger.info(f"Dashboard cache invalidated for campus {campus_id}")
+    except Exception as e:
+        logger.error(f"Error invalidating dashboard cache: {str(e)}")
+
+
 @api_router.get("/dashboard/reminders")
 async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
     """
