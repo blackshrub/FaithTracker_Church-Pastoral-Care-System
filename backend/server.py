@@ -2762,6 +2762,118 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
         logger.error(f"Error analyzing demographic trends: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== SETTINGS CONFIGURATION ENDPOINTS ====================
+
+@api_router.get("/settings/engagement")
+async def get_engagement_settings():
+    """Get engagement threshold settings"""
+    try:
+        settings = await db.settings.find_one({"type": "engagement"}, {"_id": 0})
+        if not settings:
+            # Return defaults
+            return {
+                "atRiskDays": 60,
+                "inactiveDays": 90
+            }
+        return settings.get("data", {"atRiskDays": 60, "inactiveDays": 90})
+    except Exception as e:
+        logger.error(f"Error getting engagement settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/settings/engagement")
+async def update_engagement_settings(settings: dict, current_admin: dict = Depends(get_current_admin)):
+    """Update engagement threshold settings"""
+    try:
+        await db.settings.update_one(
+            {"type": "engagement"},
+            {"$set": {
+                "type": "engagement",
+                "data": settings,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": current_admin["id"]
+            }},
+            upsert=True
+        )
+        return {"success": True, "message": "Engagement settings updated"}
+    except Exception as e:
+        logger.error(f"Error updating engagement settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/settings/grief-stages")
+async def get_grief_stages():
+    """Get grief support stage configuration"""
+    try:
+        settings = await db.settings.find_one({"type": "grief_stages"}, {"_id": 0})
+        if not settings:
+            # Return defaults
+            return [
+                {"stage": "1_week", "days": 7, "name": "1 Week After"},
+                {"stage": "2_weeks", "days": 14, "name": "2 Weeks After"},
+                {"stage": "1_month", "days": 30, "name": "1 Month After"},
+                {"stage": "3_months", "days": 90, "name": "3 Months After"},
+                {"stage": "6_months", "days": 180, "name": "6 Months After"},
+                {"stage": "1_year", "days": 365, "name": "1 Year After"}
+            ]
+        return settings.get("data", [])
+    except Exception as e:
+        logger.error(f"Error getting grief stages: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/settings/grief-stages")
+async def update_grief_stages(stages: list, current_admin: dict = Depends(get_current_admin)):
+    """Update grief support stage configuration"""
+    try:
+        await db.settings.update_one(
+            {"type": "grief_stages"},
+            {"$set": {
+                "type": "grief_stages",
+                "data": stages,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": current_admin["id"]
+            }},
+            upsert=True
+        )
+        return {"success": True, "message": "Grief stages configuration updated"}
+    except Exception as e:
+        logger.error(f"Error updating grief stages: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/settings/accident-followup")
+async def get_accident_followup():
+    """Get accident follow-up configuration"""
+    try:
+        settings = await db.settings.find_one({"type": "accident_followup"}, {"_id": 0})
+        if not settings:
+            # Return defaults
+            return [
+                {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
+                {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
+                {"stage": "final_followup", "days": 14, "name": "Final Follow-up"}
+            ]
+        return settings.get("data", [])
+    except Exception as e:
+        logger.error(f"Error getting accident followup settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/settings/accident-followup")
+async def update_accident_followup(config: list, current_admin: dict = Depends(get_current_admin)):
+    """Update accident follow-up configuration"""
+    try:
+        await db.settings.update_one(
+            {"type": "accident_followup"},
+            {"$set": {
+                "type": "accident_followup",
+                "data": config,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": current_admin["id"]
+            }},
+            upsert=True
+        )
+        return {"success": True, "message": "Accident follow-up configuration updated"}
+    except Exception as e:
+        logger.error(f"Error updating accident followup settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== NOTIFICATION LOGS ENDPOINTS ====================
 
 @api_router.get("/notification-logs")
