@@ -7,7 +7,7 @@ import asyncio
 from pymongo import MongoClient
 from datetime import datetime, timezone
 
-def calculate_engagement_status(last_contact):
+def calculate_engagement_status(last_contact, at_risk_days=60, disconnected_days=90):
     """Calculate engagement status"""
     if not last_contact:
         return "disconnected", 999
@@ -26,9 +26,9 @@ def calculate_engagement_status(last_contact):
     now = datetime.now(timezone.utc)
     days_since = (now - last_contact).days
     
-    if days_since < 30:
+    if days_since < at_risk_days:
         return "active", days_since
-    elif days_since < 60:
+    elif days_since < disconnected_days:
         return "at_risk", days_since
     else:
         return "disconnected", days_since
