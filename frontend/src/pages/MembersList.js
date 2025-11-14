@@ -31,6 +31,10 @@ const API = `${BACKEND_URL}/api`;
 export const MembersList = () => {
   const { t } = useTranslation();
   const [members, setMembers] = useState([]);
+  const [allMembers, setAllMembers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [pageSize] = useState(25); // Industry standard: 25 items per page
   const [familyGroups, setFamilyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
