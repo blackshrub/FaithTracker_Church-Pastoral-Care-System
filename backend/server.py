@@ -1031,6 +1031,82 @@ async def delete_member(member_id: str):
         logger.error(f"Error deleting member: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.delete("/care-events/{event_id}")
+async def delete_care_event(event_id: str):
+    """Delete care event and recalculate member engagement"""
+    try:
+        # Get the care event first to know which member
+        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        if not event:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        member_id = event["member_id"]
+        
+        # Delete the care event
+        result = await db.care_events.delete_one({"id": event_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Care event not found")
+        
+        # Recalculate member's last contact date from remaining events
+        remaining_events = await db.care_events.find(
+            {"member_id": member_id},
+            {"_id": 0, "created_at": 1}
+        ).sort("created_at", -1).limit(1).to_list(1)
+        
+        if remaining_events:
+            # Update to most recent remaining event
+            last_event = remaining_events[0]
+            new_last_contact = last_event["created_at"]
+            
+            # Calculate new engagement status
+            if isinstance(new_last_contact, str):
+                last_contact_dt = datetime.fromisoformat(new_last_contact)
+            else:
+                last_contact_dt = new_last_contact
+                
+            if last_contact_dt.tzinfo is None:
+                last_contact_dt = last_contact_dt.replace(tzinfo=timezone.utc)
+            
+            days_since = (datetime.now(timezone.utc) - last_contact_dt).days
+            
+            if days_since < 60:
+                engagement_status = "active"
+            elif days_since < 90:
+                engagement_status = "at_risk"
+            else:
+                engagement_status = "inactive"
+                
+            await db.members.update_one(
+                {"id": member_id},
+                {"$set": {
+                    "last_contact_date": new_last_contact,
+                    "days_since_last_contact": days_since,
+                    "engagement_status": engagement_status,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        else:
+            # No remaining events - reset to never contacted
+            await db.members.update_one(
+                {"id": member_id},
+                {"$set": {
+                    "last_contact_date": None,
+                    "days_since_last_contact": 999,
+                    "engagement_status": "inactive",
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        
+        # Also delete related grief support stages
+        await db.grief_support.delete_many({"care_event_id": event_id})
+        
+        return {"success": True, "message": "Care event deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/members/{member_id}/photo")
 async def upload_member_photo(member_id: str, file: UploadFile = File(...)):
     """Upload member profile photo with optimization"""
