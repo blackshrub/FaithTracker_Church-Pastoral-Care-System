@@ -76,11 +76,12 @@ const formatPhoneForWhatsApp = (phone) => {
   return `https://wa.me/${formatted}`;
 };
 
-const markBirthdayComplete = async (eventId, loadReminders) => {
+const markBirthdayComplete = async (eventId, setBirthdaysToday) => {
   try {
     await axios.post(`${API}/care-events/${eventId}/complete`);
     toast.success('Birthday task completed!');
-    loadReminders();
+    // Update local state
+    setBirthdaysToday(prev => prev.filter(b => b.id !== eventId));
   } catch (error) {
     toast.error('Failed to complete');
   }
