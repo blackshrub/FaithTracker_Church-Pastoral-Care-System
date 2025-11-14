@@ -719,7 +719,7 @@ export const Dashboard = () => {
         
         <TabsContent value="today" className="space-y-4">
           {birthdaysToday.length === 0 && todayTasks.length === 0 ? (
-            <Card><CardContent className="p-6 text-center">No urgent tasks for today! 🎉</CardContent></Card>
+              <CardContent className="p-6 text-center">{t('no_urgent_tasks_today')}</CardContent>
           ) : (
             <>
               {/* Birthdays Today */}
@@ -743,7 +743,7 @@ export const Dashboard = () => {
                           <div className="flex gap-2">
                             <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" asChild>
                               <a href={formatPhoneForWhatsApp(event.member_phone)} target="_blank" rel="noopener noreferrer">
-                                Contact
+                                {t('contact')}
                               </a>
                             </Button>
                             {event.completed ? (
@@ -774,9 +774,9 @@ export const Dashboard = () => {
                     <div className="space-y-3">
                       {todayTasks.map((task, index) => {
                         const typeConfig = {
-                          grief_support: { icon: '💔', color: 'pink', label: 'Grief Support' },
-                          accident_followup: { icon: '🏥', color: 'blue', label: 'Accident Follow-up' },
-                          financial_aid: { icon: '💰', color: 'green', label: 'Financial Aid' }
+                          grief_support: { icon: '💔', color: 'pink', label: t('grief_support') },
+                          accident_followup: { icon: '🏥', color: 'blue', label: t('accident_followup_label') },
+                          financial_aid: { icon: '💰', color: 'green', label: t('financial_aid') }
                         };
                         const config = typeConfig[task.type] || { icon: '📋', color: 'gray', label: 'Task' };
                         
@@ -999,7 +999,7 @@ export const Dashboard = () => {
           {overdueBirthdays.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                No overdue birthdays - all caught up! 🎉
+                {t('no_overdue_birthdays')}
               </CardContent>
             </Card>
           ) : (
@@ -1105,7 +1105,7 @@ export const Dashboard = () => {
           {accidentFollowUp.length > 0 && (
             <Card className="card-border-left-teal">
               <CardHeader>
-                <CardTitle>Accident/Illness Recovery Follow-ups</CardTitle>
+                <CardTitle>{t('accident_illness_recovery_followups')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1166,7 +1166,7 @@ export const Dashboard = () => {
           {griefDue.length > 0 && (
             <Card className="card-border-left-purple">
               <CardHeader>
-                <CardTitle>Grief Support Follow-ups</CardTitle>
+                <CardTitle>{t('grief_support_followups')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1223,13 +1223,13 @@ export const Dashboard = () => {
           {upcomingTasks.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                No upcoming tasks in the next 7 days
+                {t('no_upcoming_tasks')}
               </CardContent>
             </Card>
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Upcoming Tasks (Next 7 Days)</CardTitle>
+                <CardTitle>{t('upcoming_tasks_next_7_days')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
