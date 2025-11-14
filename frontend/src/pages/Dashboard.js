@@ -1074,32 +1074,52 @@ export const Dashboard = () => {
         </TabsContent>
         
         <TabsContent value="upcoming" className="space-y-4">
-          <Card className="card-border-left-purple">
-            <CardHeader>
-              <CardTitle>Upcoming Birthdays (Next 7 Days)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcomingBirthdays.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">No birthdays coming up</p>
-              ) : (
-                <div className="space-y-2">
-                  {upcomingBirthdays
-                    .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
-                    .map(event => (
-                    <div key={event.id} className="p-3 bg-purple-50 rounded flex justify-between items-center">
-                      <div className="flex-1">
-                        <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
-                        <p className="text-sm text-muted-foreground ml-13">{formatDate(event.event_date)}</p>
+          {upcomingTasks.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No upcoming tasks in the next 7 days
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Tasks (Next 7 Days)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {upcomingTasks.map((task, index) => {
+                    const daysUntil = Math.ceil((new Date(task.date) - new Date()) / (1000 * 60 * 60 * 24));
+                    const typeConfig = {
+                      birthday: { icon: '🎂', color: 'amber', label: 'Birthday' },
+                      grief_support: { icon: '💔', color: 'pink', label: 'Grief Support' },
+                      accident_followup: { icon: '🏥', color: 'blue', label: 'Accident Follow-up' },
+                      financial_aid: { icon: '💰', color: 'green', label: 'Financial Aid' }
+                    };
+                    const config = typeConfig[task.type] || { icon: '📋', color: 'gray', label: 'Task' };
+                    
+                    return (
+                      <div key={index} className={`p-4 bg-${config.color}-50 rounded-lg border border-${config.color}-200 flex justify-between items-center`}>
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="text-2xl">{config.icon}</div>
+                          <div className="flex-1">
+                            <MemberNameWithAvatar 
+                              member={{name: task.member_name, photo_url: task.member_photo_url}} 
+                              memberId={task.member_id} 
+                            />
+                            <p className="text-sm text-muted-foreground">{config.label}: {task.details}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(task.date)}</p>
+                          </div>
+                          <div className={`px-3 py-1 bg-${config.color}-100 text-${config.color}-700 rounded-full text-sm font-medium`}>
+                            {daysUntil} {daysUntil === 1 ? 'day' : 'days'}
+                          </div>
+                        </div>
                       </div>
-                      <Badge variant="outline" className="text-purple-600">
-                        {Math.ceil((new Date(event.event_date) - new Date()) / (1000 * 60 * 60 * 24))} days
-                      </Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
