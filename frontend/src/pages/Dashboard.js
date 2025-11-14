@@ -798,6 +798,58 @@ export const Dashboard = () => {
                                   {t('contact')}
                                 </a>
                               </Button>
+                              
+                              {task.type === 'financial_aid' ? (
+                                // Financial aid: Mark Distributed + Three-dots menu
+                                <>
+                                  <Button size="sm" variant="outline" onClick={async () => {
+                                    try {
+                                      await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
+                                      toast.success('Payment marked as distributed!');
+                                      setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                    } catch (error) {
+                                      toast.error('Failed to mark as distributed');
+                                    }
+                                  }}>
+                                    {t('mark_distributed')}
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="sm" variant="ghost">
+                                        <MoreVertical className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={async () => {
+                                        try {
+                                          await axios.post(`${API}/financial-aid-schedules/${task.data.id}/ignore`);
+                                          toast.success('Financial aid ignored');
+                                          setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                        } catch (error) {
+                                          toast.error('Failed to ignore');
+                                        }
+                                      }}>
+                                        {t('ignore')}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        className="text-red-600"
+                                        onClick={async () => {
+                                          try {
+                                            await axios.post(`${API}/financial-aid-schedules/${task.data.id}/stop`);
+                                            toast.success('Schedule stopped');
+                                            setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                          } catch (error) {
+                                            toast.error('Failed to stop');
+                                          }
+                                        }}
+                                      >
+                                        {t('stop_schedule')}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </>
+                              ) : (
+                                // Grief/Accident: Mark Complete button only
                               <Button size="sm" variant="outline" onClick={async () => {
                                 try {
                                   if (task.type === 'grief_support') {
