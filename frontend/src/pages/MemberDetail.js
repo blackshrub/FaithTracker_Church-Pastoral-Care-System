@@ -611,15 +611,65 @@ export const MemberDetail = () => {
         
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="space-y-4">
+          {/* Birthday Section - Show if within 7 days */}
+          {(() => {
+            const birthdayEvent = careEvents.find(e => e.event_type === 'birthday');
+            if (!birthdayEvent) return null;
+            
+            const eventDate = new Date(birthdayEvent.event_date);
+            const today = new Date();
+            const thisYearBirthday = new Date(today.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+            const daysUntil = Math.ceil((thisYearBirthday - today) / (1000 * 60 * 60 * 24));
+            
+            // Show if birthday is within next 7 days or today
+            if (daysUntil >= 0 && daysUntil <= 7) {
+              return (
+                <Card className="border-amber-200 bg-amber-50/50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                          🎂
+                        </div>
+                        <div>
+                          <h5 className="font-playfair font-semibold text-lg">
+                            {daysUntil === 0 ? '🎉 Birthday Today!' : `Upcoming Birthday (${daysUntil} days)`}
+                          </h5>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDate(birthdayEvent.event_date, 'dd MMMM yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                      {birthdayEvent.completed ? (
+                        <Button disabled className="bg-green-100 text-green-700">
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Completed
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => handleCompleteBirthday(birthdayEvent.id)}
+                          className="bg-amber-500 hover:bg-amber-600"
+                        >
+                          Mark Complete
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+            return null;
+          })()}
+          
           <Card>
             <CardContent className="p-6">
-              {careEvents.length === 0 ? (
+              {careEvents.filter(e => e.event_type !== 'birthday').length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   {t('empty_states.no_care_events')}
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {careEvents.map((event) => (
+                  {careEvents.filter(e => e.event_type !== 'birthday').map((event) => (
                     <div key={event.id} className="flex gap-4 pb-4 border-l-2 border-primary-200 pl-6 ml-3 relative timeline-item" data-testid={`care-event-${event.id}`}>
                       <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-primary-500 border-2 border-background"></div>
                       <div className="flex-1">
