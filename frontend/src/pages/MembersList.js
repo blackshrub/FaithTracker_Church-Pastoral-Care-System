@@ -34,7 +34,6 @@ export const MembersList = () => {
   const [familyGroups, setFamilyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebounce(search, 300); // 300ms debounce
   const [filterStatus, setFilterStatus] = useState('all');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
