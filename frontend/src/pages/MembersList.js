@@ -378,17 +378,29 @@ export const MembersList = () => {
                   />
                 </div>
               </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full md:w-48" data-testid="filter-status-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">{t('active')}</SelectItem>
-                  <SelectItem value="at_risk">{t('at_risk')}</SelectItem>
-                  <SelectItem value="inactive">{t('inactive')}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-full md:w-48" data-testid="filter-status-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">{t('active')}</SelectItem>
+                    <SelectItem value="at_risk">{t('at_risk')}</SelectItem>
+                    <SelectItem value="disconnected">{t('disconnected')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant={showArchived ? "default" : "outline"}
+                  onClick={() => {
+                    setShowArchived(!showArchived);
+                    setCurrentPage(1);
+                  }}
+                  className="whitespace-nowrap"
+                >
+                  {showArchived ? '👁️ Showing Archived' : '📁 Show Archived'}
+                </Button>
+              </div>
             </div>
             
             {/* Column Visibility Toggles */}
