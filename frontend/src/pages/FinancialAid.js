@@ -191,7 +191,7 @@ export const FinancialAid = () => {
                           memberId={recipient.member_id} 
                         />
                         <p className="text-xs text-muted-foreground mt-1 ml-11">
-                          {recipient.aid_count} aid event{recipient.aid_count !== 1 ? 's' : ''}
+                          {recipient.aid_count} {t('aid_event')}{recipient.aid_count !== 1 ? 's' : ''}
                         </p>
                       </div>
                       <p className="font-semibold text-green-700">
