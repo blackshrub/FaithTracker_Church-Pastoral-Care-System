@@ -1,10 +1,14 @@
 [
   {
-    "content": "Fix payment_date field not showing initially for one-time payments",
-    "status": "completed"
+    "content": "Update Layout/Navigation to use translation keys",
+    "status": "in_progress"
   },
   {
-    "content": "Add missing Indonesian translations",
-    "status": "completed"
+    "content": "Update Dashboard to use translation keys for all text",
+    "status": "pending"
+  },
+  {
+    "content": "Update other pages to use translation keys",
+    "status": "pending"
   }
 ]
