@@ -191,15 +191,26 @@ export const Dashboard = () => {
         console.log('🌐 Online data loaded:', membersRes.data.length, 'members');
         
         // Rest of data processing...
-        const todayBirthdays = eventsRes.data.filter(e => 
-          e.event_type === 'birthday' && e.event_date === today
-        ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
+        // Filter birthdays for today (recurring annually - month/day match)
+        const todayBirthdays = eventsRes.data.filter(e => {
+          if (e.event_type !== 'birthday') return false;
+          const eventDate = new Date(e.event_date);
+          const todayDate = new Date(today);
+          return eventDate.getMonth() === todayDate.getMonth() && eventDate.getDate() === todayDate.getDate();
+        }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
         
-        const upcoming = eventsRes.data.filter(e => 
-          e.event_type === 'birthday' && 
-          e.event_date > today && 
-          e.event_date <= weekAhead
-        ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
+        // Get upcoming birthdays (next 7 days, recurring annually)
+        const upcoming = eventsRes.data.filter(e => {
+          if (e.event_type !== 'birthday') return false;
+          const eventDate = new Date(e.event_date);
+          const todayDate = new Date(today);
+          const weekAheadDate = new Date(weekAhead);
+          
+          // Create this year's birthday date
+          const thisYearBirthday = new Date(todayDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+          
+          return thisYearBirthday > todayDate && thisYearBirthday <= weekAheadDate;
+        }).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
         
         const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
           ...g,
