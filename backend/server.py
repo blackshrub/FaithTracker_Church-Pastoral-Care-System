@@ -2062,9 +2062,24 @@ async def get_financial_aid_recipients():
             member_id = data["_id"]
             if member_id:
                 member = await db.members.find_one({"member_id": member_id}, {"_id": 0, "name": 1})
+                member_name = "Unknown"
+                
+                if member:
+                    member_name = member.get("name", "Unknown")
+                else:
+                    # Try to get name from the first event's title
+                    event = await db.care_events.find_one(
+                        {"member_id": member_id, "event_type": EventType.FINANCIAL_AID},
+                        {"_id": 0, "title": 1}
+                    )
+                    if event and event.get("title"):
+                        title = event["title"]
+                        if " - " in title:
+                            member_name = title.split(" - ", 1)[1].strip()
+                
                 recipients.append({
                     "member_id": member_id,
-                    "member_name": member.get("name", "Unknown") if member else "Unknown",
+                    "member_name": member_name,
                     "total_amount": data["total_amount"],
                     "aid_count": data["aid_count"]
                 })
