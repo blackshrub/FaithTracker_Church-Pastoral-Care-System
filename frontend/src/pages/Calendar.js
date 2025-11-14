@@ -87,7 +87,9 @@ export const Calendar = () => {
               <div key={day} className="text-center font-semibold text-sm text-muted-foreground p-2">{day}</div>
             ))}
             {days.map((day) => {
-              const dayEvents = events.filter(e => e.event_date === day.toISOString().split('T')[0]);
+              // Use local date string (YYYY-MM-DD) without UTC conversion
+              const localDateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+              const dayEvents = events.filter(e => e.event_date === localDateStr);
               return (
                 <div 
                   key={day.toISOString()} 
