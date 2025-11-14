@@ -878,25 +878,44 @@ export const Dashboard = () => {
                         >
                           Mark Distributed
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="text-red-600"
-                          onClick={async () => {
-                            if (window.confirm(`Stop financial aid schedule for ${schedule.member_name}?`)) {
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={async () => {
                               try {
-                                await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
-                                toast.success('Schedule stopped');
+                                await axios.post(`${API}/financial-aid-schedules/${schedule.id}/ignore`);
+                                toast.success('Financial aid schedule ignored');
                                 // Update local state
                                 setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
                               } catch (error) {
-                                toast.error('Failed to stop schedule');
+                                toast.error('Failed to ignore');
                               }
-                            }
-                          }}
-                        >
-                          Stop Schedule
-                        </Button>
+                            }}>
+                              Ignore
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={async () => {
+                                if (window.confirm(`Stop financial aid schedule for ${schedule.member_name}?`)) {
+                                  try {
+                                    await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
+                                    toast.success('Schedule stopped');
+                                    // Update local state
+                                    setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
+                                  } catch (error) {
+                                    toast.error('Failed to stop schedule');
+                                  }
+                                }
+                              }}
+                            >
+                              Stop Schedule
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))}
