@@ -1,18 +1,18 @@
 [
   {
-    "content": "Update backend to calculate upcoming tasks (7 days ahead) for all types",
-    "status": "in_progress"
+    "content": "Update backend to calculate today tasks and upcoming tasks for all types",
+    "status": "completed"
+  },
+  {
+    "content": "Update Today tab UI to show all tasks due today",
+    "status": "completed"
   },
   {
     "content": "Update Upcoming tab UI to show all upcoming task types",
-    "status": "pending"
+    "status": "completed"
   },
   {
-    "content": "Sort all upcoming tasks by date",
-    "status": "pending"
-  },
-  {
-    "content": "Test Upcoming tab with comprehensive data",
-    "status": "pending"
+    "content": "Sort all tasks by date and test",
+    "status": "in_progress"
   }
 ]
