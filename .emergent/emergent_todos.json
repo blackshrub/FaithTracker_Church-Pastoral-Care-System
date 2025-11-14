@@ -1,14 +1,14 @@
 [
   {
     "content": "Remove birthday from Dashboard care event form dropdown",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Remove birthday from Member profile care event form dropdown",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test birthday removal and verify forms work correctly",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
