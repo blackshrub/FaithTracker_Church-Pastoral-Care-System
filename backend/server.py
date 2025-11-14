@@ -2434,6 +2434,11 @@ async def list_aid_schedules(
 async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
     """Manually stop a financial aid schedule"""
     try:
+        # Get schedule first to get campus_id
+        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0, "campus_id": 1})
+        if not schedule:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
         result = await db.financial_aid_schedules.update_one(
             {"id": schedule_id},
             {"$set": {
@@ -2444,6 +2449,9 @@ async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_c
         
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        # Invalidate dashboard cache
+        await invalidate_dashboard_cache(schedule["campus_id"])
         
         return {"success": True, "message": "Financial aid schedule stopped"}
     except HTTPException:
