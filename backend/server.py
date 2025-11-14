@@ -964,6 +964,199 @@ async def list_members(
         logger.error(f"Error listing members: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/dashboard/reminders")
+async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
+    """
+    Get pre-calculated dashboard reminders
+    Optimized for fast loading - data refreshed daily
+    """
+    try:
+        campus_tz = await get_campus_timezone(user.get("campus_id"))
+        today_date = get_date_in_timezone(campus_tz)
+        
+        # Check if we have cached data for today
+        cache_key = f"dashboard_reminders_{user.get('campus_id')}_{today_date}"
+        cached = await db.dashboard_cache.find_one({"cache_key": cache_key})
+        
+        if cached and cached.get("data"):
+            return cached["data"]
+        
+        # If no cache, calculate now (fallback)
+        data = await calculate_dashboard_reminders(user.get("campus_id"), campus_tz, today_date)
+        
+        # Cache for 1 hour
+        await db.dashboard_cache.update_one(
+            {"cache_key": cache_key},
+            {
+                "$set": {
+                    "cache_key": cache_key,
+                    "data": data,
+                    "calculated_at": datetime.now(timezone.utc),
+                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=1)
+                }
+            },
+            upsert=True
+        )
+        
+        return data
+        
+    except Exception as e:
+        logger.error(f"Error getting dashboard reminders: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: str):
+    """Calculate all dashboard reminder data - optimized query"""
+    try:
+        today = datetime.strptime(today_date, '%Y-%m-%d').date()
+        week_ahead = today + timedelta(days=7)
+        
+        # Fetch only necessary data with projection
+        members = await db.members.find(
+            {"campus_id": campus_id},
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "photo_url": 1, "birth_date": 1, 
+             "engagement_status": 1, "days_since_last_contact": 1}
+        ).to_list(None)
+        
+        # Build member map for quick lookup
+        member_map = {m["id"]: m for m in members}
+        
+        # Birthdays today (month/day match)
+        birthdays_today = []
+        upcoming_birthdays = []
+        
+        for member in members:
+            if not member.get("birth_date"):
+                continue
+                
+            birth_date = datetime.strptime(member["birth_date"], '%Y-%m-%d').date()
+            this_year_birthday = birth_date.replace(year=today.year)
+            
+            if this_year_birthday == today:
+                # Find birthday event if exists
+                event = await db.care_events.find_one(
+                    {"member_id": member["id"], "event_type": "birthday"},
+                    {"_id": 0}
+                )
+                if event:
+                    birthdays_today.append({
+                        **event,
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url")
+                    })
+            elif today < this_year_birthday <= week_ahead:
+                event = await db.care_events.find_one(
+                    {"member_id": member["id"], "event_type": "birthday"},
+                    {"_id": 0}
+                )
+                if event:
+                    upcoming_birthdays.append({
+                        **event,
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url")
+                    })
+        
+        # Grief support due today
+        grief_stages = await db.grief_support.find(
+            {"campus_id": campus_id, "scheduled_date": today_date, "completed": False},
+            {"_id": 0}
+        ).to_list(None)
+        
+        grief_today = [{
+            **stage,
+            "member_name": member_map.get(stage["member_id"], {}).get("name"),
+            "member_phone": member_map.get(stage["member_id"], {}).get("phone"),
+            "member_photo_url": member_map.get(stage["member_id"], {}).get("photo_url")
+        } for stage in grief_stages]
+        
+        # Accident follow-ups due
+        accident_followups = await db.accident_followup.find(
+            {"campus_id": campus_id, "completed": False},
+            {"_id": 0}
+        ).to_list(None)
+        
+        accident_today = []
+        for followup in accident_followups:
+            sched_date = datetime.strptime(followup["scheduled_date"], '%Y-%m-%d').date()
+            if sched_date <= today:
+                accident_today.append({
+                    **followup,
+                    "member_name": member_map.get(followup["member_id"], {}).get("name"),
+                    "member_phone": member_map.get(followup["member_id"], {}).get("phone"),
+                    "member_photo_url": member_map.get(followup["member_id"], {}).get("photo_url")
+                })
+        
+        # At-risk and disconnected members
+        at_risk = [m for m in members if m.get("engagement_status") == "at_risk"]
+        disconnected = [m for m in members if m.get("engagement_status") == "disconnected"]
+        
+        # Financial aid due today
+        aid_schedules = await db.financial_aid_schedules.find(
+            {"campus_id": campus_id, "is_active": True},
+            {"_id": 0}
+        ).to_list(None)
+        
+        aid_due = []
+        for schedule in aid_schedules:
+            # Check if due today based on frequency
+            start = datetime.strptime(schedule["start_date"], '%Y-%m-%d').date()
+            if schedule["frequency"] == "weekly":
+                days_diff = (today - start).days
+                if days_diff >= 0 and days_diff % 7 == 0:
+                    aid_due.append({
+                        **schedule,
+                        "member_name": member_map.get(schedule["member_id"], {}).get("name"),
+                        "member_phone": member_map.get(schedule["member_id"], {}).get("phone"),
+                        "member_photo_url": member_map.get(schedule["member_id"], {}).get("photo_url")
+                    })
+            elif schedule["frequency"] == "monthly":
+                if start.day == today.day:
+                    aid_due.append({
+                        **schedule,
+                        "member_name": member_map.get(schedule["member_id"], {}).get("name"),
+                        "member_phone": member_map.get(schedule["member_id"], {}).get("phone"),
+                        "member_photo_url": member_map.get(schedule["member_id"], {}).get("photo_url")
+                    })
+        
+        # AI suggestions (top 10 at-risk)
+        suggestions_list = sorted(at_risk + disconnected, 
+                                 key=lambda x: x.get("days_since_last_contact", 0), 
+                                 reverse=True)[:10]
+        
+        return {
+            "birthdays_today": birthdays_today,
+            "upcoming_birthdays": upcoming_birthdays,
+            "grief_today": grief_today,
+            "accident_followup": accident_today,
+            "at_risk_members": at_risk,
+            "disconnected_members": disconnected,
+            "financial_aid_due": aid_due,
+            "ai_suggestions": suggestions_list,
+            "total_tasks": len(birthdays_today) + len(grief_today) + len(accident_today) + len(at_risk) + len(disconnected)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating dashboard reminders: {str(e)}")
+        raise
+
+async def get_campus_timezone(campus_id: str) -> str:
+    """Get campus timezone setting"""
+    try:
+        campus = await db.campuses.find_one({"id": campus_id}, {"_id": 0, "timezone": 1})
+        return campus.get("timezone", "Asia/Jakarta") if campus else "Asia/Jakarta"
+    except:
+        return "Asia/Jakarta"
+
+def get_date_in_timezone(timezone_str: str) -> str:
+    """Get current date in specified timezone as YYYY-MM-DD string"""
+    try:
+        tz = ZoneInfo(timezone_str)
+        return datetime.now(tz).strftime('%Y-%m-%d')
+    except:
+        return datetime.now(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d')
+
+
 @api_router.get("/members/at-risk", response_model=List[Member])
 async def list_at_risk_members():
     """Get members with no contact in 30+ days"""
