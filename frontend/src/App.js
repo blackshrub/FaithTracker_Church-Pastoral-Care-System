@@ -61,30 +61,6 @@ function AppRoutes() {
 }
 
 function App() {
-  useEffect(() => {
-    // Initialize offline storage
-    offlineStorage.init().then(() => {
-      console.log('📱 Offline storage initialized');
-    });
-
-    // Initialize gesture support
-    gestureManager.init(document.body);
-    
-    // Optimize touch interactions
-    TouchOptimizer.enableFastTap(document.body);
-    TouchOptimizer.enableSmoothScrolling(document.body);
-    
-    // Request push notification permission
-    if ('Notification' in window) {
-      pushManager.requestPermission().then(granted => {
-        if (granted) {
-          pushManager.subscribeToPush();
-          console.log('🔔 Push notifications enabled');
-        }
-      });
-    }
-  }, []);
-
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading GKBJ Care...</div>}>
       <BrowserRouter>
