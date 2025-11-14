@@ -199,6 +199,7 @@ def get_campus_filter(current_user: dict):
 class CampusCreate(BaseModel):
     campus_name: str
     location: Optional[str] = None
+    timezone: str = "Asia/Jakarta"  # Default to UTC+7
 
 class Campus(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -206,6 +207,7 @@ class Campus(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     campus_name: str
     location: Optional[str] = None
+    timezone: str = "Asia/Jakarta"  # Campus timezone (default UTC+7)
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
