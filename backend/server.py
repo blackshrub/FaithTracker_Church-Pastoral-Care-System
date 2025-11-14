@@ -1545,6 +1545,34 @@ async def get_member_accident_timeline(member_id: str):
         logger.error(f"Error getting member accident timeline: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.get("/accident-followup")
+async def list_accident_followup(completed: Optional[bool] = None, current_user: dict = Depends(get_current_user)):
+    """List all accident follow-up stages"""
+    try:
+        query = get_campus_filter(current_user)
+        if completed is not None:
+            query["completed"] = completed
+        
+        stages = await db.accident_followup.find(query, {"_id": 0}).sort("scheduled_date", 1).to_list(1000)
+        return stages
+    except Exception as e:
+        logger.error(f"Error listing accident follow-up: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/accident-followup/member/{member_id}")
+async def get_member_accident_timeline(member_id: str):
+    """Get accident follow-up timeline for specific member"""
+    try:
+        timeline = await db.accident_followup.find(
+            {"member_id": member_id},
+            {"_id": 0}
+        ).sort("scheduled_date", 1).to_list(100)
+        
+        return timeline
+    except Exception as e:
+        logger.error(f"Error getting member accident timeline: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/accident-followup/{stage_id}/complete")
 async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
     """Mark accident follow-up stage as completed"""
