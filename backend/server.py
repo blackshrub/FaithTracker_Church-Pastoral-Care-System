@@ -1261,14 +1261,9 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                                  key=lambda x: x.get("days_since_last_contact", 0), 
                                  reverse=True)[:10]
         
-        # UPCOMING TASKS (1-7 days ahead, excluding today)
-        upcoming_tasks = []
+        # Calculate date ranges for upcoming tasks
         tomorrow = today + timedelta(days=1)
         week_ahead = today + timedelta(days=7)
-        
-        # TODAY TASKS (due exactly today, all types mixed)
-        today_tasks = []
-        overdue_birthdays = []
         
         # Process all birthdays
         for member in members:
