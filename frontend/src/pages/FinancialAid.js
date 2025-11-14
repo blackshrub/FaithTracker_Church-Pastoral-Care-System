@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from '@/components/ui/skeleton';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { DollarSign, Users } from 'lucide-react';
+import LazyImage from '@/components/LazyImage';
 import { format } from 'date-fns';
 
 // Safe date formatter
@@ -31,6 +32,39 @@ const COLORS = [
   'hsl(180, 42%, 45%)',
   'hsl(240, 15%, 45%)'
 ];
+
+const MemberNameWithPhoto = ({ member, memberId }) => {
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return parts[0][0] + parts[parts.length - 1][0];
+    }
+    return name.substring(0, 2);
+  };
+
+  const photoUrl = member?.photo_url ? `${BACKEND_URL}/api${member.photo_url}` : null;
+
+  return (
+    <Link to={`/members/${memberId}`} className="flex items-center gap-3 hover:text-teal-700">
+      <div className="w-8 h-8 rounded-full overflow-hidden bg-teal-100 flex items-center justify-center">
+        {photoUrl ? (
+          <LazyImage 
+            src={photoUrl} 
+            alt={member.name}
+            className="w-full h-full object-cover"
+            placeholderClassName="w-full h-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-semibold"
+          />
+        ) : (
+          <span className="text-teal-700 font-semibold text-xs">
+            {getInitials(member.name)}
+          </span>
+        )}
+      </div>
+      <span className="font-medium hover:underline">{member.name}</span>
+    </Link>
+  );
+};
 
 export const FinancialAid = () => {
   const { t } = useTranslation();
@@ -132,15 +166,17 @@ export const FinancialAid = () => {
             ) : (
               <div className="space-y-2">
                 {recipients.map((recipient) => (
-                  <Link 
+                  <div 
                     key={recipient.member_id} 
-                    to={`/members/${recipient.member_id}`}
                     className="block p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium text-sm">{recipient.member_name}</p>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="flex-1">
+                        <MemberNameWithPhoto 
+                          member={{ name: recipient.member_name, photo_url: recipient.photo_url }} 
+                          memberId={recipient.member_id} 
+                        />
+                        <p className="text-xs text-muted-foreground mt-1 ml-11">
                           {recipient.aid_count} aid event{recipient.aid_count !== 1 ? 's' : ''}
                         </p>
                       </div>
@@ -148,7 +184,7 @@ export const FinancialAid = () => {
                         Rp {recipient.total_amount?.toLocaleString('id-ID')}
                       </p>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
