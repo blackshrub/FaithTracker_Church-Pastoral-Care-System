@@ -2318,6 +2318,7 @@ async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_c
     """Create a financial aid schedule"""
     try:
         # Calculate next occurrence based on frequency
+        today = date.today()
         start_date = date.fromisoformat(schedule['start_date']) if isinstance(schedule['start_date'], str) else schedule['start_date']
         next_occurrence = start_date
         
