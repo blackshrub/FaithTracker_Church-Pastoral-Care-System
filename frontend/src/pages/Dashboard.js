@@ -167,15 +167,14 @@ export const Dashboard = () => {
       
       try {
         // Online data loading with offline fallback
-        const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes, accidentRes] = await Promise.all([
+        const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes, suggestionsRes] = await Promise.all([
           axios.get(`${API}/care-events`),
           axios.get(`${API}/grief-support?completed=false`),
           axios.get(`${API}/care-events/hospital/due-followup`),
           axios.get(`${API}/members/at-risk`),
           axios.get(`${API}/members?limit=1000`),
           axios.get(`${API}/financial-aid-schedules/due-today`),
-          axios.get(`${API}/suggestions/follow-up`),
-          axios.get(`${API}/accident-followup?completed=false`)
+          axios.get(`${API}/suggestions/follow-up`)
         ]);
         
         // Cache fresh member data
