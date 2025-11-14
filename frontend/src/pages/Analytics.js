@@ -175,6 +175,32 @@ export const Analytics = () => {
         trends: Object.entries(eventsByMonth).map(([month, count]) => ({ month, events: count }))
       });
       
+      setTrendsData({
+        age_groups: Object.entries(ageGroups).map(([name, count]) => ({ 
+          name, 
+          count,
+          care_events: events.filter(e => {
+            const member = members.find(m => m.id === e.member_id);
+            if (!member) return false;
+            const age = member.age || 0;
+            if (name === 'Child (0-12)') return age <= 12;
+            if (name === 'Teen (13-17)') return age > 12 && age <= 17;
+            if (name === 'Youth (18-30)') return age > 17 && age <= 30;
+            if (name === 'Adult (31-60)') return age > 30 && age <= 60;
+            if (name === 'Senior (60+)') return age > 60;
+            return false;
+          }).length
+        })),
+        membership_trends: Object.entries(membershipData).map(([status, count]) => ({ 
+          status, 
+          count,
+          avg_engagement: members.filter(m => m.membership_status === status).reduce((sum, m) => {
+            const daysSinceContact = m.days_since_contact || 0;
+            return sum + (100 - Math.min(daysSinceContact, 100));
+          }, 0) / (count || 1)
+        }))
+      });
+      
       setGriefData(griefRes.data);
       
     } catch (error) {
