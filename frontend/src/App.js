@@ -1,10 +1,7 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { offlineStorage } from '@/utils/offlineStorage';
-import { gestureManager, TouchOptimizer } from '@/utils/mobileOptimizations';
-import { pushManager } from '@/utils/pushNotifications';
 import './i18n';
 import '@/App.css';
 import LoginPage from '@/pages/LoginPage';
