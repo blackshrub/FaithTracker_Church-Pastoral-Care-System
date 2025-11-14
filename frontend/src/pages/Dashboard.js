@@ -378,9 +378,9 @@ export const Dashboard = () => {
       {/* Welcome Section */}
       <div>
         <h1 className="text-5xl font-playfair font-bold text-foreground mb-2">
-          Welcome back, {user?.name}!
+          {t('welcome_back')}, {user?.name}!
         </h1>
-        <p className="text-muted-foreground text-lg">Here's your pastoral care overview</p>
+        <p className="text-muted-foreground text-lg">{t('pastoral_overview')}</p>
       </div>
       
       {/* Stats Cards with Colored Left Borders */}
@@ -389,7 +389,7 @@ export const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Total Members</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('total_members')}</p>
                 <p className="text-4xl font-playfair font-bold">805</p>
               </div>
               <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center">
@@ -403,7 +403,7 @@ export const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Total Interactions</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('total_interactions')}</p>
                 <p className="text-4xl font-playfair font-bold">{birthdaysToday.length + griefToday.length + hospitalFollowUp.length}</p>
               </div>
               <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
@@ -417,7 +417,7 @@ export const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Pending Reminders</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('pending_reminders')}</p>
                 <p className="text-4xl font-playfair font-bold">{griefDue.length + financialAidDue.length}</p>
               </div>
               <div className="w-14 h-14 rounded-full bg-pink-100 flex items-center justify-center">
@@ -431,7 +431,7 @@ export const Dashboard = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">At Risk + Disconnected</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('at_risk_disconnected')}</p>
                 <p className="text-4xl font-playfair font-bold">{atRiskMembers.length + disconnectedMembers.length}</p>
               </div>
               <div className="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center">
