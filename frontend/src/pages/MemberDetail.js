@@ -208,6 +208,8 @@ export const MemberDetail = () => {
       await axios.post(`${API}/care-events/${eventId}/complete`);
       toast.success('Birthday marked as completed!');
       loadMemberData();
+      // Trigger dashboard cache refresh by making a call
+      axios.get(`${API}/dashboard/reminders`).catch(() => {});
     } catch (error) {
       toast.error('Failed to mark birthday complete');
       console.error('Error completing birthday:', error);
