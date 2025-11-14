@@ -770,7 +770,7 @@ export const Dashboard = () => {
         </div>
         
         <TabsContent value="today" className="space-y-4">
-          {birthdaysToday.length === 0 && griefToday.length === 0 ? (
+          {birthdaysToday.length === 0 ? (
             <Card><CardContent className="p-6 text-center">No urgent tasks for today! 🎉</CardContent></Card>
           ) : (
             <>
