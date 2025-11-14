@@ -76,11 +76,29 @@ export const MembersList = () => {
   const loadMembers = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API}/members?page=${page}&limit=${pageSize}&search=${search}&engagement_status=${filterStatus !== 'all' ? filterStatus : ''}`);
+      
+      // Build query parameters properly
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', pageSize.toString());
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      if (filterStatus && filterStatus !== 'all') {
+        // Only add engagement_status if it's a valid value
+        const validStatuses = ['active', 'at_risk', 'inactive'];
+        if (validStatuses.includes(filterStatus)) {
+          params.append('engagement_status', filterStatus);
+        }
+      }
+      
+      const response = await axios.get(`${API}/members?${params.toString()}`);
       setMembers(response.data || []);
       
-      // Calculate total pages (estimate based on backend pagination)
-      const totalMembers = 805; // Known total
+      // Calculate total pages
+      const totalMembers = 805;
       setTotalPages(Math.ceil(totalMembers / pageSize));
       setCurrentPage(page);
     } catch (error) {
