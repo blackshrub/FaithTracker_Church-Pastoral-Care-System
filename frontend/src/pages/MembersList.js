@@ -426,7 +426,15 @@ export const MembersList = () => {
             </div>
           </div>
         )}
-        <CardContent className="p-0">
+        <CardContent className="p-0 relative">
+          {tableLoading && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-5 h-5 text-teal-500 animate-spin" />
+                <span className="text-sm text-teal-700">Loading members...</span>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
