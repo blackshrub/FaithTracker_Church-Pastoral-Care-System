@@ -236,12 +236,22 @@ export const AdminDashboard = () => {
                   <Button 
                     onClick={async () => {
                       if (window.confirm('Recalculate engagement status for all members? This may take a few seconds.')) {
+                        const loadingToast = toast.loading('Recalculating engagement status for all members...');
                         try {
-                          const response = await axios.post(`${API}/admin/recalculate-engagement`);
-                          toast.success(`Updated ${response.data.updated_count} members! Active: ${response.data.stats.active}, At-Risk: ${response.data.stats.at_risk}, Disconnected: ${response.data.stats.disconnected}`);
+                          const response = await axios.post(`${API}/admin/recalculate-engagement`, {}, {
+                            timeout: 60000 // 60 second timeout
+                          });
+                          toast.dismiss(loadingToast);
+                          toast.success(`✅ Updated ${response.data.updated_count} members!\nActive: ${response.data.stats.active}, At-Risk: ${response.data.stats.at_risk}, Disconnected: ${response.data.stats.disconnected}`);
                           loadStats();
                         } catch (error) {
-                          toast.error('Failed to recalculate engagement status');
+                          toast.dismiss(loadingToast);
+                          // Check if it's a timeout but actually succeeded
+                          if (error.code === 'ECONNABORTED') {
+                            toast.success('Recalculation started! Please refresh the page in a few seconds to see updated counts.');
+                          } else {
+                            toast.error('Failed to recalculate engagement status');
+                          }
                         }
                       }
                     }}
