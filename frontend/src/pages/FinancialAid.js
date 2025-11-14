@@ -225,25 +225,12 @@ export const FinancialAid = () => {
           </CardHeader>
           <CardContent>
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `Rp ${value.toLocaleString('id-ID')}`} />
-                </PieChart>
-              </ResponsiveContainer>
+              <PieChart
+                data={chartData}
+                colors={COLORS}
+                height={300}
+                formatValue={(value) => `Rp ${value.toLocaleString('id-ID')}`}
+              />
             ) : (
               <p className="text-sm text-muted-foreground text-center py-12">No financial aid data</p>
             )}
