@@ -432,6 +432,51 @@ export const MembersList = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Industry-Standard Pagination Controls */}
+      <div className="flex items-center justify-between mt-6">
+        <div className="text-sm text-muted-foreground">
+          Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, 805)} of 805 members
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            Previous
+          </Button>
+          
+          {/* Page Numbers */}
+          <div className="flex gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const page = Math.max(1, currentPage - 2) + i;
+              if (page > totalPages) return null;
+              return (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "outline"}
+                  size="sm"
+                  className={currentPage === page ? "bg-teal-500 text-white" : ""}
+                  onClick={() => handlePageChange(page)}
+                >
+                  {page}
+                </Button>
+              );
+            })}
+          </div>
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
