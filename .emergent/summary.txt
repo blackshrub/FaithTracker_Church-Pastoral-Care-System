@@ -1,0 +1,96 @@
+<analysis>
+The trajectory documents the development of a comprehensive pastoral care web application, FaithTracker, from scratch. The process was highly iterative and driven by continuous user feedback, which significantly expanded the project's scope over time.
+
+Initially, the goal was a simple member and care-event tracking system. This evolved into a multi-campus, multi-admin enterprise application. Key development phases included:
+1.  **Phase 1 & 2:** Initial setup, requirement refinement, and building a foundational MVP. This included setting up the FastAPI backend, React frontend, and integrating a WhatsApp gateway for notifications.
+2.  **Major Redesign:** The scope expanded to support multiple campuses and user roles (full admin, campus admin). This required a fundamental redesign of the database models and authentication logic to incorporate  and role-based access control. The notification system was also pivoted from messaging members directly to sending a daily digest to pastoral staff.
+3.  **Data-Centric Development:** A crucial step was importing 805 members from a user-provided CSV. This involved creating a data import script, handling data normalization (especially for phone numbers and membership status), and generating realistic dummy data for various care scenarios (grief, hospital visits, financial aid).
+4.  **Advanced Feature Implementation:** Following user requests, sophisticated features were added, including a configurable multi-stage grief support timeline, a similar system for accident/illness follow-ups, and a detailed financial aid scheduling module with recurring payments.
+5.  **UI/UX Iteration:** The UI underwent significant changes, from an initial simple design to a polished, reference-based design with a teal/amber color scheme, and finally to a task-oriented dashboard homepage. Numerous UI bugs related to styling, dark mode, and responsiveness were addressed.
+6.  **Final Polish:** The last stages focused on bug fixing, performance optimization (database indexing, lazy loading, pagination), and making all configurations API-driven for future mobile app integration.
+</analysis>
+
+<product_requirements>
+The objective is to build the FaithTracker web application, a multi-tenant pastoral care management system for the GKBJ church. The system must help the pastoral care department track and monitor interactions with every church member to ensure no one is forgotten.
+
+**Core Functionality:**
+- **Multi-Campus Architecture:** The system must support multiple church campuses, with data segregated by campus. A Full Administrator role can access all data, while Campus Admin and Pastor roles are restricted to their assigned campus.
+- **Member Management:** Maintain a database of church members, importing data from an existing CSV file. This includes detailed information like name, phone, photo, family group, and membership status.
+- **Care Event Tracking:** Log various pastoral care events: Birthdays, Childbirth, Grief/Loss, New House, Accident/Illness, Financial Aid, and Regular Contact.
+- **Automated Follow-up Systems:**
+    - **Grief Support:** Automatically generate a configurable multi-stage follow-up timeline (e.g., 1 week, 1 month, 1 year) when a Grief/Loss event is logged.
+    - **Accident/Illness Support:** Generate a similar configurable 3-stage follow-up timeline.
+- **Financial Aid Scheduling:** Allow scheduling of recurring financial aid (weekly, monthly, annual) with custom parameters, and track distribution.
+- **Staff-Centric Notifications:** A daily scheduled job sends a summary digest via WhatsApp to the pastoral team, listing all tasks due for the day (birthdays, follow-ups, etc.), with  links for easy contact. The system **must not** send automated messages directly to church members.
+- **Dashboard & UI:** The main dashboard serves as a task hub, displaying all pending reminders in a tabbed interface.
+- **Admin Features:** An admin dashboard for managing users, campuses, and system-wide settings (e.g., engagement thresholds, follow-up timelines).
+- **API-First Design:** All data and configurations must be accessible via a comprehensive REST API to support a future mobile application.
+</product_requirements>
+
+<key_technical_concepts>
+- **Full-Stack Application:** FastAPI (Python) backend with a React (JavaScript) frontend.
+- **Database:** MongoDB, using Pydantic for data modeling and validation. UUIDs are used for primary keys.
+- **Authentication:** JWT-based authentication with role-based access control (full_admin, campus_admin, pastor).
+- **Real-time Notifications:** Integration with an external WhatsApp gateway () via HTTP requests.
+- **Task Scheduling:**  for running daily jobs to send notification digests.
+- **Frontend State Management:** React Context API for authentication ().
+- **UI Library:** Shadcn/UI components with Tailwind CSS for styling.
+- **Internationalization:**  for multi-language support (English/Indonesian).
+</key_technical_concepts>
+
+<code_architecture>
+The application follows a standard monorepo structure with separate  and  directories.
+
+
+
+**Key Files:**
+
+- ****
+  - **Importance:** This is the monolithic heart of the backend. It defines all Pydantic models (, , , , , etc.), all FastAPI API routes (prefixed with ), database connection logic, and business logic for all features, including authentication, scheduling, and data processing.
+  - **Changes:** This file grew immensely, from a simple status endpoint to a complex application with over 60 endpoints. It was repeatedly modified to add new models, CRUD operations, multi-campus logic, and advanced features like financial aid scheduling and AI recommendations.
+
+- ****
+  - **Importance:** A critical one-off script created to parse the user-provided  file, normalize data (phone numbers, membership status), and populate the MongoDB database with 805 members, family groups, and realistic dummy care events.
+  - **Changes:** The script was refined multiple times to handle data inconsistencies, correctly map all CSV fields to the  model, and assign all members to a single default campus after a scope change.
+
+- ****
+  - **Importance:** The main entry point for the React application. It sets up the  for navigation, defines all page routes, and wraps the application in the  to manage global authentication state. It uses  for code-splitting pages.
+  - **Changes:** Modified to add new routes for pages like , , and . The routing logic was updated to include  components for authentication.
+
+- ****
+  - **Importance:** The landing page after login. It evolved from a simple widget-based overview to the primary task hub of the application.
+  - **Changes:** It underwent a major redesign to replace static widgets with a comprehensive 6-tab Reminders system (Today, Follow-up, etc.), providing a centralized view of all pastoral duties. It also includes the Quick Care Event form and the AI Pastoral Recommendation widget. Multiple bugs related to data loading and state management were fixed here.
+
+- ****
+  - **Importance:** Displays the list of all church members. It's a critical component for user interaction and data management.
+  - **Changes:** This page was heavily optimized. Initially, it loaded all 805 members at once, causing performance issues. It was updated to include server-side pagination, a debounced search bar with a loading indicator, and column visibility toggles for a professional UX.
+
+- ****
+  - **Importance:** Manages global user authentication state, including the user object, token, and campus information. It provides this context to all components, enabling role-based UI changes and authenticated API requests.
+  - **Changes:** Updated to store and provide campus details and user roles (, ) to support the multi-campus architecture.
+
+</code_architecture>
+
+<pending_tasks>
+- **Bundle Analysis:** The  was installed but not configured or used to analyze and optimize the frontend bundle size.
+- **Backend Infrastructure Optimizations:** Several backend performance optimizations were discussed but not implemented as they require infrastructure changes beyond the codebase:
+    - Redis Caching
+    - Background Job Task Queue (e.g., Celery)
+    - MongoDB Connection Pooling configuration
+    - CDN Integration
+</pending_tasks>
+
+<current_work>
+The most recent work focused on a series of rapid bug fixes based on detailed user feedback. The final set of tasks addressed critical issues related to both UI display and data integrity, culminating in a stable, production-ready state.
+
+Specifically, the last two issues tackled were:
+1.  **Dashboard  Error (Message 2639):** The user reported a  on the Dashboard page. The AI engineer identified that the  hook import was missing from  after a recent refactor. The fix involved adding  to the file.
+
+2.  **Missing Profile Photos on Financial Aid Page (Message 2639):** The user noted that while placeholders appeared, the actual profile pictures were not loading on the Financial Aid page. The AI engineer deduced that the  data being mapped did not include the member's . The fix involved modifying the  function in  to map over the loaded  array and enrich the  with the corresponding member's name and photo URL before setting the state.
+
+These actions were aimed at polishing the final user experience and ensuring data was correctly displayed across all components after numerous feature additions and refactors. The AI engineer has just confirmed these fixes are complete.
+</current_work>
+
+<optional_next_step>
+Verify the latest fixes by taking screenshots of the Dashboard and Financial Aid pages to confirm the  error is resolved and that member profile photos now display correctly in the recipients list.
+</optional_next_step>
