@@ -38,6 +38,7 @@ export const MembersList = () => {
   const [pageSize] = useState(25); // Industry standard: 25 items per page
   const [familyGroups, setFamilyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false); // Separate table loading
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 2000); // 2 second debounce for smooth UX
   const [filterStatus, setFilterStatus] = useState('all');
