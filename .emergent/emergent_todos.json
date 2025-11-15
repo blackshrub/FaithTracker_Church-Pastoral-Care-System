@@ -1,19 +1,11 @@
 [
   {
-    "content": "Integrate MobileBottomNav and DesktopSidebar into Layout.js with responsive visibility",
-    "status": "completed"
-  },
-  {
-    "content": "Add Sonner Toaster to App.js root level for global toast notifications",
-    "status": "completed"
-  },
-  {
     "content": "Run esbuild compile check to ensure no syntax errors after foundation changes",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Take screenshot of preview URL to verify visual changes are applied",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Call testing_agent for Phase 1 comprehensive frontend testing",
