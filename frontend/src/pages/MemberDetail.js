@@ -820,14 +820,12 @@ export const MemberDetail = () => {
         
         {/* Grief Support Tab */}
         <TabsContent value="grief" className="space-y-4">
-          <Card>
-            <CardContent className="p-6">
-              {careEvents.filter(e => e.event_type === 'grief_loss').length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No grief/loss events recorded.
-                </p>
-              ) : (
-                careEvents.filter(e => e.event_type === 'grief_loss').map(event => (
+          {careEvents.filter(e => e.event_type === 'grief_loss').length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No grief/loss events recorded.
+            </p>
+          ) : (
+            careEvents.filter(e => e.event_type === 'grief_loss').map(event => (
                   <div key={event.id} className="space-y-4 mb-6 p-4 border border-pink-200 rounded-lg">
                     <div>
                       <h4 className="font-semibold">💔 {event.title || 'Grief/Loss Event'}</h4>
@@ -941,19 +939,15 @@ export const MemberDetail = () => {
                     </div>
                   </div>
                 ))
-              )}
-            </CardContent>
-          </Card>
+          )}
         </TabsContent>
         
         {/* Accident/Illness Tab */}
         <TabsContent value="accident">
-          <Card>
-            <CardContent className="p-6">
-              {careEvents.filter(e => e.event_type === 'accident_illness').length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
-              ) : (
-                careEvents.filter(e => e.event_type === 'accident_illness').map(event => (
+          {careEvents.filter(e => e.event_type === 'accident_illness').length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
+          ) : (
+            careEvents.filter(e => e.event_type === 'accident_illness').map(event => (
                   <div key={event.id} className="space-y-4 mb-6 p-4 border rounded-lg relative">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
