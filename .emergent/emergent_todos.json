@@ -1,11 +1,7 @@
 [
   {
-    "content": "Run esbuild compile check to ensure no syntax errors",
-    "status": "completed"
-  },
-  {
     "content": "Take screenshots at 390px, 768px, 1024px for all Phase 4 pages",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Call testing_agent for comprehensive Phase 4 testing (frontend + backend)",
