@@ -1123,18 +1123,21 @@ async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
         data = await calculate_dashboard_reminders(user.get("campus_id"), campus_tz, today_date)
         
         # Cache for 1 hour
+        cache_data = {
+            "cache_key": cache_key,
+            "data": data,
+            "calculated_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1)
+        }
+        
         await db.dashboard_cache.update_one(
             {"cache_key": cache_key},
-            {
-                "$set": {
-                    "cache_key": cache_key,
-                    "data": data,
-                    "calculated_at": datetime.now(timezone.utc),
-                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=1)
-                }
-            },
+            {"$set": cache_data},
             upsert=True
         )
+        
+        # Add cache version to response
+        data["cache_version"] = cache_data["calculated_at"].isoformat()
         
         return data
         
