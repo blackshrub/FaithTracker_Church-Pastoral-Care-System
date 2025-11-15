@@ -13,9 +13,9 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const COLORS = {
-  primary: ['#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'],
-  demographic: ['#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'],
-  financial: ['#059669', '#dc2626', '#d97706', '#7c3aed', '#0284c7']
+  primary: ['#14b8a6', '#f59e0b', '#ec4899', '#a78bfa', '#06b6d4', '#84cc16', '#f97316'],
+  demographic: ['#14b8a6', '#f59e0b', '#ec4899', '#a78bfa', '#06b6d4', '#84cc16'],
+  financial: ['#059669', '#f59e0b', '#14b8a6', '#a78bfa', '#0284c7']
 };
 
 export const Analytics = () => {
