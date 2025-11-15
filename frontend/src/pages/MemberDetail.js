@@ -266,35 +266,6 @@ export const MemberDetail = () => {
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-manrope font-bold text-foreground truncate">{member.name}</h1>
                 <p className="text-muted-foreground mt-1">{member.phone}</p>
-                
-                {/* Compact info beside photo */}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-sm">
-                  {member.age && (
-                    <div className="flex gap-2">
-                      <span className="text-muted-foreground">Age:</span>
-                      <span className="font-medium">{member.age}</span>
-                    </div>
-                  )}
-                  {member.gender && (
-                    <div className="flex gap-2">
-                      <span className="text-muted-foreground">Gender:</span>
-                      <span className="font-medium">{member.gender}</span>
-                    </div>
-                  )}
-                  {member.membership_status && (
-                    <div className="flex gap-2">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="font-medium">{member.membership_status}</span>
-                    </div>
-                  )}
-                  {member.category && (
-                    <div className="flex gap-2">
-                      <span className="text-muted-foreground">Category:</span>
-                      <span className="font-medium">{member.category}</span>
-                    </div>
-                  )}
-                </div>
-                
                 <div className="flex flex-wrap items-center gap-3 mt-3">
                   <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
                   {member.last_contact_date && (
