@@ -744,7 +744,7 @@ export const MemberDetail = () => {
                     }
                     
                     return (
-                    <div key={event.id} className={`flex gap-3 sm:gap-4 pb-6 relative ${isIgnored || isCompleted ? 'opacity-60' : ''}`} data-testid={`care-event-${event.id}`}>
+                    <div key={event.id} className={`flex gap-3 sm:gap-4 pb-6 relative`} data-testid={`care-event-${event.id}`}>
                       {/* Status badge - top right */}
                       {(isIgnored || isCompleted) && (
                         <div className="absolute top-2 right-2 z-10">
@@ -753,19 +753,19 @@ export const MemberDetail = () => {
                         </div>
                       )}
                       
-                      {/* Timeline date marker with colored dot */}
+                      {/* Timeline date marker with colored dot - always full opacity */}
                       <div className="flex flex-col items-center shrink-0 w-12 sm:w-16">
                         {/* Date circle */}
                         <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border-2 border-gray-200 shadow-md flex flex-col items-center justify-center relative z-10">
                           <div className="text-sm sm:text-base font-bold leading-none">{formatDate(event.event_date, 'dd')}</div>
                           <div className="text-[9px] sm:text-[10px] leading-none uppercase opacity-70 mt-0.5">{formatDate(event.event_date, 'MMM')}</div>
                         </div>
-                        {/* Colored dot indicator below date */}
+                        {/* Colored dot indicator below date - always vibrant */}
                         <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${dotColor} border-2 border-background shadow-sm mt-1 relative z-10`}></div>
                       </div>
                       
-                      {/* Event content card */}
-                      <Card className={`flex-1 ${borderClass} shadow-sm hover:shadow-md transition-all min-w-0 card`}>
+                      {/* Event content card - apply opacity here if completed/ignored */}
+                      <Card className={`flex-1 ${borderClass} shadow-sm hover:shadow-md transition-all min-w-0 card ${isIgnored || isCompleted ? 'opacity-60' : ''}`}>
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
