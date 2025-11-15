@@ -691,28 +691,34 @@ export const Dashboard = () => {
       </div>
       
       <Tabs defaultValue="today" className="w-full">
-        <div className="overflow-x-auto">
-          <TabsList className="inline-flex w-full">
-            <TabsTrigger value="today" className="whitespace-nowrap">
-              <Bell className="w-4 h-4 mr-2" />{t('today')} ({birthdaysToday.length + todayTasks.length})
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex min-w-full w-max sm:w-full">
+            <TabsTrigger value="today" className="flex-shrink-0">
+              <Bell className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('today')}</span> ({birthdaysToday.length + todayTasks.length})
             </TabsTrigger>
-            <TabsTrigger value="birthday" className="whitespace-nowrap">
-              🎂 {t('birthdays')} ({overdueBirthdays.length})
+            <TabsTrigger value="birthday" className="flex-shrink-0">
+              🎂 <span className="hidden sm:inline ml-2">{t('birthdays')}</span> ({overdueBirthdays.length})
             </TabsTrigger>
-            <TabsTrigger value="followup" className="whitespace-nowrap">
-              <Hospital className="w-4 h-4 mr-2" />{t('followup')} ({griefDue.length + accidentFollowUp.length})
+            <TabsTrigger value="followup" className="flex-shrink-0">
+              <Hospital className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('followup')}</span> ({griefDue.length + accidentFollowUp.length})
             </TabsTrigger>
-            <TabsTrigger value="financial" className="whitespace-nowrap">
-              <DollarSign className="w-4 h-4 mr-2" />{t('aid')} ({financialAidDue.length})
+            <TabsTrigger value="financial" className="flex-shrink-0">
+              <DollarSign className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('aid')}</span> ({financialAidDue.length})
             </TabsTrigger>
-            <TabsTrigger value="disconnected" className="whitespace-nowrap">
-              <Users className="w-4 h-4 mr-2" />{t('disconnected')} ({disconnectedMembers.length})
+            <TabsTrigger value="disconnected" className="flex-shrink-0">
+              <Users className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('disconnected')}</span> ({disconnectedMembers.length})
             </TabsTrigger>
-            <TabsTrigger value="at-risk" className="whitespace-nowrap">
-              <AlertTriangle className="w-4 h-4 mr-2" />{t('at_risk')} ({atRiskMembers.length})
+            <TabsTrigger value="at-risk" className="flex-shrink-0">
+              <AlertTriangle className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('at_risk')}</span> ({atRiskMembers.length})
             </TabsTrigger>
-            <TabsTrigger value="upcoming" className="whitespace-nowrap">
-              <Heart className="w-4 h-4 mr-2" />{t('upcoming')} ({upcomingTasks.length})
+            <TabsTrigger value="upcoming" className="flex-shrink-0">
+              <Heart className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('upcoming')}</span> ({upcomingTasks.length})
             </TabsTrigger>
           </TabsList>
         </div>
