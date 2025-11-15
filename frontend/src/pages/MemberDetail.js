@@ -75,16 +75,17 @@ export const MemberDetail = () => {
   const loadMemberData = async () => {
     try {
       setLoading(true);
+      const timestamp = Date.now();
       const [memberRes, eventsRes, griefRes, accidentRes, aidSchedulesRes] = await Promise.all([
-        axios.get(`${API}/members/${id}`),
-        axios.get(`${API}/care-events?member_id=${id}`),
-        axios.get(`${API}/grief-support/member/${id}`, {
+        axios.get(`${API}/members/${id}?t=${timestamp}`),
+        axios.get(`${API}/care-events?member_id=${id}&t=${timestamp}`),
+        axios.get(`${API}/grief-support/member/${id}?t=${timestamp}`, {
           headers: {'Cache-Control': 'no-cache'}
         }),
-        axios.get(`${API}/accident-followup/member/${id}`, {
+        axios.get(`${API}/accident-followup/member/${id}?t=${timestamp}`, {
           headers: {'Cache-Control': 'no-cache'}
         }),
-        axios.get(`${API}/financial-aid-schedules/member/${id}`)
+        axios.get(`${API}/financial-aid-schedules/member/${id}?t=${timestamp}`)
       ]);
       
       setMember(memberRes.data);
