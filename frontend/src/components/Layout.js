@@ -1,84 +1,85 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from './LanguageToggle';
+import { MobileBottomNav } from './MobileBottomNav';
+import { DesktopSidebar } from './DesktopSidebar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Church, LayoutDashboard, Users, DollarSign, BarChart3, Settings, Upload, Cog, LogOut, Shield, MessageSquare, Calendar as CalIcon, Bell, ChevronDown, Menu, X } from 'lucide-react';
+import { Church, LogOut, ChevronDown } from 'lucide-react';
 
 export const Layout = ({ children }) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  const mainNavigation = [
-    { name: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
-    { name: t('members'), href: '/members', icon: Users },
-    { name: t('financial_aid'), href: '/financial-aid', icon: DollarSign },
-    { name: t('analytics'), href: '/analytics', icon: BarChart3 },
-    { name: t('calendar'), href: '/calendar', icon: CalIcon },
-  ];
-  
-  const isActive = (href) => location.pathname === href || (href === '/dashboard' && location.pathname === '/');
   
   return (
-    <div className="min-h-screen">
-      {/* Top Navigation Bar */}
-      <header className="bg-white border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo and Mobile Menu Button */}
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="md:hidden"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </Button>
-              
-              <Link to="/dashboard" className="flex items-center gap-3">
+    <div className="flex min-h-screen">
+      {/* Desktop Sidebar - Hidden on mobile */}
+      <DesktopSidebar />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Top Header - Responsive */}
+        <header className="bg-white border-b border-border sticky top-0 z-40 sm:hidden">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between h-14">
+              {/* Logo */}
+              <Link to="/dashboard" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
                   <Church className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xl font-playfair font-bold text-teal-700">Pastoral Care</span>
+                <span className="text-lg font-playfair font-bold text-teal-700">FaithTracker</span>
               </Link>
-            </div>
-            
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1">
-              {mainNavigation.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link key={item.name} to={item.href}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={isActive(item.href) 
-                        ? 'text-teal-700 bg-teal-50 font-semibold' 
-                        : 'text-gray-600 hover:text-teal-700 hover:bg-teal-50'
-                      }
-                    >
-                      <Icon className="w-4 h-4 mr-2" />
-                      {item.name}
+              
+              {/* Right Side - User Menu & Language */}
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1 hover:bg-teal-50">
+                      <div className="w-7 h-7 bg-teal-100 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-semibold text-teal-700">
+                          {user?.name?.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-3 h-3" />
                     </Button>
-                  </Link>
-                );
-              })}
-            </nav>
-            
-            {/* Right Side with Dropdown Menu */}
-            <div className="flex items-center gap-3">
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <div className="px-2 py-2 border-b">
+                      <p className="text-sm font-semibold text-gray-700">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.role === 'full_admin' ? t('full_admin') : 
+                         user?.role === 'campus_admin' ? t('campus_admin') : t('pastor')}
+                      </p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => { logout(); navigate('/login'); }} 
+                      className="text-red-600"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      {t('logout')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <LanguageToggle />
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        {/* Desktop Header - Hidden on mobile */}
+        <header className="hidden sm:block bg-white border-b border-border sticky top-0 z-40">
+          <div className="px-6">
+            <div className="flex items-center justify-end h-16 gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="group gap-2 border-0 hover:bg-teal-50 hover:text-teal-700">
-                    <div className="text-right hidden md:block">
-                      <p className="text-sm font-semibold text-gray-700 hover:text-teal-700 transition-colors">{user?.name}</p>
-                      <p className="text-xs text-gray-500 hover:text-teal-600 transition-colors">
+                  <Button variant="ghost" size="sm" className="gap-2 hover:bg-teal-50">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-gray-700">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">
                         {user?.role === 'full_admin' ? t('full_admin') : 
                          user?.role === 'campus_admin' ? t('campus_admin') : t('pastor')}
                       </p>
@@ -87,33 +88,11 @@ export const Layout = ({ children }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {user?.role === 'full_admin' && (
-                    <>
-                      <DropdownMenuItem onClick={() => navigate('/admin')}>
-                        <Shield className="w-4 h-4 mr-2" />
-                        {t('admin_dashboard')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  <DropdownMenuItem onClick={() => navigate('/import-export')}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    {t('import_export')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/messaging')}>
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    {t('messaging')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/whatsapp-logs')}>
-                    <Bell className="w-4 h-4 mr-2" />
-                    {t('whatsapp_logs')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    <Cog className="w-4 h-4 mr-2" />
-                    {t('settings')}
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => { logout(); navigate('/login'); }} className="text-red-600">
+                  <DropdownMenuItem 
+                    onClick={() => { logout(); navigate('/login'); }} 
+                    className="text-red-600"
+                  >
                     <LogOut className="w-4 h-4 mr-2" />
                     {t('logout')}
                   </DropdownMenuItem>
@@ -122,55 +101,16 @@ export const Layout = ({ children }) => {
               <LanguageToggle />
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+        
+        {/* Main Content with page animation */}
+        <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 page-enter">
+          {children}
+        </main>
+      </div>
       
-      {/* Mobile Navigation Menu */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-border">
-          <div className="container mx-auto px-6 py-4 space-y-1">
-            {mainNavigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                    isActive(item.href)
-                      ? 'bg-teal-50 text-teal-700 font-semibold'
-                      : 'text-gray-600 hover:bg-teal-50 hover:text-teal-700'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-            
-            {/* Mobile Admin/Settings Links - REMOVED duplicates */}
-            <div className="border-t pt-2 mt-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-red-600 hover:text-red-700"
-                onClick={() => {
-                  logout();
-                  navigate('/login');
-                  setMobileMenuOpen(false);
-                }}
-              >
-                <LogOut className="w-5 h-5 mr-3" />
-                {t('logout')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
-        {children}
-      </main>
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   );
 };
