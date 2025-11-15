@@ -387,6 +387,9 @@ class AccidentFollowup(BaseModel):
     scheduled_date: date
     completed: bool = False
     completed_at: Optional[datetime] = None
+    ignored: bool = False
+    ignored_at: Optional[datetime] = None
+    ignored_by: Optional[str] = None
     notes: Optional[str] = None
     reminder_sent: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
