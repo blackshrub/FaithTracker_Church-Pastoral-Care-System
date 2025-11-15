@@ -2427,7 +2427,9 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
                 "event_date": datetime.now(timezone.utc).isoformat().split('T')[0],
                 "title": f"Accident Follow-up: {stage['stage'].replace('_', ' ')}",
                 "description": (parent_event.get("description") if parent_event else "") + 
+                              (f"\nFacility: {parent_event.get('hospital_name', 'N/A')}" if parent_event else "") +
                               (f"\n{notes}" if notes else ""),
+                "accident_stage_id": stage_id,  # Link to accident stage for undo
                 "completed": True,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
