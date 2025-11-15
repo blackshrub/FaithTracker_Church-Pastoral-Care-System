@@ -24,13 +24,13 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const COLORS = [
-  'hsl(140, 55%, 48%)',
-  'hsl(200, 40%, 50%)', 
-  'hsl(15, 70%, 58%)',
-  'hsl(25, 85%, 62%)',
-  'hsl(330, 75%, 70%)',
-  'hsl(180, 42%, 45%)',
-  'hsl(240, 15%, 45%)'
+  '#14b8a6', // Teal
+  '#f59e0b', // Amber
+  '#ec4899', // Pink
+  '#a78bfa', // Purple
+  '#06b6d4', // Cyan
+  '#84cc16', // Lime
+  '#f97316'  // Orange
 ];
 
 const MemberNameWithPhoto = ({ member, memberId }) => {
