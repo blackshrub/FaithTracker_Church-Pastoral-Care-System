@@ -259,12 +259,12 @@ export const MemberDetail = () => {
           </Button>
         </Link>
         
-        <div className="flex items-start gap-6">
-          <MemberAvatar member={member} size="xl" />
-          <div className="flex-1">
-            <h1 className="text-3xl font-manrope font-bold text-foreground">{member.name}</h1>
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+          <MemberAvatar member={member} size="xl" className="shrink-0" />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-manrope font-bold text-foreground truncate">{member.name}</h1>
             <p className="text-muted-foreground mt-1">{member.phone}</p>
-            <div className="flex items-center gap-4 mt-3">
+            <div className="flex flex-wrap items-center gap-3 mt-3">
               <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
               {member.last_contact_date && (
                 <span className="text-sm text-muted-foreground">
@@ -276,7 +276,7 @@ export const MemberDetail = () => {
           
           <Dialog open={eventModalOpen} onOpenChange={setEventModalOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-teal-500 hover:bg-teal-600 text-white" data-testid="add-care-event-button">
+              <Button className="bg-teal-500 hover:bg-teal-600 text-white w-full sm:w-auto shrink-0" data-testid="add-care-event-button">
                 <Plus className="w-4 h-4 mr-2" />
                 {t('add_care_event')}
               </Button>
