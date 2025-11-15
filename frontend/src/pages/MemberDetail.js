@@ -721,20 +721,6 @@ export const MemberDetail = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={async () => {
-                                try {
-                                  await axios.post(`${API}/care-events/${event.id}/ignore`);
-                                  toast.success('Event ignored');
-                                  // Update local state
-                                  setCareEvents(prev => prev.map(e => 
-                                    e.id === event.id ? {...e, ignored: true} : e
-                                  ));
-                                } catch (error) {
-                                  toast.error('Failed to ignore event');
-                                }
-                              }}>
-                                Ignore
-                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
                                 <Trash2 className="w-4 h-4 mr-2" />Delete
                               </DropdownMenuItem>
