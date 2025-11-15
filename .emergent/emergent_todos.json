@@ -1,10 +1,6 @@
 [
   {
-    "content": "Call testing_agent for Phase 1 comprehensive frontend testing",
-    "status": "completed"
-  },
-  {
     "content": "Fix any bugs found by testing agent before proceeding to Phase 2",
-    "status": "in_progress"
+    "status": "completed"
   }
 ]
