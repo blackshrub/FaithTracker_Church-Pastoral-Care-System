@@ -1144,7 +1144,7 @@ export const MemberDetail = () => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Delete this entire financial aid schedule?')) {
+                                  if (window.confirm('Delete this entire financial aid schedule and all its history?')) {
                                     try {
                                       await axios.delete(`${API}/financial-aid-schedules/${schedule.id}`);
                                       toast.success('Schedule deleted');
