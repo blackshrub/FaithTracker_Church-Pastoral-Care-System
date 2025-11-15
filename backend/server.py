@@ -2316,6 +2316,34 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
         logger.error(f"Error completing accident stage: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/accident-followup/{stage_id}/undo")
+async def undo_accident_stage(stage_id: str, user: dict = Depends(get_current_user)):
+    """Undo completion or ignore of accident followup stage"""
+    try:
+        stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
+        if not stage:
+            raise HTTPException(status_code=404, detail="Accident followup not found")
+        
+        await db.accident_followup.update_one(
+            {"id": stage_id},
+            {"$set": {
+                "completed": False,
+                "completed_at": None,
+                "ignored": False,
+                "ignored_at": None,
+                "ignored_by": None
+            }}
+        )
+        
+        # Invalidate dashboard cache
+        await invalidate_dashboard_cache(stage["campus_id"])
+        
+        return {"success": True, "message": "Accident followup stage reset"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== FINANCIAL AID SCHEDULE ENDPOINTS ====================
 
 @api_router.post("/financial-aid-schedules", response_model=FinancialAidSchedule)
