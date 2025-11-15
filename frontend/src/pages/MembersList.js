@@ -411,20 +411,20 @@ export const MembersList = () => {
             {/* Column Visibility Toggles */}
             <div className="border-t pt-4">
               <p className="text-sm font-semibold mb-2">Show Columns:</p>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                 {Object.entries({
                   phone: 'Phone', age: 'Age', gender: 'Gender', membership: 'Membership',
                   marital: 'Marital', category: 'Category', blood_type: 'Blood Type',
                   family: 'Family', last_contact: 'Last Contact', engagement: 'Engagement'
                 }).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <label key={key} className="flex items-center gap-2 cursor-pointer min-w-0">
                     <input
                       type="checkbox"
                       checked={visibleColumns[key]}
                       onChange={(e) => setVisibleColumns({...visibleColumns, [key]: e.target.checked})}
-                      className="w-4 h-4"
+                      className="w-4 h-4 flex-shrink-0"
                     />
-                    <span className="text-sm">{label}</span>
+                    <span className="text-sm truncate">{label}</span>
                   </label>
                 ))}
               </div>
