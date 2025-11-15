@@ -1,6 +1,50 @@
 [
   {
-    "content": "Fix any bugs found by testing agent before proceeding to Phase 2",
-    "status": "completed"
+    "content": "Fix Dashboard.js horizontal overflow - add max-w-full and min-w-0 to prevent 88px overflow",
+    "status": "pending"
+  },
+  {
+    "content": "Optimize Dashboard stat cards grid for responsive layout (1 col mobile, 2-4 cols desktop)",
+    "status": "pending"
+  },
+  {
+    "content": "Add loading skeletons to Dashboard tab content using LoadingState component",
+    "status": "pending"
+  },
+  {
+    "content": "Implement toast notifications for Dashboard actions (mark complete, ignore, delete) with teal theme",
+    "status": "pending"
+  },
+  {
+    "content": "Apply card-border-left patterns consistently across Dashboard task cards",
+    "status": "pending"
+  },
+  {
+    "content": "Fix MembersList.js horizontal overflow - optimize table for 390px viewport (244px overflow)",
+    "status": "pending"
+  },
+  {
+    "content": "Add EmptyState component to MembersList with Users icon and 'Add First Member' action",
+    "status": "pending"
+  },
+  {
+    "content": "Improve MembersList search/filter bar with responsive layout and loading indicators",
+    "status": "pending"
+  },
+  {
+    "content": "Run esbuild compile check to ensure no syntax errors",
+    "status": "pending"
+  },
+  {
+    "content": "Take screenshots at 390px, 768px, 1024px to verify responsive layouts",
+    "status": "pending"
+  },
+  {
+    "content": "Call testing_agent for comprehensive Phase 2 testing (frontend + backend)",
+    "status": "pending"
+  },
+  {
+    "content": "Fix any bugs found by testing agent before proceeding to Phase 3",
+    "status": "pending"
   }
 ]
