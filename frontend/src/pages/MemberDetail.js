@@ -582,6 +582,8 @@ export const MemberDetail = () => {
               </form>
             </DialogContent>
           </Dialog>
+            </div>
+          </div>
         </div>
       </div>
       
