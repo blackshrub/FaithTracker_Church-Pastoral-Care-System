@@ -692,7 +692,7 @@ export const Dashboard = () => {
       
       <Tabs defaultValue="today" className="w-full">
         <div className="overflow-x-auto">
-          <TabsList className="inline-flex w-max min-w-full">
+          <TabsList className="inline-flex w-full">
             <TabsTrigger value="today" className="whitespace-nowrap">
               <Bell className="w-4 h-4 mr-2" />{t('today')} ({birthdaysToday.length + todayTasks.length})
             </TabsTrigger>
