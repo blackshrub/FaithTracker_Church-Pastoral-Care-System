@@ -153,7 +153,7 @@ Same commands after applying optimizations
 
 ### Lighthouse Score
 Run Chrome DevTools Lighthouse on:
-- https://member-care.preview.emergentagent.com
+- https://member-pulse-3.preview.emergentagent.com
 
 Target scores:
 - Performance: 90+

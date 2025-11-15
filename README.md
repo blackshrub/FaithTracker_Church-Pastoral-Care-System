@@ -2,7 +2,7 @@
 
 ## Enterprise-Grade Church Member Care Management with AI Intelligence
 
-[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://member-care.preview.emergentagent.com)
+[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://member-pulse-3.preview.emergentagent.com)
 [![Mobile API Ready](https://img.shields.io/badge/Mobile%20API-Ready-blue.svg)](#mobile-api-integration)
 [![PWA Compatible](https://img.shields.io/badge/PWA-Compatible-orange.svg)](#pwa-features)
 

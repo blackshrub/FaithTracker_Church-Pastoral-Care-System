@@ -122,7 +122,7 @@ Look for:
 
 ### Tools to Use
 1. **Chrome DevTools Lighthouse**
-   - Run on https://member-care.preview.emergentagent.com
+   - Run on https://member-pulse-3.preview.emergentagent.com
    - Target: Performance score 90+
 
 2. **Network Tab**

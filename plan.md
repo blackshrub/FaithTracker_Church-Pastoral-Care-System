@@ -965,7 +965,7 @@ db.campuses.update_many(
 - API Documentation: `/app/API_DOCUMENTATION.md`
 - Translation Files: `/app/frontend/src/locales/id.json`, `/app/frontend/src/locales/en.json`
 - Test Account: admin@gkbj.church / admin123
-- Base URL: https://member-care.preview.emergentagent.com/api
+- Base URL: https://member-pulse-3.preview.emergentagent.com/api
 
 ---
 
