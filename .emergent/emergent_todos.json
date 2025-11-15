@@ -1,23 +1,15 @@
 [
   {
-    "content": "View Settings.js and verify language toggle styling is consistent with design system",
-    "status": "completed"
-  },
-  {
-    "content": "Apply responsive patterns to Settings page sections",
-    "status": "completed"
-  },
-  {
     "content": "View AdminDashboard.js and implement card-based layout for mobile",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Show essential columns only on mobile in AdminDashboard (Name, Role, Actions)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Run esbuild compile check to ensure no syntax errors",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Take screenshots at 390px, 768px, 1024px for all Phase 4 pages",
