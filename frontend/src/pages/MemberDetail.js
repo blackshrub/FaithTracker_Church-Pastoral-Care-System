@@ -275,14 +275,16 @@ export const MemberDetail = () => {
                   )}
                 </div>
               </div>
-              
-              <Dialog open={eventModalOpen} onOpenChange={setEventModalOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-teal-500 hover:bg-teal-600 text-white w-full sm:w-auto shrink-0" data-testid="add-care-event-button">
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t('add_care_event')}
-                  </Button>
-                </DialogTrigger>
+            </div>
+            
+            {/* Add Care Event button - below on mobile */}
+            <Dialog open={eventModalOpen} onOpenChange={setEventModalOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-teal-500 hover:bg-teal-600 text-white w-full mt-3" data-testid="add-care-event-button">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('add_care_event')}
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="add-care-event-modal">
               <DialogHeader>
                 <DialogTitle>{t('add_care_event')}</DialogTitle>
