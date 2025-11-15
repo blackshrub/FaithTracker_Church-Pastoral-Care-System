@@ -215,17 +215,17 @@ export const Analytics = () => {
   };
   
   if (loading) {
-    return <div className="space-y-6"><Skeleton className="h-96 w-full" /></div>;
+    return <div className="space-y-6 max-w-full"><Skeleton className="h-96 w-full" /></div>;
   }
   
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="space-y-6 max-w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-playfair font-bold text-foreground">{t('analytics')}</h1>
           <p className="text-muted-foreground mt-1">{t('pastoral_care_analytics')}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-shrink-0">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-48">
               <SelectValue />
