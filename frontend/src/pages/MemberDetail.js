@@ -707,14 +707,10 @@ export const MemberDetail = () => {
                       )}
                       
                       {/* Timeline date marker - compact on mobile */}
-                      <div className="flex flex-col items-center shrink-0 w-12 sm:w-16">
-                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 border-3 border-background shadow-md flex items-center justify-center relative z-10 text-white font-bold">
-                          <div className="text-xs sm:text-sm">{formatDate(event.event_date, 'dd')}</div>
-                        </div>
-                        <div className="mt-1 text-center">
-                          <div className="text-[10px] sm:text-xs text-muted-foreground uppercase">
-                            {formatDate(event.event_date, 'MMM')}
-                          </div>
+                      <div className="flex flex-col items-center shrink-0 w-10 sm:w-12">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 border-2 border-background shadow-md flex flex-col items-center justify-center relative z-10 text-white">
+                          <div className="text-sm sm:text-base font-bold leading-none">{formatDate(event.event_date, 'dd')}</div>
+                          <div className="text-[8px] sm:text-[9px] leading-none uppercase opacity-90 mt-0.5">{formatDate(event.event_date, 'MMM')}</div>
                         </div>
                       </div>
                       
