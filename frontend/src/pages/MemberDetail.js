@@ -739,8 +739,8 @@ export const MemberDetail = () => {
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <MoreVertical className="w-4 h-4" />
+                              <Button size="sm" variant="ghost" className="min-h-[44px] min-w-[44px]">
+                                <MoreVertical className="w-5 h-5" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
