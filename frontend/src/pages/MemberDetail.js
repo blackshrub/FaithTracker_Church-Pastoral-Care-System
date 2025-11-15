@@ -961,10 +961,7 @@ export const MemberDetail = () => {
                                   try {
                                     await axios.post(`${API}/accident-followup/${stage.id}/complete`);
                                     toast.success('Follow-up completed');
-                                    // Update local state
-                                    setAccidentTimeline(prev => prev.map(s => 
-                                      s.id === stage.id ? {...s, completed: true} : s
-                                    ));
+                                    loadMemberData(); // Reload to show timeline event
                                   } catch (error) {
                                     toast.error('Failed');
                                   }
