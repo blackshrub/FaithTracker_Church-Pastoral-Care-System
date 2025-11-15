@@ -717,7 +717,7 @@ export const MemberDetail = () => {
               ) : (
                 <div className="relative max-w-full">
                   {/* Timeline vertical line */}
-                  <div className="absolute left-4 sm:left-6 top-8 bottom-0 w-0.5 bg-border"></div>
+                  <div className="absolute left-6 sm:left-7 top-12 bottom-0 w-0.5 bg-border"></div>
                   
                   {careEvents.filter(e => e.event_type !== 'birthday').map((event, idx) => {
                     const isIgnored = event.ignored === true;
