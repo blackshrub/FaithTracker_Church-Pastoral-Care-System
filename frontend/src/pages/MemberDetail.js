@@ -694,40 +694,34 @@ export const MemberDetail = () => {
               ) : (
                 <div className="relative">
                   {/* Timeline vertical line */}
-                  <div className="absolute left-8 top-8 bottom-0 w-0.5 bg-gradient-to-b from-primary-300 via-primary-200 to-transparent"></div>
+                  <div className="absolute left-4 sm:left-8 top-8 bottom-0 w-0.5 bg-gradient-to-b from-primary-300 via-primary-200 to-transparent"></div>
                   
                   {careEvents.filter(e => e.event_type !== 'birthday').map((event, idx) => {
                     const isIgnored = event.ignored === true;
                     return (
-                    <div key={event.id} className={`flex gap-6 pb-8 relative ${isIgnored ? 'opacity-60' : ''}`} data-testid={`care-event-${event.id}`}>
+                    <div key={event.id} className={`flex gap-3 sm:gap-6 pb-6 relative ${isIgnored ? 'opacity-60' : ''}`} data-testid={`care-event-${event.id}`}>
                       {isIgnored && (
                         <div className="absolute top-2 right-2 z-10">
                           <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>
                         </div>
                       )}
                       
-                      {/* Timeline dot and date */}
-                      <div className="flex flex-col items-center shrink-0">
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 border-4 border-background shadow-lg flex items-center justify-center relative z-10">
-                          <Calendar className="w-7 h-7 text-white" />
+                      {/* Timeline date marker - compact on mobile */}
+                      <div className="flex flex-col items-center shrink-0 w-12 sm:w-16">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 border-3 border-background shadow-md flex items-center justify-center relative z-10 text-white font-bold">
+                          <div className="text-xs sm:text-sm">{formatDate(event.event_date, 'dd')}</div>
                         </div>
-                        <div className="mt-2 text-center">
-                          <div className="text-xs font-bold text-foreground">
-                            {formatDate(event.event_date, 'dd')}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
+                        <div className="mt-1 text-center">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground uppercase">
                             {formatDate(event.event_date, 'MMM')}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatDate(event.event_date, 'yyyy')}
                           </div>
                         </div>
                       </div>
                       
                       {/* Event content */}
-                      <Card className="flex-1 border-l-4 border-l-primary-400">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-4">
+                      <Card className="flex-1 border-l-4 border-l-teal-400 min-w-0">
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-2">
                                 <EventTypeBadge type={event.event_type} />
@@ -735,19 +729,19 @@ export const MemberDetail = () => {
                                   <CheckCircle2 className="w-4 h-4 text-green-600" />
                                 )}
                               </div>
-                              <h5 className="font-playfair font-semibold text-base text-foreground mb-2">{event.title}</h5>
+                              <h5 className="font-playfair font-semibold text-sm sm:text-base text-foreground mb-2">{event.title}</h5>
                               {event.description && (
                                 <p className="text-sm whitespace-pre-line font-bold text-foreground mb-2">
                                   {event.description}
                                 </p>
                               )}
                               {event.grief_relationship && (
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                                   Relationship: {event.grief_relationship}
                                 </p>
                               )}
                               {event.hospital_name && (
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                                   Hospital: {event.hospital_name}
                                 </p>
                               )}
@@ -759,7 +753,7 @@ export const MemberDetail = () => {
                             </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost" className="min-h-[44px] min-w-[44px]">
+                                <Button size="sm" variant="ghost" className="min-h-[44px] min-w-[44px] shrink-0">
                                   <MoreVertical className="w-5 h-5" />
                                 </Button>
                               </DropdownMenuTrigger>
