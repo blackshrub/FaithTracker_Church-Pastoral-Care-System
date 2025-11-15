@@ -1045,10 +1045,12 @@ export const MemberDetail = () => {
                               <Button size="sm" variant="outline" onClick={async () => {
                                 if (window.confirm('Mark this scheduled payment as distributed?')) {
                                   try {
-                                    // Use the new endpoint that advances the schedule
-                                    await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                    const response = await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                     toast.success('Payment distributed! Schedule advanced to next occurrence.');
-                                    loadMemberData();
+                                    // Update local state with new next_occurrence
+                                    setAidSchedules(prev => prev.map(s => 
+                                      s.id === schedule.id ? {...s, next_occurrence: response.data.next_occurrence, occurrences_completed: (s.occurrences_completed || 0) + 1} : s
+                                    ));
                                   } catch (error) {
                                     toast.error('Failed to mark payment');
                                   }
