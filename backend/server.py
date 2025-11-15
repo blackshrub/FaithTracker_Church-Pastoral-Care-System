@@ -1628,8 +1628,9 @@ async def delete_care_event(event_id: str):
                 }}
             )
         
-        # Also delete related grief support stages
+        # Also delete related grief support stages and accident followup stages
         await db.grief_support.delete_many({"care_event_id": event_id})
+        await db.accident_followup.delete_many({"care_event_id": event_id})
         
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(event["campus_id"])
