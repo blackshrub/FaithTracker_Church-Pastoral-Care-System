@@ -712,7 +712,7 @@ export const MemberDetail = () => {
                             </div>
                             <h5 className="font-playfair font-semibold text-sm text-foreground mb-1">{event.title}</h5>
                             {event.description && (
-                              <p className={`text-sm ${event.event_type === 'accident_illness' ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
+                              <p className={`text-sm whitespace-pre-line ${event.event_type === 'accident_illness' ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
                                 {event.description}
                               </p>
                             )}
