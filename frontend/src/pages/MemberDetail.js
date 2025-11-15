@@ -1047,10 +1047,7 @@ export const MemberDetail = () => {
                                   try {
                                     const response = await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                     toast.success('Payment distributed! Schedule advanced to next occurrence.');
-                                    // Update local state with new next_occurrence
-                                    setAidSchedules(prev => prev.map(s => 
-                                      s.id === schedule.id ? {...s, next_occurrence: response.data.next_occurrence, occurrences_completed: (s.occurrences_completed || 0) + 1} : s
-                                    ));
+                                    loadMemberData(); // Reload to show new care event in timeline and update totals
                                   } catch (error) {
                                     toast.error('Failed to mark payment');
                                   }
