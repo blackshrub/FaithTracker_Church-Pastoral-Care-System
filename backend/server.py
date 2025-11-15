@@ -2337,16 +2337,8 @@ async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_c
             try:
                 first_occurrence = date(start_year, start_month, day_of_month)
                 
-                # If first occurrence is in the past, that's fine (it's backdate)
-                # It will show as overdue
+                # Use the actual start date (even if in past - will show as overdue)
                 next_occurrence = first_occurrence
-                
-                # If first occurrence already passed, advance to next month
-                if next_occurrence < today:
-                    if start_month == 12:
-                        next_occurrence = date(start_year + 1, 1, day_of_month)
-                    else:
-                        next_occurrence = date(start_year, start_month + 1, day_of_month)
                         
             except ValueError:
                 # Day doesn't exist in this month (e.g., Feb 31, Nov 31)
