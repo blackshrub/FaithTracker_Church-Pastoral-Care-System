@@ -849,17 +849,31 @@ export const MemberDetail = () => {
                 <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
               ) : (
                 careEvents.filter(e => e.event_type === 'accident_illness').map(event => (
-                  <div key={event.id} className="space-y-4 mb-6 p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-semibold text-lg mb-1">🏥 {event.description || event.title || 'Accident/Illness Visit'}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Date: {formatDate(event.event_date, 'dd MMM yyyy')}
-                      </p>
-                      {event.hospital_name && (
+                  <div key={event.id} className="space-y-4 mb-6 p-4 border rounded-lg relative">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg mb-1">🏥 {event.description || event.title || 'Accident/Illness Visit'}</h4>
                         <p className="text-sm text-muted-foreground">
-                          Facility: {event.hospital_name}
+                          Date: {formatDate(event.event_date, 'dd MMM yyyy')}
                         </p>
-                      )}
+                        {event.hospital_name && (
+                          <p className="text-sm text-muted-foreground">
+                            Facility: {event.hospital_name}
+                          </p>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />Delete Event
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     
                     {/* Follow-up Timeline within each accident record */}
