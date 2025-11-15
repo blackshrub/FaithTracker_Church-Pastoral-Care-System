@@ -1582,31 +1582,20 @@ async def delete_care_event(event_id: str):
         
         # If deleting a timeline event created from followup completion, reset the stage
         if event_type == "regular_contact":
-            title = event.get("title", "")
-            
-            # Check if this is a grief followup completion event
-            if "Grief Support:" in title:
-                # Extract stage name and find the stage to reset
-                await db.grief_support.update_many(
-                    {
-                        "member_id": member_id,
-                        "completed": True,
-                        "title": {"$regex": title.replace("Grief Support: ", ""), "$options": "i"}
-                    },
+            # Check if this timeline event is linked to a grief stage
+            if event.get("grief_stage_id"):
+                await db.grief_support.update_one(
+                    {"id": event["grief_stage_id"]},
                     {"$set": {
                         "completed": False,
                         "completed_at": None
                     }}
                 )
             
-            # Check if this is an accident followup completion event  
-            elif "Accident Follow-up:" in title:
-                # Reset the accident stage
-                await db.accident_followup.update_many(
-                    {
-                        "member_id": member_id,
-                        "completed": True
-                    },
+            # Check if this timeline event is linked to an accident stage
+            elif event.get("accident_stage_id"):
+                await db.accident_followup.update_one(
+                    {"id": event["accident_stage_id"]},
                     {"$set": {
                         "completed": False,
                         "completed_at": None
