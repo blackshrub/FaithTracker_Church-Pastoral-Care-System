@@ -1,23 +1,15 @@
 [
   {
-    "content": "View FinancialAid.js and apply 48px height to all inputs for touch-friendly interaction",
-    "status": "completed"
-  },
-  {
-    "content": "Ensure proper form spacing and validation in FinancialAid.js",
-    "status": "completed"
-  },
-  {
     "content": "View Settings.js and verify language toggle styling is consistent with design system",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Apply responsive patterns to Settings page sections",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "View AdminDashboard.js and implement card-based layout for mobile",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Show essential columns only on mobile in AdminDashboard (Name, Role, Actions)",
