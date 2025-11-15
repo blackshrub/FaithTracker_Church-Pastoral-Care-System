@@ -1257,6 +1257,7 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                         "details": f"{schedule['frequency'].title()} - Rp {schedule['aid_amount']:,}",
                         "data": schedule
                     })
+                    logger.info(f"Added financial aid to today_tasks: {schedule.get('member_id')}")
                 # OVERDUE - add to aid_due (Aid tab)
                 elif next_date < today:
                     days_overdue = (today - next_date).days
