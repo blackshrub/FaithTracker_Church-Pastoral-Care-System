@@ -1,11 +1,11 @@
 [
   {
     "content": "Fix Dashboard.js horizontal overflow - add max-w-full and min-w-0 to prevent 88px overflow",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Optimize Dashboard stat cards grid for responsive layout (1 col mobile, 2-4 cols desktop)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add loading skeletons to Dashboard tab content using LoadingState component",
