@@ -943,9 +943,7 @@ export const MemberDetail = () => {
                                     try {
                                       await axios.post(`${API}/accident-followup/${stage.id}/undo`);
                                       toast.success('Action undone');
-                                      setAccidentTimeline(prev => prev.map(s => 
-                                        s.id === stage.id ? {...s, completed: false, ignored: false} : s
-                                      ));
+                                      loadMemberData(); // Reload to remove timeline event and update tabs
                                     } catch (error) {
                                       toast.error('Failed to undo');
                                     }
