@@ -429,7 +429,9 @@ class FinancialAidSchedule(BaseModel):
     # Annual specific
     month_of_year: Optional[int] = None  # 1-12
     
+    # Tracking
     is_active: bool = True
+    ignored_occurrences: List[str] = []  # List of dates (YYYY-MM-DD) that were ignored
     next_occurrence: date
     occurrences_completed: int = 0
     created_by: str  # User ID who created the schedule
