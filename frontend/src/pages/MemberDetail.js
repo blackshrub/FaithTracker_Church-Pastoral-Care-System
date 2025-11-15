@@ -627,8 +627,13 @@ export const MemberDetail = () => {
             const thisYearBirthday = new Date(today.getFullYear(), eventDate.getMonth(), eventDate.getDate());
             const daysUntil = Math.ceil((thisYearBirthday - today) / (1000 * 60 * 60 * 24));
             
-            // Show if birthday is within next 7 days or today
-            if (daysUntil >= 0 && daysUntil <= 7) {
+            // Show if birthday is within next 7 days, today, or overdue up to writeoff limit (7 days)
+            const writeoffLimit = 7; // TODO: Get from settings
+            const showBanner = (daysUntil >= -writeoffLimit && daysUntil <= 7) && !birthdayEvent.completed;
+            
+            if (showBanner) {
+              const daysOverdue = daysUntil < 0 ? Math.abs(daysUntil) : 0;
+              
               return (
                 <Card className="border-amber-200 bg-amber-50/50">
                   <CardContent className="p-6">
@@ -639,7 +644,9 @@ export const MemberDetail = () => {
                         </div>
                         <div>
                           <h5 className="font-playfair font-semibold text-lg">
-                            {daysUntil === 0 ? '🎉 Birthday Today!' : `Upcoming Birthday (${daysUntil} days)`}
+                            {daysUntil === 0 ? '🎉 Birthday Today!' : 
+                             daysUntil > 0 ? `Upcoming Birthday (${daysUntil} days)` :
+                             `⚠️ Overdue Birthday (${daysOverdue} days ago)`}
                           </h5>
                           <p className="text-sm text-muted-foreground">
                             {formatDate(birthdayEvent.event_date, 'dd MMMM yyyy')}
