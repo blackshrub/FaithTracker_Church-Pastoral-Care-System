@@ -578,9 +578,9 @@ export const MemberDetail = () => {
       </div>
       
       {/* Member Info Card */}
-      <Card className="border-border">
-        <CardContent className="p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <Card className="border-border max-w-full">
+        <CardContent className="p-4 sm:p-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-w-full">
             {member.age && (
               <div>
                 <p className="text-xs text-muted-foreground">Age</p>
