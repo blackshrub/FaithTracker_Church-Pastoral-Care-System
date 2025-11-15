@@ -1124,7 +1124,17 @@ export const MemberDetail = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleDeleteEvent(schedule.id)} className="text-red-600">
+                                <DropdownMenuItem onClick={async () => {
+                                  if (window.confirm('Delete this financial aid schedule and all its history?')) {
+                                    try {
+                                      await axios.delete(`${API}/financial-aid-schedules/${schedule.id}`);
+                                      toast.success('Schedule deleted');
+                                      loadMemberData();
+                                    } catch (error) {
+                                      toast.error('Failed to delete');
+                                    }
+                                  }
+                                }} className="text-red-600">
                                   <Trash2 className="w-4 h-4 mr-2" />Remove Record
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
