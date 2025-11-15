@@ -2206,8 +2206,8 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None):
                 "event_date": datetime.now(timezone.utc).isoformat().split('T')[0],
                 "title": f"Grief Support: {stage['stage'].replace('_', ' ')}",
                 "description": (parent_event.get("description") if parent_event else "") + 
-                              (f"\nRelationship: {parent_event.get('grief_relationship', 'Unknown')}" if parent_event else "") +
-                              (f"\n{notes}" if notes else ""),
+                              (f"\n\nRelationship: {parent_event.get('grief_relationship', 'Unknown')}" if parent_event else "") +
+                              (f"\n\nNotes: {notes}" if notes else ""),
                 "grief_stage_id": stage_id,  # Link to grief stage for undo
                 "completed": True,
                 "created_at": datetime.now(timezone.utc).isoformat(),
