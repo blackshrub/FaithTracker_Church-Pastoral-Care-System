@@ -744,13 +744,6 @@ export const MemberDetail = () => {
                     
                     return (
                     <div key={event.id} className={`flex gap-3 sm:gap-4 pb-6 relative`} data-testid={`care-event-${event.id}`}>
-                      {/* Status badge - top right, with space for three dots menu */}
-                      {(isIgnored || isCompleted) && (
-                        <div className="absolute top-2 right-14 z-10">
-                          {isCompleted && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">✓ Completed</span>}
-                          {isIgnored && !isCompleted && <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>}
-                        </div>
-                      )}
                       
                       {/* Timeline date marker with colored dot - always full opacity */}
                       <div className="flex flex-col items-center shrink-0 w-12 sm:w-16">
@@ -770,8 +763,15 @@ export const MemberDetail = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-2">
                                 <EventTypeBadge type={event.event_type} />
-                                {event.completed && (
-                                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                {/* Status badges inline with event type */}
+                                {isCompleted && (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Completed
+                                  </span>
+                                )}
+                                {isIgnored && !isCompleted && (
+                                  <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>
                                 )}
                               </div>
                               <h5 className="font-playfair font-semibold text-sm sm:text-base text-foreground mb-2">{event.title}</h5>
