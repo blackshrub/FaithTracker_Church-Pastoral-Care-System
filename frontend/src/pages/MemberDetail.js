@@ -1105,14 +1105,30 @@ export const MemberDetail = () => {
                     <div className="space-y-2">
                       {aidSchedules.filter(s => s.ignored_occurrences && s.ignored_occurrences.length > 0).map(schedule => (
                         <div key={`ignored-${schedule.id}`} className="p-3 bg-gray-100 rounded border border-gray-300 opacity-70">
-                          <p className="font-medium text-sm">{schedule.title}</p>
-                          <div className="text-xs text-muted-foreground mt-1 space-y-1">
-                            {schedule.ignored_occurrences.map((date, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded">Ignored</span>
-                                <span>{formatDate(date, 'dd MMM yyyy')}</span>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{schedule.title}</p>
+                              <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                                {schedule.ignored_occurrences.map((date, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded">Ignored</span>
+                                    <span>{formatDate(date, 'dd MMM yyyy')}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleDeleteEvent(schedule.id)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />Remove Record
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       ))}
