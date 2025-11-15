@@ -1,39 +1,15 @@
 [
   {
-    "content": "Update /app/frontend/src/index.css with design tokens (colors, typography, spacing, animations) from design_guidelines.md",
-    "status": "completed"
-  },
-  {
-    "content": "Remove center-align styles from App.css and ensure left-aligned body text",
-    "status": "completed"
-  },
-  {
-    "content": "Add Playfair Display and Inter font imports to index.css with proper fallbacks",
-    "status": "completed"
-  },
-  {
-    "content": "Create MobileBottomNav component with 5 tabs (Dashboard, Members, Calendar, Analytics, More) and touch-friendly targets",
-    "status": "completed"
-  },
-  {
-    "content": "Create DesktopSidebar component with navigation items and collapsible structure",
-    "status": "completed"
-  },
-  {
     "content": "Integrate MobileBottomNav and DesktopSidebar into Layout.js with responsive visibility",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add Sonner Toaster to App.js root level for global toast notifications",
-    "status": "pending"
-  },
-  {
-    "content": "Create shared EmptyState, LoadingState, and ErrorState components with design system styling",
     "status": "completed"
   },
   {
     "content": "Run esbuild compile check to ensure no syntax errors after foundation changes",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Take screenshot of preview URL to verify visual changes are applied",
