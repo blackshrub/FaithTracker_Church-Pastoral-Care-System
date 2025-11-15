@@ -1,7 +1,7 @@
 [
   {
     "content": "Update /app/frontend/src/index.css with design tokens (colors, typography, spacing, animations) from design_guidelines.md",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Remove center-align styles from App.css and ensure left-aligned body text",
