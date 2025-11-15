@@ -325,14 +325,32 @@ export const Analytics = () => {
       </div>
       
       <Tabs defaultValue="demographics" className="w-full">
-        <div className="overflow-x-auto">
-          <TabsList className="inline-flex w-full">
-            <TabsTrigger value="demographics" className="whitespace-nowrap text-xs"><Users className="w-3 h-3 mr-1" />{t('demographics')}</TabsTrigger>
-            <TabsTrigger value="trends" className="whitespace-nowrap text-xs"><TrendingUp className="w-3 h-3 mr-1" />{t('trends')}</TabsTrigger>
-            <TabsTrigger value="engagement" className="whitespace-nowrap text-xs"><TrendingUp className="w-3 h-3 mr-1" />{t('engagement')}</TabsTrigger>
-            <TabsTrigger value="financial" className="whitespace-nowrap text-xs"><DollarSign className="w-3 h-3 mr-1" />{t('financial_aid')}</TabsTrigger>
-            <TabsTrigger value="care" className="whitespace-nowrap text-xs"><Heart className="w-3 h-3 mr-1" />{t('care')}</TabsTrigger>
-            <TabsTrigger value="predictive" className="whitespace-nowrap text-xs"><Target className="w-3 h-3 mr-1" />{t('predict')}</TabsTrigger>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex min-w-full w-max sm:w-full">
+            <TabsTrigger value="demographics" className="flex-shrink-0 text-xs">
+              <Users className="w-3 h-3 sm:mr-1" />
+              <span className="hidden sm:inline">{t('demographics')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="trends" className="flex-shrink-0 text-xs">
+              <TrendingUp className="w-3 h-3 sm:mr-1" />
+              <span className="hidden sm:inline">{t('trends')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="engagement" className="flex-shrink-0 text-xs">
+              <TrendingUp className="w-3 h-3 sm:mr-1" />
+              <span className="hidden sm:inline">{t('engagement')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="financial" className="flex-shrink-0 text-xs">
+              <DollarSign className="w-3 h-3 sm:mr-1" />
+              <span className="hidden sm:inline">{t('financial_aid')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="care" className="flex-shrink-0 text-xs">
+              <Heart className="w-3 h-3 sm:mr-1" />
+              <span className="hidden sm:inline">{t('care')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="predictive" className="flex-shrink-0 text-xs">
+              <Target className="w-3 h-3 sm:mr-1" />
+              <span className="hidden sm:inline">{t('predict')}</span>
+            </TabsTrigger>
           </TabsList>
         </div>
         
