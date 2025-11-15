@@ -266,7 +266,7 @@ export const MemberDetail = () => {
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl sm:text-3xl font-manrope font-bold text-foreground truncate">{member.name}</h1>
                 <p className="text-sm sm:text-base text-muted-foreground mt-1">{member.phone}</p>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 mt-2">
                   <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
                   {member.last_contact_date && (
                     <span className="text-xs sm:text-sm text-muted-foreground">
