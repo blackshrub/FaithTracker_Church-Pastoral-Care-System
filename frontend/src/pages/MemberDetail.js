@@ -1075,7 +1075,10 @@ export const MemberDetail = () => {
                                     try {
                                       await axios.post(`${API}/financial-aid-schedules/${schedule.id}/ignore`);
                                       toast.success('Aid schedule ignored');
-                                      loadMemberData();
+                                      // Update local state
+                                      setAidSchedules(prev => prev.map(s => 
+                                        s.id === schedule.id ? {...s, ignored: true} : s
+                                      ));
                                     } catch (error) {
                                       toast.error('Failed to ignore');
                                     }
@@ -1087,7 +1090,8 @@ export const MemberDetail = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
