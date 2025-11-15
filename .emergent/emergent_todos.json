@@ -1,10 +1,6 @@
 [
   {
     "content": "Fix Dashboard.js horizontal overflow - add max-w-full and min-w-0 to prevent 88px overflow",
-    "status": "in_progress"
-  },
-  {
-    "content": "Optimize Dashboard stat cards grid for responsive layout (1 col mobile, 2-4 cols desktop)",
     "status": "completed"
   },
   {
@@ -13,15 +9,15 @@
   },
   {
     "content": "Implement toast notifications for Dashboard actions (mark complete, ignore, delete) with teal theme",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Apply card-border-left patterns consistently across Dashboard task cards",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Fix MembersList.js horizontal overflow - optimize table for 390px viewport (244px overflow)",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Add EmptyState component to MembersList with Users icon and 'Add First Member' action",
@@ -44,7 +40,7 @@
     "status": "pending"
   },
   {
-    "content": "Fix any bugs found by testing agent before proceeding to Phase 3",
+    "content": "Fix any bugs found by testing agent before proceeding to Phase 2",
     "status": "pending"
   }
 ]
