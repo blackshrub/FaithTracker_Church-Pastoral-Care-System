@@ -81,17 +81,19 @@ export const AdminDashboard = () => {
   };
   
   if (user?.role !== 'full_admin') return <Navigate to="/dashboard" />;
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="max-w-full">Loading...</div>;
   
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-      <Tabs defaultValue="campuses">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="campuses"><Building2 className="w-4 h-4 mr-2" />Campuses ({campuses.length})</TabsTrigger>
-          <TabsTrigger value="users"><UsersIcon className="w-4 h-4 mr-2" />Users ({users.length})</TabsTrigger>
-          <TabsTrigger value="settings"><Shield className="w-4 h-4 mr-2" />Settings</TabsTrigger>
-        </TabsList>
+    <div className="space-y-6 max-w-full">
+      <h1 className="text-3xl font-playfair font-bold">Admin Dashboard</h1>
+      <Tabs defaultValue="campuses" className="max-w-full">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex min-w-full w-max sm:w-full sm:grid sm:grid-cols-3">
+            <TabsTrigger value="campuses" className="flex-shrink-0"><Building2 className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Campuses</span> ({campuses.length})</TabsTrigger>
+            <TabsTrigger value="users" className="flex-shrink-0"><UsersIcon className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Users</span> ({users.length})</TabsTrigger>
+            <TabsTrigger value="settings" className="flex-shrink-0"><Shield className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Settings</span></TabsTrigger>
+          </TabsList>
+        </div>
         
         <TabsContent value="campuses">
           <Card>
