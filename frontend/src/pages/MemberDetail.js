@@ -816,10 +816,7 @@ export const MemberDetail = () => {
                                   try {
                                     await axios.post(`${API}/grief-support/${stage.id}/complete`);
                                     toast.success(t('success_messages.stage_completed'));
-                                    // Update local state instead of full reload
-                                    setGriefTimeline(prev => prev.map(s => 
-                                      s.id === stage.id ? {...s, completed: true, completed_at: new Date().toISOString()} : s
-                                    ));
+                                    loadMemberData(); // Reload to show timeline event
                                   } catch (error) {
                                     toast.error('Failed');
                                   }
