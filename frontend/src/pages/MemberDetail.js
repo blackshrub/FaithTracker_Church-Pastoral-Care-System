@@ -1078,6 +1078,30 @@ export const MemberDetail = () => {
                     </div>
                   )}
                 </div>
+                </div>
+                
+                {/* Ignored/Missed Payment Schedule */}
+                {aidSchedules.some(s => s.ignored_occurrences && s.ignored_occurrences.length > 0) && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold text-foreground mb-3">Ignored/Missed Payments</h4>
+                    <div className="space-y-2">
+                      {aidSchedules.filter(s => s.ignored_occurrences && s.ignored_occurrences.length > 0).map(schedule => (
+                        <div key={`ignored-${schedule.id}`} className="p-3 bg-gray-100 rounded border border-gray-300 opacity-70">
+                          <p className="font-medium text-sm">{schedule.title}</p>
+                          <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                            {schedule.ignored_occurrences.map((date, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded">Ignored</span>
+                                <span>{formatDate(date, 'dd MMM yyyy')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 
                 {/* Total Summary */}
                 <div className="pt-4 border-t">
