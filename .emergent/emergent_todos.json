@@ -1,15 +1,11 @@
 [
   {
-    "content": "Run esbuild compile check to ensure no syntax errors after foundation changes",
+    "content": "Take screenshot of preview URL to verify visual changes are applied",
     "status": "completed"
   },
   {
-    "content": "Take screenshot of preview URL to verify visual changes are applied",
-    "status": "in_progress"
-  },
-  {
     "content": "Call testing_agent for Phase 1 comprehensive frontend testing",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Fix any bugs found by testing agent before proceeding to Phase 2",
