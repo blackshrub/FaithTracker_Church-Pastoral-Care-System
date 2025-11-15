@@ -976,9 +976,14 @@ export const MemberDetail = () => {
                 ) : (
                   <div className="space-y-3">
                     {careEvents.filter(e => e.event_type === 'financial_aid').map(event => (
-                      <div key={event.id} className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div key={event.id} className={`p-4 rounded-lg border ${event.ignored ? 'bg-gray-100 opacity-60 border-gray-300' : 'bg-green-50 border-green-200'} relative`}>
+                        {event.ignored && (
+                          <div className="absolute top-2 right-2">
+                            <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-start">
-                          <div>
+                          <div className="flex-1">
                             <p className="font-semibold text-foreground">{t(`aid_types.${event.aid_type}`)}</p>
                             <p className="text-sm text-muted-foreground">
                               {formatDate(event.event_date, 'dd MMM yyyy')}
@@ -987,9 +992,23 @@ export const MemberDetail = () => {
                               <p className="text-sm text-muted-foreground mt-1">{event.aid_notes}</p>
                             )}
                           </div>
-                          <p className="text-lg font-bold text-green-700">
-                            Rp {event.aid_amount?.toLocaleString('id-ID')}
-                          </p>
+                          <div className="flex items-start gap-2">
+                            <p className="text-lg font-bold text-green-700">
+                              Rp {event.aid_amount?.toLocaleString('id-ID')}
+                            </p>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </div>
                     ))}
