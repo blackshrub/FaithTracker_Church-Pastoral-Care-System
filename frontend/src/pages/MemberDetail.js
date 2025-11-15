@@ -1017,8 +1017,15 @@ export const MemberDetail = () => {
                     <p className="text-sm text-muted-foreground py-4">No scheduled aid.</p>
                   ) : (
                     <div className="space-y-3 mt-3">
-                      {aidSchedules.slice(0, 5).map(schedule => (
-                        <div key={schedule.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      {aidSchedules.slice(0, 5).map(schedule => {
+                        const isIgnored = schedule.ignored === true;
+                        return (
+                        <div key={schedule.id} className={`p-4 rounded-lg border relative ${isIgnored ? 'bg-gray-100 opacity-60 border-gray-300' : 'bg-blue-50 border-blue-200'}`}>
+                          {isIgnored && (
+                            <div className="absolute top-2 right-2">
+                              <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <p className="font-semibold text-foreground">{schedule.title}</p>
