@@ -453,17 +453,17 @@ export const MembersList = () => {
               </div>
             </div>
           )}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-12 hidden sm:table-cell">
                     <input type="checkbox" checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0} onChange={toggleSelectAll} className="w-4 h-4" />
                   </TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Age</TableHead>
-                  <TableHead>Gender</TableHead>
+                  <TableHead className="hidden md:table-cell">Phone</TableHead>
+                  <TableHead className="hidden lg:table-cell">Age</TableHead>
+                  <TableHead className="hidden lg:table-cell">Gender</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
