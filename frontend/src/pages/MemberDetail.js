@@ -907,6 +907,30 @@ export const MemberDetail = () => {
                                 {formatDate(stage.scheduled_date, 'dd MMM')}
                               </p>
                             </div>
+                            {(stage.completed || isIgnored) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="ghost">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={async () => {
+                                    try {
+                                      await axios.post(`${API}/accident-followup/${stage.id}/undo`);
+                                      toast.success('Action undone');
+                                      setAccidentTimeline(prev => prev.map(s => 
+                                        s.id === stage.id ? {...s, completed: false, ignored: false} : s
+                                      ));
+                                    } catch (error) {
+                                      toast.error('Failed to undo');
+                                    }
+                                  }}>
+                                    Undo
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                             {!stage.completed && !isIgnored && (
                               <div className="flex gap-1">
                                 <Button size="sm" variant="outline" onClick={async () => {
