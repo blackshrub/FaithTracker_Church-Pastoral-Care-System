@@ -268,7 +268,9 @@ export const Dashboard = () => {
               aid_type: quickEvent.aid_type,
               aid_amount: parseFloat(quickEvent.aid_amount),
               frequency: quickEvent.schedule_frequency,
-              start_date: quickEvent.schedule_start_date,
+              start_date: quickEvent.schedule_frequency === 'weekly' 
+                ? new Date().toISOString().split('T')[0]  // Use today for weekly
+                : quickEvent.schedule_start_date,
               end_date: quickEvent.schedule_end_date || null,
               day_of_week: quickEvent.day_of_week,
               day_of_month: quickEvent.day_of_month,
