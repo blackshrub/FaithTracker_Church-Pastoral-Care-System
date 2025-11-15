@@ -558,8 +558,8 @@ export const MemberDetail = () => {
         </div>
       </div>
       
-      {/* Member Info Card - Hidden on mobile, shown on desktop for full details */}
-      <Card className="border-border hidden md:block">
+      {/* Member Info Card */}
+      <Card className="border-border">
         <CardContent className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {member.age && (
