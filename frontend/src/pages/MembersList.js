@@ -487,7 +487,7 @@ export const MembersList = () => {
                 ) : (
                   filteredMembers.map((member) => (
                     <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={() => toggleSelectMember(member.id)} className="w-4 h-4" />
                       </TableCell>
                       <TableCell>
@@ -496,8 +496,8 @@ export const MembersList = () => {
                           <span className="font-medium">{member.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{member.phone || '-'}</TableCell>
-                      <TableCell>{member.age || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{member.phone || '-'}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{member.age || '-'}</TableCell>
                       <TableCell>{member.gender || '-'}</TableCell>
                       <TableCell>
                         <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
