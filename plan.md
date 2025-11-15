@@ -78,30 +78,34 @@
 
 ---
 
-### Phase 2: Dashboard & Members (Status: Not Started)
+### Phase 2: Dashboard & Members (Status: In Progress)
 
 **Scope:**
 - Redesign Dashboard.js with improved mobile layout
   - Fix remaining 88px horizontal overflow
-  - Optimize Quick Actions buttons for mobile
-  - Improve task card layouts with better spacing
-  - Add loading skeletons for each tab
-  - Implement toast notifications for all actions
+  - Optimize Quick Actions buttons for mobile (add min-w-0, max-w-full)
+  - Improve task card layouts with better spacing and card-border-left patterns
+  - Add loading skeletons for each tab content
+  - Implement toast notifications for all actions (mark complete, ignore, delete)
+  - Ensure all stat cards use responsive grid (1 col mobile, 2-4 cols desktop)
 - Redesign MembersList.js with mobile-first approach
   - Fix remaining 244px horizontal overflow
-  - Convert to card-based layout on mobile (instead of table)
-  - Implement responsive search/filter bar
-  - Add empty state with image
-  - Optimize column visibility for different breakpoints
-- Apply status-card pattern with left-border accents consistently
+  - Keep table on desktop, but ensure proper responsive behavior
+  - Further optimize column visibility (Name + Status + Actions on mobile)
+  - Implement responsive search/filter bar with proper spacing
+  - Add empty state with image using EmptyState component
+  - Ensure all buttons have min-w-0 to prevent overflow
+- Apply status-card pattern with left-border accents consistently across both pages
 - Ensure all interactive elements have proper data-testid attributes
+- Verify toast notifications work with proper styling (not default red/green)
 
 **Testing:**
 - Call testing agent (both frontend & backend)
-- Verify no horizontal scroll on Dashboard and Members pages
-- Test all task actions (mark complete, ignore, delete)
-- Validate responsive behavior at 390px, 768px, 1024px, 1920px
-- Confirm toast notifications appear for all actions
+- Verify no horizontal scroll on Dashboard and Members pages at 390px, 768px, 1024px
+- Test all task actions (mark complete, ignore, delete) and verify toasts appear
+- Validate responsive behavior across all breakpoints
+- Confirm loading skeletons appear during data fetch
+- Test with both EN and ID languages to ensure no text overflow
 
 **User Stories:**
 1. As a user, I can scan Today tasks in a single column on mobile without sideways scrolling.
@@ -174,21 +178,48 @@
 
 ---
 
-## 3) Next Actions (Immediate)
+## 3) Next Actions (Immediate - Phase 2)
 
-**Phase 2 Tasks:**
-1. Fix Dashboard horizontal overflow (88px on 390px viewport)
-   - Investigate Quick Actions button widths
-   - Ensure all cards have max-w-full
+**Dashboard.js Fixes:**
+1. Fix horizontal overflow (88px on 390px viewport)
+   - Add max-w-full to all card containers
+   - Add min-w-0 to Quick Actions buttons
+   - Ensure stat cards grid is responsive (grid-cols-1 sm:grid-cols-2 lg:grid-cols-4)
    - Test with longer Indonesian text
-2. Fix Members horizontal overflow (244px on 390px viewport)
-   - Convert table to card layout on mobile
-   - Implement responsive column visibility
-   - Add mobile-optimized search/filter
-3. Add loading skeletons to Dashboard tabs
-4. Implement toast notifications for all Dashboard actions
-5. Add empty states with images where applicable
-6. Call testing agent for Phase 2 verification
+2. Add loading skeletons to each tab content
+   - Use LoadingState component with type="card"
+   - Show skeleton while data is being fetched
+3. Implement toast notifications for all actions
+   - Mark complete: "Task marked as complete"
+   - Ignore: "Task ignored"
+   - Delete: "Task deleted"
+   - Use Sonner with teal theme (not default red/green)
+4. Apply card-border-left patterns consistently
+   - Teal for today/general tasks
+   - Amber for birthdays
+   - Pink for follow-ups
+   - Purple for special events
+
+**MembersList.js Fixes:**
+1. Fix horizontal overflow (244px on 390px viewport)
+   - Ensure table wrapper has proper -mx-4 px-4 pattern
+   - Further hide columns on mobile (only Name, Status, Actions visible)
+   - Add min-w-0 to all buttons
+   - Test table scrolling behavior
+2. Add empty state with image
+   - Use EmptyState component with Users icon
+   - "No members found" message
+   - "Add First Member" action button
+3. Improve search/filter bar
+   - Ensure proper spacing and responsive layout
+   - Add loading indicator during search
+4. Verify all toasts work correctly
+
+**Testing & Verification:**
+5. Run esbuild compile check
+6. Take screenshots at 390px, 768px, 1024px viewports
+7. Call testing agent for comprehensive Phase 2 testing
+8. Fix any bugs found before proceeding to Phase 3
 
 ---
 
@@ -203,11 +234,18 @@
 - ✅ Accessibility: Focus states with 2px teal outline, WCAG AA contrast
 - ✅ Internationalization: EN/ID language toggle working
 
+**Target for Phase 2:**
+- ⚠️ No horizontal scroll on Dashboard (currently 88px overflow)
+- ⚠️ No horizontal scroll on Members (currently 244px overflow)
+- ⚠️ Loading skeletons on all Dashboard tabs
+- ⚠️ Toast notifications for all user actions
+- ⚠️ Consistent card-border-left patterns across Dashboard
+- ⚠️ Zero console errors on Dashboard and Members pages
+
 **Remaining for Future Phases:**
-- ⚠️ No horizontal scroll on mobile (Analytics ✓, Dashboard & Members need fixes in Phase 2)
-- ⚠️ Reliability: Zero console errors on core pages (to verify in each phase)
-- ⚠️ Performance: Bundle size optimization (Phase 5)
-- ⚠️ Images: Responsive srcset, lazy loading (Phase 5)
+- Phase 3: Member Detail page optimization
+- Phase 4: Analytics, Financial Aid, Settings, Admin optimization
+- Phase 5: Bundle size optimization, final A11y audit, performance tuning
 
 ---
 
@@ -235,3 +273,10 @@
 
 **Guidelines:**
 - Full specification: `/app/design_guidelines.md`
+
+**Card Border Patterns:**
+- `.card-border-left-teal` - General tasks, today items
+- `.card-border-left-amber` - Birthdays, celebrations
+- `.card-border-left-pink` - Follow-ups, urgent care
+- `.card-border-left-purple` - Special events
+- `.card-border-left-sage` - Growth, spiritual health
