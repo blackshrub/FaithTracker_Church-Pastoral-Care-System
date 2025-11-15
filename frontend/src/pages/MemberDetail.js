@@ -1110,9 +1110,27 @@ export const MemberDetail = () => {
                               <p className="font-medium text-sm">{schedule.title}</p>
                               <div className="text-xs text-muted-foreground mt-1 space-y-1">
                                 {schedule.ignored_occurrences.map((date, idx) => (
-                                  <div key={idx} className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded">Ignored</span>
-                                    <span>{formatDate(date, 'dd MMM yyyy')}</span>
+                                  <div key={idx} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded">Ignored</span>
+                                      <span>{formatDate(date, 'dd MMM yyyy')}</span>
+                                    </div>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost" 
+                                      className="h-6 px-2"
+                                      onClick={async () => {
+                                        try {
+                                          await axios.delete(`${API}/financial-aid-schedules/${schedule.id}/ignored-occurrence/${date}`);
+                                          toast.success('Ignored occurrence removed');
+                                          loadMemberData();
+                                        } catch (error) {
+                                          toast.error('Failed to remove');
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="w-3 h-3 text-red-600" />
+                                    </Button>
                                   </div>
                                 ))}
                               </div>
@@ -1125,7 +1143,7 @@ export const MemberDetail = () => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Delete this financial aid schedule and all its history?')) {
+                                  if (window.confirm('Delete this entire financial aid schedule?')) {
                                     try {
                                       await axios.delete(`${API}/financial-aid-schedules/${schedule.id}`);
                                       toast.success('Schedule deleted');
@@ -1135,7 +1153,7 @@ export const MemberDetail = () => {
                                     }
                                   }
                                 }} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />Remove Record
+                                  <Trash2 className="w-4 h-4 mr-2" />Delete Entire Schedule
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
