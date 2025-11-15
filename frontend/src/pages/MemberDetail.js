@@ -1097,7 +1097,6 @@ export const MemberDetail = () => {
                     </div>
                   )}
                 </div>
-                </div>
                 
                 {/* Ignored/Missed Payment Schedule */}
                 {aidSchedules.some(s => s.ignored_occurrences && s.ignored_occurrences.length > 0) && (
