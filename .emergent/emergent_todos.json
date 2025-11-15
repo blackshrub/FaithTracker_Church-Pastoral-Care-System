@@ -1,6 +1,6 @@
 [
   {
-    "content": "Fix MembersList.js horizontal overflow - optimize table for 390px viewport (244px overflow)",
+    "content": "Run esbuild compile check to ensure no syntax errors",
     "status": "completed"
   },
   {
@@ -12,16 +12,8 @@
     "status": "pending"
   },
   {
-    "content": "Improve MembersList search/filter bar with responsive layout and loading indicators",
-    "status": "completed"
-  },
-  {
-    "content": "Run esbuild compile check to ensure no syntax errors",
-    "status": "in_progress"
-  },
-  {
     "content": "Take screenshots at 390px, 768px, 1024px to verify responsive layouts",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Call testing_agent for comprehensive Phase 2 testing (frontend + backend)",
