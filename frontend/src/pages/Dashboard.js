@@ -515,7 +515,7 @@ export const Dashboard = () => {
                 {/* Event Details */}
                 <div className="space-y-4">
                   <div>
-                    <Label className="font-semibold">{t('event_type_required')} *</Label>
+                    <Label className="font-semibold">{t('event_type_required')}</Label>
                     <Select value={quickEvent.event_type} onValueChange={(v) => setQuickEvent({...quickEvent, event_type: v})}>
                       <SelectTrigger className="h-12"><SelectValue placeholder="Select event type..." /></SelectTrigger>
                       <SelectContent>
@@ -544,8 +544,8 @@ export const Dashboard = () => {
                 {/* Title only for Financial Aid */}
                 {quickEvent.event_type === 'financial_aid' && (
                   <div>
-                    <Label className="font-semibold">Aid Name/Title *</Label>
-                    <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Monthly Education Support" className="h-12" required />
+                        <Label className="font-semibold">Aid Name/Title</Label>
+                        <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Monthly Education Support" className="h-12" required />
                   </div>
                 )}
                 
@@ -554,7 +554,7 @@ export const Dashboard = () => {
                   <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <p className="text-sm font-medium text-purple-900">⭐ Auto-generates 6-stage grief timeline</p>
                     <div>
-                      <Label className="font-semibold">Relationship to Deceased *</Label>
+                      <Label className="font-semibold">Relationship to Deceased</Label>
                       <Select value={quickEvent.grief_relationship} onValueChange={(v) => setQuickEvent({...quickEvent, grief_relationship: v})} required>
                         <SelectTrigger className="h-12"><SelectValue placeholder="Select relationship" /></SelectTrigger>
                         <SelectContent>
@@ -589,7 +589,7 @@ export const Dashboard = () => {
                     <h4 className="font-semibold text-green-900">Financial Aid Details</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <Label className="font-semibold">Aid Type *</Label>
+                        <Label className="font-semibold">Aid Type</Label>
                         <Select value={quickEvent.aid_type} onValueChange={(v) => setQuickEvent({...quickEvent, aid_type: v})} required>
                           <SelectTrigger className="h-12"><SelectValue placeholder="Select aid type..." /></SelectTrigger>
                           <SelectContent>
@@ -604,7 +604,7 @@ export const Dashboard = () => {
                         </Select>
                       </div>
                       <div>
-                        <Label className="font-semibold">Amount (Rp) *</Label>
+                        <Label className="font-semibold">Amount (Rp)</Label>
                         <Input
                           type="number"
                           value={quickEvent.aid_amount}
@@ -620,7 +620,7 @@ export const Dashboard = () => {
                     <div className="space-y-4 border-t pt-4">
                       <h5 className="font-semibold text-green-800">📅 Payment Type</h5>
                       <div>
-                        <Label className="font-semibold">Frequency *</Label>
+                        <Label className="font-semibold">Frequency</Label>
                         <Select value={quickEvent.schedule_frequency || 'one_time'} onValueChange={(v) => setQuickEvent({...quickEvent, schedule_frequency: v})}>
                           <SelectTrigger className="h-12"><SelectValue placeholder="Select frequency..." /></SelectTrigger>
                           <SelectContent>
@@ -634,7 +634,7 @@ export const Dashboard = () => {
                       
                       {quickEvent.schedule_frequency === 'one_time' && (
                         <div>
-                          <Label className="font-semibold">Payment Date *</Label>
+                          <Label className="font-semibold">Payment Date</Label>
                           <Input
                             type="date"
                             value={quickEvent.payment_date || quickEvent.event_date}
