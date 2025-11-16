@@ -1274,8 +1274,7 @@ export const Dashboard = () => {
                               try {
                                 await axios.post(`${API}/care-events/${event.id}/complete`);
                                 toast.success(t('toasts.birthday_marked_completed'));
-                                setOverdueBirthdays(prev => prev.filter(b => b.id !== event.id));
-                                await loadReminders();
+                                await queryClient.invalidateQueries(['dashboard']);
                               } catch (error) {
                                 toast.error(t('toasts.failed_mark_completed'));
                               }
@@ -1294,8 +1293,7 @@ export const Dashboard = () => {
                                   try {
                                     await axios.post(`${API}/care-events/${event.id}/ignore`);
                                     toast.success(t('toasts.birthday_ignored'));
-                                    setOverdueBirthdays(prev => prev.filter(b => b.id !== event.id));
-                                    await loadReminders();
+                                    await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
                                     toast.error('Failed to ignore');
                                   }
