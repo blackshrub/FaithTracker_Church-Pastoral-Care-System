@@ -1083,6 +1083,7 @@ export const Dashboard = () => {
                                       await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success('Payment marked as distributed!');
                                       setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                      await loadReminders();
                                     } catch (error) {
                                       toast.error('Failed to mark as distributed');
                                     }
@@ -1102,6 +1103,7 @@ export const Dashboard = () => {
                                           await axios.post(`${API}/financial-aid-schedules/${task.data.id}/ignore`);
                                           toast.success('Financial aid ignored');
                                           setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                          await loadReminders();
                                         } catch (error) {
                                           toast.error('Failed to ignore');
                                         }
