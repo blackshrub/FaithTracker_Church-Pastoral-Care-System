@@ -182,6 +182,7 @@ export const AdminDashboard = () => {
                   </TableBody>
                 </Table>
               </div>
+            </div>
             </CardContent>
           </Card>
         </TabsContent>
