@@ -253,8 +253,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 /* Force date inputs to match standard input sizing */
 input[type="date"], input[type="month"], input[type="time"] {
   line-height: normal !important;
-  padding-top: 0.5rem !important;
-  padding-bottom: 0.5rem !important;
+  padding: 0.5rem 0.75rem !important;
+  height: 3rem !important;
+  max-height: 3rem !important;
+  min-height: 3rem !important;
 }
 
 /* Mobile fixes */
