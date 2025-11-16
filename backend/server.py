@@ -1166,8 +1166,19 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         
         logger.info(f"Found {len(members)} members for campus {campus_id}")
         
-        # Build member map for quick lookup
-        member_map = {m["id"]: m for m in members}
+        # Build member map for quick lookup and calculate ages
+        member_map = {}
+        for m in members:
+            # Calculate age from birth_date
+            age = None
+            if m.get("birth_date"):
+                try:
+                    birth_date = datetime.strptime(m["birth_date"], '%Y-%m-%d').date()
+                    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+                except:
+                    pass
+            m["age"] = age
+            member_map[m["id"]] = m
         
         # Initialize all arrays at the beginning
         birthdays_today = []
