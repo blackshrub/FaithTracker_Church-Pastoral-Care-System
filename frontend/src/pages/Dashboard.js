@@ -381,8 +381,9 @@ export const Dashboard = () => {
         schedule_frequency: 'one_time',
         payment_date: new Date().toISOString().split('T')[0]
       });
-      // Refresh dashboard to show new tasks
-      loadReminders();
+      // Refresh dashboard to show new tasks - Invalidate React Query cache
+      queryClient.invalidateQueries(['dashboard']);
+      queryClient.invalidateQueries(['members']);
     } catch (error) {
       toast.error('Failed to add events');
     }
@@ -400,7 +401,7 @@ export const Dashboard = () => {
   );
 
   
-  if (loading) return <div>{t('loading')}</div>;
+  if (isLoading) return <div>{t('loading')}</div>;
   
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   
