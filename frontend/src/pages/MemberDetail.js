@@ -376,7 +376,7 @@ export const MemberDetail = () => {
                   {newEvent.event_type !== 'financial_aid' && (
                     <div>
                       <Label className="font-semibold">Event Date</Label>
-                      <Popover modal={true}>
+                      <Popover modal={true} open={eventDateOpen} onOpenChange={setEventDateOpen}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -390,6 +390,7 @@ export const MemberDetail = () => {
                             onSelect={(date) => {
                               if (date) {
                                 setNewEvent({...newEvent, event_date: formatDateFns(date, 'yyyy-MM-dd')});
+                                setEventDateOpen(false);
                               }
                             }}
                             initialFocus
@@ -516,7 +517,7 @@ export const MemberDetail = () => {
                       {newEvent.schedule_frequency === 'one_time' && (
                         <div>
                           <Label className="font-semibold">Payment Date</Label>
-                          <Popover modal={true}>
+                          <Popover modal={true} open={paymentDateOpen} onOpenChange={setPaymentDateOpen}>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
                                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -530,6 +531,7 @@ export const MemberDetail = () => {
                                 onSelect={(date) => {
                                   if (date) {
                                     setNewEvent({...newEvent, payment_date: formatDateFns(date, 'yyyy-MM-dd')});
+                                    setPaymentDateOpen(false);
                                   }
                                 }}
                                 initialFocus
@@ -559,7 +561,7 @@ export const MemberDetail = () => {
                           </div>
                           <div>
                             <Label className="font-semibold text-xs">End Date (optional)</Label>
-                            <Popover modal={true}>
+                            <Popover modal={true} open={endDateOpen} onOpenChange={setEndDateOpen}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
                                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -573,6 +575,7 @@ export const MemberDetail = () => {
                                   onSelect={(date) => {
                                     if (date) {
                                       setNewEvent({...newEvent, schedule_end_date: formatDateFns(date, 'yyyy-MM-dd')});
+                                      setEndDateOpen(false);
                                     }
                                   }}
                                   initialFocus
