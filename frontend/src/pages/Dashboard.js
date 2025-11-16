@@ -1040,9 +1040,9 @@ export const Dashboard = () => {
               {financialAidDue.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">{t('no_overdue_financial_aid')}</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {financialAidDue.map(schedule => (
-                    <div key={schedule.id} className="p-3 bg-green-50 rounded flex justify-between items-center">
+                    <div key={schedule.id} className="p-4 bg-purple-50 rounded-lg border border-purple-200 relative hover:shadow-lg transition-all">
                       <div className="flex-1">
                         <MemberNameWithAvatar 
                           member={{name: schedule.member_name, photo_url: schedule.member_photo_url}} 
