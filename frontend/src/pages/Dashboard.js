@@ -274,59 +274,6 @@ export const Dashboard = () => {
     }
   }, []);
   
-  const loadReminders = async () => {
-    try {
-      setLoading(true);
-      
-      // Use optimized pre-calculated endpoint with cache-busting
-      const response = await axios.get(`${API}/dashboard/reminders`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        },
-        params: {
-          t: Date.now() // Cache-busting timestamp
-        }
-      });
-      const data = response.data;
-      
-      // Set all state from pre-calculated data
-      setBirthdaysToday(data.birthdays_today || []);
-      setOverdueBirthdays(data.overdue_birthdays || []);
-      setTodayTasks(data.today_tasks || []);
-      setUpcomingBirthdays(data.upcoming_birthdays || []);
-      setUpcomingTasks(data.upcoming_tasks || []);
-      setGriefToday(data.grief_today || []);
-      setGriefDue(data.grief_today || []); // Same as grief_today
-      setAccidentFollowUp(data.accident_followup || []);
-      setHospitalFollowUp([]);
-      setAtRiskMembers(data.at_risk_members || []);
-      setDisconnectedMembers(data.disconnected_members || []);
-      setFinancialAidDue(data.financial_aid_due || []);
-      setSuggestions(data.ai_suggestions || []);
-      
-      // Also load all members for the quick event form (in background, non-blocking)
-      loadAllMembersForForm();
-      
-    } catch (error) {
-      console.error('Error loading reminders:', error);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const loadAllMembersForForm = async () => {
-    try {
-      const membersRes = await axios.get(`${API}/members?limit=1000`);
-      setAllMembers(membersRes.data);
-    } catch (error) {
-      console.error('Error loading members for form:', error);
-    }
-  };
-  
-
-  
   const handleQuickEvent = async (e) => {
     e.preventDefault();
     if (selectedMemberIds.length === 0) {
