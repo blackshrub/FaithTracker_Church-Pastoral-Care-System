@@ -733,13 +733,13 @@ export const Dashboard = () => {
                             <Select value={quickEvent.day_of_week || 'monday'} onValueChange={(v) => setQuickEvent({...quickEvent, day_of_week: v})}>
                               <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="monday">Monday</SelectItem>
-                                <SelectItem value="tuesday">Tuesday</SelectItem>
-                                <SelectItem value="wednesday">Wednesday</SelectItem>
-                                <SelectItem value="thursday">Thursday</SelectItem>
-                                <SelectItem value="friday">Friday</SelectItem>
-                                <SelectItem value="saturday">Saturday</SelectItem>
-                                <SelectItem value="sunday">Sunday</SelectItem>
+                                <SelectItem value="monday">{t('days_of_week.monday')}</SelectItem>
+                                <SelectItem value="tuesday">{t('days_of_week.tuesday')}</SelectItem>
+                                <SelectItem value="wednesday">{t('days_of_week.wednesday')}</SelectItem>
+                                <SelectItem value="thursday">{t('days_of_week.thursday')}</SelectItem>
+                                <SelectItem value="friday">{t('days_of_week.friday')}</SelectItem>
+                                <SelectItem value="saturday">{t('days_of_week.saturday')}</SelectItem>
+                                <SelectItem value="sunday">{t('days_of_week.sunday')}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
