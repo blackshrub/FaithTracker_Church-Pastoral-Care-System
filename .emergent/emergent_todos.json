@@ -5,7 +5,7 @@
   },
   {
     "content": "Implement prefers-reduced-motion support for users with motion sensitivity",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Verify complete i18n coverage (EN/ID) - check for any missing translations",
@@ -13,11 +13,11 @@
   },
   {
     "content": "Final horizontal scroll verification across all pages (390px, 768px, 1024px)",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Add proper aria-labels to all icon-only buttons for screen reader accessibility",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Verify all interactive elements have unique data-testid for testing",
