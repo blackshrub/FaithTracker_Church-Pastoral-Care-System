@@ -5,7 +5,7 @@
   },
   {
     "content": "Implement prefers-reduced-motion support for users with motion sensitivity",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Verify complete i18n coverage (EN/ID) - check for any missing translations",
