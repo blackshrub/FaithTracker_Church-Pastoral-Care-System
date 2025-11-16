@@ -1,14 +1,14 @@
 [
   {
-    "content": "Update main README.md with latest project status",
-    "status": "completed"
+    "content": "Fix Dashboard.js mutation functions to reload data after changes",
+    "status": "in_progress"
   },
   {
-    "content": "Update design_guidelines.md with mobile-first tab pattern",
-    "status": "completed"
+    "content": "Add cache-busting headers to axios GET requests in production",
+    "status": "pending"
   },
   {
-    "content": "Update PERFORMANCE_OPTIMIZATIONS.md with dashboard refactor details",
-    "status": "completed"
+    "content": "Test cache invalidation works in both staging and production",
+    "status": "pending"
   }
 ]
