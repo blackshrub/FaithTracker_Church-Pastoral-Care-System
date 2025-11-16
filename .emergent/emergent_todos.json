@@ -1,6 +1,26 @@
 [
   {
-    "content": "Translation file object/string conflict resolution complete",
-    "status": "completed"
+    "content": "Systematically scan BulkMessaging.js for ALL hardcoded English",
+    "status": "in_progress"
+  },
+  {
+    "content": "Systematically scan ImportExport.js for ALL hardcoded English",
+    "status": "pending"
+  },
+  {
+    "content": "Systematically scan WhatsAppLogs.js for ALL hardcoded English",
+    "status": "pending"
+  },
+  {
+    "content": "Add all missing keys to translation files",
+    "status": "pending"
+  },
+  {
+    "content": "Replace all hardcoded text in these 3 pages",
+    "status": "pending"
+  },
+  {
+    "content": "Verify complete translation coverage",
+    "status": "pending"
   }
 ]
