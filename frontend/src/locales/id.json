@@ -509,7 +509,8 @@
     "no_members_at_risk": "Tidak ada jemaat berisiko",
     "no_follow_ups_today": "Tidak ada tindak lanjut yang diperlukan hari ini",
     "recipients": "penerima",
-    "avg": "rata-rata"
+    "avg": "rata-rata",
+    "members": "jemaat"
   },
   
   "_comment_settings_page": "Settings Page",
