@@ -1,14 +1,18 @@
 [
   {
-    "content": "Final comprehensive testing with testing_agent",
+    "content": "Fix Admin Dashboard horizontal scroll on mobile (hide columns, optimize table)",
+    "status": "in_progress"
+  },
+  {
+    "content": "Fix Select dropdown error by adding position='popper' and sideOffset",
     "status": "completed"
   },
   {
-    "content": "Fix any remaining bugs before production readiness",
-    "status": "completed"
+    "content": "Verify Admin Dashboard fixes with screenshots at 390px",
+    "status": "pending"
   },
   {
-    "content": "Update plan.md with final Phase 5 completion and overall summary",
-    "status": "completed"
+    "content": "Test dropdown functionality to ensure no errors",
+    "status": "pending"
   }
 ]
