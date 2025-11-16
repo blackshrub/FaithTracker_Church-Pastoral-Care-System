@@ -74,11 +74,11 @@ export const BulkMessaging = () => {
         }
       }
       
-      toast.success(`Sent to ${sent} recipients, ${failed} failed`);
+      toast.success(t('bulk_messaging.sent_results', {sent, failed}));
       setMessage('');
       setSelectedUsers([]);
     } catch (error) {
-      toast.error('Bulk send failed');
+      toast.error(t('bulk_messaging.bulk_send_failed'));
     } finally {
       setSending(false);
     }
@@ -126,7 +126,7 @@ export const BulkMessaging = () => {
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type your message to pastoral team..."
+                placeholder={t('bulk_messaging.type_message_placeholder')}
                 rows={8}
               />
             </div>
