@@ -1089,11 +1089,11 @@ export const Dashboard = () => {
                                   <Button size="default" variant="outline" onClick={async () => {
                                     try {
                                       await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
-                                      toast.success('Payment marked as distributed!');
+                                      toast.success(t('toasts.payment_distributed'));
                                       setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                       await loadReminders();
                                     } catch (error) {
-                                      toast.error('Failed to mark as distributed');
+                                      toast.error(t('toasts.failed_mark_distributed'));
                                     }
                                   }} className="h-11 flex-1 min-w-0">
                                     <Check className="w-4 h-4 mr-1" />
@@ -1109,11 +1109,11 @@ export const Dashboard = () => {
                                       <DropdownMenuItem onClick={async () => {
                                         try {
                                           await axios.post(`${API}/financial-aid-schedules/${task.data.id}/ignore`);
-                                          toast.success('Financial aid ignored');
+                                          toast.success(t('toasts.financial_aid_ignored'));
                                           setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                           await loadReminders();
                                         } catch (error) {
-                                          toast.error('Failed to ignore');
+                                          toast.error(t('toasts.failed_ignore'));
                                         }
                                       }}>
                                         {t('ignore')}
