@@ -1623,8 +1623,7 @@ export const Dashboard = () => {
                                   try {
                                     await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                     toast.success(t('toasts.payment_distributed_advanced'));
-                                    setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
-                                    await loadReminders();
+                                    await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
                                     toast.error('Failed to mark as distributed');
                                   }
@@ -1646,8 +1645,7 @@ export const Dashboard = () => {
                                   try {
                                     await axios.post(`${API}/financial-aid-schedules/${schedule.id}/ignore`);
                                     toast.success(t('toasts.financial_aid_schedule_ignored'));
-                                    setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
-                                    await loadReminders();
+                                    await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
                                     toast.error('Failed to ignore');
                                   }
@@ -1660,8 +1658,7 @@ export const Dashboard = () => {
                                     if (window.confirm(t('confirmations.stop_schedule', {name: schedule.member_name}))) {
                                       try {
                                         await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
-                                        toast.success('Schedule stopped');
-                                        setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
+                                        toast.success(t('toasts.schedule_stopped'));
                                         await queryClient.invalidateQueries(['dashboard']);
                                       } catch (error) {
                                         toast.error(t('toasts.failed_stop_schedule'));
