@@ -1210,6 +1210,23 @@ export const Dashboard = () => {
             
             {/* Financial Child Tab */}
             <TabsContent value="financial" className="space-y-4 mt-4">
+              {/* Financial content will be here */}
+            </TabsContent>
+            
+            {/* At Risk Child Tab */}
+            <TabsContent value="atrisk" className="space-y-4 mt-4">
+              {/* At Risk content will be here */}
+            </TabsContent>
+            
+            {/* Disconnected Child Tab */}
+            <TabsContent value="disconnected" className="space-y-4 mt-4">
+              {/* Disconnected content will be here */}
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+        
+        
+        <TabsContent value="financial" className="space-y-4">
           <Card className="card-border-left-green">
             <CardHeader>
               <CardTitle>{t('financial_aid_overdue')}</CardTitle>
