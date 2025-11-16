@@ -150,6 +150,29 @@ export const MemberDetail = () => {
           toast.success('Financial aid recorded as given!');
         } else {
           // Scheduled aid: Create schedule (future payments)
+          let startDate, endDate;
+          
+          if (newEvent.schedule_frequency === 'weekly') {
+            startDate = new Date().toISOString().split('T')[0];  // Use today for weekly
+            endDate = newEvent.schedule_end_date || null;
+          } else if (newEvent.schedule_frequency === 'monthly') {
+            // Construct start_date from start_month and start_year
+            const startMonth = newEvent.start_month || new Date().getMonth() + 1;
+            const startYear = newEvent.start_year || new Date().getFullYear();
+            startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+            
+            // Construct end_date from end_month and end_year if provided
+            if (newEvent.end_month && newEvent.end_year) {
+              endDate = `${newEvent.end_year}-${String(newEvent.end_month).padStart(2, '0')}-01`;
+            } else {
+              endDate = null;
+            }
+          } else {
+            // For annually or other frequencies
+            startDate = newEvent.schedule_start_date;
+            endDate = newEvent.schedule_end_date || null;
+          }
+          
           const scheduleData = {
             member_id: id,
             campus_id: member.campus_id,
@@ -157,10 +180,8 @@ export const MemberDetail = () => {
             aid_type: newEvent.aid_type,
             aid_amount: parseFloat(newEvent.aid_amount),
             frequency: newEvent.schedule_frequency,
-            start_date: newEvent.schedule_frequency === 'weekly' 
-              ? new Date().toISOString().split('T')[0]  // Use today for weekly
-              : newEvent.schedule_start_date,
-            end_date: newEvent.schedule_end_date || null,
+            start_date: startDate,
+            end_date: endDate,
             day_of_week: newEvent.day_of_week,
             day_of_month: newEvent.day_of_month,
             month_of_year: newEvent.month_of_year,
