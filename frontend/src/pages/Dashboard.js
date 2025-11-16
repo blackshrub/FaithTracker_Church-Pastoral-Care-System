@@ -531,18 +531,30 @@ export const Dashboard = () => {
                   </Select>
                 </div>
                 
-                {/* Event Date - Native with forced styling */}
+                {/* Event Date - Calendar Picker with proper z-index */}
                 {quickEvent.event_type !== 'financial_aid' && (
                   <div>
                     <Label className="font-semibold">{t('event_date_required')}</Label>
-                    <Input 
-                      type="date" 
-                      value={quickEvent.event_date} 
-                      onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} 
-                      className="h-12"
-                      style={{height: '3rem', minHeight: '3rem', maxHeight: '3rem'}}
-                      required 
-                    />
+                    <Popover modal={true}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {quickEvent.event_date ? formatDateFns(new Date(quickEvent.event_date), 'dd MMM yyyy') : <span className="text-muted-foreground">Select date...</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[100]" align="start" sideOffset={5}>
+                        <CalendarComponent
+                          mode="single"
+                          selected={quickEvent.event_date ? new Date(quickEvent.event_date) : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              setQuickEvent({...quickEvent, event_date: formatDateFns(date, 'yyyy-MM-dd')});
+                            }
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 )}
                 
