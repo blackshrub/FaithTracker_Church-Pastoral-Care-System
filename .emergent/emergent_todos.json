@@ -1,6 +1,14 @@
 [
   {
-    "content": "Financial aid schedule bug - RESOLVED",
-    "status": "completed"
+    "content": "Debug 'Delete Entire Schedule' in Ignored Payments section",
+    "status": "in_progress"
+  },
+  {
+    "content": "Understand user expectation vs current behavior",
+    "status": "pending"
+  },
+  {
+    "content": "Fix delete logic if needed",
+    "status": "pending"
   }
 ]
