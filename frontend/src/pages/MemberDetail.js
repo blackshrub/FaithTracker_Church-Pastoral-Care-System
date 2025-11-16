@@ -969,7 +969,7 @@ export const MemberDetail = () => {
                         <p className="text-sm text-muted-foreground">
                           Date: {formatDate(event.event_date, 'dd MMM yyyy')}
                         </p>
-                        {event.hospital_name && (
+                        {event.hospital_name && event.hospital_name !== 'N/A' && event.hospital_name !== 'null' && event.hospital_name !== 'NULL' && (
                           <p className="text-sm text-muted-foreground">
                             Facility: {event.hospital_name}
                           </p>
