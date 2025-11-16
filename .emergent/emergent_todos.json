@@ -1,6 +1,18 @@
 [
   {
-    "content": "Complete internationalization for all 13 pages",
-    "status": "completed"
+    "content": "Scan all components for hardcoded English text",
+    "status": "in_progress"
+  },
+  {
+    "content": "Add component translation keys to en.json and id.json",
+    "status": "pending"
+  },
+  {
+    "content": "Update components with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Verify all components compile correctly",
+    "status": "pending"
   }
 ]
