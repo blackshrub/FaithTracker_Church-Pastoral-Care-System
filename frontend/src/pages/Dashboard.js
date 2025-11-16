@@ -833,9 +833,9 @@ export const Dashboard = () => {
                               </Button>
                               
                               {task.type === 'financial_aid' ? (
-                                // Financial aid: Mark Distributed + Three-dots menu
+                                // Financial aid: Full-width buttons on mobile
                                 <>
-                                  <Button size="sm" variant="outline" onClick={async () => {
+                                  <Button size="lg" variant="outline" onClick={async () => {
                                     try {
                                       await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success('Payment marked as distributed!');
@@ -843,16 +843,17 @@ export const Dashboard = () => {
                                     } catch (error) {
                                       toast.error('Failed to mark as distributed');
                                     }
-                                  }}>
+                                  }} className="h-12 flex-1">
+                                    <Check className="w-4 h-4 mr-2" />
                                     {t('mark_distributed')}
                                   </Button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button size="sm" variant="ghost">
-                                        <MoreVertical className="w-4 h-4" />
+                                      <Button size="lg" variant="ghost" className="h-12 w-12 p-0 flex-shrink-0">
+                                        <MoreVertical className="w-5 h-5" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuContent align="end" className="w-40">
                                       <DropdownMenuItem onClick={async () => {
                                         try {
                                           await axios.post(`${API}/financial-aid-schedules/${task.data.id}/ignore`);
@@ -882,42 +883,42 @@ export const Dashboard = () => {
                                   </DropdownMenu>
                                 </>
                               ) : (
-                                // Grief/Accident: Mark Complete + Ignore button
+                                // Grief/Accident: Full-width buttons on mobile
                                 <>
-                              <Button size="sm" variant="outline" onClick={async () => {
-                                try {
-                                  if (task.type === 'grief_support') {
-                                    await markGriefStageComplete(task.data.id, setGriefDue);
-                                  } else if (task.type === 'accident_followup') {
-                                    await axios.post(`${API}/accident-followup/${task.data.id}/complete`);
-                                    toast.success('Follow-up marked complete');
-                                    // Update local state
-                                    setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
-                                  }
-                                } catch (error) {
-                                  toast.error('Failed to mark as completed');
-                                }
-                              }}>
-                                {t('mark_completed')}
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button size="sm" variant="ghost">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={async () => {
+                                  <Button size="lg" variant="outline" onClick={async () => {
                                     try {
                                       if (task.type === 'grief_support') {
-                                        await axios.post(`${API}/grief-support/${task.data.id}/ignore`);
-                                        toast.success('Grief stage ignored');
+                                        await markGriefStageComplete(task.data.id, setGriefDue);
                                       } else if (task.type === 'accident_followup') {
-                                        await axios.post(`${API}/accident-followup/${task.data.id}/ignore`);
-                                        toast.success('Accident follow-up ignored');
+                                        await axios.post(`${API}/accident-followup/${task.data.id}/complete`);
+                                        toast.success('Follow-up marked complete');
+                                        setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                       }
-                                      setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                     } catch (error) {
+                                      toast.error('Failed to mark as completed');
+                                    }
+                                  }} className="h-12 flex-1">
+                                    <Check className="w-4 h-4 mr-2" />
+                                    {t('mark_completed')}
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="lg" variant="ghost" className="h-12 w-12 p-0 flex-shrink-0">
+                                        <MoreVertical className="w-5 h-5" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-32">
+                                      <DropdownMenuItem onClick={async () => {
+                                        try {
+                                          if (task.type === 'grief_support') {
+                                            await axios.post(`${API}/grief-support/${task.data.id}/ignore`);
+                                            toast.success('Grief stage ignored');
+                                          } else if (task.type === 'accident_followup') {
+                                            await axios.post(`${API}/accident-followup/${task.data.id}/ignore`);
+                                            toast.success('Accident follow-up ignored');
+                                          }
+                                          setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                        } catch (error) {
                                       toast.error('Failed to ignore');
                                     }
                                   }}>
