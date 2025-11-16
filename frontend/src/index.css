@@ -195,6 +195,10 @@ input::placeholder, textarea::placeholder {
   border-left: 4px solid hsl(271, 91%, 65%);
 }
 
+.card-border-left-gray {
+  border-left: 4px solid hsl(0, 0%, 60%);
+}
+
 .card-border-left-sage {
   border-left: 4px solid hsl(142, 40%, 55%);
 }
