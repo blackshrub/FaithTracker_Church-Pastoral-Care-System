@@ -1,10 +1,14 @@
 [
   {
-    "content": "Implement Member Profile Financial Aid tab improvements - bold amounts, icons, colored borders, status badges, structured layout",
-    "status": "completed"
+    "content": "Implement all 10 form modal improvements to Dashboard 'Add New Care Event' modal",
+    "status": "in_progress"
   },
   {
-    "content": "Test Member Profile Financial Aid tab at 390px",
-    "status": "completed"
+    "content": "Implement all 10 form modal improvements to Member Profile 'Add Care Event' modal",
+    "status": "pending"
+  },
+  {
+    "content": "Test form modals on mobile (390px) and verify touch-friendly inputs",
+    "status": "pending"
   }
 ]
