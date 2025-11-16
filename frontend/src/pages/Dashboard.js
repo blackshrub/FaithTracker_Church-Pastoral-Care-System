@@ -1170,8 +1170,36 @@ export const Dashboard = () => {
           )}
         </TabsContent>
         
-        
-        <TabsContent value="financial" className="space-y-4">
+        {/* Overdue Tab with Nested Tabs */}
+        <TabsContent value="overdue" className="space-y-4">
+          <Tabs defaultValue="birthdays" className="w-full">
+            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="inline-flex min-w-full w-max sm:w-full">
+                <TabsTrigger value="birthdays" className="flex-shrink-0">
+                  <Cake className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Birthdays</span> ({overdueBirthdays.length})
+                </TabsTrigger>
+                <TabsTrigger value="followups" className="flex-shrink-0">
+                  <Hospital className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Follow-ups</span> ({griefDue.length + accidentFollowUp.length})
+                </TabsTrigger>
+                <TabsTrigger value="financial" className="flex-shrink-0">
+                  <DollarSign className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Aid</span> ({financialAidDue.length})
+                </TabsTrigger>
+                <TabsTrigger value="atrisk" className="flex-shrink-0">
+                  <AlertTriangle className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">At Risk</span> ({atRiskMembers.length})
+                </TabsTrigger>
+                <TabsTrigger value="disconnected" className="flex-shrink-0">
+                  <Users className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Disconnected</span> ({disconnectedMembers.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            
+            {/* Birthday Child Tab */}
+            <TabsContent value="birthdays" className="space-y-4 mt-4">
           <Card className="card-border-left-green">
             <CardHeader>
               <CardTitle>{t('financial_aid_overdue')}</CardTitle>
