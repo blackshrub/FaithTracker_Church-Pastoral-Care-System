@@ -13,18 +13,10 @@
   },
   {
     "content": "Convert MemberDetail.js to React Query",
+    "status": "completed"
+  },
+  {
+    "content": "Test React Query implementation and verify data consistency",
     "status": "in_progress"
-  },
-  {
-    "content": "Convert MembersList.js to React Query",
-    "status": "pending"
-  },
-  {
-    "content": "Convert remaining pages to React Query",
-    "status": "pending"
-  },
-  {
-    "content": "Test all pages and verify data consistency",
-    "status": "pending"
   }
 ]
