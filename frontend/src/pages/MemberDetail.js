@@ -1115,47 +1115,48 @@ export const MemberDetail = () => {
                 ) : (
                   <div className="space-y-3">
                     {careEvents.filter(e => e.event_type === 'financial_aid').map(event => (
-                      <div key={event.id} className={`p-4 rounded-lg border relative hover:shadow-lg transition-all ${event.ignored ? 'bg-gray-50 border-gray-300 card-border-left-gray opacity-70' : event.completed ? 'bg-green-50 border-green-200 card-border-left-sage' : 'bg-purple-50 border-purple-200 card-border-left-purple'}`}>
-                        {/* Status Badge - Past aid is already given, so show "Given" */}
-                        {event.ignored ? (
-                          <span className="absolute top-3 right-3 px-2 py-1 bg-gray-400 text-white text-xs font-semibold rounded shadow-sm z-10">
+                      <div key={event.id} className={`p-4 rounded-lg border relative hover:shadow-lg transition-all ${event.ignored ? 'bg-gray-50 border-gray-300 card-border-left-gray opacity-70' : 'bg-purple-50 border-purple-200 card-border-left-purple'}`}>
+                        {/* Only show "Ignored" badge, remove Given/Completed badges */}
+                        {event.ignored && (
+                          <span className="absolute top-3 right-14 px-2 py-1 bg-gray-400 text-white text-xs font-semibold rounded shadow-sm z-10">
                             Ignored
-                          </span>
-                        ) : event.completed ? (
-                          <span className="absolute top-3 right-3 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded shadow-sm z-10">
-                            Completed
-                          </span>
-                        ) : (
-                          <span className="absolute top-3 right-3 px-2 py-1 bg-purple-500 text-white text-xs font-semibold rounded shadow-sm z-10">
-                            Given
                           </span>
                         )}
                         
-                        <div className="flex items-start gap-3 mb-3">
-                          {/* Aid Type Icon */}
-                          <div className="text-3xl flex-shrink-0">
-                            {getAidTypeIcon(event.aid_type)}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {/* Aid Type Icon */}
+                            <div className="text-3xl flex-shrink-0">
+                              {getAidTypeIcon(event.aid_type)}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              {/* Title if exists */}
+                              {event.title && (
+                                <p className="font-semibold text-base text-foreground mb-1">
+                                  {event.title}
+                                </p>
+                              )}
+                              {/* Amount - Hero */}
+                              <p className="text-lg font-bold text-foreground">
+                                Rp {event.aid_amount?.toLocaleString('id-ID')}
+                              </p>
+                              {/* Aid Type */}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {event.aid_type?.charAt(0).toUpperCase() + event.aid_type?.slice(1)}
+                              </p>
+                              {/* Date */}
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                📅 {formatDate(event.event_date, 'dd MMM yyyy')}
+                              </p>
+                              {/* Notes */}
+                              {event.aid_notes && (
+                                <p className="text-xs text-muted-foreground mt-2 italic">{event.aid_notes}</p>
+                              )}
+                            </div>
                           </div>
                           
-                          <div className="flex-1 min-w-0">
-                            {/* Amount - Hero */}
-                            <p className="text-lg font-bold text-foreground">
-                              Rp {event.aid_amount?.toLocaleString('id-ID')}
-                            </p>
-                            {/* Aid Type */}
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {event.aid_type?.charAt(0).toUpperCase() + event.aid_type?.slice(1)}
-                            </p>
-                            {/* Date */}
-                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                              📅 {formatDate(event.event_date, 'dd MMM yyyy')}
-                            </p>
-                            {/* Notes */}
-                            {event.aid_notes && (
-                              <p className="text-xs text-muted-foreground mt-2 italic">{event.aid_notes}</p>
-                            )}
-                          </div>
-                          
+                          {/* Three Dots - Top Right */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button size="sm" variant="ghost" className="h-8 w-8 p-0 flex-shrink-0">
