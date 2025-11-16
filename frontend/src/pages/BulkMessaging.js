@@ -86,12 +86,12 @@ export const BulkMessaging = () => {
   
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-playfair font-bold">Bulk Messaging</h1>
+      <h1 className="text-3xl font-playfair font-bold">{t('bulk_messaging_page.title')}</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Select Recipients</CardTitle>
+            <CardTitle>{t('bulk_messaging_page.select_recipients')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -118,11 +118,11 @@ export const BulkMessaging = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle>Compose Message</CardTitle>
+            <CardTitle>{t('bulk_messaging_page.compose_message')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-2">{selectedUsers.length} recipients selected</p>
+              <p className="text-sm text-muted-foreground mb-2">{t('bulk_messaging_page.recipients_selected', {count: selectedUsers.length})}</p>
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -136,7 +136,7 @@ export const BulkMessaging = () => {
               disabled={sending || selectedUsers.length === 0 || !message.trim()}
             >
               <Send className="w-4 h-4 mr-2" />
-              {sending ? 'Sending...' : `Send to ${selectedUsers.length} Recipients`}
+              {sending ? t('bulk_messaging_page.sending') : t('bulk_messaging_page.send_to_recipients', {count: selectedUsers.length})}
             </Button>
           </CardContent>
         </Card>
