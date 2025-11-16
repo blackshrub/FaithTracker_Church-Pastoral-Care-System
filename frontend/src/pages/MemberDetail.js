@@ -596,12 +596,13 @@ export const MemberDetail = () => {
                   </div>
                 )}
                 
-                <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setEventModalOpen(false)}>
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setEventModalOpen(false)} className="flex-1 h-12">
                     {t('cancel')}
                   </Button>
-                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white" data-testid="save-care-event-button">
-                    {t('save')}
+                  <Button type="submit" className="flex-1 h-12 bg-teal-500 hover:bg-teal-600 text-white font-semibold" data-testid="save-care-event-button">
+                    Save Care Event
                   </Button>
                 </div>
               </form>
