@@ -227,35 +227,35 @@ export const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-                <Table>
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
+                      <TableHead className="pl-2 pr-1">Name</TableHead>
                       <TableHead className="hidden md:table-cell">Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="px-1">Role</TableHead>
+                      <TableHead className="w-10 text-center px-1">⋮</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {users.map(u => (
                       <TableRow key={u.id}>
-                        <TableCell>
+                        <TableCell className="pl-2 pr-1">
                           <div>
-                            <p className="font-medium">{u.name}</p>
+                            <p className="font-medium text-sm">{u.name}</p>
                             <p className="text-xs text-muted-foreground md:hidden">{u.email}</p>
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{u.email}</TableCell>
-                        <TableCell>
+                        <TableCell className="px-1">
                           <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                             {u.role === 'full_admin' ? 'Full Admin' : u.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right pr-2">
+                        <TableCell className="w-10 text-center px-1">
                           {u.id !== user.id && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
