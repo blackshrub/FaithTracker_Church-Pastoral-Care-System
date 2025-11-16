@@ -1207,9 +1207,19 @@ export const Dashboard = () => {
                   {overdueBirthdays
                     .sort((a, b) => (b.days_overdue || 0) - (a.days_overdue || 0))
                     .map(event => (
-                    <div key={event.id} className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <div key={event.id} className="p-4 bg-amber-50 rounded-lg border border-amber-200 relative hover:shadow-lg transition-all">
+                      {/* Overdue Badge - Top Right */}
+                      {event.days_overdue > 0 && (
+                        <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10">
+                          {event.days_overdue}d overdue
+                        </span>
+                      )}
+                      
                       <div className="flex items-start gap-3 mb-3">
-                        <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
+                        {/* Avatar with amber ring */}
+                        <div className="flex-shrink-0 rounded-full ring-2 ring-amber-400">
+                          <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <Link to={`/members/${event.member_id}`} className="font-semibold text-base hover:text-teal-600">
                             {event.member_name}
@@ -1220,13 +1230,13 @@ export const Dashboard = () => {
                             </a>
                           )}
                           <p className="text-sm text-muted-foreground mt-1">
-                            {formatDate(event.event_date, 'dd MMM yyyy')} 
-                            <span className="ml-2 text-red-600 font-medium">({event.days_overdue} {t('days_ago')})</span>
+                            {formatDate(event.event_date, 'dd MMM yyyy')}
+                            {event.member_age && <span className="ml-2 text-xs">• {event.member_age} years old</span>}
                           </p>
                         </div>
                       </div>
                       
-                      {/* Actions - Horizontal compact layout */}
+                      {/* Actions - Horizontal compact */}
                       <div className="flex gap-2">
                         <Button size="default" className="bg-amber-500 hover:bg-amber-600 text-white h-11 flex-1 min-w-0" asChild>
                           <a href={formatPhoneForWhatsApp(event.member_phone)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
@@ -1237,6 +1247,7 @@ export const Dashboard = () => {
                           </a>
                         </Button>
                         <Button size="default" variant="outline" onClick={async () => {
+                          triggerHaptic();
                           try {
                             await axios.post(`${API}/care-events/${event.id}/complete`);
                             toast.success('Birthday marked as completed!');
@@ -1244,7 +1255,7 @@ export const Dashboard = () => {
                           } catch (error) {
                             toast.error('Failed to mark as completed');
                           }
-                        }} className="h-11 flex-1 min-w-0">
+                        }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                           <Check className="w-4 h-4 mr-1" />
                           <span className="truncate">{t('mark_complete')}</span>
                         </Button>
