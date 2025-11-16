@@ -799,7 +799,7 @@ export const MemberDetail = () => {
                                   Relationship: {event.grief_relationship}
                                 </p>
                               )}
-                              {event.hospital_name && (
+                              {event.hospital_name && event.hospital_name !== 'N/A' && event.hospital_name !== 'null' && event.hospital_name !== 'NULL' && (
                                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                                   Hospital: {event.hospital_name}
                                 </p>
