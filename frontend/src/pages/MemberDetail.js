@@ -151,7 +151,7 @@ export const MemberDetail = () => {
             aid_amount: parseFloat(newEvent.aid_amount)
           };
           await axios.post(`${API}/care-events`, eventData);
-          toast.success('Financial aid recorded as given!');
+          toast.success(t('toasts.financial_aid_recorded'));
         } else {
           // Scheduled aid: Create schedule (future payments)
           let startDate, endDate;
@@ -192,7 +192,7 @@ export const MemberDetail = () => {
             notes: newEvent.description
           };
           await axios.post(`${API}/financial-aid-schedules`, scheduleData);
-          toast.success('Financial aid schedule created!');
+          toast.success(t('toasts.financial_aid_schedule_created'));
         }
       } else {
         // Other event types: Create normal care event
@@ -245,10 +245,10 @@ export const MemberDetail = () => {
     if (!window.confirm('Delete this care event?')) return;
     try {
       await axios.delete(`${API}/care-events/${eventId}`);
-      toast.success('Event deleted');
+      toast.success(t('toasts.event_deleted'));
       loadMemberData();
     } catch (error) {
-      toast.error('Failed to delete');
+      toast.error(t('toasts.failed_delete'));
     }
   };
   
@@ -269,12 +269,12 @@ export const MemberDetail = () => {
   const handleCompleteBirthday = async (eventId) => {
     try {
       await axios.post(`${API}/care-events/${eventId}/complete`);
-      toast.success('Birthday marked as completed!');
+      toast.success(t('toasts.birthday_marked_completed'));
       loadMemberData();
       // Trigger dashboard cache refresh by making a call
       axios.get(`${API}/dashboard/reminders`).catch(() => {});
     } catch (error) {
-      toast.error('Failed to mark birthday complete');
+      toast.error(t('toasts.failed_mark_birthday'));
       console.error('Error completing birthday:', error);
     }
   };
@@ -1042,10 +1042,10 @@ export const MemberDetail = () => {
                                   <DropdownMenuItem onClick={async () => {
                                     try {
                                       await axios.post(`${API}/grief-support/${stage.id}/undo`);
-                                      toast.success('Action undone');
+                                      toast.success(t('toasts.action_undone'));
                                       loadMemberData(); // Reload to remove timeline event and update tabs
                                     } catch (error) {
-                                      toast.error('Failed to undo');
+                                      toast.error(t('toasts.failed_undo'));
                                     }
                                   }}>
                                     Undo
@@ -1061,7 +1061,7 @@ export const MemberDetail = () => {
                                     toast.success(t('success_messages.stage_completed'));
                                     loadMemberData(); // Reload to show timeline event
                                   } catch (error) {
-                                    toast.error('Failed');
+                                    toast.error(t('toasts.failed'));
                                   }
                                 }}>
                                   Mark Complete
@@ -1176,10 +1176,10 @@ export const MemberDetail = () => {
                                   <DropdownMenuItem onClick={async () => {
                                     try {
                                       await axios.post(`${API}/accident-followup/${stage.id}/undo`);
-                                      toast.success('Action undone');
+                                      toast.success(t('toasts.action_undone'));
                                       loadMemberData(); // Reload to remove timeline event and update tabs
                                     } catch (error) {
-                                      toast.error('Failed to undo');
+                                      toast.error(t('toasts.failed_undo'));
                                     }
                                   }}>
                                     Undo
@@ -1195,7 +1195,7 @@ export const MemberDetail = () => {
                                     toast.success('Follow-up completed');
                                     loadMemberData(); // Reload to show timeline event
                                   } catch (error) {
-                                    toast.error('Failed');
+                                    toast.error(t('toasts.failed'));
                                   }
                                 }}>
                                   Mark Complete
@@ -1481,7 +1481,7 @@ export const MemberDetail = () => {
                                       toast.success('Schedule deleted');
                                       loadMemberData();
                                     } catch (error) {
-                                      toast.error('Failed to delete');
+                                      toast.error(t('toasts.failed_delete'));
                                     }
                                   }
                                 }} className="text-red-600">
