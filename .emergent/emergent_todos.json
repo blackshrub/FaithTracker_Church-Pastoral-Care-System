@@ -1,34 +1,14 @@
 [
   {
-    "content": "Run webpack-bundle-analyzer to identify large dependencies and optimization opportunities",
-    "status": "completed"
-  },
-  {
-    "content": "Verify complete i18n coverage (EN/ID) - check for any missing translations",
-    "status": "completed"
-  },
-  {
-    "content": "Final horizontal scroll verification across all pages (390px, 768px, 1024px)",
-    "status": "completed"
-  },
-  {
-    "content": "Verify all interactive elements have unique data-testid for testing",
-    "status": "completed"
-  },
-  {
-    "content": "Run Lighthouse performance audit and address critical issues",
-    "status": "completed"
-  },
-  {
     "content": "Final comprehensive testing with testing_agent",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Fix any remaining bugs before production readiness",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update plan.md with final Phase 5 completion and overall summary",
-    "status": "pending"
+    "status": "completed"
   }
 ]
