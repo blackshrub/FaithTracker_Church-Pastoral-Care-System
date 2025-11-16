@@ -1,26 +1,6 @@
 [
   {
-    "content": "Migrate Follow-up tab content from old standalone tab to new nested Overdue -> Follow-ups child tab",
-    "status": "completed"
-  },
-  {
-    "content": "Migrate Financial Aid tab content from old standalone tab to new nested Overdue -> Aid child tab",
-    "status": "completed"
-  },
-  {
-    "content": "Migrate At Risk tab content from old standalone tab to new nested Overdue -> At Risk child tab",
-    "status": "completed"
-  },
-  {
-    "content": "Migrate Disconnected tab content from old standalone tab to new nested Overdue -> Disconnected child tab",
-    "status": "completed"
-  },
-  {
-    "content": "Delete all old standalone tab containers from the JSX",
-    "status": "completed"
-  },
-  {
-    "content": "Test all migrated tabs and verify task counts work correctly",
-    "status": "completed"
+    "content": "Update Analytics page tabs to be larger and show tab name only when active",
+    "status": "in_progress"
   }
 ]
