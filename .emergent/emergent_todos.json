@@ -1,22 +1,30 @@
 [
   {
-    "content": "Search for all window.location.reload() calls across the codebase",
+    "content": "Install @tanstack/react-query package",
     "status": "in_progress"
   },
   {
-    "content": "Identify what causes forced page reloads",
+    "content": "Setup QueryClientProvider in App.js",
     "status": "pending"
   },
   {
-    "content": "Replace forced reloads with proper data refetching",
+    "content": "Convert Dashboard.js to React Query (queries + mutations)",
     "status": "pending"
   },
   {
-    "content": "Verify no stale data appears after mutations",
+    "content": "Convert MemberDetail.js to React Query",
     "status": "pending"
   },
   {
-    "content": "Test PWA experience without forced reloads",
+    "content": "Convert MembersList.js to React Query",
+    "status": "pending"
+  },
+  {
+    "content": "Convert remaining pages to React Query",
+    "status": "pending"
+  },
+  {
+    "content": "Test all pages and verify data consistency",
     "status": "pending"
   }
 ]
