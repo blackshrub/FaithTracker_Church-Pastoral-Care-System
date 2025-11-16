@@ -1074,7 +1074,7 @@ export const Dashboard = () => {
                               🔄 {schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1)}
                             </span>
                             <span>•</span>
-                            <span className="px-2 py-0.5 bg-teal-500 text-white rounded">
+                            <span>
                               {schedule.aid_type.charAt(0).toUpperCase() + schedule.aid_type.slice(1)}
                             </span>
                           </p>
