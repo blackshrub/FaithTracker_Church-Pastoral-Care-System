@@ -95,7 +95,7 @@ export const ImportExport = () => {
   const handleUpdateSync = async (e) => {
     e.preventDefault();
     // Would update sync job in backend
-    toast.success(t('import_export.sync_updated'));
+    toast.success(t('import_export_page.sync_updated'));
     setEditSyncOpen(false);
     setEditingSyncId(null);
     loadActiveSyncs();
@@ -144,15 +144,15 @@ export const ImportExport = () => {
       formData.append('file', csvFile);
       
       const response = await axios.post(`${API}/import/members/csv`, formData);
-      toast.success(t('import_export.imported_count', {count: response.data.imported_count}));
+      toast.success(t('import_export_page.imported_count', {count: response.data.imported_count}));
       if (response.data.errors.length > 0) {
-        toast.warning(t('import_export.errors_occurred', {count: response.data.errors.length}));
+        toast.warning(t('import_export_page.errors_occurred', {count: response.data.errors.length}));
       }
       setCsvFile(null);
       setShowPreview(false);
       setCsvPreview(null);
     } catch (error) {
-      toast.error(t('import_export.import_failed'));
+      toast.error(t('import_export_page.import_failed'));
     } finally {
       setImporting(false);
     }
@@ -164,10 +164,10 @@ export const ImportExport = () => {
       setImporting(true);
       const members = JSON.parse(jsonData);
       const response = await axios.post(`${API}/import/members/json`, members);
-      toast.success(t('import_export.imported_count', {count: response.data.imported_count}));
+      toast.success(t('import_export_page.imported_count', {count: response.data.imported_count}));
       setJsonData('');
     } catch (error) {
-      toast.error(t('import_export.import_failed_json'));
+      toast.error(t('import_export_page.import_failed_json'));
     } finally {
       setImporting(false);
     }
@@ -175,7 +175,7 @@ export const ImportExport = () => {
   
   const handleApiTest = async () => {
     if (!apiUrl) {
-      toast.error(t('import_export.enter_api_url'));
+      toast.error(t('import_export_page.enter_api_url'));
       return;
     }
     
@@ -187,7 +187,7 @@ export const ImportExport = () => {
       const data = Array.isArray(response.data) ? response.data : [response.data];
       
       if (data.length === 0) {
-        toast.error(t('import_export.api_no_data'));
+        toast.error(t('import_export_page.api_no_data'));
         return;
       }
       
@@ -226,7 +226,7 @@ export const ImportExport = () => {
         qualityIssues: qualityIssues.slice(0, 10) // Show first 10 issues
       });
       setShowApiPreview(true);
-      toast.success(t('import_export.api_success'));
+      toast.success(t('import_export_page.api_success'));
       
     } catch (error) {
       setApiValidation({
@@ -234,7 +234,7 @@ export const ImportExport = () => {
         error: error.response?.data?.message || error.message || 'API connection failed'
       });
       setShowApiPreview(true);
-      toast.error(t('import_export.api_failed'));
+      toast.error(t('import_export_page.api_failed'));
     } finally {
       setImporting(false);
     }
@@ -250,9 +250,9 @@ export const ImportExport = () => {
       const response = await axios.post(`${API}/sync/members/from-api`, null, {
         params: { api_url: apiUrl, api_key: apiKey || undefined }
       });
-      toast.success(t('import_export.api_sync_created', {count: response.data.synced_count}));
+      toast.success(t('import_export_page.api_sync_created', {count: response.data.synced_count}));
       if (response.data.errors.length > 0) {
-        toast.warning(t('import_export.errors_occurred', {count: response.data.errors.length}));
+        toast.warning(t('import_export_page.errors_occurred', {count: response.data.errors.length}));
       }
       setApiUrl('');
       setApiKey('');
@@ -260,7 +260,7 @@ export const ImportExport = () => {
       setApiPreview(null);
       loadActiveSyncs();
     } catch (error) {
-      toast.error(t('import_export.api_sync_failed'));
+      toast.error(t('import_export_page.api_sync_failed'));
     } finally {
       setImporting(false);
     }
@@ -276,9 +276,9 @@ export const ImportExport = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success(t('import_export.members_exported'));
+      toast.success(t('import_export_page.members_exported'));
     } catch (error) {
-      toast.error(t('import_export.export_failed'));
+      toast.error(t('import_export_page.export_failed'));
     }
   };
   
@@ -292,9 +292,9 @@ export const ImportExport = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success(t('import_export.events_exported'));
+      toast.success(t('import_export_page.events_exported'));
     } catch (error) {
-      toast.error(t('import_export.export_failed'));
+      toast.error(t('import_export_page.export_failed'));
     }
   };
   
