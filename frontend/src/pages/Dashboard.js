@@ -132,39 +132,39 @@ const formatPhoneForWhatsApp = (phone) => {
 const markBirthdayComplete = async (eventId, setBirthdaysToday, loadReminders) => {
   try {
     await axios.post(`${API}/care-events/${eventId}/complete`);
-    toast.success('Birthday task completed!');
+    toast.success(t('toasts.birthday_completed'));
     // Update local state immediately for instant feedback
     setBirthdaysToday(prev => prev.filter(b => b.id !== eventId));
     // Reload all dashboard data to sync with backend cache
     await loadReminders();
   } catch (error) {
-    toast.error('Failed to complete');
+    toast.error(t('toasts.failed_complete'));
   }
 };
 
 const markGriefStageComplete = async (stageId, setGriefDue, loadReminders) => {
   try {
     await axios.post(`${API}/grief-support/${stageId}/complete`);
-    toast.success('Grief stage completed!');
+    toast.success(t('toasts.grief_completed'));
     // Update local state immediately for instant feedback
     setGriefDue(prev => prev.filter(s => s.id !== stageId));
     // Reload all dashboard data to sync with backend cache
     await loadReminders();
   } catch (error) {
-    toast.error('Failed to complete');
+    toast.error(t('toasts.failed_complete'));
   }
 };
 
 const markAccidentComplete = async (eventId, setAccidentFollowUp, loadReminders) => {
   try {
     await axios.post(`${API}/care-events/${eventId}/complete`);
-    toast.success('Accident follow-up completed!');
+    toast.success(t('toasts.accident_completed'));
     // Update local state immediately for instant feedback
     setAccidentFollowUp(prev => prev.filter(a => a.id !== eventId));
     // Reload all dashboard data to sync with backend cache
     await loadReminders();
   } catch (error) {
-    toast.error('Failed to complete');
+    toast.error(t('toasts.failed_complete'));
   }
 };
 
