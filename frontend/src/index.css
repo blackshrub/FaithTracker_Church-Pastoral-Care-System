@@ -324,6 +324,25 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Respect user's motion preferences - WCAG 2.1 Level AA */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  /* Disable hover transforms for reduced motion */
+  .card:hover,
+  button:hover:not(:disabled),
+  button:active:not(:disabled) {
+    transform: none !important;
+  }
+}
+
 /* Mobile bottom navigation spacing */
 @media (max-width: 640px) {
   body {
