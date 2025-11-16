@@ -17,7 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, MessageSquare } from 'lucide-react';
+import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Phone } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -766,7 +766,7 @@ export const Dashboard = () => {
                               asChild
                             >
                               <a href={formatPhoneForWhatsApp(event.member_phone)} target="_blank" rel="noopener noreferrer">
-                                <MessageSquare className="w-4 h-4 mr-1 flex-shrink-0" />
+                                <Phone className="w-4 h-4 mr-1 flex-shrink-0" />
                                 <span className="truncate">{t('contact_whatsapp')}</span>
                               </a>
                             </Button>
@@ -828,7 +828,7 @@ export const Dashboard = () => {
                             <div className="flex gap-2">
                               <Button size="default" className={`${config.btnClass} text-white h-11 flex-1 min-w-0`} asChild>
                                 <a href={formatPhoneForWhatsApp(task.member_phone)} target="_blank" rel="noopener noreferrer">
-                                  <MessageSquare className="w-4 h-4 mr-1 flex-shrink-0" />
+                                  <Phone className="w-4 h-4 mr-1 flex-shrink-0" />
                                   <span className="truncate">{t('contact_whatsapp')}</span>
                                 </a>
                               </Button>
