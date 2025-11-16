@@ -447,6 +447,7 @@
     "member_contacted": "{{name}} ditandai dihubungi! Status diperbarui menjadi Aktif.",
     "action_undone": "Tindakan dibatalkan",
     "ignored": "Diabaikan",
+    "completed": "Selesai!",
     "failed_complete": "Gagal menyelesaikan",
     "failed_mark_distributed": "Gagal menandai sebagai didistribusikan",
     "failed_ignore": "Gagal mengabaikan",
