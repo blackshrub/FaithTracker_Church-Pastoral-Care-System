@@ -870,7 +870,7 @@ export const Dashboard = () => {
                             
                             {/* Stage Badge for Grief */}
                             {task.type === 'grief_support' && (
-                              <span className="absolute top-2 left-2 px-2 py-1 bg-purple-500 text-white text-xs font-semibold rounded shadow-sm">
+                              <span className="absolute top-2 left-2 px-2 py-1 bg-purple-500 text-white text-xs font-semibold rounded shadow-sm z-10">
                                 {getGriefStageBadge(task.data.stage)}
                               </span>
                             )}
