@@ -1,10 +1,18 @@
 [
   {
-    "content": "Implement all 9 Dashboard card improvements comprehensively",
-    "status": "completed"
+    "content": "Apply 9 enhancements to Financial Aid tab - avatars, badges, buttons, member context",
+    "status": "in_progress"
   },
   {
-    "content": "Test all improvements at 390px and verify enhanced usability",
-    "status": "completed"
+    "content": "Apply 9 enhancements to At Risk tab - avatars, badges, buttons, member context",
+    "status": "pending"
+  },
+  {
+    "content": "Apply 9 enhancements to Disconnected tab - avatars, badges, buttons, member context",
+    "status": "pending"
+  },
+  {
+    "content": "Test all enhanced tabs at 390px and verify consistency",
+    "status": "pending"
   }
 ]
