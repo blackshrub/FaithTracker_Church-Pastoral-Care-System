@@ -1,6 +1,18 @@
 [
   {
-    "content": "Fixed monthly schedule day-of-month handling and annual schedule creation",
-    "status": "completed"
+    "content": "Debug monthly schedule disappearing after Mark Distributed",
+    "status": "in_progress"
+  },
+  {
+    "content": "Debug monthly schedule disappearing after Ignore",
+    "status": "pending"
+  },
+  {
+    "content": "Check backend updates next_occurrence correctly",
+    "status": "pending"
+  },
+  {
+    "content": "Check frontend filters and display logic",
+    "status": "pending"
   }
 ]
