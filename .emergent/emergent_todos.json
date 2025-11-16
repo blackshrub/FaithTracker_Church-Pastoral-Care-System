@@ -1,14 +1,18 @@
 [
   {
-    "content": "Search server.py for all UTC date usage - COMPLETE: All timeline events now use campus timezone",
-    "status": "completed"
+    "content": "Debug monthly payment schedule disappearing after ignore",
+    "status": "in_progress"
   },
   {
-    "content": "Analyze Ignore Payment behavior - Backend works correctly, adds to ignored_occurrences array",
-    "status": "completed"
+    "content": "Debug annual payment schedule not displaying when created",
+    "status": "pending"
   },
   {
-    "content": "Issue likely: React Query cache timing or UI not updating immediately after ignore",
-    "status": "completed"
+    "content": "Check monthly next_occurrence calculation in ignore endpoint",
+    "status": "pending"
+  },
+  {
+    "content": "Check annual schedule creation and display logic",
+    "status": "pending"
   }
 ]
