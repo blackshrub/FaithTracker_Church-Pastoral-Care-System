@@ -80,7 +80,11 @@ export const MemberDetail = () => {
     schedule_end_date: '',
     day_of_week: 'monday',
     day_of_month: 1,
-    month_of_year: 1
+    month_of_year: 1,
+    start_month: new Date().getMonth() + 1,
+    start_year: new Date().getFullYear(),
+    end_month: null,
+    end_year: null
   });
   
   useEffect(() => {
