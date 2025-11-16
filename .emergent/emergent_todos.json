@@ -1,6 +1,18 @@
 [
   {
-    "content": "Update Settings page tabs to be larger and show tab name only when active",
-    "status": "completed"
+    "content": "Update main README.md with latest project status",
+    "status": "in_progress"
+  },
+  {
+    "content": "Update design_guidelines.md with mobile-first tab pattern",
+    "status": "pending"
+  },
+  {
+    "content": "Update API_DOCUMENTATION.md if needed",
+    "status": "pending"
+  },
+  {
+    "content": "Update PERFORMANCE_OPTIMIZATIONS.md with dashboard refactor details",
+    "status": "pending"
   }
 ]
