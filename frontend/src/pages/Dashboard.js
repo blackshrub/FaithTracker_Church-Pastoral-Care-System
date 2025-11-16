@@ -1038,7 +1038,7 @@ export const Dashboard = () => {
                                     </span>
                                   )}
                                   {task.type !== 'grief_support' && `: ${task.details}`}
-                                  {task.days_since_last_contact && <span className="ml-2 text-xs">• Last contact {task.days_since_last_contact}d ago</span>}
+                                  {task.days_since_last_contact > 0 && <span className="ml-2 text-xs">• Last contact {task.days_since_last_contact}d ago</span>}
                                 </p>
                               </div>
                             </div>
