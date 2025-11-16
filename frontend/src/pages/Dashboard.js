@@ -789,14 +789,9 @@ export const Dashboard = () => {
                           )}
                           
                           <div className="flex items-start gap-3 mb-3">
-                            {/* Avatar with colored ring */}
-                            <div className="relative flex-shrink-0">
-                              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 p-0.5">
-                                <div className="bg-white rounded-full w-full h-full"></div>
-                              </div>
-                              <div className="relative">
-                                <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
-                              </div>
+                            {/* Avatar with colored ring - Simplified */}
+                            <div className="flex-shrink-0 rounded-full ring-2 ring-amber-400">
+                              <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
                             </div>
                             
                             <div className="flex-1 min-w-0">
