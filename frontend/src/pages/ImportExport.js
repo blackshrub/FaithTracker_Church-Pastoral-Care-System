@@ -579,7 +579,7 @@ export const ImportExport = () => {
         <TabsContent value="export" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Export Members</CardTitle>
+              <CardTitle>{t('import_export_page.export_members')}</CardTitle>
               <CardDescription>Download all members as CSV</CardDescription>
             </CardHeader>
             <CardContent>
@@ -592,7 +592,7 @@ export const ImportExport = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle>Export Care Events</CardTitle>
+              <CardTitle>{t('import_export_page.export_care_events')}</CardTitle>
               <CardDescription>Download all care events as CSV</CardDescription>
             </CardHeader>
             <CardContent>
@@ -607,7 +607,7 @@ export const ImportExport = () => {
         <TabsContent value="sync-status" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Active API Sync Jobs</CardTitle>
+              <CardTitle>{t('import_export_page.active_sync_jobs')}</CardTitle>
               <CardDescription>Monitor continuous synchronization status</CardDescription>
             </CardHeader>
             <CardContent>
@@ -652,11 +652,11 @@ export const ImportExport = () => {
               </DialogHeader>
               <form onSubmit={handleUpdateSync} className="space-y-4">
                 <div>
-                  <Label>API URL</Label>
+                  <Label>{t('import_export_page.api_url')}</Label>
                   <Input value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Sync Interval (minutes)</Label>
+                  <Label>{t('import_export_page.sync_interval_minutes')}</Label>
                   <Input type="number" value={syncInterval} onChange={(e) => setSyncInterval(parseInt(e.target.value))} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -672,8 +672,8 @@ export const ImportExport = () => {
                   ))}
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setEditSyncOpen(false)}>Cancel</Button>
-                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">Update Sync</Button>
+                  <Button type="button" variant="outline" onClick={() => setEditSyncOpen(false)}>{t('cancel')}</Button>
+                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">{t('import_export_page.update_sync')}</Button>
                 </div>
               </form>
             </DialogContent>
