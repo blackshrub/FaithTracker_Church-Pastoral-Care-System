@@ -1,15 +1,15 @@
 [
   {
     "content": "Apply 9 enhancements to Financial Aid tab - avatars, badges, buttons, member context",
-    "status": "in_progress"
+    "status": "pending"
   },
   {
     "content": "Apply 9 enhancements to At Risk tab - avatars, badges, buttons, member context",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Apply 9 enhancements to Disconnected tab - avatars, badges, buttons, member context",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test all enhanced tabs at 390px and verify consistency",
