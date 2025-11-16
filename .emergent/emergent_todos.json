@@ -1,14 +1,22 @@
 [
   {
-    "content": "Scan Settings.js, Analytics.js, MembersList.js, MemberDetail.js for hardcoded text",
-    "status": "completed"
+    "content": "Update Settings.js with translation keys",
+    "status": "in_progress"
   },
   {
-    "content": "Add all missing translation keys for these 4 pages to en.json and id.json",
-    "status": "completed"
+    "content": "Update Analytics.js with translation keys",
+    "status": "pending"
   },
   {
-    "content": "Dashboard.js - Complete internationalization (150+ replacements)",
-    "status": "completed"
+    "content": "Update MembersList.js with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Update MemberDetail.js with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Verify all 4 pages compile and work correctly",
+    "status": "pending"
   }
 ]
