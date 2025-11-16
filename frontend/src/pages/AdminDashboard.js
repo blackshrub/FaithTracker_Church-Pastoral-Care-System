@@ -109,7 +109,7 @@ export const AdminDashboard = () => {
           <Card className="max-w-full overflow-hidden">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Manage Campuses</CardTitle>
+                <CardTitle>{t('admin_dashboard_page.manage_campuses')}</CardTitle>
                 <Dialog open={campusModalOpen} onOpenChange={setCampusModalOpen}>
                   <DialogTrigger asChild>
                     <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />Add Campus</Button>
@@ -117,10 +117,10 @@ export const AdminDashboard = () => {
                   <DialogContent>
                     <DialogHeader><DialogTitle>{newCampus.id ? 'Edit Campus' : 'Add Campus'}</DialogTitle></DialogHeader>
                     <form onSubmit={handleAddCampus} className="space-y-4">
-                      <div><Label>Campus Name *</Label><Input value={newCampus.campus_name} onChange={(e) => setNewCampus({...newCampus, campus_name: e.target.value})} required /></div>
-                      <div><Label>Location</Label><Input value={newCampus.location} onChange={(e) => setNewCampus({...newCampus, location: e.target.value})} /></div>
+                      <div><Label>{t('admin_dashboard_page.campus_name')}</Label><Input value={newCampus.campus_name} onChange={(e) => setNewCampus({...newCampus, campus_name: e.target.value})} required /></div>
+                      <div><Label>{t('admin_dashboard_page.location')}</Label><Input value={newCampus.location} onChange={(e) => setNewCampus({...newCampus, location: e.target.value})} /></div>
                       <div className="flex gap-2 justify-end">
-                        <Button type="button" variant="outline" onClick={() => setCampusModalOpen(false)}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={() => setCampusModalOpen(false)}>{t('cancel')}</Button>
                         <Button type="submit" className="bg-primary-500">Save</Button>
                       </div>
                     </form>
@@ -238,13 +238,13 @@ export const AdminDashboard = () => {
           <Card className="max-w-full overflow-hidden">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Manage Users</CardTitle>
+                <CardTitle>{t('admin_dashboard_page.manage_users')}</CardTitle>
                 <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>
                   <DialogTrigger asChild>
                     <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />Add User</Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{t('admin_dashboard_page.add_user')}</DialogTitle></DialogHeader>
                     <form onSubmit={handleAddUser} className="space-y-3">
                       <div><Label>Name *</Label><Input value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required /></div>
                       <div><Label>Email *</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required /></div>
