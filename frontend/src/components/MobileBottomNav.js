@@ -28,10 +28,10 @@ export const MobileBottomNav = () => {
       testId: 'nav-members'
     },
     {
-      name: t('calendar'),
-      href: '/calendar',
-      icon: Calendar,
-      testId: 'nav-calendar'
+      name: t('financial_aid'),
+      href: '/financial-aid',
+      icon: DollarSign,
+      testId: 'nav-financial-aid'
     },
     {
       name: t('analytics'),
@@ -42,12 +42,12 @@ export const MobileBottomNav = () => {
   ];
   
   const moreMenuItems = [
-    { name: t('financial_aid'), href: '/financial-aid', icon: DollarSign },
-    ...(user?.role === 'full_admin' ? [{ name: t('admin_dashboard'), href: '/admin', icon: Shield }] : []),
-    { name: t('import_export'), href: '/import-export', icon: Upload },
-    { name: t('messaging'), href: '/messaging', icon: MessageSquare },
-    { name: t('whatsapp_logs'), href: '/whatsapp-logs', icon: Bell },
-    { name: t('settings'), href: '/settings', icon: SettingsIcon }
+    { name: t('calendar'), href: '/calendar', icon: Calendar, category: 'tools' },
+    { name: t('messaging'), href: '/messaging', icon: MessageSquare, category: 'tools' },
+    { name: t('whatsapp_logs'), href: '/whatsapp-logs', icon: Bell, category: 'tools' },
+    { name: t('import_export'), href: '/import-export', icon: Upload, category: 'tools' },
+    ...(user?.role === 'full_admin' ? [{ name: t('admin_dashboard'), href: '/admin', icon: Shield, category: 'admin' }] : []),
+    { name: t('settings'), href: '/settings', icon: SettingsIcon, category: 'admin' },
   ];
   
   const isActive = (href) => {
