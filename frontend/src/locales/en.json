@@ -476,6 +476,7 @@
     "cannot_delete_has_members": "Cannot delete - has members",
     "deleted": "Deleted",
     "failed_load": "Failed to load",
+    "failed_load_events": "Failed to load events",
     "financial_aid_recorded": "Financial aid recorded as given!",
     "financial_aid_schedule_created": "Financial aid schedule created!",
     "failed_mark_birthday": "Failed to mark birthday complete"
