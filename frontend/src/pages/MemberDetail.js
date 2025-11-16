@@ -1270,7 +1270,6 @@ export const MemberDetail = () => {
                               </DropdownMenu>
                             </div>
                           </div>
-                        </div>
                         );
                       })}
                     </div>
