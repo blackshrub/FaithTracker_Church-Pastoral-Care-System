@@ -213,10 +213,10 @@ export const AdminDashboard = () => {
                                   if (!window.confirm(`Delete ${c.campus_name}?`)) return;
                                   try {
                                     await axios.delete(`${API}/campuses/${c.id}`);
-                                    toast.success('Deleted');
+                                    toast.success(t('toasts.deleted'));
                                     loadData();
                                   } catch (e) {
-                                    toast.error('Cannot delete - has members');
+                                    toast.error(t('toasts.cannot_delete_has_members'));
                                   }
                                 }}
                               >
