@@ -1481,17 +1481,21 @@ export const MemberDetail = () => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Delete this entire financial aid schedule and all its history?')) {
+                                  if (window.confirm('Clear all ignored payments for this schedule? Future payments will continue.')) {
                                     try {
-                                      await axios.delete(`${API}/financial-aid-schedules/${schedule.id}`);
-                                      toast.success('Schedule deleted');
+                                      // Clear all ignored occurrences by setting to empty array
+                                      await axios.put(`${API}/financial-aid-schedules/${schedule.id}`, {
+                                        ignored_occurrences: []
+                                      });
+                                      toast.success('All ignored payments cleared');
                                       queryClient.invalidateQueries(['member', id]);
+                                      queryClient.invalidateQueries(['dashboard']);
                                     } catch (error) {
                                       toast.error(t('toasts.failed_delete'));
                                     }
                                   }
                                 }} className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />Delete Entire Schedule
+                                  <Trash2 className="w-4 h-4 mr-2" />Clear All Ignored Payments
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
