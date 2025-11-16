@@ -766,10 +766,10 @@ export const Dashboard = () => {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                               <Label className="font-semibold text-xs">End Month (optional)</Label>
-                              <Select value={(quickEvent.end_month || '').toString()} onValueChange={(v) => setQuickEvent({...quickEvent, end_month: v ? parseInt(v) : null})}>
+                              <Select value={(quickEvent.end_month || 'none').toString()} onValueChange={(v) => setQuickEvent({...quickEvent, end_month: v === 'none' ? null : parseInt(v)})}>
                                 <SelectTrigger className="h-12"><SelectValue placeholder="No end date" /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">No end date</SelectItem>
+                                  <SelectItem value="none">No end date</SelectItem>
                                   <SelectItem value="1">January</SelectItem>
                                   <SelectItem value="2">February</SelectItem>
                                   <SelectItem value="3">March</SelectItem>
@@ -787,10 +787,10 @@ export const Dashboard = () => {
                             </div>
                             <div>
                               <Label className="font-semibold text-xs">End Year (optional)</Label>
-                              <Select value={(quickEvent.end_year || '').toString()} onValueChange={(v) => setQuickEvent({...quickEvent, end_year: v ? parseInt(v) : null})}>
+                              <Select value={(quickEvent.end_year || 'none').toString()} onValueChange={(v) => setQuickEvent({...quickEvent, end_year: v === 'none' ? null : parseInt(v)})}>
                                 <SelectTrigger className="h-12"><SelectValue placeholder="No end date" /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">No end date</SelectItem>
+                                  <SelectItem value="none">No end date</SelectItem>
                                   {[...Array(10)].map((_, i) => {
                                     const year = new Date().getFullYear() + i;
                                     return <SelectItem key={year} value={year.toString()}>{year}</SelectItem>;
