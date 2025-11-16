@@ -17,10 +17,10 @@
   },
   {
     "content": "Delete all old standalone tab containers from the JSX",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Test all migrated tabs and verify task counts work correctly",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
