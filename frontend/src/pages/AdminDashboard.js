@@ -62,7 +62,7 @@ export const AdminDashboard = () => {
       setNewCampus({ id: null, campus_name: '', location: '' });
       loadData();
     } catch (error) {
-      toast.error('Failed');
+      toast.error(t('toasts.failed'));
     }
   };
   
@@ -70,12 +70,12 @@ export const AdminDashboard = () => {
     e.preventDefault();
     try {
       await axios.post(`${API}/auth/register`, newUser);
-      toast.success(`User created!`);
+      toast.success(t('admin_dashboard.user_created'));
       setUserModalOpen(false);
       setNewUser({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed');
+      toast.error(error.response?.data?.detail || t('toasts.failed'));
     }
   };
   
