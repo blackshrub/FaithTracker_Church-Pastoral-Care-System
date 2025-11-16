@@ -315,6 +315,26 @@ export const Dashboard = () => {
             });
           } else {
             // Scheduled aid: Create schedule
+            // Convert Month/Year Selects to date format for monthly
+            let startDate = quickEvent.schedule_start_date;
+            let endDate = quickEvent.schedule_end_date;
+            
+            if (quickEvent.schedule_frequency === 'monthly') {
+              // Convert start_month + start_year to YYYY-MM-01 format
+              const startMonth = quickEvent.start_month || new Date().getMonth() + 1;
+              const startYear = quickEvent.start_year || new Date().getFullYear();
+              startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+              
+              // Convert end_month + end_year to YYYY-MM-01 format (if provided)
+              if (quickEvent.end_month && quickEvent.end_year) {
+                endDate = `${quickEvent.end_year}-${String(quickEvent.end_month).padStart(2, '0')}-01`;
+              } else {
+                endDate = null;
+              }
+            } else if (quickEvent.schedule_frequency === 'weekly') {
+              startDate = new Date().toISOString().split('T')[0]; // Use today for weekly
+            }
+            
             await axios.post(`${API}/financial-aid-schedules`, {
               member_id: memberId,
               campus_id: member.campus_id,
@@ -322,10 +342,8 @@ export const Dashboard = () => {
               aid_type: quickEvent.aid_type,
               aid_amount: parseFloat(quickEvent.aid_amount),
               frequency: quickEvent.schedule_frequency,
-              start_date: quickEvent.schedule_frequency === 'weekly' 
-                ? new Date().toISOString().split('T')[0]  // Use today for weekly
-                : quickEvent.schedule_start_date,
-              end_date: quickEvent.schedule_end_date || null,
+              start_date: startDate,
+              end_date: endDate,
               day_of_week: quickEvent.day_of_week,
               day_of_month: quickEvent.day_of_month,
               month_of_year: quickEvent.month_of_year,
