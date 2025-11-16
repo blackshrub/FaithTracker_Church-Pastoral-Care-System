@@ -389,7 +389,7 @@ export const MembersList = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all">{t('members_list.all_status')}</SelectItem>
                     <SelectItem value="active">{t('active')}</SelectItem>
                     <SelectItem value="at_risk">{t('at_risk')}</SelectItem>
                     <SelectItem value="disconnected">{t('disconnected')}</SelectItem>
@@ -410,7 +410,7 @@ export const MembersList = () => {
             
             {/* Column Visibility Toggles */}
             <div className="border-t pt-4">
-              <p className="text-sm font-semibold mb-2">Show Columns:</p>
+              <p className="text-sm font-semibold mb-2">{t('members_list.show_columns')}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                 {Object.entries({
                   phone: 'Phone', age: 'Age', gender: 'Gender', membership: 'Membership',
@@ -439,8 +439,8 @@ export const MembersList = () => {
           <div className="p-4 bg-amber-50 border-b flex items-center justify-between">
             <span className="font-semibold">{selectedMembers.length} members selected</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>Clear Selection</Button>
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>Delete Selected</Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>{t('members_list.clear_selection')}</Button>
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>{t('members_list.delete_selected')}</Button>
             </div>
           </div>
         )}
@@ -449,7 +449,7 @@ export const MembersList = () => {
             <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-5 h-5 text-teal-500 animate-spin" />
-                <span className="text-sm text-teal-700">Loading members...</span>
+                <span className="text-sm text-teal-700">{t('members_list.loading_members')}</span>
               </div>
             </div>
           )}
@@ -460,12 +460,12 @@ export const MembersList = () => {
                   <TableHead className="w-12 hidden sm:table-cell">
                     <input type="checkbox" checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0} onChange={toggleSelectAll} className="w-4 h-4" />
                   </TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">Phone</TableHead>
-                  <TableHead className="hidden lg:table-cell">Age</TableHead>
-                  <TableHead className="hidden lg:table-cell">Gender</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('members_list.name')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('members_list.phone')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('members_list.age_column')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('members_list.gender_column')}</TableHead>
+                  <TableHead>{t('members_list.status_column')}</TableHead>
+                  <TableHead className="text-right">{t('members_list.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -474,7 +474,7 @@ export const MembersList = () => {
                     <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
-                        <span className="text-muted-foreground">Searching members...</span>
+                        <span className="text-muted-foreground">{t('members_list.searching_members')}</span>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -507,8 +507,8 @@ export const MembersList = () => {
                           <Link to={`/members/${member.id}`}>
                             <Button size="sm" variant="outline">{t('view')}</Button>
                           </Link>
-                          <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => { setEditingMember(member); setEditModalOpen(true); }}>Edit</Button>
-                          <Button size="sm" variant="ghost" className="text-red-600 hidden sm:inline-flex" onClick={() => handleDeleteMember(member.id, member.name)}>Delete</Button>
+                          <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => { setEditingMember(member); setEditModalOpen(true); }}>{t('edit')}</Button>
+                          <Button size="sm" variant="ghost" className="text-red-600 hidden sm:inline-flex" onClick={() => handleDeleteMember(member.id, member.name)}>{t('delete')}</Button>
                         </div>
                       </TableCell>
                     </TableRow>
