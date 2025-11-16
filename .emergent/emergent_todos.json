@@ -1,30 +1,30 @@
 [
   {
-    "content": "Get list of all pages and components to scan",
+    "content": "Dashboard.js internationalization - translations, toast messages, confirmations",
     "status": "completed"
   },
   {
-    "content": "Scan all pages for hardcoded English text and compile master list",
-    "status": "completed"
-  },
-  {
-    "content": "Add all missing translation keys to en.json with proper structure",
-    "status": "completed"
-  },
-  {
-    "content": "Add all Indonesian translations to id.json",
-    "status": "completed"
-  },
-  {
-    "content": "Replace hardcoded toast messages in Dashboard.js",
-    "status": "in_progress"
-  },
-  {
-    "content": "Replace hardcoded confirmation dialogs in Dashboard.js",
+    "content": "Settings.js - complete internationalization",
     "status": "pending"
   },
   {
-    "content": "Verify Dashboard.js translations complete",
+    "content": "Analytics.js - complete internationalization",
+    "status": "pending"
+  },
+  {
+    "content": "MembersList.js - complete internationalization",
+    "status": "pending"
+  },
+  {
+    "content": "MemberDetail.js - complete internationalization",
+    "status": "pending"
+  },
+  {
+    "content": "AdminDashboard.js, FinancialAid.js, Calendar.js, LoginPage.js - complete internationalization",
+    "status": "pending"
+  },
+  {
+    "content": "All components - complete internationalization",
     "status": "pending"
   }
 ]
