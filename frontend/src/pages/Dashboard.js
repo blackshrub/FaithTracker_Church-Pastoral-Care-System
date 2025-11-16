@@ -674,7 +674,7 @@ export const Dashboard = () => {
                           type="number"
                           value={quickEvent.aid_amount}
                           onChange={(e) => setQuickEvent({...quickEvent, aid_amount: e.target.value})}
-                          placeholder="1500000"
+                          placeholder={t('form_placeholders.amount_example')}
                           className="h-12"
                           required
                         />
@@ -687,7 +687,7 @@ export const Dashboard = () => {
                       <div>
                         <Label className="font-semibold">Frequency</Label>
                         <Select value={quickEvent.schedule_frequency || 'one_time'} onValueChange={(v) => setQuickEvent({...quickEvent, schedule_frequency: v})}>
-                          <SelectTrigger className="h-12"><SelectValue placeholder="Select frequency..." /></SelectTrigger>
+                          <SelectTrigger className="h-12"><SelectValue placeholder={t('form_placeholders.select_frequency')} /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="one_time">One-time Payment (already given)</SelectItem>
                             <SelectItem value="weekly">Weekly Schedule (future payments)</SelectItem>
@@ -810,7 +810,7 @@ export const Dashboard = () => {
                           </div>
                           <div>
                             <Label className="font-semibold text-xs">Day of Month *</Label>
-                            <Input type="number" min="1" max="31" value={quickEvent.day_of_month || ''} onChange={(e) => setQuickEvent({...quickEvent, day_of_month: parseInt(e.target.value) || 1})} placeholder="13" className="h-12" required />
+                            <Input type="number" min="1" max="31" value={quickEvent.day_of_month || ''} onChange={(e) => setQuickEvent({...quickEvent, day_of_month: parseInt(e.target.value) || 1})} placeholder={t('form_placeholders.day_example')} className="h-12" required />
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
@@ -976,7 +976,7 @@ export const Dashboard = () => {
                                 </a>
                               )}
                               <p className="text-sm text-muted-foreground mt-1">
-                                {event.completed ? "✅ Birthday contact completed" : "Call to wish happy birthday"}
+                                {event.completed ? "✅ Birthday contact completed" : t('labels.call_wish_birthday')}
                                 {event.member_age && <span className="ml-2 text-xs">• {event.member_age} years old</span>}
                               </p>
                             </div>
