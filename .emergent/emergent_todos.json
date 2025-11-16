@@ -1,14 +1,14 @@
 [
   {
-    "content": "Debug 'Delete Entire Schedule' in Ignored Payments section",
+    "content": "Rename 'Delete Entire Schedule' button in Ignored section to 'Clear All Ignored Payments'",
     "status": "in_progress"
   },
   {
-    "content": "Understand user expectation vs current behavior",
+    "content": "Change button action to clear ignored_occurrences array instead of deleting schedule",
     "status": "pending"
   },
   {
-    "content": "Fix delete logic if needed",
+    "content": "Test clearing ignored payments keeps upcoming schedule visible",
     "status": "pending"
   }
 ]
