@@ -1066,20 +1066,28 @@ export const Dashboard = () => {
                               📞 {schedule.member_phone}
                             </a>
                           )}
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-lg font-bold text-foreground mt-1">
+                            Rp {schedule.aid_amount?.toLocaleString('id-ID')}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1">
                               🔄 {schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1)}
                             </span>
-                            <span className="mx-2">•</span>
-                            <span className="font-semibold text-foreground">Rp {schedule.aid_amount?.toLocaleString('id-ID')}</span>
-                            <span className="mx-2">•</span>
-                            <span className="px-2 py-0.5 bg-teal-500 text-white text-xs rounded">
+                            <span>•</span>
+                            <span className="px-2 py-0.5 bg-teal-500 text-white rounded">
                               {schedule.aid_type.charAt(0).toUpperCase() + schedule.aid_type.slice(1)}
                             </span>
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            📅 {formatDate(schedule.next_occurrence)}
-                            {schedule.member_age && <span className="ml-2">• {schedule.member_age} years old</span>}
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1">
+                              📅 {formatDate(schedule.next_occurrence)}
+                            </span>
+                            {schedule.member_age && (
+                              <>
+                                <span>•</span>
+                                <span>{schedule.member_age} years old</span>
+                              </>
+                            )}
                           </p>
                         </div>
                       </div>
