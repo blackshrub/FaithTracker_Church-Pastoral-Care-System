@@ -711,6 +711,8 @@
     "api_url": "URL API",
     "update_sync": "Perbarui Sinkronisasi",
     "sync_now": "Sinkronkan Sekarang",
+    "testing": "Mengetes...",
+    "confirm_sync": "Konfirmasi Pengaturan Sinkronisasi API ({{total}} jemaat, setiap {{interval}} menit)",
     "sync_updated": "Pekerjaan sinkronisasi diperbarui!",
     "imported_count": "Mengimpor {{count}} jemaat!",
     "errors_occurred": "{{count}} kesalahan terjadi",
