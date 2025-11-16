@@ -1186,76 +1186,68 @@ export const MemberDetail = () => {
                         const isIgnored = schedule.ignored === true;
                         return (
                         <div key={schedule.id} className={`p-4 rounded-lg border relative hover:shadow-lg transition-all ${isIgnored ? 'bg-gray-50 border-gray-300 card-border-left-gray opacity-70' : 'bg-purple-50 border-purple-200 card-border-left-purple'}`}>
-                          {/* Status Badge */}
-                          {isIgnored ? (
-                            <span className="absolute top-3 right-3 px-2 py-1 bg-gray-400 text-white text-xs font-semibold rounded shadow-sm z-10">
+                          {/* Only show Ignored badge */}
+                          {isIgnored && (
+                            <span className="absolute top-3 right-14 px-2 py-1 bg-gray-400 text-white text-xs font-semibold rounded shadow-sm z-10">
                               Ignored
-                            </span>
-                          ) : (
-                            <span className="absolute top-3 right-3 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded shadow-sm z-10">
-                              Active
                             </span>
                           )}
                           
-                          <div className="flex items-start gap-3 mb-3">
-                            {/* Aid Type Icon */}
-                            <div className="text-3xl flex-shrink-0">
-                              {getAidTypeIcon(schedule.aid_type)}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              {/* Aid Type Icon */}
+                              <div className="text-3xl flex-shrink-0">
+                                {getAidTypeIcon(schedule.aid_type)}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                {/* Title */}
+                                {schedule.title && (
+                                  <p className="font-semibold text-base text-foreground mb-1">
+                                    {schedule.title}
+                                  </p>
+                                )}
+                                {/* Amount - Hero */}
+                                <p className="text-lg font-bold text-foreground">
+                                  Rp {schedule.aid_amount?.toLocaleString('id-ID')}
+                                </p>
+                                {/* Frequency + Aid Type */}
+                                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                                  <span className="inline-flex items-center gap-1">
+                                    🔄 {schedule.frequency?.charAt(0).toUpperCase() + schedule.frequency?.slice(1)}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{schedule.aid_type?.charAt(0).toUpperCase() + schedule.aid_type?.slice(1)}</span>
+                                </p>
+                                {/* Dates */}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  📅 Next: {formatDate(schedule.next_occurrence, 'dd MMM yyyy')}
+                                </p>
+                              </div>
                             </div>
                             
-                            <div className="flex-1 min-w-0">
-                              {/* Amount - Hero */}
-                              <p className="text-lg font-bold text-foreground">
-                                Rp {schedule.aid_amount?.toLocaleString('id-ID')}
-                              </p>
-                              {/* Frequency + Aid Type */}
-                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                                <span className="inline-flex items-center gap-1">
-                                  🔄 {schedule.frequency?.charAt(0).toUpperCase() + schedule.frequency?.slice(1)}
-                                </span>
-                                <span>•</span>
-                                <span>{schedule.aid_type?.charAt(0).toUpperCase() + schedule.aid_type?.slice(1)}</span>
-                              </p>
-                              {/* Dates */}
-                              <p className="text-xs text-muted-foreground mt-1">
-                                📅 Next: {formatDate(schedule.next_occurrence, 'dd MMM yyyy')}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {/* Actions */}
-                          <div className="flex gap-2">
-                            <Button size="default" variant="outline" onClick={async () => {
-                              if (window.confirm('Mark this scheduled payment as distributed?')) {
-                                try {
-                                  await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
-                                  toast.success('Payment distributed! Schedule advanced to next occurrence.');
-                                  loadMemberData();
-                                } catch (error) {
-                                  toast.error('Failed to mark payment');
-                                }
-                              }
-                            }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
-                              <Check className="w-4 h-4 mr-1" />
-                              <span className="truncate">Distributed</span>
-                            </Button>
+                            {/* Three Dots - Top Right */}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button size="default" variant="ghost" className="h-11 w-11 p-0 flex-shrink-0">
-                                  <MoreVertical className="w-5 h-5" />
+                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 flex-shrink-0">
+                                  <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-32">
+                              <DropdownMenuContent align="end" className="w-40">
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Stop this aid schedule? (Ignored history will be preserved)')) {
+                                  if (window.confirm('Mark this scheduled payment as distributed?')) {
                                     try {
-                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
-                                      toast.success('Schedule stopped');
+                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                      toast.success('Payment distributed! Schedule advanced to next occurrence.');
                                       loadMemberData();
                                     } catch (error) {
-                                      toast.error('Failed to stop schedule');
+                                      toast.error('Failed to mark payment');
                                     }
                                   }
+                                }} className="text-green-600">
+                                  <Check className="w-4 h-4 mr-2" />
+                                  Distributed
+                                </DropdownMenuItem>
                                   }}>
                                     Stop Schedule
                                   </DropdownMenuItem>
