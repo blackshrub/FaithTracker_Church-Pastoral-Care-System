@@ -1698,59 +1698,53 @@ export const Dashboard = () => {
                               <span className="truncate">{t('contact_whatsapp')}</span>
                             </a>
                           </Button>
+                          
+                          {/* Complete Button - Type-specific */}
+                          {task.type === 'financial_aid' ? (
+                            <Button size="default" variant="outline" onClick={async () => {
+                              triggerHaptic();
+                              try {
+                                await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
+                                toast.success('Payment distributed!');
+                                setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
+                              } catch (error) {
+                                toast.error('Failed');
+                              }
+                            }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                              <Check className="w-4 h-4 mr-1" />
+                              <span className="truncate">{t('mark_distributed')}</span>
+                            </Button>
+                          ) : (
+                            <Button size="default" variant="outline" onClick={async () => {
+                              triggerHaptic();
+                              try {
+                                let endpoint;
+                                if (task.type === 'grief_support') endpoint = `${API}/grief-support/${task.data.id}/complete`;
+                                else if (task.type === 'accident_followup') endpoint = `${API}/accident-followup/${task.data.id}/complete`;
+                                else if (task.type === 'birthday') endpoint = `${API}/care-events/${task.data.id}/complete`;
+                                
+                                if (endpoint) {
+                                  await axios.post(endpoint);
+                                  toast.success('Completed!');
+                                  setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
+                                }
+                              } catch (error) {
+                                toast.error('Failed');
+                              }
+                            }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                              <Check className="w-4 h-4 mr-1" />
+                              <span className="truncate">{t('mark_complete')}</span>
+                            </Button>
+                          )}
+                          
+                          {/* Three Dots - Ignore only */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button size="default" variant="ghost" className="h-11 w-11 p-0 flex-shrink-0">
                                 <MoreVertical className="w-5 h-5" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              {/* Mark Complete - Type-specific */}
-                              {task.type === 'financial_aid' && (
-                                <DropdownMenuItem onClick={async () => {
-                                  try {
-                                    await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
-                                    toast.success('Payment distributed!');
-                                    setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
-                                  } catch (error) {
-                                    toast.error('Failed');
-                                  }
-                                }}>
-                                  {t('mark_distributed')}
-                                </DropdownMenuItem>
-                              )}
-                              {(task.type === 'grief_support' || task.type === 'accident_followup') && (
-                                <DropdownMenuItem onClick={async () => {
-                                  triggerHaptic();
-                                  try {
-                                    const endpoint = task.type === 'grief_support' 
-                                      ? `${API}/grief-support/${task.data.id}/complete`
-                                      : `${API}/accident-followup/${task.data.id}/complete`;
-                                    await axios.post(endpoint);
-                                    toast.success('Completed!');
-                                    setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
-                                  } catch (error) {
-                                    toast.error('Failed');
-                                  }
-                                }}>
-                                  {t('mark_complete')}
-                                </DropdownMenuItem>
-                              )}
-                              {task.type === 'birthday' && (
-                                <DropdownMenuItem onClick={async () => {
-                                  triggerHaptic();
-                                  try {
-                                    await axios.post(`${API}/care-events/${task.data.id}/complete`);
-                                    toast.success('Birthday marked complete!');
-                                    setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
-                                  } catch (error) {
-                                    toast.error('Failed');
-                                  }
-                                }}>
-                                  {t('mark_complete')}
-                                </DropdownMenuItem>
-                              )}
-                              {/* Ignore - All types */}
+                            <DropdownMenuContent align="end" className="w-32">
                               <DropdownMenuItem onClick={async () => {
                                 try {
                                   let endpoint;
