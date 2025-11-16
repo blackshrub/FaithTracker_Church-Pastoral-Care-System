@@ -1357,8 +1357,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                         "member_age": member.get("age"),
                         "days_overdue": days_overdue
                     })
-            elif tomorrow <= this_year_birthday <= week_ahead:
-                # Upcoming birthday (1-7 days ahead)
+            elif tomorrow <= this_year_birthday <= week_ahead and not event.get("completed") and not event.get("ignored"):
+                # Upcoming birthday (1-7 days ahead) - exclude completed and ignored
                 days_until = (this_year_birthday - today).days
                 upcoming_tasks.append({
                     "type": "birthday",
