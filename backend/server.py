@@ -1340,7 +1340,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     **event,
                     "member_name": member["name"],
                     "member_phone": member["phone"],
-                    "member_photo_url": member.get("photo_url")
+                    "member_photo_url": member.get("photo_url"),
+                    "member_age": member.get("age")
                 })
             elif this_year_birthday < today and not event.get("completed") and not event.get("ignored"):
                 # Overdue birthday (past but not completed and not ignored)
