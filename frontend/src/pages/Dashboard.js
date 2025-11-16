@@ -900,16 +900,16 @@ export const Dashboard = () => {
         <div className="overflow-hidden">
           <TabsList className="flex w-full">
             <TabsTrigger value="today" className="flex-1">
-              <Bell className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Today</span>
+              <Bell className="w-4 h-4 mr-2" />
+              <span>Today</span>
             </TabsTrigger>
             <TabsTrigger value="overdue" className="flex-1">
-              <AlertTriangle className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Overdue</span>
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              <span>Overdue</span>
             </TabsTrigger>
             <TabsTrigger value="upcoming" className="flex-1">
-              <Heart className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Upcoming</span>
+              <Heart className="w-4 h-4 mr-2" />
+              <span>Upcoming</span>
             </TabsTrigger>
           </TabsList>
         </div>
