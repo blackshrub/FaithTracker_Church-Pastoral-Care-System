@@ -319,17 +319,16 @@ export const MemberDetail = () => {
               </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="add-care-event-modal">
               <DialogHeader>
-                <DialogTitle>{t('add_care_event')}</DialogTitle>
+                <DialogTitle className="text-2xl font-playfair">{t('add_care_event')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAddCareEvent} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Event Type *</Label>
-                    <Select value={newEvent.event_type} onValueChange={(v) => setNewEvent({...newEvent, event_type: v})} required>
-                      <SelectTrigger data-testid="event-type-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
+                <div>
+                  <Label className="font-semibold">Event Type</Label>
+                  <Select value={newEvent.event_type} onValueChange={(v) => setNewEvent({...newEvent, event_type: v})} required>
+                    <SelectTrigger className="h-12" data-testid="event-type-select">
+                      <SelectValue placeholder="Select event type..." />
+                    </SelectTrigger>
+                    <SelectContent>
                         <SelectItem value="childbirth">👶 {t('event_types.childbirth')}</SelectItem>
                         <SelectItem value="grief_loss">💔 {t('event_types.grief_loss')}</SelectItem>
                         <SelectItem value="new_house">🏠 {t('event_types.new_house')}</SelectItem>
