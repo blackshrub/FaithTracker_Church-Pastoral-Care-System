@@ -263,7 +263,7 @@ export const AdminDashboard = () => {
                       {newUser.role !== 'full_admin' && (
                         <div><Label>Campus *</Label>
                           <Select value={newUser.campus_id} onValueChange={(v) => setNewUser({...newUser, campus_id: v})}>
-                            <SelectTrigger className="h-12"><SelectValue placeholder="Select" /></SelectTrigger>
+                            <SelectTrigger className="h-12"><SelectValue placeholder={t('misc.select')} /></SelectTrigger>
                             <SelectContent position="popper" sideOffset={5} className="max-h-[200px] overflow-y-auto">
                               {campuses.map(c => <SelectItem key={c.id} value={c.id}>{c.campus_name}</SelectItem>)}
                             </SelectContent>
