@@ -9,6 +9,6 @@
   },
   {
     "content": "Test cache invalidation works in both staging and production",
-    "status": "in_progress"
+    "status": "completed"
   }
 ]
