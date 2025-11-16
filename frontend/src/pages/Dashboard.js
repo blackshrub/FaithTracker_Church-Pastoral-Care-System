@@ -469,7 +469,7 @@ export const Dashboard = () => {
               </DialogHeader>
               <form onSubmit={handleQuickEvent} className="space-y-4">
                 {/* Member Selection */}
-                <div className="space-y-2 p-4 bg-muted/10 rounded-lg">
+                <div className="space-y-2">
                   <Label className="font-semibold">{t('select_members_required')} *</Label>
                   <Input
                     value={memberSearch}
