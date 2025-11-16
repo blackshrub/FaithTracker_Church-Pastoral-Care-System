@@ -23,7 +23,7 @@ export const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [campusModalOpen, setCampusModalOpen] = useState(false);
-  const [newCampus, setNewCampus] = useState({ campus_name: '', location: '' });
+  const [newCampus, setNewCampus] = useState({ id: null, campus_name: '', location: '' });
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
   
@@ -47,10 +47,17 @@ export const AdminDashboard = () => {
   const handleAddCampus = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API}/campuses`, newCampus);
-      toast.success('Campus created!');
+      if (newCampus.id) {
+        // Update existing campus
+        await axios.put(`${API}/campuses/${newCampus.id}`, { campus_name: newCampus.campus_name, location: newCampus.location });
+        toast.success('Campus updated');
+      } else {
+        // Create new campus
+        await axios.post(`${API}/campuses`, newCampus);
+        toast.success('Campus created!');
+      }
       setCampusModalOpen(false);
-      setNewCampus({ campus_name: '', location: '' });
+      setNewCampus({ id: null, campus_name: '', location: '' });
       loadData();
     } catch (error) {
       toast.error('Failed');
@@ -137,7 +144,7 @@ export const AdminDashboard = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-32">
                           <DropdownMenuItem onClick={() => {
-                            setNewCampus({campus_name: c.campus_name, location: c.location || ''});
+                            setNewCampus({id: c.id, campus_name: c.campus_name, location: c.location || ''});
                             setCampusModalOpen(true);
                           }}>
                             Edit
