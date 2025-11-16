@@ -1,6 +1,18 @@
 [
   {
-    "content": "Assess React Query migration status and decide next steps",
+    "content": "Debug upcoming birthday complete button in Dashboard.js",
     "status": "in_progress"
+  },
+  {
+    "content": "Check if mutation is being called",
+    "status": "pending"
+  },
+  {
+    "content": "Fix complete button for upcoming birthdays",
+    "status": "pending"
+  },
+  {
+    "content": "Test birthday complete works in Upcoming tab",
+    "status": "pending"
   }
 ]
