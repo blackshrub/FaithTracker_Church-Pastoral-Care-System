@@ -106,30 +106,80 @@ export const MobileBottomNav = () => {
             </SheetTrigger>
             <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl">
               <SheetHeader className="mb-4">
-                <SheetTitle className="text-2xl font-playfair">{t('more_menu')}</SheetTitle>
+                <SheetTitle className="text-2xl font-playfair">Menu</SheetTitle>
               </SheetHeader>
               
-              <div className="space-y-2">
-                {moreMenuItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.href);
-                  
-                  return (
+              <div className="space-y-6 overflow-y-auto h-[calc(80vh-100px)]">
+                {/* Tools Section */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                    {t('tools')}
+                  </p>
+                  <div className="space-y-2">
+                    {moreMenuItems.filter(item => item.category === 'tools').map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.href);
+                      
+                      return (
+                        <button
+                          key={item.name}
+                          onClick={() => handleMoreMenuClick(item.href)}
+                          className={`w-full flex items-center gap-4 p-4 rounded-lg transition-colors ${
+                            active
+                              ? 'bg-teal-50 text-teal-700 font-semibold'
+                              : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                          }`}
+                          aria-label={`Navigate to ${item.name}`}
+                        >
+                          <Icon className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                          <span className="text-base">{item.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                {/* Admin Section */}
+                <div>
+                  <div className="space-y-2">
+                    {moreMenuItems.filter(item => item.category === 'admin').map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.href);
+                      
+                      return (
+                        <button
+                          key={item.name}
+                          onClick={() => handleMoreMenuClick(item.href)}
+                          className={`w-full flex items-center gap-4 p-4 rounded-lg transition-colors ${
+                            active
+                              ? 'bg-teal-50 text-teal-700 font-semibold'
+                              : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                          }`}
+                          aria-label={`Navigate to ${item.name}`}
+                        >
+                          <Icon className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                          <span className="text-base">{item.name}</span>
+                        </button>
+                      );
+                    })}
+                    
+                    {/* Logout Button */}
                     <button
-                      key={item.name}
-                      onClick={() => handleMoreMenuClick(item.href)}
-                      className={`w-full flex items-center gap-4 p-4 rounded-lg transition-colors ${
-                        active
-                          ? 'bg-teal-50 text-teal-700 font-semibold'
-                          : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
-                      }`}
-                      aria-label={`Navigate to ${item.name}`}
+                      onClick={() => {
+                        logout();
+                        navigate('/login');
+                        setMoreMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-4 p-4 rounded-lg transition-colors text-red-600 hover:bg-red-50"
+                      aria-label="Logout"
                     >
-                      <Icon className="h-6 w-6" aria-hidden="true" />
-                      <span className="text-base">{item.name}</span>
+                      <LogOut className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                      <span className="text-base font-semibold">{t('logout')}</span>
                     </button>
-                  );
-                })}
+                  </div>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
