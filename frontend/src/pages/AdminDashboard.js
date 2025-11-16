@@ -252,7 +252,24 @@ export const AdminDashboard = () => {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {u.id !== user.id && <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id, u.name)}><Trash2 className="w-4 h-4 text-red-600" /></Button>}
+                          {u.id !== user.id && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" position="popper" sideOffset={5}>
+                                <DropdownMenuItem 
+                                  className="text-red-600"
+                                  onClick={() => handleDeleteUser(u.id, u.name)}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
