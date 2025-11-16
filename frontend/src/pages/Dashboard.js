@@ -419,58 +419,58 @@ export const Dashboard = () => {
       </div>
       
       {/* Stats Cards with Colored Left Borders */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-full">
         <Card className="card-border-left-teal shadow-sm hover:shadow-md transition-all min-w-0">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground mb-1">{t('total_members')}</p>
-                <p className="text-4xl font-playfair font-bold">805</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">{t('total_members')}</p>
+                <p className="text-2xl sm:text-4xl font-playfair font-bold">805</p>
               </div>
-              <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
-                <Users className="w-7 h-7 text-teal-600" />
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 sm:w-7 sm:h-7 text-teal-600" />
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="card-border-left-amber shadow-sm hover:shadow-md transition-all min-w-0">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground mb-1">{t('total_interactions')}</p>
-                <p className="text-4xl font-playfair font-bold">{birthdaysToday.length + griefToday.length + hospitalFollowUp.length}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Tasks Due Today</p>
+                <p className="text-2xl sm:text-4xl font-playfair font-bold">{birthdaysToday.length + todayTasks.length}</p>
               </div>
-              <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-7 h-7 text-amber-600" />
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Bell className="w-5 h-5 sm:w-7 sm:h-7 text-amber-600" />
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="card-border-left-pink shadow-sm hover:shadow-md transition-all min-w-0">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground mb-1">{t('pending_reminders')}</p>
-                <p className="text-4xl font-playfair font-bold">{griefDue.length + financialAidDue.length}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Overdue Follow-ups</p>
+                <p className="text-2xl sm:text-4xl font-playfair font-bold">{griefDue.length + accidentFollowUp.length + financialAidDue.length}</p>
               </div>
-              <div className="w-14 h-14 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
-                <Bell className="w-7 h-7 text-pink-600" />
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
+                <Heart className="w-5 h-5 sm:w-7 sm:h-7 text-pink-600" />
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="card-border-left-purple shadow-sm hover:shadow-md transition-all min-w-0">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground mb-1">{t('at_risk_disconnected')}</p>
-                <p className="text-4xl font-playfair font-bold">{atRiskMembers.length + disconnectedMembers.length}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Members Needing Care</p>
+                <p className="text-2xl sm:text-4xl font-playfair font-bold">{atRiskMembers.length + disconnectedMembers.length}</p>
               </div>
-              <div className="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                <Heart className="w-7 h-7 text-purple-600" />
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 sm:w-7 sm:h-7 text-purple-600" />
               </div>
             </div>
           </CardContent>
