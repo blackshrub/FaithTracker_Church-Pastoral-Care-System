@@ -469,9 +469,9 @@ export const MemberDetail = () => {
                     <div className="space-y-4 border-t pt-4">
                       <h5 className="font-semibold text-green-800 dark:text-green-200">📅 Payment Type</h5>
                       <div>
-                        <Label>Frequency *</Label>
+                        <Label className="font-semibold">Frequency</Label>
                         <Select value={newEvent.schedule_frequency} onValueChange={(v) => setNewEvent({...newEvent, schedule_frequency: v})}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-12"><SelectValue placeholder="Select frequency..." /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="one_time">One-time Payment (already given)</SelectItem>
                             <SelectItem value="weekly">Weekly Schedule (future payments)</SelectItem>
@@ -483,13 +483,27 @@ export const MemberDetail = () => {
                       
                       {newEvent.schedule_frequency === 'one_time' && (
                         <div>
-                          <Label>Payment Date *</Label>
-                          <Input
-                            type="date"
-                            value={newEvent.payment_date}
-                            onChange={(e) => setNewEvent({...newEvent, payment_date: e.target.value})}
-                            required
-                          />
+                          <Label className="font-semibold">Payment Date</Label>
+                          <Popover modal={true}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newEvent.payment_date ? formatDateFns(new Date(newEvent.payment_date), 'dd MMM yyyy') : <span className="text-muted-foreground">Select payment date...</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-3 z-[9999]" side="bottom" align="center">
+                              <CalendarComponent
+                                mode="single"
+                                selected={newEvent.payment_date ? new Date(newEvent.payment_date) : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    setNewEvent({...newEvent, payment_date: formatDateFns(date, 'yyyy-MM-dd')});
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                           <p className="text-xs text-muted-foreground mt-1">Date when aid was given</p>
                         </div>
                       )}
