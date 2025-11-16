@@ -1420,8 +1420,7 @@ export const Dashboard = () => {
                               try {
                                 await axios.post(`${API}/accident-followup/${followup.id}/complete`);
                                 toast.success(t('toasts.accident_completed'));
-                                setAccidentFollowUp(prev => prev.filter(a => a.id !== followup.id));
-                                await loadReminders();
+                                await queryClient.invalidateQueries(['dashboard']);
                               } catch (error) {
                                 toast.error(t('toasts.failed_complete'));
                               }
@@ -1440,8 +1439,7 @@ export const Dashboard = () => {
                                   try {
                                     await axios.post(`${API}/accident-followup/${followup.id}/ignore`);
                                     toast.success(t('toasts.accident_ignored'));
-                                    setAccidentFollowUp(prev => prev.filter(a => a.id !== followup.id));
-                                    await loadReminders();
+                                    await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
                                     toast.error('Failed to ignore');
                                   }
@@ -1522,8 +1520,7 @@ export const Dashboard = () => {
                                   try {
                                     await axios.post(`${API}/grief-support/${stage.id}/ignore`);
                                     toast.success(t('toasts.grief_ignored'));
-                                    setGriefDue(prev => prev.filter(s => s.id !== stage.id));
-                                    await loadReminders();
+                                    await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
                                     toast.error('Failed to ignore');
                                   }
