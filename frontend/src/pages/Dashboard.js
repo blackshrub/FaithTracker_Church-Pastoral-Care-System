@@ -780,18 +780,18 @@ export const Dashboard = () => {
                               <Select value={(quickEvent.start_month || new Date().getMonth() + 1).toString()} onValueChange={(v) => setQuickEvent({...quickEvent, start_month: parseInt(v)})}>
                                 <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="1">January</SelectItem>
-                                  <SelectItem value="2">February</SelectItem>
-                                  <SelectItem value="3">March</SelectItem>
-                                  <SelectItem value="4">April</SelectItem>
-                                  <SelectItem value="5">May</SelectItem>
-                                  <SelectItem value="6">June</SelectItem>
-                                  <SelectItem value="7">July</SelectItem>
-                                  <SelectItem value="8">August</SelectItem>
-                                  <SelectItem value="9">September</SelectItem>
-                                  <SelectItem value="10">October</SelectItem>
-                                  <SelectItem value="11">November</SelectItem>
-                                  <SelectItem value="12">December</SelectItem>
+                                  <SelectItem value="1">{t('months.january')}</SelectItem>
+                                  <SelectItem value="2">{t('months.february')}</SelectItem>
+                                  <SelectItem value="3">{t('months.march')}</SelectItem>
+                                  <SelectItem value="4">{t('months.april')}</SelectItem>
+                                  <SelectItem value="5">{t('months.may')}</SelectItem>
+                                  <SelectItem value="6">{t('months.june')}</SelectItem>
+                                  <SelectItem value="7">{t('months.july')}</SelectItem>
+                                  <SelectItem value="8">{t('months.august')}</SelectItem>
+                                  <SelectItem value="9">{t('months.september')}</SelectItem>
+                                  <SelectItem value="10">{t('months.october')}</SelectItem>
+                                  <SelectItem value="11">{t('months.november')}</SelectItem>
+                                  <SelectItem value="12">{t('months.december')}</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -819,18 +819,18 @@ export const Dashboard = () => {
                                 <SelectTrigger className="h-12"><SelectValue placeholder="No end date" /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="none">No end date</SelectItem>
-                                  <SelectItem value="1">January</SelectItem>
-                                  <SelectItem value="2">February</SelectItem>
-                                  <SelectItem value="3">March</SelectItem>
-                                  <SelectItem value="4">April</SelectItem>
-                                  <SelectItem value="5">May</SelectItem>
-                                  <SelectItem value="6">June</SelectItem>
-                                  <SelectItem value="7">July</SelectItem>
-                                  <SelectItem value="8">August</SelectItem>
-                                  <SelectItem value="9">September</SelectItem>
-                                  <SelectItem value="10">October</SelectItem>
-                                  <SelectItem value="11">November</SelectItem>
-                                  <SelectItem value="12">December</SelectItem>
+                                  <SelectItem value="1">{t('months.january')}</SelectItem>
+                                  <SelectItem value="2">{t('months.february')}</SelectItem>
+                                  <SelectItem value="3">{t('months.march')}</SelectItem>
+                                  <SelectItem value="4">{t('months.april')}</SelectItem>
+                                  <SelectItem value="5">{t('months.may')}</SelectItem>
+                                  <SelectItem value="6">{t('months.june')}</SelectItem>
+                                  <SelectItem value="7">{t('months.july')}</SelectItem>
+                                  <SelectItem value="8">{t('months.august')}</SelectItem>
+                                  <SelectItem value="9">{t('months.september')}</SelectItem>
+                                  <SelectItem value="10">{t('months.october')}</SelectItem>
+                                  <SelectItem value="11">{t('months.november')}</SelectItem>
+                                  <SelectItem value="12">{t('months.december')}</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
