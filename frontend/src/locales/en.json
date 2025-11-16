@@ -640,5 +640,46 @@
     "email_placeholder": "admin@gkbj.church",
     "password_placeholder": "Enter your password",
     "select_campus_required": "Select your campus (required for all users)"
+  },
+  
+  "_comment_bulk_messaging": "Bulk Messaging Page",
+  "bulk_messaging": {
+    "failed_load_users": "Failed to load users",
+    "select_recipient": "Select at least one recipient",
+    "enter_message": "Enter a message",
+    "sent_results": "Sent to {{sent}} recipients, {{failed}} failed",
+    "bulk_send_failed": "Bulk send failed",
+    "type_message_placeholder": "Type your message to pastoral team..."
+  },
+  
+  "_comment_import_export": "Import/Export Page",
+  "import_export": {
+    "sync_updated": "Sync job updated!",
+    "imported_count": "Imported {{count}} members!",
+    "errors_occurred": "{{count}} errors occurred",
+    "import_failed": "Import failed",
+    "import_failed_json": "Import failed - check JSON format",
+    "enter_api_url": "Enter API URL first",
+    "api_no_data": "API returned no data",
+    "api_success": "API connection successful!",
+    "api_failed": "API connection failed",
+    "api_sync_created": "API sync created! {{count}} members synced.",
+    "api_sync_failed": "API sync failed",
+    "members_exported": "Members exported!",
+    "events_exported": "Events exported!",
+    "export_failed": "Export failed"
+  },
+  
+  "_comment_whatsapp_logs": "WhatsApp Logs Page",
+  "whatsapp_logs": {
+    "logs_loaded": "Loaded {{count}} logs",
+    "failed_load_logs": "Failed to load logs",
+    "message_sent": "Message sent!",
+    "failed_send": "Failed to send message"
+  },
+  
+  "_comment_reminders": "Reminders Page",  
+  "reminders_page": {
+    "failed_load_reminders": "Failed to load reminders"
   }
 }
