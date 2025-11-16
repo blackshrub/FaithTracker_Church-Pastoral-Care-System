@@ -31,6 +31,45 @@ const formatDate = (dateStr, format = 'short') => {
   } catch { return dateStr; }
 };
 
+const getRelativeDate = (dateStr) => {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffTime = now - date;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+    }
+    const months = Math.floor(diffDays / 30);
+    return months === 1 ? '1 month ago' : `${months} months ago`;
+  } catch {
+    return dateStr;
+  }
+};
+
+const getGriefStageBadge = (stage) => {
+  const badges = {
+    '1_week': 'Week 1',
+    '2_weeks': 'Week 2',
+    '1_month': 'Month 1',
+    '3_months': 'Month 3',
+    '6_months': 'Month 6',
+    '1_year': 'Year 1'
+  };
+  return badges[stage] || stage.replace('_', ' ');
+};
+
+const triggerHaptic = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(50); // 50ms vibration
+  }
+};
+
 const MemberNameWithAvatar = ({ member, memberId }) => {
   const getInitials = (name) => {
     if (!name) return '?';
