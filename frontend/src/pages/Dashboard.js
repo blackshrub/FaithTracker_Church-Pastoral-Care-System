@@ -1192,7 +1192,7 @@ export const Dashboard = () => {
                 <TabsTrigger value="followups" className="flex-shrink-0">
                   <Hospital className="w-4 h-4" />
                   {activeOverdueTab === 'followups' ? (
-                    <span className="ml-2">Follow-ups ({griefDue.length + accidentFollowUp.length})</span>
+                    <span className="ml-2">Followup ({griefDue.length + accidentFollowUp.length})</span>
                   ) : (
                     <span className="ml-1">({griefDue.length + accidentFollowUp.length})</span>
                   )}
@@ -1216,7 +1216,7 @@ export const Dashboard = () => {
                 <TabsTrigger value="disconnected" className="flex-shrink-0">
                   <Users className="w-4 h-4" />
                   {activeOverdueTab === 'disconnected' ? (
-                    <span className="ml-2">Disconnected ({disconnectedMembers.length})</span>
+                    <span className="ml-2">Inactive ({disconnectedMembers.length})</span>
                   ) : (
                     <span className="ml-1">({disconnectedMembers.length})</span>
                   )}
@@ -1740,7 +1740,7 @@ export const Dashboard = () => {
                             </Button>
                             <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markMemberContacted(member.id, member.name, user, setAtRiskMembers, setDisconnectedMembers); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
-                              <span className="truncate">{t('mark_contacted')}</span>
+                              <span className="truncate">Contacted</span>
                             </Button>
                           </div>
                         </div>
@@ -1798,7 +1798,7 @@ export const Dashboard = () => {
                             </Button>
                             <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markMemberContacted(member.id, member.name, user, setAtRiskMembers, setDisconnectedMembers); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
-                              <span className="truncate">{t('mark_contacted')}</span>
+                              <span className="truncate">Contacted</span>
                             </Button>
                           </div>
                         </div>
