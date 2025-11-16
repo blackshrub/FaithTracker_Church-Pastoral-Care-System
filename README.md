@@ -184,12 +184,21 @@ Login: admin@gkbj.church / admin123
 6. **Timeline tracking**: Monitor grief and accident follow-up progress
 
 ### **Task Management Tabs**
-- **Today**: Birthdays + grief stages due today
-- **Follow-up**: Accident recovery + overdue grief support
-- **Financial Aid**: Due payments with advancement capability
-- **Disconnected**: 90+ days no contact requiring reconnection
-- **At Risk**: 60-89 days no contact needing attention
-- **Upcoming**: Next 7 days birthdays for planning
+**3-Level Nested Structure (Mobile-Optimized):**
+- **Today**: Birthdays + all tasks due today
+- **Overdue** (5 nested child tabs):
+  - Birthday: Overdue birthday acknowledgments
+  - F-Ups: Grief support + accident recovery follow-ups
+  - Aid: Due financial aid payments
+  - At Risk: 60-89 days no contact
+  - Inactive: 90+ days no contact requiring reconnection
+- **Upcoming**: Next 7 days tasks for planning
+
+**Mobile-First Features:**
+- Active tab shows full label, inactive shows icon only
+- No horizontal overflow on any screen size
+- Larger touch targets for better mobile usability
+- Consistent pattern across Dashboard, Analytics, Settings
 
 ## 🔧 **Configuration**
 
