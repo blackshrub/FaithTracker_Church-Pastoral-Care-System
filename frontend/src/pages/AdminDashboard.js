@@ -246,22 +246,22 @@ export const AdminDashboard = () => {
                   <DialogContent>
                     <DialogHeader><DialogTitle>{t('admin_dashboard_page.add_user')}</DialogTitle></DialogHeader>
                     <form onSubmit={handleAddUser} className="space-y-3">
-                      <div><Label>Name *</Label><Input value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required /></div>
-                      <div><Label>Email *</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required /></div>
-                      <div><Label>Phone *</Label><Input value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} required /></div>
-                      <div><Label>Password *</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} required /></div>
-                      <div><Label>Role *</Label>
+                      <div><Label>{t('admin_dashboard_page.name_required')}</Label><Input value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required /></div>
+                      <div><Label>{t('admin_dashboard_page.email_required')}</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required /></div>
+                      <div><Label>{t('admin_dashboard_page.phone_required')}</Label><Input value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} required /></div>
+                      <div><Label>{t('admin_dashboard_page.password_required')}</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} required /></div>
+                      <div><Label>{t('admin_dashboard_page.role_required')}</Label>
                         <Select value={newUser.role} onValueChange={(v) => setNewUser({...newUser, role: v})}>
                           <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                           <SelectContent position="popper" sideOffset={5}>
-                            <SelectItem value="campus_admin">Campus Admin</SelectItem>
-                            <SelectItem value="pastor">Pastor</SelectItem>
-                            <SelectItem value="full_admin">Full Admin</SelectItem>
+                            <SelectItem value="campus_admin">{t('admin_dashboard_page.role_campus_admin')}</SelectItem>
+                            <SelectItem value="pastor">{t('admin_dashboard_page.role_pastor')}</SelectItem>
+                            <SelectItem value="full_admin">{t('admin_dashboard_page.role_full_admin')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {newUser.role !== 'full_admin' && (
-                        <div><Label>Campus *</Label>
+                        <div><Label>{t('admin_dashboard_page.campus_required')}</Label>
                           <Select value={newUser.campus_id} onValueChange={(v) => setNewUser({...newUser, campus_id: v})}>
                             <SelectTrigger className="h-12"><SelectValue placeholder={t('misc.select')} /></SelectTrigger>
                             <SelectContent position="popper" sideOffset={5} className="max-h-[200px] overflow-y-auto">
@@ -271,7 +271,7 @@ export const AdminDashboard = () => {
                         </div>
                       )}
                       <div className="flex gap-2 justify-end">
-                        <Button type="button" variant="outline" onClick={() => setUserModalOpen(false)}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={() => setUserModalOpen(false)}>{t('cancel')}</Button>
                         <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">Create</Button>
                       </div>
                     </form>
