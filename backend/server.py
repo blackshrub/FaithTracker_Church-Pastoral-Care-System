@@ -2430,6 +2430,10 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
         # Update member's last contact date
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
         if stage:
+            # Get campus timezone for correct date
+            campus_tz = await get_campus_timezone(stage["campus_id"])
+            today_date = get_date_in_timezone(campus_tz)
+            
             # Get parent accident event for description
             parent_event = await db.care_events.find_one(
                 {"id": stage["care_event_id"]},
@@ -2442,7 +2446,7 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None):
                 "member_id": stage["member_id"],
                 "campus_id": stage["campus_id"],
                 "event_type": "regular_contact",
-                "event_date": datetime.now(timezone.utc).isoformat().split('T')[0],
+                "event_date": today_date,  # Use campus timezone date
                 "title": f"Accident Follow-up: {stage['stage'].replace('_', ' ')}",
                 "description": (parent_event.get("description") if parent_event else "") + 
                               (f"\nFacility: {parent_event.get('hospital_name', 'N/A')}" if parent_event else "") +
