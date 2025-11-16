@@ -214,5 +214,160 @@ Before deploying to production:
 
 ---
 
+
+## Mobile-First Dashboard Refactor
+
+### Issue: Horizontal Overflow on Mobile
+**Problem:** The Dashboard had 7 tabs at the main level, causing horizontal scroll on mobile devices (<640px width).
+
+**Root Cause:** Too many tabs with text labels competing for limited horizontal space.
+
+### Solution: 3-Level Nested Tab Architecture
+
+**Before:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Today | Birthday | Follow-up | Aid | At Risk | ...     →│  (Overflow!)
+└─────────────────────────────────────────────────────────┘
+```
+
+**After:**
+```
+┌──────────────────────────────────┐
+│ Today | Overdue | Upcoming        │  (No overflow)
+└──────────────────────────────────┘
+       ↓ (When Overdue selected)
+┌──────────────────────────────────┐
+│ 🎂 | 🏥 | 💰 | ⚠️ | 👤           │  (Icon-only when inactive)
+│ Birthday (12)                     │  (Full text when active)
+└──────────────────────────────────┘
+```
+
+### Implementation Details
+
+**File:** `/app/frontend/src/pages/Dashboard.js`
+
+**Changes:**
+1. **Created 3 main-level tabs:**
+   - Today (birthdaysToday + todayTasks)
+   - Overdue (5 nested child tabs)
+   - Upcoming (upcomingTasks)
+
+2. **Added 5 child tabs under Overdue:**
+   - Birthday (overdueBirthdays)
+   - F-Ups (griefDue + accidentFollowUp) 
+   - Aid (financialAidDue)
+   - At Risk (atRiskMembers)
+   - Inactive (disconnectedMembers)
+
+3. **Migrated content:**
+   - Copied all JSX content from old standalone tabs
+   - Moved into new nested TabsContent components
+   - Deleted old standalone tab containers (~470 lines removed)
+
+4. **Added adaptive tab behavior:**
+   ```jsx
+   const [activeOverdueTab, setActiveOverdueTab] = useState('birthdays');
+   
+   <TabsTrigger value="birthdays">
+     <Cake className="w-4 h-4" />
+     {activeOverdueTab === 'birthdays' ? (
+       <span className="ml-2">Birthday ({count})</span>
+     ) : (
+       <span className="ml-1">({count})</span>
+     )}
+   </TabsTrigger>
+   ```
+
+### Performance Improvements
+
+**1. Reduced DOM Complexity:**
+- Removed duplicate tab containers
+- Single-source rendering for each tab type
+- Cleaned up 470 lines of redundant code
+
+**2. Improved Mobile Rendering:**
+- No horizontal scroll calculations needed
+- Fewer re-renders on tab switch
+- Smaller component tree depth
+
+**3. Better UX:**
+- Larger touch targets (w-4 h-4 vs w-3 h-3 icons)
+- Clear visual indication of active tab
+- Consistent pattern across Dashboard, Analytics, Settings
+
+### Bundle Impact
+
+**Code Reduction:**
+- Dashboard.js: ~1,990 lines (after refactor)
+- Removed: ~470 lines of duplicate code
+- Net reduction: ~19% smaller component
+
+**Runtime Performance:**
+- Single tab system vs multiple systems
+- Unified state management
+- Fewer event listeners
+
+### Consistency Across Pages
+
+Applied same pattern to:
+1. **Dashboard.js** - 3-level nested (3 main + 5 child tabs)
+2. **Analytics.js** - Single-level with 6 tabs
+3. **Settings.js** - Single-level with 6 tabs
+
+**Pattern:**
+```jsx
+// Active state tracking
+const [activeTab, setActiveTab] = useState('default');
+
+// Conditional text display
+<TabsTrigger value="tab1">
+  <Icon className="w-4 h-4" />
+  {activeTab === 'tab1' && <span className="ml-2">Tab Name</span>}
+</TabsTrigger>
+```
+
+### Mobile Optimizations
+
+**Text Abbreviations:**
+- "Birthdays" → "Birthday"
+- "Follow-ups" → "F-Ups"
+- "Disconnected" → "Inactive"
+- "Mark contacted" → "Contacted"
+
+**Visual Improvements:**
+- Icon size: w-3 h-3 → w-4 h-4 (better visibility)
+- Touch targets: Ensured 44px minimum
+- No text-xs usage (improved readability)
+
+### Testing Results
+
+**Mobile (375px width):**
+- ✅ No horizontal overflow
+- ✅ All tabs accessible
+- ✅ Smooth tab transitions
+- ✅ Count badges visible
+- ✅ Touch targets meet iOS HIG (44px)
+
+**Tablet (768px width):**
+- ✅ Same behavior (consistent UX)
+- ✅ More space utilized efficiently
+
+**Desktop (1920px width):**
+- ✅ Full layout with ample spacing
+- ✅ Same tab pattern maintained
+
+### Lessons Learned
+
+1. **Mobile-first is critical** - Design for smallest screen first
+2. **Icon-only tabs work well** - When paired with active state text
+3. **Nested tabs are powerful** - Organize information hierarchically
+4. **Consistency matters** - Same pattern across all pages
+5. **Code reduction improves performance** - Removing duplication helps
+
+---
+
+
+
 **Last Updated:** 2025-11-14
 **Status:** Production optimizations applied
