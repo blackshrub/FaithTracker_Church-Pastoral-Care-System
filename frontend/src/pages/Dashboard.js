@@ -1123,11 +1123,11 @@ export const Dashboard = () => {
                                         onClick={async () => {
                                           try {
                                             await axios.post(`${API}/financial-aid-schedules/${task.data.id}/stop`);
-                                            toast.success('Schedule stopped');
+                                            toast.success(t('toasts.schedule_stopped'));
                                             setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                             await loadReminders();
                                           } catch (error) {
-                                            toast.error('Failed to stop');
+                                            toast.error(t('toasts.failed_stop'));
                                           }
                                         }}
                                       >
@@ -1146,7 +1146,7 @@ export const Dashboard = () => {
                                         await markGriefStageComplete(task.data.id, setGriefDue, loadReminders, t);
                                       } else if (task.type === 'accident_followup') {
                                         await axios.post(`${API}/accident-followup/${task.data.id}/complete`);
-                                        toast.success('Follow-up marked complete');
+                                        toast.success(t('toasts.followup_completed'));
                                         setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                         await loadReminders();
                                       }
@@ -1168,10 +1168,10 @@ export const Dashboard = () => {
                                         try {
                                           if (task.type === 'grief_support') {
                                             await axios.post(`${API}/grief-support/${task.data.id}/ignore`);
-                                            toast.success('Grief stage ignored');
+                                            toast.success(t('toasts.grief_ignored'));
                                           } else if (task.type === 'accident_followup') {
                                             await axios.post(`${API}/accident-followup/${task.data.id}/ignore`);
-                                            toast.success('Accident follow-up ignored');
+                                            toast.success(t('toasts.accident_ignored'));
                                           }
                                           setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                           await loadReminders();
