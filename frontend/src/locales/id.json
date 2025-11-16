@@ -474,6 +474,7 @@
     "cannot_delete_has_members": "Tidak dapat menghapus - memiliki jemaat",
     "deleted": "Dihapus",
     "failed_load": "Gagal memuat",
+    "failed_load_events": "Gagal memuat kejadian",
     "financial_aid_recorded": "Bantuan keuangan dicatat sebagai diberikan!",
     "financial_aid_schedule_created": "Jadwal bantuan keuangan dibuat!",
     "failed_mark_birthday": "Gagal menandai ulang tahun selesai"
