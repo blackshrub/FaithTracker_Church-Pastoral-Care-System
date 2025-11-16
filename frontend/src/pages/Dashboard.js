@@ -1390,7 +1390,7 @@ export const Dashboard = () => {
                           )}
                           <p className="text-sm text-muted-foreground mt-1">
                             <span className="px-2 py-0.5 bg-teal-500 text-white text-xs rounded mr-2">
-                              {followup.stage.replace('_', ' ')}
+                              {getAccidentStageBadge(followup.stage)}
                             </span>
                             Due: {formatDate(followup.scheduled_date)}
                             {followup.days_since_last_contact && <span className="ml-2 text-xs">• Last contact {followup.days_since_last_contact}d ago</span>}
