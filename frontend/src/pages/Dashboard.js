@@ -679,7 +679,7 @@ export const Dashboard = () => {
                       {quickEvent.schedule_frequency === 'one_time' && (
                         <div>
                           <Label className="font-semibold">Payment Date</Label>
-                          <Popover modal={true}>
+                          <Popover modal={true} open={paymentDateOpen} onOpenChange={setPaymentDateOpen}>
                             <PopoverTrigger asChild>
                               <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
                                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -693,6 +693,7 @@ export const Dashboard = () => {
                                 onSelect={(date) => {
                                   if (date) {
                                     setQuickEvent({...quickEvent, payment_date: formatDateFns(date, 'yyyy-MM-dd')});
+                                    setPaymentDateOpen(false); // Close calendar
                                   }
                                 }}
                                 initialFocus
