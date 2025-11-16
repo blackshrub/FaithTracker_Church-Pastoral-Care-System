@@ -1248,9 +1248,20 @@ export const MemberDetail = () => {
                                   <Check className="w-4 h-4 mr-2" />
                                   Distributed
                                 </DropdownMenuItem>
-                                  }}>
-                                    Stop Schedule
-                                  </DropdownMenuItem>
+                                <DropdownMenuItem onClick={async () => {
+                                  if (window.confirm('Stop this aid schedule? (Ignored history will be preserved)')) {
+                                    try {
+                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
+                                      toast.success('Schedule stopped');
+                                      loadMemberData();
+                                    } catch (error) {
+                                      toast.error('Failed to stop schedule');
+                                    }
+                                  }
+                                }} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Stop Schedule
+                                </DropdownMenuItem>
                                   <DropdownMenuItem onClick={async () => {
                                     try {
                                       const response = await axios.post(`${API}/financial-aid-schedules/${schedule.id}/ignore`);
