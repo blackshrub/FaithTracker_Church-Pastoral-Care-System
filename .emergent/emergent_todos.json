@@ -5,14 +5,10 @@
   },
   {
     "content": "Update design_guidelines.md with mobile-first tab pattern",
-    "status": "in_progress"
-  },
-  {
-    "content": "Update API_DOCUMENTATION.md if needed",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update PERFORMANCE_OPTIMIZATIONS.md with dashboard refactor details",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
