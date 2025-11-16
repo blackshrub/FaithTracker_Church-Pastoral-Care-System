@@ -1,6 +1,30 @@
 [
   {
-    "content": "All 4 pages (LoginPage, AdminDashboard, FinancialAid, Calendar) internationalized",
-    "status": "completed"
+    "content": "Scan BulkMessaging.js, ImportExport.js, WhatsAppLogs.js, Reminders.js for hardcoded text",
+    "status": "in_progress"
+  },
+  {
+    "content": "Add missing translation keys to en.json and id.json",
+    "status": "pending"
+  },
+  {
+    "content": "Update BulkMessaging.js with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Update ImportExport.js with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Update WhatsAppLogs.js with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Update Reminders.js with translation keys",
+    "status": "pending"
+  },
+  {
+    "content": "Verify all 4 pages compile correctly",
+    "status": "pending"
   }
 ]
