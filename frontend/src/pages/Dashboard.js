@@ -1067,10 +1067,18 @@ export const Dashboard = () => {
                             </a>
                           )}
                           <p className="text-sm text-muted-foreground mt-1">
-                            {schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1)} - Rp {schedule.aid_amount?.toLocaleString('id-ID')} ({schedule.aid_type})
+                            <span className="inline-flex items-center gap-1">
+                              🔄 {schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1)}
+                            </span>
+                            <span className="mx-2">•</span>
+                            <span className="font-semibold text-foreground">Rp {schedule.aid_amount?.toLocaleString('id-ID')}</span>
+                            <span className="mx-2">•</span>
+                            <span className="px-2 py-0.5 bg-teal-500 text-white text-xs rounded">
+                              {schedule.aid_type.charAt(0).toUpperCase() + schedule.aid_type.slice(1)}
+                            </span>
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Scheduled: {formatDate(schedule.next_occurrence)}
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                            📅 {formatDate(schedule.next_occurrence)}
                             {schedule.member_age && <span className="ml-2">• {schedule.member_age} years old</span>}
                           </p>
                         </div>
