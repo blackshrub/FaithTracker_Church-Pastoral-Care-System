@@ -610,7 +610,7 @@ export const Dashboard = () => {
                 {quickEvent.event_type === 'financial_aid' && (
                   <div>
                         <Label className="font-semibold">Aid Name/Title</Label>
-                        <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Monthly Education Support" className="h-12" required />
+                        <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder={t('form_placeholders.monthly_education_support')} className="h-12" required />
                   </div>
                 )}
                 
@@ -621,7 +621,7 @@ export const Dashboard = () => {
                     <div>
                       <Label className="font-semibold">Relationship to Deceased</Label>
                       <Select value={quickEvent.grief_relationship} onValueChange={(v) => setQuickEvent({...quickEvent, grief_relationship: v})} required>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Select relationship" /></SelectTrigger>
+                        <SelectTrigger className="h-12"><SelectValue placeholder={t('form_placeholders.select_relationship')} /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="spouse">Spouse</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
@@ -642,7 +642,7 @@ export const Dashboard = () => {
                       <Input
                         value={quickEvent.hospital_name}
                         onChange={(e) => setQuickEvent({...quickEvent, hospital_name: e.target.value})}
-                        placeholder="e.g., RSU Jakarta, Ciputra Hospital"
+                        placeholder={t('form_placeholders.hospital_example')}
                         className="h-12"
                       />
                     </div>
@@ -656,7 +656,7 @@ export const Dashboard = () => {
                       <div>
                         <Label className="font-semibold">Aid Type</Label>
                         <Select value={quickEvent.aid_type} onValueChange={(v) => setQuickEvent({...quickEvent, aid_type: v})} required>
-                          <SelectTrigger className="h-12"><SelectValue placeholder="Select aid type..." /></SelectTrigger>
+                          <SelectTrigger className="h-12"><SelectValue placeholder={t('form_placeholders.select_aid_type')} /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="education">Education Support</SelectItem>
                             <SelectItem value="medical">Medical Bills</SelectItem>
