@@ -1661,7 +1661,7 @@ export const Dashboard = () => {
                                 if (window.confirm(`Mark financial aid as distributed to ${schedule.member_name}?`)) {
                                   try {
                                     await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
-                                    toast.success('Payment distributed! Schedule advanced to next occurrence.');
+                                    toast.success(t('toasts.payment_distributed_advanced'));
                                     setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
                                     await loadReminders();
                                   } catch (error) {
@@ -1684,7 +1684,7 @@ export const Dashboard = () => {
                                 <DropdownMenuItem onClick={async () => {
                                   try {
                                     await axios.post(`${API}/financial-aid-schedules/${schedule.id}/ignore`);
-                                    toast.success('Financial aid schedule ignored');
+                                    toast.success(t('toasts.financial_aid_schedule_ignored'));
                                     setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
                                     await loadReminders();
                                   } catch (error) {
@@ -1703,7 +1703,7 @@ export const Dashboard = () => {
                                         setFinancialAidDue(prev => prev.filter(s => s.id !== schedule.id));
                                         await loadReminders();
                                       } catch (error) {
-                                        toast.error('Failed to stop schedule');
+                                        toast.error(t('toasts.failed_stop_schedule'));
                                       }
                                     }
                                   }}
