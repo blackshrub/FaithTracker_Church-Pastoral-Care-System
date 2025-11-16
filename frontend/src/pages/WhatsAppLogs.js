@@ -37,7 +37,7 @@ export const WhatsAppLogs = () => {
       const response = await axios.get(`${API}/notification-logs?limit=100`);
       setLogs(response.data);
     } catch (error) {
-      toast.error('Failed to load logs');
+      toast.error(t('whatsapp_logs.failed_load_logs'));
     } finally {
       setLoading(false);
     }
@@ -53,10 +53,10 @@ export const WhatsAppLogs = () => {
       });
       
       if (response.data.success) {
-        toast.success('Message resent successfully!');
+        toast.success(t('whatsapp_logs.message_sent'));
         loadLogs();
       } else {
-        toast.error('Retry failed');
+        toast.error(t('whatsapp_logs.failed_send'));
       }
     } catch (error) {
       toast.error('Retry failed');
