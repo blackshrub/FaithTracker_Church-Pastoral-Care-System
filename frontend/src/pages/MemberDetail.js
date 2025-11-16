@@ -383,7 +383,7 @@ export const MemberDetail = () => {
                             {newEvent.event_date ? formatDateFns(new Date(newEvent.event_date), 'dd MMM yyyy') : <span className="text-muted-foreground">Select date...</span>}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-3 z-[9999]" side="bottom" align="center">
+                        <PopoverContent className="w-[320px] p-3 z-[9999]" side="bottom" align="center">
                           <CalendarComponent
                             mode="single"
                             selected={newEvent.event_date ? new Date(newEvent.event_date) : undefined}
@@ -524,7 +524,7 @@ export const MemberDetail = () => {
                                 {newEvent.payment_date ? formatDateFns(new Date(newEvent.payment_date), 'dd MMM yyyy') : <span className="text-muted-foreground">Select payment date...</span>}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-3 z-[9999]" side="bottom" align="center">
+                            <PopoverContent className="w-[320px] p-3 z-[9999]" side="bottom" align="center">
                               <CalendarComponent
                                 mode="single"
                                 selected={newEvent.payment_date ? new Date(newEvent.payment_date) : undefined}
@@ -568,7 +568,7 @@ export const MemberDetail = () => {
                                   {newEvent.schedule_end_date ? formatDateFns(new Date(newEvent.schedule_end_date), 'dd MMM yyyy') : <span className="text-muted-foreground">No end date</span>}
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-auto p-3 z-[9999]" side="bottom" align="center">
+                              <PopoverContent className="w-[320px] p-3 z-[9999]" side="bottom" align="center">
                                 <CalendarComponent
                                   mode="single"
                                   selected={newEvent.schedule_end_date ? new Date(newEvent.schedule_end_date) : undefined}
