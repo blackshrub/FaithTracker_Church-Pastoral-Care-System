@@ -2756,14 +2756,14 @@ async def get_member_aid_schedules(member_id: str, current_user: dict = Depends(
     try:
         logger.info(f"[GET AID SCHEDULES] Querying for member_id={member_id}")
         
-        # Get all schedules (active + stopped with ignored occurrences)
+        # Get ALL schedules for this member (don't limit to 20)
         schedules = await db.financial_aid_schedules.find(
             {"member_id": member_id},
             {"_id": 0}
-        ).sort("next_occurrence", 1).to_list(20)
+        ).sort("next_occurrence", 1).to_list(None)  # None = no limit
         
         # Log all schedule IDs found
-        logger.info(f"[GET AID SCHEDULES] Found schedule IDs: {[s.get('id') for s in schedules]}")
+        logger.info(f"[GET AID SCHEDULES] Found {len(schedules)} schedule IDs for member")
         
         # Filter: active schedules OR stopped schedules with ignored history
         filtered = [
