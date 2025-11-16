@@ -1,18 +1,6 @@
 [
   {
-    "content": "Debug upcoming birthday complete button in Dashboard.js",
-    "status": "in_progress"
-  },
-  {
-    "content": "Check if mutation is being called",
-    "status": "pending"
-  },
-  {
-    "content": "Fix complete button for upcoming birthdays",
-    "status": "pending"
-  },
-  {
-    "content": "Test birthday complete works in Upcoming tab",
-    "status": "pending"
+    "content": "Fixed upcoming birthday filter and grief support '0' display bug",
+    "status": "completed"
   }
 ]
