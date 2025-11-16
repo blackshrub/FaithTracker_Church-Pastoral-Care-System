@@ -391,11 +391,11 @@ export const AdminDashboard = () => {
                             // Ignore timeout errors - backend still processing
                           });
                           
-                          toast.success('✅ Recalculation started! Please wait 15 seconds then refresh the page to see updated counts.', {
+                          toast.success(t('admin_dashboard.recalculation_started'), {
                             duration: 8000
                           });
                         } catch (error) {
-                          toast.error('Failed to start recalculation');
+                          toast.error(t('admin_dashboard.failed_start_recalculation'));
                         }
                       }
                     }}
