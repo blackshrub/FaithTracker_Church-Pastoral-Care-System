@@ -526,18 +526,18 @@ export const Analytics = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="p-3 bg-red-50 rounded">
-                    <p className="font-semibold text-red-700">High Priority ({demographicData.engagement?.find(e => e.name === 'inactive')?.value || 0} members)</p>
-                    <p className="text-sm text-muted-foreground">Members disconnected - need immediate attention</p>
+                    <p className="font-semibold text-red-700">{t('analytics_page.high_priority')} ({demographicData.engagement?.find(e => e.name === 'inactive')?.value || 0} {t('misc.members')})</p>
+                    <p className="text-sm text-muted-foreground">{t('analytics_page.members_disconnected_attention')}</p>
                   </div>
                   
                   <div className="p-3 bg-amber-50 rounded">
-                    <p className="font-semibold text-amber-700">Medium Priority ({demographicData.engagement?.find(e => e.name === 'at_risk')?.value || 0} members)</p>
-                    <p className="text-sm text-muted-foreground">At-risk members - follow up needed</p>
+                    <p className="font-semibold text-amber-700">{t('analytics_page.medium_priority')} ({demographicData.engagement?.find(e => e.name === 'at_risk')?.value || 0} {t('misc.members')})</p>
+                    <p className="text-sm text-muted-foreground">{t('analytics_page.at_risk_followup_needed')}</p>
                   </div>
                   
                   <div className="p-3 bg-green-50 rounded">
-                    <p className="font-semibold text-green-700">Active Members ({demographicData.engagement?.find(e => e.name === 'active')?.value || 0} members)</p>
-                    <p className="text-sm text-muted-foreground">Regular contact maintained</p>
+                    <p className="font-semibold text-green-700">{t('analytics_page.active_members_count', {count: demographicData.engagement?.find(e => e.name === 'active')?.value || 0})}</p>
+                    <p className="text-sm text-muted-foreground">{t('analytics_page.active_members_maintained')}</p>
                   </div>
                 </div>
               </CardContent>
