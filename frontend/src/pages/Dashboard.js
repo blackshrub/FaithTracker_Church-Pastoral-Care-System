@@ -722,7 +722,7 @@ export const Dashboard = () => {
                           </div>
                           <div>
                             <Label className="font-semibold text-xs">End Date (optional)</Label>
-                            <Popover modal={true}>
+                            <Popover modal={true} open={endDateOpen} onOpenChange={setEndDateOpen}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" className="w-full h-12 justify-start text-left font-normal" type="button">
                                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -736,6 +736,7 @@ export const Dashboard = () => {
                                   onSelect={(date) => {
                                     if (date) {
                                       setQuickEvent({...quickEvent, schedule_end_date: formatDateFns(date, 'yyyy-MM-dd')});
+                                      setEndDateOpen(false); // Close calendar
                                     }
                                   }}
                                   initialFocus
