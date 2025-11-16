@@ -861,17 +861,10 @@ export const Dashboard = () => {
                         
                         return (
                           <div key={index} className={`p-4 ${config.bgClass} rounded-lg border ${config.borderClass} relative hover:shadow-lg transition-all`}>
-                            {/* Overdue Badge */}
+                            {/* Overdue Badge - Top Right */}
                             {task.days_overdue > 0 && (
-                              <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm">
+                              <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10">
                                 {task.days_overdue}d overdue
-                              </span>
-                            )}
-                            
-                            {/* Stage Badge for Grief */}
-                            {task.type === 'grief_support' && (
-                              <span className="absolute top-2 left-2 px-2 py-1 bg-purple-500 text-white text-xs font-semibold rounded shadow-sm z-10">
-                                {getGriefStageBadge(task.data.stage)}
                               </span>
                             )}
                             
@@ -896,6 +889,11 @@ export const Dashboard = () => {
                                 )}
                                 <p className="text-sm text-muted-foreground mt-1">
                                   <span className="font-medium">{config.label}:</span> {task.details}
+                                  {task.type === 'grief_support' && (
+                                    <span className="ml-2 px-2 py-0.5 bg-purple-500 text-white text-xs rounded">
+                                      {getGriefStageBadge(task.data.stage)}
+                                    </span>
+                                  )}
                                   {task.days_since_last_contact && <span className="ml-2 text-xs">• Last contact {task.days_since_last_contact}d ago</span>}
                                 </p>
                               </div>
