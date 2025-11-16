@@ -824,19 +824,19 @@ export const Dashboard = () => {
                               </div>
                             </div>
                             
-                            {/* Actions - Responsive layout */}
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <Button size="lg" className={`${config.btnClass} text-white h-12 flex-1`} asChild>
+                            {/* Actions - Horizontal compact layout */}
+                            <div className="flex gap-2">
+                              <Button size="default" className={`${config.btnClass} text-white h-11 flex-1 min-w-0`} asChild>
                                 <a href={formatPhoneForWhatsApp(task.member_phone)} target="_blank" rel="noopener noreferrer">
-                                  <MessageSquare className="w-4 h-4 mr-2" />
-                                  {t('contact_whatsapp')}
+                                  <MessageSquare className="w-4 h-4 mr-1 flex-shrink-0" />
+                                  <span className="truncate">{t('contact_whatsapp')}</span>
                                 </a>
                               </Button>
                               
                               {task.type === 'financial_aid' ? (
-                                // Financial aid: Full-width buttons on mobile
+                                // Financial aid: Compact horizontal buttons
                                 <>
-                                  <Button size="lg" variant="outline" onClick={async () => {
+                                  <Button size="default" variant="outline" onClick={async () => {
                                     try {
                                       await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success('Payment marked as distributed!');
@@ -844,13 +844,13 @@ export const Dashboard = () => {
                                     } catch (error) {
                                       toast.error('Failed to mark as distributed');
                                     }
-                                  }} className="h-12 flex-1">
-                                    <Check className="w-4 h-4 mr-2" />
-                                    {t('mark_distributed')}
+                                  }} className="h-11 flex-1 min-w-0">
+                                    <Check className="w-4 h-4 mr-1" />
+                                    <span className="truncate">{t('mark_distributed')}</span>
                                   </Button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button size="lg" variant="ghost" className="h-12 w-12 p-0 flex-shrink-0">
+                                      <Button size="default" variant="ghost" className="h-11 w-11 p-0 flex-shrink-0">
                                         <MoreVertical className="w-5 h-5" />
                                       </Button>
                                     </DropdownMenuTrigger>
@@ -884,9 +884,9 @@ export const Dashboard = () => {
                                   </DropdownMenu>
                                 </>
                               ) : (
-                                // Grief/Accident: Full-width buttons on mobile
+                                // Grief/Accident: Compact horizontal buttons
                                 <>
-                                  <Button size="lg" variant="outline" onClick={async () => {
+                                  <Button size="default" variant="outline" onClick={async () => {
                                     try {
                                       if (task.type === 'grief_support') {
                                         await markGriefStageComplete(task.data.id, setGriefDue);
@@ -898,13 +898,13 @@ export const Dashboard = () => {
                                     } catch (error) {
                                       toast.error('Failed to mark as completed');
                                     }
-                                  }} className="h-12 flex-1">
-                                    <Check className="w-4 h-4 mr-2" />
-                                    {t('mark_completed')}
+                                  }} className="h-11 flex-1 min-w-0">
+                                    <Check className="w-4 h-4 mr-1" />
+                                    <span className="truncate">{t('mark_completed')}</span>
                                   </Button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button size="lg" variant="ghost" className="h-12 w-12 p-0 flex-shrink-0">
+                                      <Button size="default" variant="ghost" className="h-11 w-11 p-0 flex-shrink-0">
                                         <MoreVertical className="w-5 h-5" />
                                       </Button>
                                     </DropdownMenuTrigger>
