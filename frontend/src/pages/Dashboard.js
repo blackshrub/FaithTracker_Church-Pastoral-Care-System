@@ -1074,9 +1074,7 @@ export const Dashboard = () => {
                               🔄 {schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1)}
                             </span>
                             <span>•</span>
-                            <span>
-                              {schedule.aid_type.charAt(0).toUpperCase() + schedule.aid_type.slice(1)}
-                            </span>
+                            <span>{schedule.aid_type.charAt(0).toUpperCase() + schedule.aid_type.slice(1)}</span>
                           </p>
                           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                             <span className="inline-flex items-center gap-1">
