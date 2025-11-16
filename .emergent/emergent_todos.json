@@ -1,39 +1,7 @@
 [
   {
-    "content": "Add overdue indicator - red badge showing days overdue on top-right of cards",
-    "status": "pending"
-  },
-  {
-    "content": "Add colored ring border around member avatars matching card type (purple=grief, teal=accident, amber=birthday)",
-    "status": "pending"
-  },
-  {
-    "content": "Enhance hover state - increase shadow lift on card hover for better feedback",
-    "status": "pending"
-  },
-  {
-    "content": "Implement relative dates - show '3 days ago' instead of 'Due: 13 Nov' for overdue items",
-    "status": "pending"
-  },
-  {
-    "content": "Make Complete button outlined white background (not colored) for better visual hierarchy",
-    "status": "pending"
-  },
-  {
-    "content": "Add swipe-to-complete gesture for mobile power users",
-    "status": "pending"
-  },
-  {
-    "content": "Add stage priority badges for grief - 'Week 1', 'Month 1', etc. for quick identification",
-    "status": "pending"
-  },
-  {
-    "content": "Add member context - display age or last contact date in cards",
-    "status": "pending"
-  },
-  {
-    "content": "Add haptic feedback on Complete button (if browser supports)",
-    "status": "pending"
+    "content": "Implement all 9 Dashboard card improvements comprehensively",
+    "status": "in_progress"
   },
   {
     "content": "Test all improvements at 390px and verify enhanced usability",
