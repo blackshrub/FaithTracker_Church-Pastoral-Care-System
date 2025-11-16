@@ -873,7 +873,7 @@ export const Dashboard = () => {
                           <div key={index} className={`p-4 ${config.bgClass} rounded-lg border ${config.borderClass} relative hover:shadow-lg transition-all`}>
                             {/* Overdue Badge - Top Right */}
                             {task.days_overdue > 0 && (
-                              <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10">
+                              <span className="absolute top-3 right-3 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10">
                                 {task.days_overdue}d overdue
                               </span>
                             )}
