@@ -250,6 +250,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-color: hsl(174, 94%, 39%) !important;
 }
 
+/* Force date inputs to match standard input sizing */
+input[type="date"], input[type="month"], input[type="time"] {
+  line-height: normal !important;
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
 /* Mobile fixes */
 @media (max-width: 768px) {
   .table-container {
