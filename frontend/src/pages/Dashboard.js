@@ -1661,7 +1661,10 @@ export const Dashboard = () => {
                             )}
                             <p className="text-sm text-muted-foreground mt-1">
                               {task.type === 'birthday' ? (
-                                <span className="font-medium">Birthday</span>
+                                <>
+                                  <span className="font-medium">Birthday</span>
+                                  {task.member_age && <span className="ml-2 text-xs">• Will be {task.member_age + 1} years old</span>}
+                                </>
                               ) : task.type === 'accident_followup' ? (
                                 <>
                                   <span className="font-medium">{config.label}:</span> {getAccidentStageBadge(task.data.stage)}
