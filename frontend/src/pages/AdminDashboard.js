@@ -140,22 +140,36 @@ export const AdminDashboard = () => {
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">{c.location || '-'}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="outline" onClick={() => {
-                              setNewCampus({campus_name: c.campus_name, location: c.location || ''});
-                              setCampusModalOpen(true);
-                            }}>Edit</Button>
-                            <Button size="sm" variant="ghost" className="text-red-600" onClick={async () => {
-                              if (!window.confirm(`Delete ${c.campus_name}?`)) return;
-                              try {
-                                await axios.delete(`${API}/campuses/${c.id}`);
-                                toast.success('Deleted');
-                                loadData();
-                              } catch (e) {
-                                toast.error('Cannot delete - has members');
-                              }
-                            }}>Delete</Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" position="popper" sideOffset={5}>
+                              <DropdownMenuItem onClick={() => {
+                                setNewCampus({campus_name: c.campus_name, location: c.location || ''});
+                                setCampusModalOpen(true);
+                              }}>
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={async () => {
+                                  if (!window.confirm(`Delete ${c.campus_name}?`)) return;
+                                  try {
+                                    await axios.delete(`${API}/campuses/${c.id}`);
+                                    toast.success('Deleted');
+                                    loadData();
+                                  } catch (e) {
+                                    toast.error('Cannot delete - has members');
+                                  }
+                                }}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
