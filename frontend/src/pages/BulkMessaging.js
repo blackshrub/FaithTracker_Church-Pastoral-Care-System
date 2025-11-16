@@ -27,17 +27,17 @@ export const BulkMessaging = () => {
       const response = await axios.get(`${API}/users`);
       setUsers(response.data);
     } catch (error) {
-      toast.error(t('bulk_messaging.failed_load_users'));
+      toast.error(t('bulk_messaging_page.failed_load_users'));
     }
   };
   
   const handleSendBulk = async () => {
     if (selectedUsers.length === 0) {
-      toast.error(t('bulk_messaging.select_recipient'));
+      toast.error(t('bulk_messaging_page.select_recipient'));
       return;
     }
     if (!message.trim()) {
-      toast.error(t('bulk_messaging.enter_message'));
+      toast.error(t('bulk_messaging_page.enter_message'));
       return;
     }
     
@@ -74,11 +74,11 @@ export const BulkMessaging = () => {
         }
       }
       
-      toast.success(t('bulk_messaging.sent_results', {sent, failed}));
+      toast.success(t('bulk_messaging_page.sent_results', {sent, failed}));
       setMessage('');
       setSelectedUsers([]);
     } catch (error) {
-      toast.error(t('bulk_messaging.bulk_send_failed'));
+      toast.error(t('bulk_messaging_page.bulk_send_failed'));
     } finally {
       setSending(false);
     }
@@ -126,7 +126,7 @@ export const BulkMessaging = () => {
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={t('bulk_messaging.type_message_placeholder')}
+                placeholder={t('bulk_messaging_page.type_message_placeholder')}
                 rows={8}
               />
             </div>
