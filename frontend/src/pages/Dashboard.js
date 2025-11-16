@@ -537,15 +537,15 @@ export const Dashboard = () => {
                 </div>
                 
                 <div>
-                  <Label>Description</Label>
-                  <Input value={quickEvent.description} onChange={(e) => setQuickEvent({...quickEvent, description: e.target.value})} placeholder={t('additional_details')} />
+                  <Label className="font-semibold">Description</Label>
+                  <Input value={quickEvent.description} onChange={(e) => setQuickEvent({...quickEvent, description: e.target.value})} placeholder="Additional details..." className="h-12" />
                 </div>
                 
                 {/* Title only for Financial Aid */}
                 {quickEvent.event_type === 'financial_aid' && (
                   <div>
-                    <Label>Aid Name/Title *</Label>
-                    <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Monthly Education Support" required />
+                    <Label className="font-semibold">Aid Name/Title *</Label>
+                    <Input value={quickEvent.title} onChange={(e) => setQuickEvent({...quickEvent, title: e.target.value})} placeholder="e.g., Monthly Education Support" className="h-12" required />
                   </div>
                 )}
                 
@@ -554,9 +554,9 @@ export const Dashboard = () => {
                   <div className="space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <p className="text-sm font-medium text-purple-900">⭐ Auto-generates 6-stage grief timeline</p>
                     <div>
-                      <Label>Relationship to Deceased *</Label>
+                      <Label className="font-semibold">Relationship to Deceased *</Label>
                       <Select value={quickEvent.grief_relationship} onValueChange={(v) => setQuickEvent({...quickEvent, grief_relationship: v})} required>
-                        <SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger>
+                        <SelectTrigger className="h-12"><SelectValue placeholder="Select relationship" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="spouse">Spouse</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
@@ -573,11 +573,12 @@ export const Dashboard = () => {
                 {quickEvent.event_type === 'accident_illness' && (
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div>
-                      <Label>Hospital/Medical Facility Name</Label>
+                      <Label className="font-semibold">Hospital/Medical Facility Name</Label>
                       <Input
                         value={quickEvent.hospital_name}
                         onChange={(e) => setQuickEvent({...quickEvent, hospital_name: e.target.value})}
-                        placeholder="RSU Jakarta"
+                        placeholder="e.g., RSU Jakarta, Ciputra Hospital"
+                        className="h-12"
                       />
                     </div>
                   </div>
@@ -586,11 +587,11 @@ export const Dashboard = () => {
                 {quickEvent.event_type === 'financial_aid' && (
                   <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
                     <h4 className="font-semibold text-green-900">Financial Aid Details</h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <Label>Aid Type *</Label>
+                        <Label className="font-semibold">Aid Type *</Label>
                         <Select value={quickEvent.aid_type} onValueChange={(v) => setQuickEvent({...quickEvent, aid_type: v})} required>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-12"><SelectValue placeholder="Select aid type..." /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="education">Education Support</SelectItem>
                             <SelectItem value="medical">Medical Bills</SelectItem>
@@ -603,12 +604,13 @@ export const Dashboard = () => {
                         </Select>
                       </div>
                       <div>
-                        <Label>Amount (Rp) *</Label>
+                        <Label className="font-semibold">Amount (Rp) *</Label>
                         <Input
                           type="number"
                           value={quickEvent.aid_amount}
                           onChange={(e) => setQuickEvent({...quickEvent, aid_amount: e.target.value})}
                           placeholder="1500000"
+                          className="h-12"
                           required
                         />
                       </div>
