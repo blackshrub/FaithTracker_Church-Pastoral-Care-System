@@ -1,6 +1,18 @@
 [
   {
-    "content": "Timeline date timezone issue - Fixed in backend",
-    "status": "completed"
+    "content": "Search server.py for all UTC date usage that should use campus timezone",
+    "status": "in_progress"
+  },
+  {
+    "content": "Fix MemberDetail.js 'Ignore This Payment' - should show in Ignored Payments section",
+    "status": "pending"
+  },
+  {
+    "content": "Check backend ignore payment endpoint behavior",
+    "status": "pending"
+  },
+  {
+    "content": "Test ignored payments display correctly",
+    "status": "pending"
   }
 ]
