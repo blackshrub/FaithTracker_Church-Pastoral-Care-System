@@ -623,5 +623,21 @@
     "distributed": "Distributed",
     "stop_schedule": "Stop Schedule",
     "ignore_payment": "Ignore This Payment"
+  },
+  
+  "_comment_admin_dashboard": "Admin Dashboard Page",
+  "admin_dashboard": {
+    "user_created": "User created!",
+    "recalculation_started": "✅ Recalculation started! Please wait 15 seconds then refresh the page to see updated counts.",
+    "failed_start_recalculation": "Failed to start recalculation"
+  },
+  
+  "_comment_login_page": "Login Page",
+  "login_page": {
+    "sign_in_subtitle": "Sign in to access the pastoral care system",
+    "select_campus_placeholder": "Select your campus",
+    "email_placeholder": "admin@gkbj.church",
+    "password_placeholder": "Enter your password",
+    "select_campus_required": "Select your campus (required for all users)"
   }
 }
