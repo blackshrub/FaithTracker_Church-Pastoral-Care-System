@@ -122,8 +122,8 @@ export const Settings = () => {
   return (
     <div className="space-y-6 max-w-full">
       <div className="min-w-0">
-        <h1 className="text-3xl font-playfair font-bold">Settings & Configuration</h1>
-        <p className="text-muted-foreground mt-1">System configuration and automation settings</p>
+        <h1 className="text-3xl font-playfair font-bold">{t('settings_page.title')}</h1>
+        <p className="text-muted-foreground mt-1">{t('settings_page.subtitle')}</p>
       </div>
       
       <Tabs defaultValue="automation" className="max-w-full" onValueChange={(v) => setActiveTab(v)}>
@@ -131,27 +131,27 @@ export const Settings = () => {
           <TabsList className="inline-flex min-w-full w-max sm:w-full">
             <TabsTrigger value="automation" className="flex-shrink-0">
               <Bell className="w-4 h-4" />
-              {activeTab === 'automation' && <span className="ml-2">Automation</span>}
+              {activeTab === 'automation' && <span className="ml-2">{t('settings_page.automation_tab')}</span>}
             </TabsTrigger>
             <TabsTrigger value="grief" className="flex-shrink-0">
               <Heart className="w-4 h-4" />
-              {activeTab === 'grief' && <span className="ml-2">Grief Support</span>}
+              {activeTab === 'grief' && <span className="ml-2">{t('settings_page.grief_tab')}</span>}
             </TabsTrigger>
             <TabsTrigger value="accident" className="flex-shrink-0">
               <Zap className="w-4 h-4" />
-              {activeTab === 'accident' && <span className="ml-2">Accident/Illness</span>}
+              {activeTab === 'accident' && <span className="ml-2">{t('settings_page.accident_tab')}</span>}
             </TabsTrigger>
             <TabsTrigger value="engagement" className="flex-shrink-0">
               <Users className="w-4 h-4" />
-              {activeTab === 'engagement' && <span className="ml-2">Engagement</span>}
+              {activeTab === 'engagement' && <span className="ml-2">{t('settings_page.engagement_tab')}</span>}
             </TabsTrigger>
             <TabsTrigger value="writeoff" className="flex-shrink-0">
               <Clock className="w-4 h-4" />
-              {activeTab === 'writeoff' && <span className="ml-2">Write-off Policy</span>}
+              {activeTab === 'writeoff' && <span className="ml-2">{t('settings_page.writeoff_tab')}</span>}
             </TabsTrigger>
             <TabsTrigger value="system" className="flex-shrink-0">
               <SettingsIcon className="w-4 h-4" />
-              {activeTab === 'system' && <span className="ml-2">System</span>}
+              {activeTab === 'system' && <span className="ml-2">{t('settings_page.system_tab')}</span>}
             </TabsTrigger>
           </TabsList>
         </div>
