@@ -1,18 +1,6 @@
 [
   {
-    "content": "Debug monthly payment schedule disappearing after ignore",
-    "status": "in_progress"
-  },
-  {
-    "content": "Debug annual payment schedule not displaying when created",
-    "status": "pending"
-  },
-  {
-    "content": "Check monthly next_occurrence calculation in ignore endpoint",
-    "status": "pending"
-  },
-  {
-    "content": "Check annual schedule creation and display logic",
-    "status": "pending"
+    "content": "Fixed monthly schedule day-of-month handling and annual schedule creation",
+    "status": "completed"
   }
 ]
