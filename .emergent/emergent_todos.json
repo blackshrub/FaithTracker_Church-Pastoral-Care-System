@@ -1,14 +1,10 @@
 [
   {
-    "content": "Implement mobile-first Dashboard improvements - larger touch targets, better spacing, visual hierarchy",
+    "content": "Test Dashboard improvements at 390px and verify usability",
     "status": "completed"
   },
   {
-    "content": "Test Dashboard improvements at 390px and verify usability",
-    "status": "in_progress"
-  },
-  {
     "content": "Run esbuild compile check after Dashboard improvements",
-    "status": "pending"
+    "status": "completed"
   }
 ]
