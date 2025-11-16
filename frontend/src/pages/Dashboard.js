@@ -130,46 +130,40 @@ const formatPhoneForWhatsApp = (phone) => {
   return `https://wa.me/${formatted}`;
 };
 
-const markBirthdayComplete = async (eventId, setBirthdaysToday, loadReminders, t) => {
+const markBirthdayComplete = async (eventId, queryClient, t) => {
   try {
     await axios.post(`${API}/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
-    // Update local state immediately for instant feedback
-    setBirthdaysToday(prev => prev.filter(b => b.id !== eventId));
-    // Reload all dashboard data to sync with backend cache
-    await loadReminders();
+    // Invalidate and refetch dashboard data
+    await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
     toast.error(t('toasts.failed_complete'));
   }
 };
 
-const markGriefStageComplete = async (stageId, setGriefDue, loadReminders, t) => {
+const markGriefStageComplete = async (stageId, queryClient, t) => {
   try {
     await axios.post(`${API}/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
-    // Update local state immediately for instant feedback
-    setGriefDue(prev => prev.filter(s => s.id !== stageId));
-    // Reload all dashboard data to sync with backend cache
-    await loadReminders();
+    // Invalidate and refetch dashboard data
+    await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
     toast.error(t('toasts.failed_complete'));
   }
 };
 
-const markAccidentComplete = async (eventId, setAccidentFollowUp, loadReminders, t) => {
+const markAccidentComplete = async (eventId, queryClient, t) => {
   try {
     await axios.post(`${API}/care-events/${eventId}/complete`);
     toast.success(t('toasts.accident_completed'));
-    // Update local state immediately for instant feedback
-    setAccidentFollowUp(prev => prev.filter(a => a.id !== eventId));
-    // Reload all dashboard data to sync with backend cache
-    await loadReminders();
+    // Invalidate and refetch dashboard data
+    await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
     toast.error(t('toasts.failed_complete'));
   }
 };
 
-const markMemberContacted = async (memberId, memberName, user, setAtRiskMembers, setDisconnectedMembers, loadReminders, t) => {
+const markMemberContacted = async (memberId, memberName, user, queryClient, t) => {
   try {
     // Create a regular contact event which updates last_contact_date
     await axios.post(`${API}/care-events`, {
@@ -181,11 +175,8 @@ const markMemberContacted = async (memberId, memberName, user, setAtRiskMembers,
       description: 'Contacted via Reminders page'
     });
     toast.success(t('toasts.member_contacted', {name: memberName}));
-    // Update local state immediately for instant feedback
-    setAtRiskMembers(prev => prev.filter(m => m.id !== memberId));
-    setDisconnectedMembers(prev => prev.filter(m => m.id !== memberId));
-    // Reload all dashboard data to sync with backend cache
-    await loadReminders();
+    // Invalidate and refetch dashboard data
+    await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
     toast.error('Failed to mark as contacted');
     console.error('Error marking member contacted:', error);
