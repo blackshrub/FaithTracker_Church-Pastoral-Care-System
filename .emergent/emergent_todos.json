@@ -5,11 +5,11 @@
   },
   {
     "content": "Migrate Financial Aid tab content from old standalone tab (line 1345) to new nested Overdue -> Aid child tab (line 1328)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Migrate At Risk tab content from old standalone tab (line 1532) to new nested Overdue -> At Risk child tab (line 1333)",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Migrate Disconnected tab content from old standalone tab (line 1479) to new nested Overdue -> Disconnected child tab (line 1338)",
