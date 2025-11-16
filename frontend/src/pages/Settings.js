@@ -78,9 +78,9 @@ export const Settings = () => {
           grief_support: parseInt(writeoffGrief)
         }
       });
-      toast.success('Overdue write-off settings saved!');
+      toast.success(t('toasts.writeoff_saved'));
     } catch (error) {
-      toast.error('Failed to save write-off settings');
+      toast.error(t('toasts.failed_save_writeoff'));
       console.error('Error saving writeoff settings:', error);
     }
   };
@@ -95,9 +95,9 @@ export const Settings = () => {
       await axios.put(`${API}/campuses/${user.campus_id}`, {
         timezone: campusTimezone
       });
-      toast.success('Timezone settings saved! All date/time operations will use this timezone.');
+      toast.success(t('toasts.timezone_saved'));
     } catch (error) {
-      toast.error('Failed to save timezone settings');
+      toast.error(t('toasts.failed_save_timezone'));
       console.error('Error saving timezone:', error);
     }
   };
@@ -105,18 +105,18 @@ export const Settings = () => {
   const saveEngagementSettings = () => {
     // Would save to backend/database in production
     localStorage.setItem('engagement_settings', JSON.stringify({ atRiskDays, inactiveDays }));
-    toast.success('Engagement thresholds saved!');
+    toast.success(t('toasts.engagement_saved'));
   };
   
   const saveGriefStages = () => {
     // Would save to backend/database in production
     localStorage.setItem('grief_stages', JSON.stringify(griefStages));
-    toast.success('Grief stages configuration saved!');
+    toast.success(t('toasts.grief_stages_saved'));
   };
   
   const saveAccidentFollowUp = () => {
     localStorage.setItem('accident_followup', JSON.stringify(accidentFollowUp));
-    toast.success('Accident/Illness follow-up configuration saved!');
+    toast.success(t('toasts.accident_config_saved'));
   };
   
   return (
