@@ -113,7 +113,7 @@ export const AdminDashboard = () => {
                     <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />Add Campus</Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>Add Campus</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{newCampus.id ? 'Edit Campus' : 'Add Campus'}</DialogTitle></DialogHeader>
                     <form onSubmit={handleAddCampus} className="space-y-4">
                       <div><Label>Campus Name *</Label><Input value={newCampus.campus_name} onChange={(e) => setNewCampus({...newCampus, campus_name: e.target.value})} required /></div>
                       <div><Label>Location</Label><Input value={newCampus.location} onChange={(e) => setNewCampus({...newCampus, location: e.target.value})} /></div>
