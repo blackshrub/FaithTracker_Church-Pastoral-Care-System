@@ -642,6 +642,12 @@
   
   "_comment_bulk_messaging": "Bulk Messaging Page",
   "bulk_messaging_page": {
+    "title": "Pesan Massal",
+    "select_recipients": "Pilih Penerima",
+    "compose_message": "Tulis Pesan",
+    "recipients_selected": "{{count}} penerima terpilih",
+    "sending": "Mengirim...",
+    "send_to_recipients": "Kirim ke {{count}} Penerima",
     "failed_load_users": "Gagal memuat pengguna",
     "select_recipient": "Pilih minimal satu penerima",
     "enter_message": "Masukkan pesan",
@@ -652,6 +658,26 @@
   
   "_comment_import_export": "Import/Export Page",
   "import_export_page": {
+    "title": "Impor/Ekspor Data",
+    "csv_import": "Impor CSV",
+    "select_csv_file": "Pilih File CSV",
+    "json_import": "Impor JSON",
+    "json_data": "Data JSON",
+    "api_sync_continuous": "Sinkronisasi API (Berkelanjutan)",
+    "external_api_url": "URL API Eksternal *",
+    "api_key_optional": "Kunci API (opsional)",
+    "sync_interval_minutes": "Interval Sinkronisasi (menit) *",
+    "assign_campus": "Tetapkan ke Kampus *",
+    "export_members": "Ekspor Jemaat",
+    "export_care_events": "Ekspor Kejadian Perawatan",
+    "active_sync_jobs": "Pekerjaan Sinkronisasi Aktif",
+    "api_url": "URL API",
+    "update_sync": "Perbarui Sinkronisasi",
+    "test_connection": "Tes Koneksi",
+    "sync_now": "Sinkronkan Sekarang",
+    "import": "Impor",
+    "export_csv": "Ekspor CSV",
+    "export_json": "Ekspor JSON",
     "sync_updated": "Pekerjaan sinkronisasi diperbarui!",
     "imported_count": "Mengimpor {{count}} jemaat!",
     "errors_occurred": "{{count}} kesalahan terjadi",
@@ -670,6 +696,8 @@
   
   "_comment_whatsapp_logs": "WhatsApp Logs Page",
   "whatsapp_logs_page": {
+    "title": "Log Notifikasi WhatsApp",
+    "recent_notifications": "Notifikasi Terkini",
     "logs_loaded": "Memuat {{count}} log",
     "failed_load_logs": "Gagal memuat log",
     "message_sent": "Pesan terkirim!",
