@@ -1,6 +1,18 @@
 [
   {
-    "content": "React Query migration complete for Dashboard and MemberDetail with all bugs fixed",
-    "status": "completed"
+    "content": "Debug accident follow-up completion timeline date issue",
+    "status": "in_progress"
+  },
+  {
+    "content": "Check backend timezone handling for timeline event creation",
+    "status": "pending"
+  },
+  {
+    "content": "Fix date conversion to use campus timezone",
+    "status": "pending"
+  },
+  {
+    "content": "Test accident follow-up completion shows correct date",
+    "status": "pending"
   }
 ]
