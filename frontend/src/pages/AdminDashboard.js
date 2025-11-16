@@ -119,8 +119,53 @@ export const AdminDashboard = () => {
                 </Dialog>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <CardContent className="p-4">
+              {/* Mobile Card Layout */}
+              <div className="block sm:hidden space-y-3">
+                {campuses.map(c => (
+                  <div key={c.id} className="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">{c.campus_name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{c.location || '-'}</p>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                          <DropdownMenuItem onClick={() => {
+                            setNewCampus({campus_name: c.campus_name, location: c.location || ''});
+                            setCampusModalOpen(true);
+                          }}>
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={async () => {
+                              if (!window.confirm(`Delete ${c.campus_name}?`)) return;
+                              try {
+                                await axios.delete(`${API}/campuses/${c.id}`);
+                                toast.success('Deleted');
+                                loadData();
+                              } catch (e) {
+                                toast.error('Cannot delete - has members');
+                              }
+                            }}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Desktop Table Layout */}
+              <div className="hidden sm:block overflow-x-auto">
                 <Table className="w-full">
                   <TableHeader>
                     <TableRow>
