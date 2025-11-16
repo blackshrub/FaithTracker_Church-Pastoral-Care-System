@@ -530,8 +530,8 @@ export const Dashboard = () => {
                   </div>
                   {quickEvent.event_type !== 'financial_aid' && (
                     <div>
-                      <Label>{t('event_date_required')}</Label>
-                      <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} required />
+                      <Label className="font-semibold">{t('event_date_required')}</Label>
+                      <Input type="date" value={quickEvent.event_date} onChange={(e) => setQuickEvent({...quickEvent, event_date: e.target.value})} className="h-12" required />
                     </div>
                   )}
                 </div>
