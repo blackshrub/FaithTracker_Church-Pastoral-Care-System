@@ -1061,7 +1061,6 @@ export const Dashboard = () => {
                                     try {
                                       await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success(t('toasts.payment_distributed'));
-                                      setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                       await queryClient.invalidateQueries(['dashboard']);
                                     } catch (error) {
                                       toast.error(t('toasts.failed_mark_distributed'));
@@ -1081,7 +1080,6 @@ export const Dashboard = () => {
                                         try {
                                           await axios.post(`${API}/financial-aid-schedules/${task.data.id}/ignore`);
                                           toast.success(t('toasts.financial_aid_ignored'));
-                                          setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                           await queryClient.invalidateQueries(['dashboard']);
                                         } catch (error) {
                                           toast.error(t('toasts.failed_ignore'));
@@ -1095,7 +1093,6 @@ export const Dashboard = () => {
                                           try {
                                             await axios.post(`${API}/financial-aid-schedules/${task.data.id}/stop`);
                                             toast.success(t('toasts.schedule_stopped'));
-                                            setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                             await queryClient.invalidateQueries(['dashboard']);
                                           } catch (error) {
                                             toast.error(t('toasts.failed_stop'));
@@ -1118,7 +1115,6 @@ export const Dashboard = () => {
                                       } else if (task.type === 'accident_followup') {
                                         await axios.post(`${API}/accident-followup/${task.data.id}/complete`);
                                         toast.success(t('toasts.followup_completed'));
-                                        setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                         await queryClient.invalidateQueries(['dashboard']);
                                       }
                                     } catch (error) {
@@ -1144,7 +1140,6 @@ export const Dashboard = () => {
                                             await axios.post(`${API}/accident-followup/${task.data.id}/ignore`);
                                             toast.success(t('toasts.accident_ignored'));
                                           }
-                                          setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
                                           await queryClient.invalidateQueries(['dashboard']);
                                         } catch (error) {
                                       toast.error('Failed to ignore');
