@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -106,6 +107,7 @@ const markMemberContacted = async (memberId, memberName, user, loadReminders) =>
 };
 
 export const Reminders = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [birthdaysToday, setBirthdaysToday] = useState([]);
   const [griefDue, setGriefDue] = useState([]);
