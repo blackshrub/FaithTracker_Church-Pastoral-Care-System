@@ -1660,10 +1660,24 @@ export const Dashboard = () => {
                               </a>
                             )}
                             <p className="text-sm text-muted-foreground mt-1">
-                              <span className="font-medium">{config.label}:</span> 
-                              {task.type === 'accident_followup' ? ` ${getAccidentStageBadge(task.data.stage)}` :
-                               task.type === 'grief_support' ? ` ${getGriefStageBadge(task.data.stage)}` :
-                               ` ${task.details}`}
+                              {task.type === 'birthday' ? (
+                                <span className="font-medium">Birthday</span>
+                              ) : task.type === 'accident_followup' ? (
+                                <>
+                                  <span className="font-medium">{config.label}:</span> {getAccidentStageBadge(task.data.stage)}
+                                </>
+                              ) : task.type === 'grief_support' ? (
+                                <>
+                                  <span className="px-2 py-0.5 bg-purple-500 text-white text-xs rounded mr-2">
+                                    {getGriefStageBadge(task.data.stage)}
+                                  </span>
+                                  after mourning
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-medium">{config.label}:</span> {task.details}
+                                </>
+                              )}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
                               📅 {formatDate(task.date, 'dd MMM yyyy')}
