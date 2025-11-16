@@ -9,11 +9,11 @@
   },
   {
     "content": "Migrate At Risk tab content from old standalone tab (line 1532) to new nested Overdue -> At Risk child tab (line 1333)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Migrate Disconnected tab content from old standalone tab (line 1479) to new nested Overdue -> Disconnected child tab (line 1338)",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Delete all old standalone tab containers (lines 1345-1819)",
