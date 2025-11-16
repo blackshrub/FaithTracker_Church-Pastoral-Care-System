@@ -2978,6 +2978,10 @@ async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(g
             }}
         )
         
+        # Log after update for debugging
+        updated_schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        logger.info(f"[IGNORE] After update - Schedule {schedule_id}: is_active={updated_schedule.get('is_active')}, ignored_occurrences={updated_schedule.get('ignored_occurrences')}, next_occurrence={updated_schedule.get('next_occurrence')}")
+        
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(schedule["campus_id"])
         
