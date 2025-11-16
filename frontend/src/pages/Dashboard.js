@@ -790,36 +790,45 @@ export const Dashboard = () => {
               
               {/* All Other Tasks Due Today */}
               {todayTasks.length > 0 && (
-                <Card>
+                <Card className="card-border-left-teal">
                   <CardHeader>
-                    <CardTitle>{t('other_tasks_due_today')} ({todayTasks.length})</CardTitle>
+                    <CardTitle className="text-xl">{t('other_tasks_due_today')} ({todayTasks.length})</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {todayTasks.map((task, index) => {
                         const typeConfig = {
-                          grief_support: { icon: '💔', color: 'pink', label: t('grief_support') },
-                          accident_followup: { icon: '🏥', color: 'blue', label: t('accident_followup_label') },
-                          financial_aid: { icon: '💰', color: 'green', label: t('financial_aid') }
+                          grief_support: { icon: '💔', color: 'pink', bgClass: 'bg-pink-50', borderClass: 'border-pink-200', btnClass: 'bg-pink-500 hover:bg-pink-600', label: t('grief_support') },
+                          accident_followup: { icon: '🏥', color: 'blue', bgClass: 'bg-blue-50', borderClass: 'border-blue-200', btnClass: 'bg-blue-500 hover:bg-blue-600', label: t('accident_followup_label') },
+                          financial_aid: { icon: '💰', color: 'green', bgClass: 'bg-purple-50', borderClass: 'border-purple-200', btnClass: 'bg-purple-500 hover:bg-purple-600', label: t('financial_aid') }
                         };
-                        const config = typeConfig[task.type] || { icon: '📋', color: 'gray', label: 'Task' };
+                        const config = typeConfig[task.type] || { icon: '📋', color: 'gray', bgClass: 'bg-gray-50', borderClass: 'border-gray-200', btnClass: 'bg-gray-500 hover:bg-gray-600', label: 'Task' };
                         
                         return (
-                          <div key={index} className={`p-4 bg-${config.color}-50 rounded-lg border border-${config.color}-200 flex justify-between items-center`}>
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="text-2xl">{config.icon}</div>
-                              <div className="flex-1">
-                                <MemberNameWithAvatar 
-                                  member={{name: task.member_name, photo_url: task.member_photo_url}} 
-                                  memberId={task.member_id} 
-                                />
-                                <p className="text-sm text-muted-foreground">{config.label}: {task.details}</p>
+                          <div key={index} className={`p-4 ${config.bgClass} rounded-lg border ${config.borderClass}`}>
+                            <div className="flex items-start gap-3 mb-3">
+                              <div className="text-3xl flex-shrink-0">{config.icon}</div>
+                              <div className="flex-1 min-w-0">
+                                <Link to={`/members/${task.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                                  {task.member_name}
+                                </Link>
+                                {task.member_phone && (
+                                  <a href={`tel:${task.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
+                                    📞 {task.member_phone}
+                                  </a>
+                                )}
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  <span className="font-medium">{config.label}:</span> {task.details}
+                                </p>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" className={`bg-${config.color}-500 hover:bg-${config.color}-600 text-white`} asChild>
+                            
+                            {/* Actions - Responsive layout */}
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Button size="lg" className={`${config.btnClass} text-white h-12 flex-1`} asChild>
                                 <a href={formatPhoneForWhatsApp(task.member_phone)} target="_blank" rel="noopener noreferrer">
-                                  {t('contact')}
+                                  <MessageSquare className="w-4 h-4 mr-2" />
+                                  {t('contact_whatsapp')}
                                 </a>
                               </Button>
                               
