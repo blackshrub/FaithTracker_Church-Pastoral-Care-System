@@ -1,6 +1,18 @@
 [
   {
-    "content": "Complete internationalization for all 13 pages and critical components",
-    "status": "completed"
+    "content": "Examine id.json for object values instead of string values",
+    "status": "in_progress"
+  },
+  {
+    "content": "Fix all object values to be proper strings in id.json",
+    "status": "pending"
+  },
+  {
+    "content": "Validate en.json has no object issues",
+    "status": "pending"
+  },
+  {
+    "content": "Test translation files load correctly",
+    "status": "pending"
   }
 ]
