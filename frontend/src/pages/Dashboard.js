@@ -1117,6 +1117,7 @@ export const Dashboard = () => {
                                             await axios.post(`${API}/financial-aid-schedules/${task.data.id}/stop`);
                                             toast.success('Schedule stopped');
                                             setTodayTasks(prev => prev.filter(t => t.data.id !== task.data.id));
+                                            await loadReminders();
                                           } catch (error) {
                                             toast.error('Failed to stop');
                                           }
