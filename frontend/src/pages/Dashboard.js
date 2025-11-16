@@ -1298,9 +1298,19 @@ export const Dashboard = () => {
               <CardContent>
                 <div className="space-y-4">
                   {hospitalFollowUp.map(event => (
-                    <div key={event.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div key={event.id} className="p-4 bg-blue-50 rounded-lg border border-blue-200 relative hover:shadow-lg transition-all">
+                      {/* Overdue Badge */}
+                      {event.days_overdue > 0 && (
+                        <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10">
+                          {event.days_overdue}d overdue
+                        </span>
+                      )}
+                      
                       <div className="flex items-start gap-3 mb-3">
-                        <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
+                        {/* Avatar with blue ring */}
+                        <div className="flex-shrink-0 rounded-full ring-2 ring-blue-400">
+                          <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <Link to={`/members/${event.member_id}`} className="font-semibold text-base hover:text-teal-600">
                             {event.member_name}
@@ -1310,7 +1320,10 @@ export const Dashboard = () => {
                               📞 {event.member_phone}
                             </a>
                           )}
-                          <p className="text-sm text-muted-foreground mt-1">{event.followup_reason}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {event.followup_reason}
+                            {event.days_since_last_contact && <span className="ml-2 text-xs">• Last contact {event.days_since_last_contact}d ago</span>}
+                          </p>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -1322,7 +1335,7 @@ export const Dashboard = () => {
                             <span className="truncate">{t('contact_whatsapp')}</span>
                           </a>
                         </Button>
-                        <Button size="default" variant="outline" onClick={() => markAccidentComplete(event.id, setAccidentFollowUp)} className="h-11 flex-1 min-w-0">
+                        <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markAccidentComplete(event.id, setAccidentFollowUp); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                           <Check className="w-4 h-4 mr-1" />
                           <span className="truncate">{t('mark_complete')}</span>
                         </Button>
