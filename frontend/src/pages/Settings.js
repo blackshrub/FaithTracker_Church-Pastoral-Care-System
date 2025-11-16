@@ -23,6 +23,7 @@ export const Settings = () => {
   const [writeoffFinancialAid, setWriteoffFinancialAid] = useState(0);
   const [writeoffAccident, setWriteoffAccident] = useState(14);
   const [writeoffGrief, setWriteoffGrief] = useState(14);
+  const [activeTab, setActiveTab] = useState('automation');
   const [griefStages, setGriefStages] = useState([
     { stage: '1_week', days: 7, name: '1 Week After' },
     { stage: '2_weeks', days: 14, name: '2 Weeks After' },
@@ -123,15 +124,33 @@ export const Settings = () => {
         <p className="text-muted-foreground mt-1">System configuration and automation settings</p>
       </div>
       
-      <Tabs defaultValue="automation" className="max-w-full">
+      <Tabs defaultValue="automation" className="max-w-full" onValueChange={(v) => setActiveTab(v)}>
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <TabsList className="inline-flex min-w-full w-max sm:w-full sm:grid sm:grid-cols-6">
-            <TabsTrigger value="automation" className="flex-shrink-0"><Bell className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Automation</span></TabsTrigger>
-            <TabsTrigger value="grief" className="flex-shrink-0"><Heart className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Grief Support</span></TabsTrigger>
-            <TabsTrigger value="accident" className="flex-shrink-0"><Zap className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Accident/Illness</span></TabsTrigger>
-            <TabsTrigger value="engagement" className="flex-shrink-0"><Users className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Engagement</span></TabsTrigger>
-            <TabsTrigger value="writeoff" className="flex-shrink-0"><Clock className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Write-off Policy</span></TabsTrigger>
-            <TabsTrigger value="system" className="flex-shrink-0"><SettingsIcon className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">System</span></TabsTrigger>
+          <TabsList className="inline-flex min-w-full w-max sm:w-full">
+            <TabsTrigger value="automation" className="flex-shrink-0">
+              <Bell className="w-4 h-4" />
+              {activeTab === 'automation' && <span className="ml-2">Automation</span>}
+            </TabsTrigger>
+            <TabsTrigger value="grief" className="flex-shrink-0">
+              <Heart className="w-4 h-4" />
+              {activeTab === 'grief' && <span className="ml-2">Grief Support</span>}
+            </TabsTrigger>
+            <TabsTrigger value="accident" className="flex-shrink-0">
+              <Zap className="w-4 h-4" />
+              {activeTab === 'accident' && <span className="ml-2">Accident/Illness</span>}
+            </TabsTrigger>
+            <TabsTrigger value="engagement" className="flex-shrink-0">
+              <Users className="w-4 h-4" />
+              {activeTab === 'engagement' && <span className="ml-2">Engagement</span>}
+            </TabsTrigger>
+            <TabsTrigger value="writeoff" className="flex-shrink-0">
+              <Clock className="w-4 h-4" />
+              {activeTab === 'writeoff' && <span className="ml-2">Write-off Policy</span>}
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex-shrink-0">
+              <SettingsIcon className="w-4 h-4" />
+              {activeTab === 'system' && <span className="ml-2">System</span>}
+            </TabsTrigger>
           </TabsList>
         </div>
         
