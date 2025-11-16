@@ -1932,6 +1932,7 @@ export const Dashboard = () => {
                                 await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                 toast.success('Payment distributed!');
                                 setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
+                                await loadReminders();
                               } catch (error) {
                                 toast.error('Failed');
                               }
@@ -1982,6 +1983,7 @@ export const Dashboard = () => {
                                     await axios.post(endpoint);
                                     toast.success('Ignored');
                                     setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
+                                    await loadReminders();
                                   }
                                 } catch (error) {
                                   toast.error('Failed');
