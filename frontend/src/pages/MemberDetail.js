@@ -19,6 +19,20 @@ import { EngagementBadge } from '@/components/EngagementBadge';
 import { EventTypeBadge } from '@/components/EventTypeBadge';
 import { format } from 'date-fns/format';
 
+// Aid type icon helper
+const getAidTypeIcon = (aidType) => {
+  const icons = {
+    'education': '🎓',
+    'medical': '🏥',
+    'housing': '🏠',
+    'family': '👨‍👩‍👧',
+    'food': '🍚',
+    'transportation': '🚗',
+    'emergency': '🆘'
+  };
+  return icons[aidType?.toLowerCase()] || '💰';
+};
+
 // Safe date formatter
 const formatDate = (dateStr, formatStr = 'dd MMM yyyy') => {
   try {
