@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export const BulkMessaging = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [message, setMessage] = useState('');
@@ -25,17 +27,17 @@ export const BulkMessaging = () => {
       const response = await axios.get(`${API}/users`);
       setUsers(response.data);
     } catch (error) {
-      toast.error('Failed to load users');
+      toast.error(t('bulk_messaging.failed_load_users'));
     }
   };
   
   const handleSendBulk = async () => {
     if (selectedUsers.length === 0) {
-      toast.error('Select at least one recipient');
+      toast.error(t('bulk_messaging.select_recipient'));
       return;
     }
     if (!message.trim()) {
-      toast.error('Enter a message');
+      toast.error(t('bulk_messaging.enter_message'));
       return;
     }
     
