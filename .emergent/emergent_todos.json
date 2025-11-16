@@ -1,11 +1,11 @@
 [
   {
     "content": "Update MembersList.js with translation keys",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update MemberDetail.js with translation keys",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Verify both pages compile correctly",
