@@ -1200,6 +1200,16 @@ export const Dashboard = () => {
             
             {/* Birthday Child Tab */}
             <TabsContent value="birthdays" className="space-y-4 mt-4">
+              {/* Birthday content will be here */}
+            </TabsContent>
+            
+            {/* Followups Child Tab */}
+            <TabsContent value="followups" className="space-y-4 mt-4">
+              {/* Followup content will be here */}
+            </TabsContent>
+            
+            {/* Financial Child Tab */}
+            <TabsContent value="financial" className="space-y-4 mt-4">
           <Card className="card-border-left-green">
             <CardHeader>
               <CardTitle>{t('financial_aid_overdue')}</CardTitle>
