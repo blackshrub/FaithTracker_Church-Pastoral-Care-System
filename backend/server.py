@@ -2035,6 +2035,10 @@ async def complete_care_event(event_id: str):
         
         # For birthday completions, also create a regular contact event for timeline
         if event["event_type"] == "birthday":
+            # Get campus timezone for correct date
+            campus_tz = await get_campus_timezone(event["campus_id"])
+            today_date = get_date_in_timezone(campus_tz)
+            
             # Get member name for the title
             member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0, "name": 1})
             member_name = member["name"] if member else "Member"
@@ -2044,7 +2048,7 @@ async def complete_care_event(event_id: str):
                 "member_id": event["member_id"],
                 "campus_id": event["campus_id"],
                 "event_type": "regular_contact",
-                "event_date": datetime.now(timezone.utc).date().isoformat(),
+                "event_date": today_date,  # Use campus timezone date
                 "title": "Birthday Contact",
                 "description": f"Contacted {member_name} for their birthday celebration",
                 "completed": True,
