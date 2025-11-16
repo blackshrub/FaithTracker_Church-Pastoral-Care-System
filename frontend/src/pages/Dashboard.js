@@ -1185,7 +1185,7 @@ export const Dashboard = () => {
                           <Link to={`/members/${member.id}`} className="font-semibold text-base hover:text-teal-600">
                             {member.name}
                           </Link>
-                          {member.phone && (
+                          {member.phone && member.phone !== 'null' && member.phone !== 'NULL' && (
                             <a href={`tel:${member.phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                               📞 {member.phone}
                             </a>
@@ -1238,7 +1238,7 @@ export const Dashboard = () => {
                           <Link to={`/members/${member.id}`} className="font-semibold text-base hover:text-teal-600">
                             {member.name}
                           </Link>
-                          {member.phone && (
+                          {member.phone && member.phone !== 'null' && member.phone !== 'NULL' && (
                             <a href={`tel:${member.phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                               📞 {member.phone}
                             </a>
