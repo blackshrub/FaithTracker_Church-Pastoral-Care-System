@@ -1654,7 +1654,7 @@ export const Dashboard = () => {
                             <Link to={`/members/${task.member_id}`} className="font-semibold text-base hover:text-teal-600">
                               {task.member_name}
                             </Link>
-                            {task.member_phone && (
+                            {task.member_phone && task.member_phone !== 'null' && task.member_phone !== 'NULL' && (
                               <a href={`tel:${task.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                 📞 {task.member_phone}
                               </a>
