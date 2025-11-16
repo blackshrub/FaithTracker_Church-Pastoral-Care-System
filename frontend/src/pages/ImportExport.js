@@ -301,7 +301,7 @@ export const ImportExport = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Import/Export Data</h1>
+        <h1 className="text-3xl font-bold">{t('import_export_page.title')}</h1>
         <p className="text-muted-foreground mt-1">Sync member data and export reports</p>
       </div>
       
@@ -315,13 +315,13 @@ export const ImportExport = () => {
         <TabsContent value="import" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>CSV Import</CardTitle>
+              <CardTitle>{t('import_export_page.csv_import')}</CardTitle>
               <CardDescription>Upload CSV file to bulk import members</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <Label>Select CSV File</Label>
+                  <Label>{t('import_export_page.select_csv_file')}</Label>
                   <Input type="file" accept=".csv" onChange={handleCsvSelect} />
                   <p className="text-xs text-muted-foreground mt-1">Required columns: name, phone</p>
                 </div>
@@ -382,13 +382,13 @@ export const ImportExport = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle>JSON Import</CardTitle>
+              <CardTitle>{t('import_export_page.json_import')}</CardTitle>
               <CardDescription>Paste JSON array for API integration</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleJsonImport} className="space-y-4">
                 <div>
-                  <Label>JSON Data</Label>
+                  <Label>{t('import_export_page.json_data')}</Label>
                   <textarea 
                     className="w-full h-32 p-2 border rounded" 
                     value={jsonData}
@@ -406,13 +406,13 @@ export const ImportExport = () => {
           
           <Card className="card-border-left-teal">
             <CardHeader>
-              <CardTitle>API Sync (Continuous)</CardTitle>
+              <CardTitle>{t('import_export_page.api_sync_continuous')}</CardTitle>
               <CardDescription>Connect to external church management system for continuous sync</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={(e) => { e.preventDefault(); handleApiTest(); }} className="space-y-4">
                 <div>
-                  <Label>External API URL *</Label>
+                  <Label>{t('import_export_page.external_api_url')}</Label>
                   <Input
                     value={apiUrl}
                     onChange={(e) => setApiUrl(e.target.value)}
@@ -421,7 +421,7 @@ export const ImportExport = () => {
                   />
                 </div>
                 <div>
-                  <Label>API Key (optional)</Label>
+                  <Label>{t('import_export_page.api_key_optional')}</Label>
                   <Input
                     type="password"
                     value={apiKey}
@@ -431,7 +431,7 @@ export const ImportExport = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Sync Interval (minutes) *</Label>
+                    <Label>{t('import_export_page.sync_interval_minutes')}</Label>
                     <Input
                       type="number"
                       value={syncInterval}
@@ -442,7 +442,7 @@ export const ImportExport = () => {
                     <p className="text-xs text-muted-foreground">Auto-sync every X minutes</p>
                   </div>
                   <div>
-                    <Label>Assign to Campus *</Label>
+                    <Label>{t('import_export_page.assign_campus')}</Label>
                     <Select value={selectedCampusId} onValueChange={setSelectedCampusId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select campus" />
