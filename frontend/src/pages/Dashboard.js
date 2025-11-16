@@ -1940,11 +1940,11 @@ export const Dashboard = () => {
                               triggerHaptic();
                               try {
                                 await axios.post(`${API}/financial-aid-schedules/${task.data.id}/mark-distributed`);
-                                toast.success('Payment distributed!');
+                                toast.success(t('toasts.payment_distributed'));
                                 setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
                                 await loadReminders();
                               } catch (error) {
-                                toast.error('Failed');
+                                toast.error(t('toasts.failed'));
                               }
                             }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
@@ -1961,12 +1961,12 @@ export const Dashboard = () => {
                                 
                                 if (endpoint) {
                                   await axios.post(endpoint);
-                                  toast.success('Completed!');
+                                  toast.success(t('toasts.completed'));
                                   setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
                                   await loadReminders();
                                 }
                               } catch (error) {
-                                toast.error('Failed');
+                                toast.error(t('toasts.failed'));
                               }
                             }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
@@ -1992,12 +1992,12 @@ export const Dashboard = () => {
                                   
                                   if (endpoint) {
                                     await axios.post(endpoint);
-                                    toast.success('Ignored');
+                                    toast.success(t('toasts.ignored'));
                                     setUpcomingTasks(prev => prev.filter((t, i) => i !== index));
                                     await loadReminders();
                                   }
                                 } catch (error) {
-                                  toast.error('Failed');
+                                  toast.error(t('toasts.failed'));
                                 }
                               }}>
                                 {t('ignore')}
