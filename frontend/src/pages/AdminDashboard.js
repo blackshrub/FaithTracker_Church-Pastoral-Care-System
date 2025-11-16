@@ -200,7 +200,7 @@ export const AdminDashboard = () => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-32">
                               <DropdownMenuItem onClick={() => {
-                                setNewCampus({campus_name: c.campus_name, location: c.location || ''});
+                                setNewCampus({id: c.id, campus_name: c.campus_name, location: c.location || ''});
                                 setCampusModalOpen(true);
                               }}>
                                 Edit
