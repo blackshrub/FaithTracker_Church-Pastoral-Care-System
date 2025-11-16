@@ -307,8 +307,8 @@ export const ImportExport = () => {
       
       <Tabs defaultValue="import">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="import"><Upload className="w-4 h-4 mr-2" />Import</TabsTrigger>
-          <TabsTrigger value="export"><Download className="w-4 h-4 mr-2" />Export</TabsTrigger>
+          <TabsTrigger value="import"><Upload className="w-4 h-4 mr-2" />{t('import_export_page.import_tab')}</TabsTrigger>
+          <TabsTrigger value="export"><Download className="w-4 h-4 mr-2" />{t('import_export_page.export_tab')}</TabsTrigger>
           <TabsTrigger value="sync-status">🔄 API Sync Status</TabsTrigger>
         </TabsList>
         
@@ -316,7 +316,7 @@ export const ImportExport = () => {
           <Card>
             <CardHeader>
               <CardTitle>{t('import_export_page.csv_import')}</CardTitle>
-              <CardDescription>Upload CSV file to bulk import members</CardDescription>
+              <CardDescription>{t('import_export_page.csv_import_description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -580,7 +580,7 @@ export const ImportExport = () => {
           <Card>
             <CardHeader>
               <CardTitle>{t('import_export_page.export_members')}</CardTitle>
-              <CardDescription>Download all members as CSV</CardDescription>
+              <CardDescription>{t('import_export_page.export_members_description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Button onClick={handleExportMembers}>
@@ -593,7 +593,7 @@ export const ImportExport = () => {
           <Card>
             <CardHeader>
               <CardTitle>{t('import_export_page.export_care_events')}</CardTitle>
-              <CardDescription>Download all care events as CSV</CardDescription>
+              <CardDescription>{t('import_export_page.export_events_description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Button onClick={handleExportEvents}>
