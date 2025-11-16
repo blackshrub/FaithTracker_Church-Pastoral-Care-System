@@ -973,7 +973,7 @@ export const Dashboard = () => {
                                 <span className="truncate">{t('completed')}</span>
                               </Button>
                             ) : (
-                              <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markBirthdayComplete(event.id, setBirthdaysToday, loadReminders, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                              <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markBirthdayComplete(event.id, queryClient, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                                 <Check className="w-4 h-4 mr-1" />
                                 <span className="truncate">{t('mark_complete')}</span>
                               </Button>
@@ -1114,7 +1114,7 @@ export const Dashboard = () => {
                                     triggerHaptic();
                                     try {
                                       if (task.type === 'grief_support') {
-                                        await markGriefStageComplete(task.data.id, setGriefDue, loadReminders, t);
+                                        await markGriefStageComplete(task.data.id, queryClient, t);
                                       } else if (task.type === 'accident_followup') {
                                         await axios.post(`${API}/accident-followup/${task.data.id}/complete`);
                                         toast.success(t('toasts.followup_completed'));
@@ -1361,7 +1361,7 @@ export const Dashboard = () => {
                                 <span className="truncate">{t('contact_whatsapp')}</span>
                               </a>
                             </Button>
-                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markAccidentComplete(event.id, setAccidentFollowUp, loadReminders, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markAccidentComplete(event.id, queryClient, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
                               <span className="truncate">{t('mark_complete')}</span>
                             </Button>
@@ -1514,7 +1514,7 @@ export const Dashboard = () => {
                                 <span className="truncate">{t('contact_whatsapp')}</span>
                               </a>
                             </Button>
-                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markGriefStageComplete(stage.id, setGriefDue, loadReminders, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markGriefStageComplete(stage.id, queryClient, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
                               <span className="truncate">{t('mark_complete')}</span>
                             </Button>
@@ -1737,7 +1737,7 @@ export const Dashboard = () => {
                                 <span className="truncate">{t('contact_whatsapp')}</span>
                               </a>
                             </Button>
-                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markMemberContacted(member.id, member.name, user, setAtRiskMembers, setDisconnectedMembers, loadReminders, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markMemberContacted(member.id, member.name, user, queryClient, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
                               <span className="truncate">{t('buttons.contacted')}</span>
                             </Button>
@@ -1795,7 +1795,7 @@ export const Dashboard = () => {
                                 <span className="truncate">{t('contact_whatsapp')}</span>
                               </a>
                             </Button>
-                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markMemberContacted(member.id, member.name, user, setAtRiskMembers, setDisconnectedMembers, loadReminders, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
+                            <Button size="default" variant="outline" onClick={() => { triggerHaptic(); markMemberContacted(member.id, member.name, user, queryClient, t); }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
                               <Check className="w-4 h-4 mr-1" />
                               <span className="truncate">{t('buttons.contacted')}</span>
                             </Button>
