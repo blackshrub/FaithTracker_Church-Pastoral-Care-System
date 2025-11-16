@@ -135,49 +135,7 @@ export const MemberDetail = () => {
     end_year: null
   });
   
-  useEffect(() => {
-    if (id) {
-      queryClient.invalidateQueries(['member', id]);
-    }
-  }, [id]);
-  
-  const loadMemberData = async () => {
-    try {
-      setLoading(true);
-      const timestamp = Date.now();
-      const cacheHeaders = {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      };
-      
-      const [memberRes, eventsRes, griefRes, accidentRes, aidSchedulesRes] = await Promise.all([
-        axios.get(`${API}/members/${id}?t=${timestamp}`, { headers: cacheHeaders }),
-        axios.get(`${API}/care-events?member_id=${id}&t=${timestamp}`, { headers: cacheHeaders }),
-        axios.get(`${API}/grief-support/member/${id}?t=${timestamp}`, { headers: cacheHeaders }),
-        axios.get(`${API}/accident-followup/member/${id}?t=${timestamp}`, { headers: cacheHeaders }),
-        axios.get(`${API}/financial-aid-schedules/member/${id}?t=${timestamp}`, { headers: cacheHeaders })
-      ]);
-      
-      setMember(memberRes.data);
-      setCareEvents((eventsRes.data || []).sort((a, b) => {
-        // Primary sort by event_date (descending - newest first)
-        const dateCompare = new Date(b.event_date) - new Date(a.event_date);
-        if (dateCompare !== 0) return dateCompare;
-        // Secondary sort by created_at (descending - most recent first)
-        return new Date(b.created_at) - new Date(a.created_at);
-      }));
-      setGriefTimeline(griefRes.data);
-      setAccidentTimeline(accidentRes.data);
-      setAidSchedules(aidSchedulesRes.data || []);
-      
-      console.log('Aid schedules loaded:', aidSchedulesRes.data);
-    } catch (error) {
-      toast.error(t('error_messages.member_not_found'));
-      console.error('Error loading member:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // The useQuery automatically fetches when id changes, no need for useEffect
   
   const handleAddCareEvent = async (e) => {
     e.preventDefault();
