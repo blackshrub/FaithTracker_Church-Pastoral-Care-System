@@ -344,5 +344,78 @@
     "no_financial_aid": "Belum ada bantuan keuangan yang dicatat.",
     "no_tasks_today": "Tidak ada tugas untuk hari ini!",
     "no_results_found": "Tidak ada hasil ditemukan"
+  },
+  
+  "_comment_hardcoded_ui": "Hardcoded UI Text",
+  "main_tabs": {
+    "today": "Hari Ini",
+    "overdue": "Terlambat",
+    "upcoming": "Mendatang"
+  },
+  
+  "nested_tabs": {
+    "birthday": "Ulang Tahun",
+    "followups": "Tindak Lanjut",
+    "aid": "Bantuan",
+    "at_risk": "Berisiko",
+    "inactive": "Tidak Aktif"
+  },
+  
+  "buttons": {
+    "contacted": "Dihubungi",
+    "cancel": "Batal",
+    "save_care_event": "Simpan Kejadian Perawatan"
+  },
+  
+  "days_of_week": {
+    "monday": "Senin",
+    "tuesday": "Selasa",
+    "wednesday": "Rabu",
+    "thursday": "Kamis",
+    "friday": "Jumat",
+    "saturday": "Sabtu",
+    "sunday": "Minggu"
+  },
+  
+  "months": {
+    "january": "Januari",
+    "february": "Februari",
+    "march": "Maret",
+    "april": "April",
+    "may": "Mei",
+    "june": "Juni",
+    "july": "Juli",
+    "august": "Agustus",
+    "september": "September",
+    "october": "Oktober",
+    "november": "November",
+    "december": "Desember"
+  },
+  
+  "form_placeholders": {
+    "search_name_phone": "Cari berdasarkan nama atau nomor telepon...",
+    "select_event_type": "Pilih jenis kejadian...",
+    "additional_details": "Detail tambahan...",
+    "monthly_education_support": "contoh: Dukungan Pendidikan Bulanan",
+    "select_relationship": "Pilih hubungan",
+    "hospital_example": "contoh: RSU Jakarta, RS Ciputra",
+    "select_aid_type": "Pilih jenis bantuan...",
+    "amount_example": "1500000",
+    "select_frequency": "Pilih frekuensi...",
+    "day_example": "13",
+    "year_example": "2030",
+    "no_end_date": "Tidak ada tanggal akhir",
+    "select_date": "Pilih tanggal...",
+    "select_payment_date": "Pilih tanggal pembayaran..."
+  },
+  
+  "labels": {
+    "selected_members": "Jemaat Terpilih",
+    "selected_members_count": "Jemaat Terpilih ({{count}})",
+    "tasks_due_today": "Tugas Jatuh Tempo Hari Ini",
+    "overdue_followups": "Tindak Lanjut Terlambat",
+    "members_needing_care": "Jemaat Memerlukan Perawatan",
+    "call_wish_birthday": "Telepon untuk mengucapkan selamat ulang tahun",
+    "payment_type": "Jenis Pembayaran"
   }
 }
