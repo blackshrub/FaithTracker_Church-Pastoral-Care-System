@@ -920,17 +920,17 @@ export const Dashboard = () => {
           <TabsList className="flex w-full">
             <TabsTrigger value="today" className="flex-1">
               <Bell className="w-4 h-4 mr-2" />
-              <span>Today</span>
+              <span>{t('main_tabs.today')}</span>
               <span className="ml-1 text-xs">({birthdaysToday.filter(b => !b.completed).length + todayTasks.filter(t => !t.completed).length})</span>
             </TabsTrigger>
             <TabsTrigger value="overdue" className="flex-1">
               <AlertTriangle className="w-4 h-4 mr-2" />
-              <span>Overdue</span>
+              <span>{t('main_tabs.overdue')}</span>
               <span className="ml-1 text-xs">({overdueBirthdays.length + griefDue.length + accidentFollowUp.length + financialAidDue.length + atRiskMembers.length + disconnectedMembers.length})</span>
             </TabsTrigger>
             <TabsTrigger value="upcoming" className="flex-1">
               <Heart className="w-4 h-4 mr-2" />
-              <span>Upcoming</span>
+              <span>{t('main_tabs.upcoming')}</span>
               <span className="ml-1 text-xs">({upcomingTasks.length})</span>
             </TabsTrigger>
           </TabsList>
