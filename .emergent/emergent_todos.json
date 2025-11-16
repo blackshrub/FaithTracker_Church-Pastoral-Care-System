@@ -1,15 +1,11 @@
 [
   {
-    "content": "View Dashboard.js Today tab task card structure and understand current layout",
+    "content": "Implement mobile-first Dashboard improvements - larger touch targets, better spacing, visual hierarchy",
     "status": "completed"
   },
   {
-    "content": "Implement mobile-first Dashboard improvements - larger touch targets, better spacing, visual hierarchy",
-    "status": "in_progress"
-  },
-  {
     "content": "Test Dashboard improvements at 390px and verify usability",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Run esbuild compile check after Dashboard improvements",
