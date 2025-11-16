@@ -380,3 +380,34 @@ input[type="date"], input[type="month"], input[type="time"] {
     width: 3rem;
   }
 }
+
+/* Calendar component alignment fix */
+.rdp {
+  --rdp-cell-size: 40px !important;
+  --rdp-caption-font-size: 18px !important;
+  --rdp-accent-color: hsl(174, 94%, 39%) !important;
+}
+
+.rdp-months {
+  width: 100% !important;
+}
+
+.rdp-month {
+  width: 100% !important;
+}
+
+.rdp-table {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.rdp-head_cell, .rdp-cell {
+  width: 40px !important;
+  height: 40px !important;
+  text-align: center !important;
+}
+
+.rdp-day {
+  width: 40px !important;
+  height: 40px !important;
+}
