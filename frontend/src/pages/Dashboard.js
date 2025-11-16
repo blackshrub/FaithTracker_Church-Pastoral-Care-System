@@ -195,26 +195,58 @@ const markMemberContacted = async (memberId, memberName, user, setAtRiskMembers,
 export const Dashboard = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [birthdaysToday, setBirthdaysToday] = useState([]);
-  const [overdueBirthdays, setOverdueBirthdays] = useState([]);
-  const [todayTasks, setTodayTasks] = useState([]);
-  const [griefDue, setGriefDue] = useState([]);
-  const [griefToday, setGriefToday] = useState([]);
-  const [hospitalFollowUp, setHospitalFollowUp] = useState([]);
-  const [accidentFollowUp, setAccidentFollowUp] = useState([]);
-  const [atRiskMembers, setAtRiskMembers] = useState([]);
-  const [disconnectedMembers, setDisconnectedMembers] = useState([]);
-  const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
-  const [upcomingTasks, setUpcomingTasks] = useState([]);
-  const [financialAidDue, setFinancialAidDue] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
+  // React Query for dashboard data
+  const { data: dashboardData, isLoading, refetch: refetchDashboard } = useQuery({
+    queryKey: ['dashboard', 'reminders', user?.campus_id],
+    queryFn: async () => {
+      const response = await axios.get(`${API}/dashboard/reminders`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        params: {
+          t: Date.now()
+        }
+      });
+      return response.data;
+    },
+    enabled: !!user?.campus_id,
+    staleTime: 1000 * 30, // 30 seconds
+  });
+  
+  // React Query for all members (for quick event form)
+  const { data: allMembers = [] } = useQuery({
+    queryKey: ['members', 'all'],
+    queryFn: async () => {
+      const response = await axios.get(`${API}/members?limit=1000`);
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes (member list changes infrequently)
+  });
+  
+  // Extract data with defaults
+  const birthdaysToday = dashboardData?.birthdays_today || [];
+  const overdueBirthdays = dashboardData?.overdue_birthdays || [];
+  const todayTasks = dashboardData?.today_tasks || [];
+  const griefDue = dashboardData?.grief_today || [];
+  const griefToday = dashboardData?.grief_today || [];
+  const accidentFollowUp = dashboardData?.accident_followup || [];
+  const hospitalFollowUp = [];
+  const atRiskMembers = dashboardData?.at_risk_members || [];
+  const disconnectedMembers = dashboardData?.disconnected_members || [];
+  const upcomingBirthdays = dashboardData?.upcoming_birthdays || [];
+  const upcomingTasks = dashboardData?.upcoming_tasks || [];
+  const financialAidDue = dashboardData?.financial_aid_due || [];
+  const suggestions = dashboardData?.ai_suggestions || [];
+  
+  // UI state (not related to server data)
   const [quickEventOpen, setQuickEventOpen] = useState(false);
   const [eventDateOpen, setEventDateOpen] = useState(false);
   const [paymentDateOpen, setPaymentDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
   const [activeOverdueTab, setActiveOverdueTab] = useState('birthdays');
-  const [allMembers, setAllMembers] = useState([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [quickEvent, setQuickEvent] = useState({
@@ -240,7 +272,6 @@ export const Dashboard = () => {
     if (savedSettings) {
       setEngagementSettings(JSON.parse(savedSettings));
     }
-    loadReminders();
   }, []);
   
   const loadReminders = async () => {
