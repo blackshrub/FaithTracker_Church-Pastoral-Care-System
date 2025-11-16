@@ -246,8 +246,16 @@ export const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Use optimized pre-calculated endpoint
-      const response = await axios.get(`${API}/dashboard/reminders`);
+      // Use optimized pre-calculated endpoint with cache-busting
+      const response = await axios.get(`${API}/dashboard/reminders`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        params: {
+          t: Date.now() // Cache-busting timestamp
+        }
+      });
       const data = response.data;
       
       // Set all state from pre-calculated data
