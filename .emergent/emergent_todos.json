@@ -1,6 +1,34 @@
 [
   {
-    "content": "Fixed upcoming birthday filter and grief support '0' display bug",
-    "status": "completed"
+    "content": "Create comprehensive README.md with installation script instructions",
+    "status": "in_progress"
+  },
+  {
+    "content": "Create docs/FEATURES.md with detailed module documentation",
+    "status": "pending"
+  },
+  {
+    "content": "Create docs/API.md with complete API reference",
+    "status": "pending"
+  },
+  {
+    "content": "Create docs/DEPLOYMENT_DEBIAN.md with step-by-step deployment guide",
+    "status": "pending"
+  },
+  {
+    "content": "Create docs/STRUCTURE.md explaining codebase organization",
+    "status": "pending"
+  },
+  {
+    "content": "Create install.sh automated installation script",
+    "status": "pending"
+  },
+  {
+    "content": "Create/update .env.example files",
+    "status": "pending"
+  },
+  {
+    "content": "Create/update .gitignore",
+    "status": "pending"
   }
 ]
