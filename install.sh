@@ -274,12 +274,19 @@ configure_env() {
     
     # Prompt for configuration
     echo ""
-    echo -e "${YELLOW}=== Configuration ===${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo -e "${CYAN}    FaithTracker Configuration${NC}"
+    echo -e "${CYAN}========================================${NC}"
     echo ""
     
     # MongoDB URL
     if [ "$MONGODB_REMOTE" = true ]; then
-        read -p "Enter MongoDB connection string: " MONGO_URL
+        while [ -z "$MONGO_URL" ]; do
+            read -p "Enter MongoDB connection string: " MONGO_URL
+            if [ -z "$MONGO_URL" ]; then
+                print_error "MongoDB URL cannot be empty"
+            fi
+        done
     else
         MONGO_URL="mongodb://localhost:27017"
         print_info "Using local MongoDB: $MONGO_URL"
@@ -289,8 +296,20 @@ configure_env() {
     read -p "Enter database name [pastoral_care_db]: " DB_NAME
     DB_NAME=${DB_NAME:-pastoral_care_db}
     
-    # Domain name
-    read -p "Enter your domain name (e.g., faithtracker.com): " DOMAIN_NAME
+    # Domain name - validate format
+    while [ -z "$DOMAIN_NAME" ]; do
+        read -p "Enter your domain name (e.g., faithtracker.com): " DOMAIN_NAME
+        if [ -z "$DOMAIN_NAME" ]; then
+            print_error "Domain name cannot be empty"
+        elif [[ ! "$DOMAIN_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}$ ]]; then
+            print_warning "Domain format may be invalid. Continue anyway? (y/n)"
+            read -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                DOMAIN_NAME=""
+            fi
+        fi
+    done
     
     # Church name
     read -p "Enter church name [GKBJ]: " CHURCH_NAME
@@ -299,17 +318,56 @@ configure_env() {
     # WhatsApp Gateway (optional)
     read -p "Enter WhatsApp gateway URL (leave blank to skip): " WHATSAPP_URL
     
-    # Admin credentials
+    # Admin credentials with validation
     echo ""
-    echo -e "${YELLOW}=== Admin User Creation ===${NC}"
-    read -p "Enter admin email: " ADMIN_EMAIL
-    read -s -p "Enter admin password: " ADMIN_PASSWORD
-    echo ""
-    read -s -p "Confirm admin password: " ADMIN_PASSWORD_CONFIRM
+    echo -e "${CYAN}=== Admin User Creation ===${NC}"
     echo ""
     
-    if [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]; then
-        print_error "Passwords do not match. Aborting."
+    while [ -z "$ADMIN_EMAIL" ]; do
+        read -p "Enter admin email: " ADMIN_EMAIL
+        if [ -z "$ADMIN_EMAIL" ]; then
+            print_error "Email cannot be empty"
+        elif [[ ! "$ADMIN_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            print_error "Invalid email format"
+            ADMIN_EMAIL=""
+        fi
+    done
+    
+    while [ -z "$ADMIN_PASSWORD" ] || [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]; do
+        read -s -p "Enter admin password (min 8 characters): " ADMIN_PASSWORD
+        echo ""
+        
+        if [ ${#ADMIN_PASSWORD} -lt 8 ]; then
+            print_error "Password must be at least 8 characters"
+            ADMIN_PASSWORD=""
+            continue
+        fi
+        
+        read -s -p "Confirm admin password: " ADMIN_PASSWORD_CONFIRM
+        echo ""
+        
+        if [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]; then
+            print_error "Passwords do not match. Try again."
+            ADMIN_PASSWORD=""
+            ADMIN_PASSWORD_CONFIRM=""
+        fi
+    done
+    
+    print_success "Configuration validated successfully"
+    
+    # Show configuration summary
+    echo ""
+    echo -e "${CYAN}=== Configuration Summary ===${NC}"
+    echo -e "  MongoDB URL:   ${GREEN}$MONGO_URL${NC}"
+    echo -e "  Database:      ${GREEN}$DB_NAME${NC}"
+    echo -e "  Domain:        ${GREEN}$DOMAIN_NAME${NC}"
+    echo -e "  Church Name:   ${GREEN}$CHURCH_NAME${NC}"
+    echo -e "  Admin Email:   ${GREEN}$ADMIN_EMAIL${NC}"
+    echo ""
+    read -p "Proceed with installation? (y/n): " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_error "Installation cancelled by user"
         exit 1
     fi
     
