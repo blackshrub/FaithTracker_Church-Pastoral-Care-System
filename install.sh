@@ -226,6 +226,7 @@ clone_repository() {
         read -p "Remove and re-clone? (y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Removing existing directory..."
             rm -rf "$INSTALL_DIR"
         else
             print_error "Installation directory exists. Aborting."
@@ -233,18 +234,35 @@ clone_repository() {
         fi
     fi
     
-    print_info "Cloning FaithTracker repository..."
+    print_info "Setting up application directory..."
     mkdir -p "$INSTALL_DIR"
     
-    # For now, we'll copy files from current directory since we're already in the repo
-    # In production, replace with: git clone https://github.com/YOUR-USERNAME/faithtracker.git "$INSTALL_DIR"
-    
-    if [ "$PWD" != "$INSTALL_DIR" ]; then
-        cp -r . "$INSTALL_DIR"
+    # Check if we're running from within the repo (for local testing)
+    if [ -f "$PWD/backend/server.py" ] && [ -f "$PWD/frontend/package.json" ]; then
+        print_info "Detected local repository. Copying files..."
+        # Exclude .git directory and other unnecessary files
+        rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' . "$INSTALL_DIR/" 2>/dev/null || cp -r . "$INSTALL_DIR/"
+    else
+        # For production use - clone from GitHub
+        print_info "Cloning from GitHub..."
+        print_warning "Note: Update the GitHub URL in the script before deployment"
+        
+        # Prompt for GitHub URL
+        read -p "Enter GitHub repository URL (or press Enter to skip): " GITHUB_URL
+        
+        if [ -n "$GITHUB_URL" ]; then
+            git clone "$GITHUB_URL" "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
+        else
+            print_error "No GitHub URL provided and not running from local repository"
+            print_error "Please either:"
+            print_error "  1. Run this script from within the cloned repository, OR"
+            print_error "  2. Provide a GitHub repository URL"
+            exit 1
+        fi
     fi
     
     chown -R faithtracker:faithtracker "$INSTALL_DIR"
-    print_success "Repository cloned to $INSTALL_DIR"
+    print_success "Application files ready at $INSTALL_DIR"
 }
 
 # Function to configure environment variables
