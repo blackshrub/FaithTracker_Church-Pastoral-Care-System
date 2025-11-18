@@ -38,5 +38,13 @@
   {
     "content": "Final review and verification of all documentation",
     "status": "completed"
+  },
+  {
+    "content": "Improve install.sh with better error handling, validation, and user-friendliness",
+    "status": "in_progress"
+  },
+  {
+    "content": "Test installation script components and add progress indicators",
+    "status": "pending"
   }
 ]
