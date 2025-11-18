@@ -41,10 +41,10 @@
   },
   {
     "content": "Improve install.sh with better error handling, validation, and user-friendliness",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Test installation script components and add progress indicators",
-    "status": "pending"
+    "status": "completed"
   }
 ]
