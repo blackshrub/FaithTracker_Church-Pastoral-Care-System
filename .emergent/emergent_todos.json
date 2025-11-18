@@ -17,11 +17,11 @@
   },
   {
     "content": "Write /docs/API.md - complete API endpoint reference with examples",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Write /docs/STRUCTURE.md - codebase architecture guide",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Write /docs/DEPLOYMENT_DEBIAN.md - step-by-step deployment guide",
