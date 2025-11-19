@@ -747,23 +747,25 @@ export const Settings = () => {
                 </div>
                 
                 <div>
-                  <Label>Service Account Email</Label>
+                  <Label>API Username</Label>
                   <Input 
                     type="email"
                     placeholder="faithtracker-sync@yourdomain.com"
                     value={syncConfig.api_email}
                     onChange={(e) => setSyncConfig({...syncConfig, api_email: e.target.value})}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Email address for API authentication</p>
                 </div>
                 
                 <div>
-                  <Label>Service Account Password</Label>
+                  <Label>API Secret Key</Label>
                   <Input 
                     type="password"
                     placeholder="Enter API password"
                     value={syncConfig.api_password === '********' ? '' : syncConfig.api_password}
                     onChange={(e) => setSyncConfig({...syncConfig, api_password: e.target.value})}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Password for API authentication</p>
                 </div>
                 
                 {/* Polling-specific settings */}
