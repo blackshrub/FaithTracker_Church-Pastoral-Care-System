@@ -1050,6 +1050,58 @@ export const Settings = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Reconciliation Toggle - Recommended for Webhook mode */}
+                {syncConfig.sync_method === 'webhook' && (
+                  <div className="border-t pt-4 mt-4">
+                    <div className="flex items-start gap-3">
+                      <input 
+                        type="checkbox"
+                        checked={syncConfig.reconciliation_enabled}
+                        onChange={(e) => setSyncConfig({...syncConfig, reconciliation_enabled: e.target.checked})}
+                        className="w-5 h-5 text-teal-600 mt-0.5"
+                        id="enable-reconciliation"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="enable-reconciliation" className="text-sm font-semibold text-gray-900 cursor-pointer">
+                          Enable Daily Reconciliation (Recommended)
+                        </label>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {syncConfig.reconciliation_enabled ? (
+                            <span className="text-green-700 font-medium">
+                              ✓ Daily reconciliation ACTIVE at {syncConfig.reconciliation_time} (Jakarta time)
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">
+                              ✗ No reconciliation - Relies only on webhooks
+                            </span>
+                          )}
+                        </p>
+                        <div className="mt-2 text-xs text-gray-600 space-y-1 bg-yellow-50 p-2 rounded border border-yellow-200">
+                          <p><strong>Why Reconciliation?</strong></p>
+                          <p>• Webhooks can occasionally fail or be missed</p>
+                          <p>• Network issues might cause lost updates</p>
+                          <p>• Daily full sync ensures 100% data integrity</p>
+                          <p>• Runs at low-traffic time (3 AM by default)</p>
+                          <p>• <strong>Highly recommended for webhook mode</strong></p>
+                        </div>
+                        {syncConfig.reconciliation_enabled && (
+                          <div className="mt-2">
+                            <Label className="text-xs">Reconciliation Time (24-hour format)</Label>
+                            <Input 
+                              type="time"
+                              value={syncConfig.reconciliation_time}
+                              onChange={(e) => setSyncConfig({...syncConfig, reconciliation_time: e.target.value})}
+                              className="w-32 h-8 text-xs"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Asia/Jakarta timezone</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 
                 <div className="flex gap-2 pt-4 border-t">
                   <Button 
