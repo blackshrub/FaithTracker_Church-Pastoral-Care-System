@@ -544,13 +544,13 @@ class ActivityLogResponse(BaseModel):
     campus_id: str
     user_id: str
     user_name: str
-    user_photo_url: Optional[str]
+    user_photo_url: Optional[str] = None
     action_type: str
-    member_id: Optional[str]
-    member_name: Optional[str]
-    care_event_id: Optional[str]
-    event_type: Optional[str]
-    notes: Optional[str]
+    member_id: Optional[str] = None
+    member_name: Optional[str] = None
+    care_event_id: Optional[str] = None
+    event_type: Optional[str] = None
+    notes: Optional[str] = None
     created_at: datetime
 
 # ==================== UTILITY FUNCTIONS ====================
