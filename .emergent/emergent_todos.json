@@ -1,18 +1,18 @@
 [
   {
     "content": "Re-add timeline entry creation for grief complete/ignore (visible in Timeline tab only)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Re-add timeline entry creation for accident complete/ignore (visible in Timeline tab only)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update undo to delete timeline entries created from stage actions",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Verify Timeline tab shows entries but Grief/Accident tabs don't",
-    "status": "pending"
+    "status": "completed"
   }
 ]
