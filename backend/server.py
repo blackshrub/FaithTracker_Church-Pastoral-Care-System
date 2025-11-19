@@ -124,6 +124,21 @@ class WeekDay(str, Enum):
     SATURDAY = "saturday"
     SUNDAY = "sunday"
 
+
+class ActivityActionType(str, Enum):
+    COMPLETE_TASK = "complete_task"
+    IGNORE_TASK = "ignore_task"
+    UNIGNORE_TASK = "unignore_task"
+    SEND_REMINDER = "send_reminder"
+    STOP_SCHEDULE = "stop_schedule"
+    CLEAR_IGNORED = "clear_ignored"
+    CREATE_MEMBER = "create_member"
+    UPDATE_MEMBER = "update_member"
+    DELETE_MEMBER = "delete_member"
+    CREATE_CARE_EVENT = "create_care_event"
+    UPDATE_CARE_EVENT = "update_care_event"
+    DELETE_CARE_EVENT = "delete_care_event"
+
 # ==================== AUTH CONFIGURATION ====================
 
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
