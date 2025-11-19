@@ -608,7 +608,7 @@ A: It's calculated in real-time whenever you view a member. Based on the last ca
 A: Currently, export includes all data. Date range filtering is a planned feature.
 
 **Q: What happens if I delete a member with financial aid schedules?**
-A: All associated events and schedules are deleted. Consider marking the member as inactive instead (future feature).
+A: All associated events and schedules are deleted. Consider marking the member as disconnected instead (future feature).
 
 **Q: Can I customize the grief support stages?**
 A: Not currently in the UI. The stages are hard-coded based on pastoral care best practices.
