@@ -249,7 +249,6 @@ class MemberCreate(BaseModel):
     external_member_id: Optional[str] = None
     notes: Optional[str] = None
     birth_date: Optional[date] = None
-    email: Optional[str] = None
     address: Optional[str] = None
     category: Optional[str] = None
     gender: Optional[str] = None
@@ -265,7 +264,6 @@ class MemberUpdate(BaseModel):
     external_member_id: Optional[str] = None
     notes: Optional[str] = None
     birth_date: Optional[date] = None
-    email: Optional[str] = None
     address: Optional[str] = None
     category: Optional[str] = None
     gender: Optional[str] = None
@@ -291,7 +289,6 @@ class Member(BaseModel):
     external_member_id: Optional[str] = None
     notes: Optional[str] = None
     birth_date: Optional[date] = None
-    email: Optional[str] = None
     address: Optional[str] = None
     category: Optional[str] = None
     gender: Optional[str] = None
