@@ -1,18 +1,26 @@
 [
   {
-    "content": "Find and fix contact at-risk/disconnected member endpoints - add activity logging",
-    "status": "completed"
+    "content": "Add edit user functionality in AdminDashboard page",
+    "status": "in_progress"
   },
   {
-    "content": "Verify care_events API returns completed_by fields in response",
-    "status": "completed"
+    "content": "Add phone number column to users table in AdminDashboard",
+    "status": "pending"
   },
   {
-    "content": "Check if MemberDetail properly displays actor info from API",
-    "status": "completed"
+    "content": "Add user profile photo upload capability (backend + frontend)",
+    "status": "pending"
   },
   {
-    "content": "Test all action types to ensure logging works",
-    "status": "completed"
+    "content": "Display user photos in Activity Log page",
+    "status": "pending"
+  },
+  {
+    "content": "Display user photos in other relevant places (navigation, activity timeline)",
+    "status": "pending"
+  },
+  {
+    "content": "Test all new features",
+    "status": "pending"
   }
 ]
