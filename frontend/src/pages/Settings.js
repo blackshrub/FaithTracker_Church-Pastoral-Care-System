@@ -75,14 +75,13 @@ export const Settings = () => {
     api_password: '',
     polling_interval_hours: 6,
     filter_mode: 'include',
-    filter_gender: '',
-    filter_age_min: '',
-    filter_age_max: '',
-    filter_member_status: [],
+    filter_rules: [],
     webhook_secret: '',
     is_enabled: false
   });
   const [syncLogs, setSyncLogs] = useState([]);
+  const [availableFields, setAvailableFields] = useState([]);
+  const [discovering, setDiscovering] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   
