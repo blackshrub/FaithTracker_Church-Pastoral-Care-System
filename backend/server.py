@@ -5162,8 +5162,43 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
                 existing_members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(None)
                 existing_map = {m.get("external_member_id"): m for m in existing_members if m.get("external_member_id")}
                 
-                # Process each core member
+                # Apply filters
+                filtered_members = []
                 for core_member in core_members:
+                    # Gender filter
+                    if config.get("filter_gender") and core_member.get("gender") != config["filter_gender"]:
+                        continue
+                    
+                    # Age filter
+                    if config.get("filter_age_min") or config.get("filter_age_max"):
+                        dob = core_member.get("date_of_birth")
+                        if dob:
+                            try:
+                                birth_date = date.fromisoformat(dob) if isinstance(dob, str) else dob
+                                age = (date.today() - birth_date).days // 365
+                                
+                                if config.get("filter_age_min") and age < config["filter_age_min"]:
+                                    continue
+                                if config.get("filter_age_max") and age > config["filter_age_max"]:
+                                    continue
+                            except:
+                                pass  # Skip age filter if date parsing fails
+                    
+                    # Member status filter
+                    if config.get("filter_member_status") and len(config["filter_member_status"]) > 0:
+                        member_status = core_member.get("member_status")
+                        if member_status not in config["filter_member_status"]:
+                            continue
+                    
+                    filtered_members.append(core_member)
+                
+                logger.info(f"Filtered {len(core_members)} members to {len(filtered_members)} based on sync filters")
+                
+                # Update stats
+                stats["fetched"] = len(filtered_members)
+                
+                # Process each filtered core member
+                for core_member in filtered_members:
                     core_id = core_member.get("id")
                     existing = existing_map.get(core_id)
                     
