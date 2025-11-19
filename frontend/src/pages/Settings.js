@@ -715,6 +715,24 @@ export const Settings = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
+                  <Label>Sync Method</Label>
+                  <Select value={syncConfig.sync_method} onValueChange={(v) => setSyncConfig({...syncConfig, sync_method: v})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="polling">Polling (Pull every X hours)</SelectItem>
+                      <SelectItem value="webhook">Webhook (Real-time push from core)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {syncConfig.sync_method === 'polling' 
+                      ? 'FaithTracker pulls data from core API periodically'
+                      : 'Core system pushes updates to FaithTracker in real-time'}
+                  </p>
+                </div>
+                
+                <div>
                   <Label>API Base URL</Label>
                   <Input 
                     placeholder="https://faithflow.yourdomain.com"
