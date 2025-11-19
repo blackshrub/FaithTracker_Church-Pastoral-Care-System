@@ -279,7 +279,7 @@ class Member(BaseModel):
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    phone: str
+    phone: Optional[str] = None  # Some members may not have phone numbers
     campus_id: str
     photo_url: Optional[str] = None
     family_group_id: Optional[str] = None
