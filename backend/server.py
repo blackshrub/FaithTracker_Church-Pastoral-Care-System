@@ -1892,20 +1892,20 @@ async def delete_care_event(event_id: str):
         if event_type == "grief_loss":
             # Delete grief support stages
             await db.grief_support.delete_many({"care_event_id": event_id})
-            # Delete timeline events created from grief followup completions
+            # Delete timeline events created from grief followup completions/ignores
             await db.care_events.delete_many({
                 "member_id": member_id,
-                "event_type": "regular_contact",
-                "title": {"$regex": "Grief Support:", "$options": "i"}
+                "event_type": "grief_loss",
+                "grief_stage_id": {"$exists": True}
             })
         elif event_type == "accident_illness":
             # Delete accident followup stages
             await db.accident_followup.delete_many({"care_event_id": event_id})
-            # Delete timeline events created from accident followup completions
+            # Delete timeline events created from accident followup completions/ignores
             await db.care_events.delete_many({
                 "member_id": member_id,
-                "event_type": "regular_contact",
-                "title": {"$regex": "Accident Follow-up:", "$options": "i"}
+                "event_type": "accident_illness",
+                "accident_stage_id": {"$exists": True}
             })
         
         # Recalculate member's last contact date from remaining NON-BIRTHDAY events
