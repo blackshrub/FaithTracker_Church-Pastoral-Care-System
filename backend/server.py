@@ -5216,10 +5216,18 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
             
             members = members_response.json()
             
+            # Handle both paginated and direct array response
+            if isinstance(members, dict) and 'data' in members:
+                member_count = len(members['data'])
+                total_info = f" (showing first page of {members.get('pagination', {}).get('total', '?')} total)"
+            else:
+                member_count = len(members) if isinstance(members, list) else 0
+                total_info = " (Note: May be paginated - actual sync will fetch all)"
+            
             return {
                 "success": True,
-                "message": f"Connection successful! Found {len(members)} members in core system.",
-                "member_count": len(members)
+                "message": f"Connection successful! Core API accessible. Sample: {member_count} members{total_info}",
+                "member_count": member_count
             }
     
     except httpx.TimeoutException:
