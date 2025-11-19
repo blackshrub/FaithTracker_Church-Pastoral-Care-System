@@ -1,18 +1,34 @@
 [
   {
-    "content": "Backend: Add filter_mode field to SyncConfig (include/exclude)",
-    "status": "completed"
+    "content": "Backend: Create GET /api/sync/discover-fields endpoint to analyze sample data",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: Update sync logic to handle include vs exclude filtering",
-    "status": "completed"
+    "content": "Backend: Extract field metadata (name, type, distinct values) from core API",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Add include/exclude toggle in filter section",
-    "status": "completed"
+    "content": "Backend: Update SyncConfig to store dynamic filter rules as JSON",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Add clear explanation of include vs exclude mode",
-    "status": "completed"
+    "content": "Backend: Update sync logic to apply dynamic filters with operators",
+    "status": "pending"
+  },
+  {
+    "content": "Frontend: Create dynamic filter rule builder UI",
+    "status": "pending"
+  },
+  {
+    "content": "Frontend: Add filter rule with field selector, operator, and value",
+    "status": "pending"
+  },
+  {
+    "content": "Frontend: Allow adding/removing multiple filter rules",
+    "status": "pending"
+  },
+  {
+    "content": "Frontend: Show field type and distinct values as dropdowns",
+    "status": "pending"
   }
 ]
