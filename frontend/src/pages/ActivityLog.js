@@ -380,8 +380,18 @@ const ActivityLog = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <User className="h-4 w-4 text-blue-600" />
+                          <div className="flex-shrink-0">
+                            {log.user_photo_url ? (
+                              <img 
+                                src={`${process.env.REACT_APP_BACKEND_URL}${log.user_photo_url}`}
+                                alt={log.user_name}
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="h-4 w-4 text-blue-600" />
+                              </div>
+                            )}
                           </div>
                           <div className="ml-3">
                             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
