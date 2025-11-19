@@ -1,14 +1,10 @@
 [
   {
-    "content": "Update create care event endpoint to auto-complete one-time events",
-    "status": "completed"
+    "content": "Clear all dashboard caches and verify complete database cleanup",
+    "status": "in_progress"
   },
   {
-    "content": "Define one-time event types (regular_contact, childbirth, new_house, financial_aid one-time)",
-    "status": "completed"
-  },
-  {
-    "content": "Test creating one-time events and verify they appear as completed",
-    "status": "completed"
+    "content": "Update test connection message to clarify it's a sample count, not total",
+    "status": "pending"
   }
 ]
