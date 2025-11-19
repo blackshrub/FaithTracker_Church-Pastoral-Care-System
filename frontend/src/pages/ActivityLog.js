@@ -20,6 +20,15 @@ const ActivityLog = () => {
   const [startDate, setStartDate] = useState(getDefaultStartDate());
   const [endDate, setEndDate] = useState(getDefaultEndDate());
 
+  // Format date/time in local timezone (Asia/Jakarta for Indonesia)
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'short', day: 'numeric' }),
+      time: date.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' })
+    };
+  };
+
   // Get default start date (30 days ago)
   function getDefaultStartDate() {
     const date = new Date();
