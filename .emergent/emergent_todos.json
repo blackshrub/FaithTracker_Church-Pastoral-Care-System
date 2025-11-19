@@ -1,14 +1,14 @@
 [
   {
     "content": "Fix search result member photo broken URL",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Verify cascade delete logic - parent deletes all, child deletes only itself",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Verify grief tab only shows grief_support stages, not care_events",
-    "status": "pending"
+    "status": "completed"
   }
 ]
