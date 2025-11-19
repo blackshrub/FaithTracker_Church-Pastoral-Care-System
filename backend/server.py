@@ -1897,10 +1897,36 @@ async def delete_care_event(event_id: str):
         
         # If deleting grief/accident parent event, also delete followup stages
         if event_type == "grief_loss":
+            # Get all grief stages for this event (to delete their activity logs)
+            grief_stages = await db.grief_support.find(
+                {"care_event_id": event_id},
+                {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
+            ).to_list(None)
+            
+            # Delete activity logs for each grief stage
+            for stage in grief_stages:
+                await db.activity_logs.delete_many({
+                    "member_id": stage["member_id"],
+                    "notes": {"$regex": f"{stage['stage'].replace('_', ' ')}", "$options": "i"}
+                })
+            
             # Delete grief support stages
             await db.grief_support.delete_many({"care_event_id": event_id})
             
         elif event_type == "accident_illness":
+            # Get all accident stages for this event (to delete their activity logs)
+            accident_stages = await db.accident_followup.find(
+                {"care_event_id": event_id},
+                {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
+            ).to_list(None)
+            
+            # Delete activity logs for each accident stage
+            for stage in accident_stages:
+                await db.activity_logs.delete_many({
+                    "member_id": stage["member_id"],
+                    "notes": {"$regex": f"{stage['stage'].replace('_', ' ')}", "$options": "i"}
+                })
+            
             # Delete accident followup stages
             await db.accident_followup.delete_many({"care_event_id": event_id})
         
