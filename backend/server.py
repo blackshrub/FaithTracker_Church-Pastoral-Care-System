@@ -593,6 +593,8 @@ class SyncConfigCreate(BaseModel):
     api_email: str
     api_password: str
     polling_interval_hours: int = 6
+    reconciliation_enabled: bool = False
+    reconciliation_time: str = "03:00"
     filter_mode: str = "include"
     filter_rules: Optional[List[Dict[str, Any]]] = None
     is_enabled: bool = False
