@@ -66,6 +66,82 @@ export const Settings = () => {
     }
   };
 
+  // Sync configuration state
+  const [syncConfig, setSyncConfig] = useState({
+    api_base_url: '',
+    api_email: '',
+    api_password: '',
+    is_enabled: false
+  });
+  const [syncLogs, setSyncLogs] = useState([]);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  
+  const loadSyncConfig = async () => {
+    try {
+      const response = await axios.get(`${API}/sync/config`);
+      if (response.data) {
+        setSyncConfig(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading sync config:', error);
+    }
+  };
+  
+  const loadSyncLogs = async () => {
+    try {
+      const response = await axios.get(`${API}/sync/logs?limit=10`);
+      setSyncLogs(response.data);
+    } catch (error) {
+      console.error('Error loading sync logs:', error);
+    }
+  };
+  
+  const testConnection = async () => {
+    setTesting(true);
+    try {
+      const response = await axios.post(`${API}/sync/test-connection`, {
+        api_base_url: syncConfig.api_base_url,
+        api_email: syncConfig.api_email,
+        api_password: syncConfig.api_password
+      });
+      
+      if (response.data.success) {
+        toast.success(response.data.message);
+      } else {
+        toast.error(response.data.message);
+      }
+    } catch (error) {
+      toast.error('Connection test failed: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setTesting(false);
+    }
+  };
+  
+  const saveSyncConfig = async () => {
+    try {
+      await axios.post(`${API}/sync/config`, syncConfig);
+      toast.success('Sync configuration saved successfully');
+      loadSyncConfig();
+    } catch (error) {
+      toast.error('Failed to save configuration: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+  
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      const response = await axios.post(`${API}/sync/members/pull`);
+      toast.success(response.data.message + ` - ${response.data.stats.created} created, ${response.data.stats.updated} updated`);
+      loadSyncLogs();
+    } catch (error) {
+      toast.error('Sync failed: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+
   
   useEffect(() => {
     loadCampusCount();
