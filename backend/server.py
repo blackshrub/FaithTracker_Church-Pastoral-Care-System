@@ -573,6 +573,8 @@ class SyncConfig(BaseModel):
     webhook_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
     is_enabled: bool = False
     polling_interval_hours: int = 6  # For polling method
+    reconciliation_enabled: bool = False  # Daily 3 AM reconciliation (recommended for webhook mode)
+    reconciliation_time: str = "03:00"  # Time for daily reconciliation (HH:MM format)
     
     # Sync filters (optional - empty means sync all)
     filter_mode: str = "include"  # "include" or "exclude"
