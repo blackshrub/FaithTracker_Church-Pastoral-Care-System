@@ -1579,6 +1579,10 @@ async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
         
+        # Get member name for logging
+        member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
+        member_name = member["name"] if member else "Unknown"
+        
         # Update event to mark as ignored
         await db.care_events.update_one(
             {"id": event_id},
@@ -1586,8 +1590,22 @@ async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user
                 "ignored": True,
                 "ignored_at": datetime.now(timezone.utc).isoformat(),
                 "ignored_by": user.get("id"),
+                "ignored_by_name": user.get("name"),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
+        )
+        
+        # Log activity
+        await log_activity(
+            campus_id=event["campus_id"],
+            user_id=user["id"],
+            user_name=user["name"],
+            action_type=ActivityActionType.IGNORE_TASK,
+            member_id=event["member_id"],
+            member_name=member_name,
+            care_event_id=event_id,
+            event_type=EventType(event["event_type"]),
+            notes=f"Ignored {event['event_type']} task"
         )
         
         # Invalidate dashboard cache
