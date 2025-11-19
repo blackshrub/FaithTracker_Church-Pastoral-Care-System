@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from './LanguageToggle';
 import { MobileBottomNav } from './MobileBottomNav';
 import { DesktopSidebar } from './DesktopSidebar';
+import SearchBar from './SearchBar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Church, LogOut, ChevronDown } from 'lucide-react';
