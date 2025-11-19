@@ -369,6 +369,7 @@ export const AdminDashboard = () => {
                     <TableRow>
                       <TableHead className="pl-2 pr-1">Name</TableHead>
                       <TableHead className="hidden md:table-cell">Email</TableHead>
+                      <TableHead className="hidden lg:table-cell">Phone</TableHead>
                       <TableHead className="px-1">Role</TableHead>
                       <TableHead className="w-10 text-center px-1">⋮</TableHead>
                     </TableRow>
