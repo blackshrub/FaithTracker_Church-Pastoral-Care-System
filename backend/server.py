@@ -688,7 +688,8 @@ async def log_activity(
     member_name: Optional[str] = None,
     care_event_id: Optional[str] = None,
     event_type: Optional[EventType] = None,
-    notes: Optional[str] = None
+    notes: Optional[str] = None,
+    user_photo_url: Optional[str] = None
 ):
     """Log user activity for accountability tracking"""
     try:
@@ -696,6 +697,7 @@ async def log_activity(
             campus_id=campus_id,
             user_id=user_id,
             user_name=user_name,
+            user_photo_url=user_photo_url,
             action_type=action_type,
             member_id=member_id,
             member_name=member_name,
