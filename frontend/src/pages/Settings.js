@@ -859,74 +859,63 @@ export const Settings = () => {
                     </div>
                   </div>
                   
-                  <p className="text-xs text-gray-600 mb-4">Configure filters below. Leave all empty to sync all members.</p>
+                  <p className="text-xs text-gray-600 mb-4">Discover available fields from core API, then create custom filter rules.</p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Gender Filter</Label>
-                      <Select value={syncConfig.filter_gender || 'all'} onValueChange={(v) => setSyncConfig({...syncConfig, filter_gender: v === 'all' ? null : v})}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Genders</SelectItem>
-                          <SelectItem value="Male">Male Only</SelectItem>
-                          <SelectItem value="Female">Female Only</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <Label>Member Status Filter</Label>
-                      <Input 
-                        placeholder="e.g., Member, Baptized (comma-separated)"
-                        value={Array.isArray(syncConfig.filter_member_status) ? syncConfig.filter_member_status.join(', ') : ''}
-                        onChange={(e) => {
-                          const statuses = e.target.value.split(',').map(s => s.trim()).filter(s => s);
-                          setSyncConfig({...syncConfig, filter_member_status: statuses.length > 0 ? statuses : null});
-                        }}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Leave empty for all statuses</p>
-                    </div>
-                    
-                    <div>
-                      <Label>Minimum Age</Label>
-                      <Input 
-                        type="number"
-                        placeholder="e.g., 18"
-                        value={syncConfig.filter_age_min || ''}
-                        onChange={(e) => setSyncConfig({...syncConfig, filter_age_min: e.target.value ? parseInt(e.target.value) : null})}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label>Maximum Age</Label>
-                      <Input 
-                        type="number"
-                        placeholder="e.g., 65"
-                        value={syncConfig.filter_age_max || ''}
-                        onChange={(e) => setSyncConfig({...syncConfig, filter_age_max: e.target.value ? parseInt(e.target.value) : null})}
-                      />
-                    </div>
+                  {/* Discover Fields Button */}
+                  <div className="mb-4">
+                    <Button 
+                      onClick={discoverFields}
+                      disabled={discovering || !syncConfig.api_base_url || !syncConfig.api_email || !syncConfig.api_password || syncConfig.api_password === '********'}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {discovering ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-500"></div>
+                          Discovering Fields...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4" />
+                          Discover Available Fields
+                        </>
+                      )}
+                    </Button>
+                    {availableFields.length > 0 && (
+                      <p className="text-xs text-green-600 mt-2">✓ Found {availableFields.length} fields. Build filter rules below.</p>
+                    )}
                   </div>
                   
-                  {(syncConfig.filter_gender || syncConfig.filter_age_min || syncConfig.filter_age_max || (syncConfig.filter_member_status && syncConfig.filter_member_status.length > 0)) && (
+                  {/* Dynamic Filter Rule Builder */}
+                  <FilterRuleBuilder 
+                    availableFields={availableFields}
+                    filterRules={syncConfig.filter_rules || []}
+                    onChange={(rules) => setSyncConfig({...syncConfig, filter_rules: rules})}
+                  />
+                  
+                  {/* Active Filters Summary */}
+                  {syncConfig.filter_rules && syncConfig.filter_rules.length > 0 && (
                     <div className={`mt-3 p-3 rounded border ${syncConfig.filter_mode === 'include' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                       <p className={`font-medium text-sm mb-2 ${syncConfig.filter_mode === 'include' ? 'text-green-900' : 'text-red-900'}`}>
-                        {syncConfig.filter_mode === 'include' ? '✓ Will ONLY Sync:' : '✗ Will EXCLUDE:'}
+                        {syncConfig.filter_mode === 'include' ? '✓ Will ONLY Sync Members Matching ALL Rules:' : '✗ Will EXCLUDE Members Matching ALL Rules:'}
                       </p>
                       <ul className={`space-y-1 text-xs ${syncConfig.filter_mode === 'include' ? 'text-green-700' : 'text-red-700'}`}>
-                        {syncConfig.filter_gender && <li>• Gender: {syncConfig.filter_gender}</li>}
-                        {syncConfig.filter_age_min && <li>• Age ≥ {syncConfig.filter_age_min}</li>}
-                        {syncConfig.filter_age_max && <li>• Age ≤ {syncConfig.filter_age_max}</li>}
-                        {syncConfig.filter_member_status && syncConfig.filter_member_status.length > 0 && (
-                          <li>• Status: {syncConfig.filter_member_status.join(', ')}</li>
-                        )}
+                        {syncConfig.filter_rules.map((rule, idx) => {
+                          const field = availableFields.find(f => f.name === rule.field);
+                          const fieldLabel = field?.label || rule.field;
+                          return (
+                            <li key={idx}>
+                              • {fieldLabel} {rule.operator.replace('_', ' ')} {
+                                Array.isArray(rule.value) ? rule.value.join(', ') : rule.value
+                              }
+                            </li>
+                          );
+                        })}
                       </ul>
                       <p className="mt-2 text-xs text-gray-600 italic">
                         {syncConfig.filter_mode === 'include' 
-                          ? 'Members matching ALL criteria above will be synced'
-                          : 'Members matching ANY criteria above will be SKIPPED'
+                          ? 'Only members matching ALL rules above will be synced to FaithTracker'
+                          : 'Members matching ALL rules above will be SKIPPED (everyone else synced)'
                         }
                       </p>
                     </div>
