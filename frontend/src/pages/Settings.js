@@ -27,12 +27,12 @@ export const Settings = () => {
   const [writeoffGrief, setWriteoffGrief] = useState(14);
   const [activeTab, setActiveTab] = useState('automation');
   const [griefStages, setGriefStages] = useState([
-    { stage: '1_week', days: 7, name: '1 Week After' },
-    { stage: '2_weeks', days: 14, name: '2 Weeks After' },
-    { stage: '1_month', days: 30, name: '1 Month After' },
-    { stage: '3_months', days: 90, name: '3 Months After' },
-    { stage: '6_months', days: 180, name: '6 Months After' },
-    { stage: '1_year', days: 365, name: '1 Year After' },
+    { stage: '1_week', days: 7, name: 'First Follow-up' },
+    { stage: '2_weeks', days: 14, name: 'Second Follow-up' },
+    { stage: '1_month', days: 30, name: 'Third Follow-up' },
+    { stage: '3_months', days: 90, name: 'Fourth Follow-up' },
+    { stage: '6_months', days: 180, name: 'Fifth Follow-up' },
+    { stage: '1_year', days: 365, name: 'Sixth Follow-up (1 Year Anniversary)' },
   ]);
   const [accidentFollowUp, setAccidentFollowUp] = useState([
     { stage: 'first_followup', days: 3, name: 'First Follow-up' },
