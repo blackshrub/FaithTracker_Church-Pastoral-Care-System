@@ -895,10 +895,3 @@ export const Settings = () => {
 };
 
 export default Settings;
-
-      </Tabs>
-    </div>
-  );
-};
-
-export default Settings;
