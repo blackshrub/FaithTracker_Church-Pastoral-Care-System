@@ -1,42 +1,38 @@
 [
   {
-    "content": "Backend: Create SyncConfig model and database schema",
-    "status": "completed"
+    "content": "Backend: Add sync_method field to SyncConfig (polling/webhook)",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: Create POST /api/sync/config endpoint to save sync settings",
-    "status": "completed"
+    "content": "Backend: Generate webhook secret and add to SyncConfig",
+    "status": "pending"
   },
   {
-    "content": "Backend: Create GET /api/sync/config endpoint to retrieve settings",
-    "status": "completed"
+    "content": "Backend: Create POST /api/sync/webhook endpoint with signature verification",
+    "status": "pending"
   },
   {
-    "content": "Backend: Create POST /api/sync/test-connection endpoint for validation",
-    "status": "completed"
+    "content": "Backend: Add rate limiting for webhook endpoint",
+    "status": "pending"
   },
   {
-    "content": "Backend: Create POST /api/sync/members/pull endpoint for manual sync",
-    "status": "completed"
+    "content": "Backend: Add webhook delivery logging",
+    "status": "pending"
   },
   {
-    "content": "Backend: Create sync helper functions (fetch, merge, archive logic)",
-    "status": "completed"
+    "content": "Backend: Add scheduled polling job to APScheduler",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Add Sync Configuration tab in Settings page",
-    "status": "completed"
+    "content": "Frontend: Add sync method selector (polling/webhook) in Settings",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Add form for API URL, email, password with test connection button",
-    "status": "completed"
+    "content": "Frontend: Display webhook URL and secret for core system configuration",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Add manual 'Sync Now' button with progress indicator",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Add sync logs/history viewer",
-    "status": "completed"
+    "content": "Frontend: Show different instructions based on selected method",
+    "status": "pending"
   }
 ]
