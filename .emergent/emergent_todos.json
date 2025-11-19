@@ -1,22 +1,22 @@
 [
   {
     "content": "Add reconciliation_enabled field to SyncConfig",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add scheduled reconciliation job to APScheduler (runs at 3 AM)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update sync endpoint to support 'reconciliation' sync_type",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add reconciliation toggle in Settings UI",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test reconciliation job execution",
-    "status": "pending"
+    "status": "completed"
   }
 ]
