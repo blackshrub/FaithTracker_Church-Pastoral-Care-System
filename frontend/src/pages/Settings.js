@@ -158,6 +158,27 @@ export const Settings = () => {
   };
 
 
+
+  const discoverFields = async () => {
+    setDiscovering(true);
+    try {
+      const response = await axios.post(`${API}/sync/discover-fields`, {
+        sync_method: syncConfig.sync_method,
+        api_base_url: syncConfig.api_base_url,
+        api_email: syncConfig.api_email,
+        api_password: syncConfig.api_password,
+        polling_interval_hours: syncConfig.polling_interval_hours
+      });
+      
+      setAvailableFields(response.data.fields);
+      toast.success(response.data.message);
+    } catch (error) {
+      toast.error('Failed to discover fields: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
   
   useEffect(() => {
     loadCampusCount();
