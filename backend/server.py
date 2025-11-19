@@ -593,6 +593,7 @@ class SyncConfigCreate(BaseModel):
     api_email: str
     api_password: str
     polling_interval_hours: int = 6
+    filter_mode: str = "include"
     filter_gender: Optional[str] = None
     filter_age_min: Optional[int] = None
     filter_age_max: Optional[int] = None
