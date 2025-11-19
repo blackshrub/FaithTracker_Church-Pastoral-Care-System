@@ -131,7 +131,7 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             discharge_date = today - timedelta(days=days_after)
             events = await db.care_events.find({
                 "campus_id": campus_id,
-                "event_type": "hospital_visit",
+                "event_type": "accident_illness",
                 "discharge_date": discharge_date.isoformat(),
                 "completed": False
             }, {"_id": 0}).to_list(100)
