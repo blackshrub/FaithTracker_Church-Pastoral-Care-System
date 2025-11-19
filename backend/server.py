@@ -4993,6 +4993,15 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
                 filter_rules=config.filter_rules or [],
                 is_enabled=config.is_enabled
             )
+            await db.sync_configs.insert_one(sync_config.model_dump())
+        
+        return {"success": True, "message": "Sync configuration saved"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving sync config: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.post("/sync/discover-fields")
