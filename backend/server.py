@@ -2193,6 +2193,22 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
         member = await db.members.find_one({"id": event.member_id}, {"_id": 0, "name": 1})
         member_name = member["name"] if member else "Unknown"
         
+        # Determine if this is a one-time event that should be auto-completed
+        one_time_events = [
+            EventType.REGULAR_CONTACT,
+            EventType.CHILDBIRTH,
+            EventType.NEW_HOUSE
+        ]
+        
+        # Check if financial aid is one-time
+        is_one_time_financial_aid = (
+            event.event_type == EventType.FINANCIAL_AID and 
+            event.aid_type and 
+            not event.aid_notes  # No recurring schedule means one-time
+        )
+        
+        is_one_time = event.event_type in one_time_events or is_one_time_financial_aid
+        
         care_event = CareEvent(
             member_id=event.member_id,
             campus_id=campus_id,
@@ -2206,7 +2222,12 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
             aid_amount=event.aid_amount,
             aid_notes=event.aid_notes,
             created_by_user_id=current_user["id"],
-            created_by_user_name=current_user["name"]
+            created_by_user_name=current_user["name"],
+            # Auto-complete one-time events
+            completed=is_one_time,
+            completed_at=datetime.now(timezone.utc) if is_one_time else None,
+            completed_by_user_id=current_user["id"] if is_one_time else None,
+            completed_by_user_name=current_user["name"] if is_one_time else None
         )
         
         # Add initial visitation log if hospital visit
