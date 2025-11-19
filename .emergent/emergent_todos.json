@@ -1,14 +1,18 @@
 [
   {
-    "content": "Add activity log deletion when undoing grief stage completion",
-    "status": "completed"
+    "content": "Re-add timeline entry creation for grief complete/ignore (visible in Timeline tab only)",
+    "status": "in_progress"
   },
   {
-    "content": "Add activity log deletion when undoing accident stage completion",
-    "status": "completed"
+    "content": "Re-add timeline entry creation for accident complete/ignore (visible in Timeline tab only)",
+    "status": "pending"
   },
   {
-    "content": "Verify cascade delete removes all activity logs for grief stages when parent deleted",
-    "status": "completed"
+    "content": "Update undo to delete timeline entries created from stage actions",
+    "status": "pending"
+  },
+  {
+    "content": "Verify Timeline tab shows entries but Grief/Accident tabs don't",
+    "status": "pending"
   }
 ]
