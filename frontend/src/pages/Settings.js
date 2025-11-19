@@ -1213,6 +1213,17 @@ export const Settings = () => {
                             navigator.clipboard.writeText(syncConfig.webhook_secret);
                             toast.success('Copied!');
                           }}>Copy</Button>
+                          <Button size="sm" variant="outline" className="text-orange-600 border-orange-300" onClick={async () => {
+                            if (confirm('Regenerate webhook secret? You must update the core system with the new secret.')) {
+                              try {
+                                const response = await axios.post(`${API}/sync/regenerate-secret`);
+                                toast.success('Secret regenerated. Update core system!');
+                                await loadSyncConfig();
+                              } catch (error) {
+                                toast.error('Failed to regenerate secret');
+                              }
+                            }
+                          }}>Regenerate</Button>
                         </div>
                       </div>
                     </>
