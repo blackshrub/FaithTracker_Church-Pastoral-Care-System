@@ -1,26 +1,18 @@
 [
   {
-    "content": "Find all grief stage completion endpoints and add activity logging",
-    "status": "completed"
+    "content": "Fix search results to display member photos",
+    "status": "in_progress"
   },
   {
-    "content": "Find all accident/illness followup endpoints and add logging",
-    "status": "completed"
+    "content": "Change grief/accident completion to use correct event type (grief_loss/accident_illness not regular_contact)",
+    "status": "pending"
   },
   {
-    "content": "Find all financial aid distribution endpoints and add logging",
-    "status": "completed"
+    "content": "Fix grief ignore toast error and add ignored badge positioning",
+    "status": "pending"
   },
   {
-    "content": "Add actor fields to all specialized event models",
-    "status": "completed"
-  },
-  {
-    "content": "Update frontend to display actor info for all event types",
-    "status": "completed"
-  },
-  {
-    "content": "Test all event type actions end-to-end",
-    "status": "completed"
+    "content": "Create timeline items for ignored grief/accident stages",
+    "status": "pending"
   }
 ]
