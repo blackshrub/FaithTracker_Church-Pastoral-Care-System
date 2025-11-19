@@ -1,54 +1,14 @@
 [
   {
-    "content": "Backend: Add activity_logs collection schema and helper function to log all user actions",
-    "status": "completed"
+    "content": "Debug Activity Log page - verify API returns data and page displays it",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: Update all action endpoints to track user (complete, ignore, stop schedule, send reminder)",
-    "status": "completed"
+    "content": "Debug member timeline - ensure completed_by fields are returned from backend",
+    "status": "pending"
   },
   {
-    "content": "Backend: Create global search API endpoint (members + care events)",
-    "status": "completed"
-  },
-  {
-    "content": "Backend: Create activity log API endpoint with filters (user, date range, action type)",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Create SearchBar component with live search and dropdown",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Add SearchBar to Layout component (visible on all pages)",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Create ActivityLog page with filters and export to CSV",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Add Activity Log to navigation menu under Administration",
-    "status": "completed"
-  },
-  {
-    "content": "Check frontend for compilation errors",
-    "status": "completed"
-  },
-  {
-    "content": "Restart backend service to apply changes",
-    "status": "completed"
-  },
-  {
-    "content": "Verify services are running without errors",
-    "status": "completed"
-  },
-  {
-    "content": "Fix duplicate endpoints issue - remove duplicates after include_router",
-    "status": "completed"
-  },
-  {
-    "content": "Restart backend and test search API",
-    "status": "completed"
+    "content": "Test with real user action and verify both Activity Log and Timeline display",
+    "status": "pending"
   }
 ]
