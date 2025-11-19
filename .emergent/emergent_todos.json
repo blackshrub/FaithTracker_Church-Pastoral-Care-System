@@ -1,18 +1,18 @@
 [
   {
     "content": "Fix search results to display member photos",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Change grief/accident completion to use correct event type (grief_loss/accident_illness not regular_contact)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Fix grief ignore toast error and add ignored badge positioning",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Create timeline items for ignored grief/accident stages",
-    "status": "pending"
+    "status": "completed"
   }
 ]
