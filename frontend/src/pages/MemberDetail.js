@@ -1097,12 +1097,11 @@ export const MemberDetail = () => {
                                       try {
                                         await axios.post(`${API}/grief-support/${stage.id}/ignore`);
                                         toast.success('Grief stage ignored');
-                                        // Update local state instead of full reload
-                                        setGriefTimeline(prev => prev.map(s => 
-                                          s.id === stage.id ? {...s, ignored: true} : s
-                                        ));
+                                        // Refetch member data to get updated timeline
+                                        queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
                                         toast.error('Failed to ignore');
+                                        console.error('Error ignoring grief stage:', error);
                                       }
                                     }}>
                                       Ignore
