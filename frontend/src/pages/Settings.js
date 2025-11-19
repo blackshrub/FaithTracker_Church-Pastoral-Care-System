@@ -153,9 +153,13 @@ export const Settings = () => {
         <p className="text-muted-foreground mt-1">{t('settings_page.subtitle')}</p>
       </div>
       
-      <Tabs defaultValue="automation" className="max-w-full" onValueChange={(v) => setActiveTab(v)}>
+      <Tabs defaultValue="profile" className="max-w-full" onValueChange={(v) => setActiveTab(v)}>
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="inline-flex min-w-full w-max sm:w-full">
+            <TabsTrigger value="profile" className="flex-shrink-0">
+              <UserCircle className="w-4 h-4" />
+              {activeTab === 'profile' && <span className="ml-2">Profile</span>}
+            </TabsTrigger>
             <TabsTrigger value="automation" className="flex-shrink-0">
               <Bell className="w-4 h-4" />
               {activeTab === 'automation' && <span className="ml-2">{t('settings_page.automation_tab')}</span>}
