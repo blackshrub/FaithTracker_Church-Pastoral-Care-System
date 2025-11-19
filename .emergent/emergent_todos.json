@@ -1,18 +1,18 @@
 [
   {
     "content": "Backend: Add filter_mode field to SyncConfig (include/exclude)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Backend: Update sync logic to handle include vs exclude filtering",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add include/exclude toggle in filter section",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add clear explanation of include vs exclude mode",
-    "status": "pending"
+    "status": "completed"
   }
 ]
