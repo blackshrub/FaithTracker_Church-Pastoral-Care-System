@@ -3232,7 +3232,7 @@ async def get_dashboard_stats():
             if last_contact and isinstance(last_contact, str):
                 last_contact = datetime.fromisoformat(last_contact)
             status, _ = calculate_engagement_status(last_contact)
-            if status in [EngagementStatus.AT_RISK, EngagementStatus.INACTIVE]:
+            if status in [EngagementStatus.AT_RISK, EngagementStatus.DISCONNECTED]:
                 at_risk_count += 1
         
         # This month's financial aid
