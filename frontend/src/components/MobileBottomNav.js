@@ -46,6 +46,7 @@ export const MobileBottomNav = () => {
     { name: t('messaging'), href: '/messaging', icon: MessageSquare, category: 'tools' },
     { name: t('whatsapp_logs'), href: '/whatsapp-logs', icon: Bell, category: 'tools' },
     { name: t('import_export'), href: '/import-export', icon: Upload, category: 'tools' },
+    { name: t('activity_log'), href: '/activity-log', icon: Activity, category: 'admin' },
     ...(user?.role === 'full_admin' ? [{ name: t('admin_dashboard'), href: '/admin', icon: Shield, category: 'admin' }] : []),
     { name: t('settings'), href: '/settings', icon: SettingsIcon, category: 'admin' },
   ];
