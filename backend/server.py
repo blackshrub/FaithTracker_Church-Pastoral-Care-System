@@ -573,6 +573,13 @@ class SyncConfig(BaseModel):
     webhook_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
     is_enabled: bool = False
     polling_interval_hours: int = 6  # For polling method
+    
+    # Sync filters (optional - empty means sync all)
+    filter_gender: Optional[str] = None  # "Male", "Female", or None for all
+    filter_age_min: Optional[int] = None  # Minimum age
+    filter_age_max: Optional[int] = None  # Maximum age
+    filter_member_status: Optional[List[str]] = None  # e.g., ["Member", "Baptized"], None for all
+    
     last_sync_at: Optional[datetime] = None
     last_sync_status: Optional[str] = None  # success, error
     last_sync_message: Optional[str] = None
@@ -585,6 +592,10 @@ class SyncConfigCreate(BaseModel):
     api_email: str
     api_password: str
     polling_interval_hours: int = 6
+    filter_gender: Optional[str] = None
+    filter_age_min: Optional[int] = None
+    filter_age_max: Optional[int] = None
+    filter_member_status: Optional[List[str]] = None
     is_enabled: bool = False
 
 class SyncLog(BaseModel):
