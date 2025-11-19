@@ -166,14 +166,21 @@ const markAccidentComplete = async (eventId, queryClient, t) => {
 const markMemberContacted = async (memberId, memberName, user, queryClient, t) => {
   try {
     // Create a regular contact event which updates last_contact_date
-    await axios.post(`${API}/care-events`, {
+    const response = await axios.post(`${API}/care-events`, {
       member_id: memberId,
       campus_id: user?.campus_id || '2b3f9094-eef4-4af4-a3ff-730ef4adeb8a',
       event_type: 'regular_contact',
       event_date: new Date().toISOString().split('T')[0],
       title: `Contact with ${memberName}`,
-      description: 'Contacted via Reminders page'
+      description: 'Contacted member - marked from dashboard',
+      completed: true
     });
+    
+    // If the event was created, mark it as completed to trigger activity logging
+    if (response.data && response.data.id) {
+      await axios.post(`${API}/care-events/${response.data.id}/complete`);
+    }
+    
     toast.success(t('toasts.member_contacted', {name: memberName}));
     // Invalidate and refetch dashboard data
     await queryClient.invalidateQueries(['dashboard']);
