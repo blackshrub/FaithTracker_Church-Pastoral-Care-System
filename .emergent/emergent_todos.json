@@ -1,10 +1,14 @@
 [
   {
-    "content": "Add reconciliation information text to API Sync page",
-    "status": "completed"
+    "content": "Update create care event endpoint to auto-complete one-time events",
+    "status": "in_progress"
   },
   {
-    "content": "Clean up all members and care events from database for fresh testing",
-    "status": "completed"
+    "content": "Define one-time event types (regular_contact, childbirth, new_house, financial_aid one-time)",
+    "status": "pending"
+  },
+  {
+    "content": "Test creating one-time events and verify they appear as completed",
+    "status": "pending"
   }
 ]
