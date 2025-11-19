@@ -74,6 +74,8 @@ export const Settings = () => {
     api_email: '',
     api_password: '',
     polling_interval_hours: 6,
+    reconciliation_enabled: false,
+    reconciliation_time: '03:00',
     filter_mode: 'include',
     filter_rules: [],
     webhook_secret: '',
