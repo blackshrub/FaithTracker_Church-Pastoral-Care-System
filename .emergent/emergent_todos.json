@@ -1,18 +1,18 @@
 [
   {
     "content": "Find and fix contact at-risk/disconnected member endpoints - add activity logging",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Verify care_events API returns completed_by fields in response",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Check if MemberDetail properly displays actor info from API",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test all action types to ensure logging works",
-    "status": "pending"
+    "status": "completed"
   }
 ]
