@@ -772,12 +772,12 @@ export const Settings = () => {
                 <div>
                   <Label>API Username</Label>
                   <Input 
-                    type="email"
-                    placeholder="faithtracker-sync@yourdomain.com"
+                    type="text"
+                    placeholder="faithtracker-sync@yourdomain.com or username"
                     value={syncConfig.api_email}
                     onChange={(e) => setSyncConfig({...syncConfig, api_email: e.target.value})}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Email address for API authentication</p>
+                  <p className="text-xs text-gray-500 mt-1">Username for API authentication (can be email or any string)</p>
                 </div>
                 
                 <div>
