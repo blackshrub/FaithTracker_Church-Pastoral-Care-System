@@ -1,18 +1,26 @@
 [
   {
-    "content": "Add activity logging when care events are created (all event types)",
-    "status": "completed"
+    "content": "Find all grief stage completion endpoints and add activity logging",
+    "status": "in_progress"
   },
   {
-    "content": "Add created_by user fields to care events",
-    "status": "completed"
+    "content": "Find all accident/illness followup endpoints and add logging",
+    "status": "pending"
   },
   {
-    "content": "Display creator info in member timeline",
-    "status": "completed"
+    "content": "Find all financial aid distribution endpoints and add logging",
+    "status": "pending"
   },
   {
-    "content": "Restart backend and test creating care events",
-    "status": "completed"
+    "content": "Add actor fields to all specialized event models",
+    "status": "pending"
+  },
+  {
+    "content": "Update frontend to display actor info for all event types",
+    "status": "pending"
+  },
+  {
+    "content": "Test all event type actions end-to-end",
+    "status": "pending"
   }
 ]
