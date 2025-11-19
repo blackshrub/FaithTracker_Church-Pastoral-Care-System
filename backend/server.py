@@ -4585,6 +4585,165 @@ async def get_uploaded_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(filepath)
 
+# ==================== SEARCH ENDPOINT ====================
+
+@api_router.get("/search")
+async def global_search(q: str, current_user: dict = Depends(get_current_user)):
+    """
+    Global search across members and care events
+    Returns members matching name, phone, email and care events matching title, description
+    """
+    try:
+        if not q or len(q) < 2:
+            return {"members": [], "care_events": []}
+        
+        # Get user's campus
+        campus_id = current_user.get("campus_id")
+        
+        # For full admin, search across all campuses they have access to
+        search_filter = {}
+        if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+            search_filter["campus_id"] = campus_id
+        
+        # Search members
+        member_query = {
+            **search_filter,
+            "$or": [
+                {"name": {"$regex": q, "$options": "i"}},
+                {"phone": {"$regex": q, "$options": "i"}},
+                {"email": {"$regex": q, "$options": "i"}}
+            ]
+        }
+        
+        members = await db.members.find(member_query, {"_id": 0}).limit(10).to_list(10)
+        
+        # Search care events
+        care_event_query = {
+            **search_filter,
+            "$or": [
+                {"title": {"$regex": q, "$options": "i"}},
+                {"description": {"$regex": q, "$options": "i"}}
+            ]
+        }
+        
+        care_events = await db.care_events.find(care_event_query, {"_id": 0}).limit(10).to_list(10)
+        
+        # Enrich care events with member names
+        for event in care_events:
+            if event.get("member_id"):
+                member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0, "name": 1})
+                event["member_name"] = member["name"] if member else "Unknown"
+        
+        return {
+            "members": members,
+            "care_events": care_events
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in global search: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== ACTIVITY LOG ENDPOINTS ====================
+
+@api_router.get("/activity-logs", response_model=List[ActivityLogResponse])
+async def get_activity_logs(
+    current_user: dict = Depends(get_current_user),
+    user_id: Optional[str] = None,
+    action_type: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+):
+    """
+    Get activity logs with optional filters
+    Default: last 30 days
+    """
+    try:
+        # Get user's campus
+        campus_id = current_user.get("campus_id")
+        
+        # Build query
+        query = {}
+        if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+            query["campus_id"] = campus_id
+        
+        # Filter by user
+        if user_id:
+            query["user_id"] = user_id
+        
+        # Filter by action type
+        if action_type:
+            query["action_type"] = action_type
+        
+        # Date range filter (default: last 30 days)
+        if not start_date:
+            start_date = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        
+        if not end_date:
+            end_date = datetime.now(timezone.utc).isoformat()
+        
+        query["created_at"] = {
+            "$gte": start_date,
+            "$lte": end_date
+        }
+        
+        # Get logs
+        logs = await db.activity_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+        
+        return logs
+    
+    except Exception as e:
+        logger.error(f"Error fetching activity logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/activity-logs/summary")
+async def get_activity_summary(current_user: dict = Depends(get_current_user)):
+    """
+    Get summary statistics for activity logs
+    """
+    try:
+        campus_id = current_user.get("campus_id")
+        
+        query = {}
+        if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+            query["campus_id"] = campus_id
+        
+        # Last 30 days
+        start_date = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        query["created_at"] = {"$gte": start_date}
+        
+        # Total activities
+        total = await db.activity_logs.count_documents(query)
+        
+        # Get unique users
+        users_pipeline = [
+            {"$match": query},
+            {"$group": {"_id": "$user_id", "name": {"$first": "$user_name"}, "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        
+        users = await db.activity_logs.aggregate(users_pipeline).to_list(None)
+        
+        # Count by action type
+        actions_pipeline = [
+            {"$match": query},
+            {"$group": {"_id": "$action_type", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        
+        actions = await db.activity_logs.aggregate(actions_pipeline).to_list(None)
+        
+        return {
+            "total_activities": total,
+            "active_users": len(users),
+            "top_users": users[:5],
+            "action_breakdown": actions
+        }
+    
+    except Exception as e:
+        logger.error(f"Error fetching activity summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 
