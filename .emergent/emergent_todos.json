@@ -33,11 +33,11 @@
   },
   {
     "content": "Check frontend for compilation errors",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Restart backend service to apply changes",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Test all features with screenshots",
