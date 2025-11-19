@@ -977,14 +977,32 @@ export const Settings = () => {
             
             <Card className="bg-yellow-50 border-yellow-200">
               <CardHeader>
-                <CardTitle className="text-sm">Important Notes</CardTitle>
+                <CardTitle className="text-sm">Important Notes - {syncConfig.sync_method === 'polling' ? 'Polling Mode' : 'Webhook Mode'}</CardTitle>
               </CardHeader>
               <CardContent className="text-xs space-y-2 text-gray-700">
                 <p>• When sync is enabled, you cannot manually create new members (read-only from core)</p>
                 <p>• Sync only updates basic profile data (name, phone, birth date, photo)</p>
                 <p>• All pastoral care events, engagement data, and notes are preserved locally</p>
                 <p>• Members deactivated in core system will be archived (hidden from lists but history preserved)</p>
-                <p>• Sync runs automatically every 6 hours when enabled</p>
+                
+                {syncConfig.sync_method === 'polling' ? (
+                  <>
+                    <p className="pt-2 border-t border-yellow-300 font-medium">Polling Mode:</p>
+                    <p>• FaithTracker pulls data from core API every {syncConfig.polling_interval_hours} hours</p>
+                    <p>• Changes may take up to {syncConfig.polling_interval_hours} hours to appear</p>
+                    <p>• No changes needed on core system side</p>
+                    <p>• Lower server load, delayed updates</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="pt-2 border-t border-yellow-300 font-medium">Webhook Mode:</p>
+                    <p>• Core system pushes updates to FaithTracker in real-time</p>
+                    <p>• Changes appear immediately (within seconds)</p>
+                    <p>• <strong>Requires core system configuration:</strong> Add webhook URL and secret to FaithFlow Enterprise</p>
+                    <p>• Core must send HMAC-SHA256 signature in X-Webhook-Signature header</p>
+                    <p>• See webhook details in blue box above</p>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
