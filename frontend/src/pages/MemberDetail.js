@@ -329,11 +329,6 @@ export const MemberDetail = () => {
                       📞 {member.phone}
                     </a>
                   )}
-                  {member.email && (
-                    <a href={`mailto:${member.email}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1">
-                      ✉️ {member.email}
-                    </a>
-                  )}
                 </div>
               </div>
               
