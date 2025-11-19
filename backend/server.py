@@ -1582,6 +1582,11 @@ async def update_member(member_id: str, update: MemberUpdate):
     """Update member"""
     try:
         update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        
+        # Normalize phone number if provided
+        if 'phone' in update_data and update_data['phone']:
+            update_data['phone'] = normalize_phone_number(update_data['phone'])
+        
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         result = await db.members.update_one(
