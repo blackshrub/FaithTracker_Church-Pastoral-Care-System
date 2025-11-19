@@ -530,6 +530,7 @@ class ActivityLog(BaseModel):
     campus_id: str
     user_id: str
     user_name: str
+    user_photo_url: Optional[str] = None
     action_type: ActivityActionType
     member_id: Optional[str] = None
     member_name: Optional[str] = None
@@ -543,6 +544,7 @@ class ActivityLogResponse(BaseModel):
     campus_id: str
     user_id: str
     user_name: str
+    user_photo_url: Optional[str]
     action_type: str
     member_id: Optional[str]
     member_name: Optional[str]
