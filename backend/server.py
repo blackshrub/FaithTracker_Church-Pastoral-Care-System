@@ -658,6 +658,37 @@ def normalize_phone_number(phone: str, default_country_code: str = "+62") -> str
     # No recognizable prefix - assume it needs country code
     return f"{default_country_code}{phone}"
 
+
+async def log_activity(
+    campus_id: str,
+    user_id: str,
+    user_name: str,
+    action_type: ActivityActionType,
+    member_id: Optional[str] = None,
+    member_name: Optional[str] = None,
+    care_event_id: Optional[str] = None,
+    event_type: Optional[EventType] = None,
+    notes: Optional[str] = None
+):
+    """Log user activity for accountability tracking"""
+    try:
+        activity = ActivityLog(
+            campus_id=campus_id,
+            user_id=user_id,
+            user_name=user_name,
+            action_type=action_type,
+            member_id=member_id,
+            member_name=member_name,
+            care_event_id=care_event_id,
+            event_type=event_type,
+            notes=notes
+        )
+        await db.activity_logs.insert_one(activity.model_dump())
+    except Exception as e:
+        logger.error(f"Error logging activity: {str(e)}")
+        # Don't fail the main operation if logging fails
+        pass
+
 def generate_accident_followup_timeline(event_date: date, care_event_id: str, member_id: str, campus_id: str) -> List[Dict[str, Any]]:
     """Generate 3-stage accident/illness follow-up timeline"""
     # Get settings from localStorage or use defaults
