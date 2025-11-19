@@ -1895,50 +1895,14 @@ async def delete_care_event(event_id: str):
         # Delete activity logs related to this care event
         await db.activity_logs.delete_many({"care_event_id": event_id})
         
-        # If deleting grief/accident parent event, also delete followup timeline events
+        # If deleting grief/accident parent event, also delete followup stages
         if event_type == "grief_loss":
             # Delete grief support stages
             await db.grief_support.delete_many({"care_event_id": event_id})
-            # Delete timeline events created from grief followup completions/ignores
-            deleted_timeline_events = await db.care_events.find({
-                "member_id": member_id,
-                "event_type": "grief_loss",
-                "grief_stage_id": {"$exists": True}
-            }, {"_id": 0, "id": 1}).to_list(None)
-            
-            # Delete the timeline events
-            await db.care_events.delete_many({
-                "member_id": member_id,
-                "event_type": "grief_loss",
-                "grief_stage_id": {"$exists": True}
-            })
-            
-            # Delete activity logs for these timeline events
-            timeline_event_ids = [e["id"] for e in deleted_timeline_events]
-            if timeline_event_ids:
-                await db.activity_logs.delete_many({"care_event_id": {"$in": timeline_event_ids}})
             
         elif event_type == "accident_illness":
             # Delete accident followup stages
             await db.accident_followup.delete_many({"care_event_id": event_id})
-            # Delete timeline events created from accident followup completions/ignores
-            deleted_timeline_events = await db.care_events.find({
-                "member_id": member_id,
-                "event_type": "accident_illness",
-                "accident_stage_id": {"$exists": True}
-            }, {"_id": 0, "id": 1}).to_list(None)
-            
-            # Delete the timeline events
-            await db.care_events.delete_many({
-                "member_id": member_id,
-                "event_type": "accident_illness",
-                "accident_stage_id": {"$exists": True}
-            })
-            
-            # Delete activity logs for these timeline events
-            timeline_event_ids = [e["id"] for e in deleted_timeline_events]
-            if timeline_event_ids:
-                await db.activity_logs.delete_many({"care_event_id": {"$in": timeline_event_ids}})
         
         # Recalculate member's last contact date from remaining NON-BIRTHDAY events
         # Birthday events don't count as contact unless completed (marked as contacted)
