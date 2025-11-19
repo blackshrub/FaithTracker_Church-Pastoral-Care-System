@@ -73,6 +73,7 @@ export const Settings = () => {
     api_email: '',
     api_password: '',
     polling_interval_hours: 6,
+    filter_mode: 'include',
     filter_gender: '',
     filter_age_min: '',
     filter_age_max: '',
