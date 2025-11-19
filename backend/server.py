@@ -5246,16 +5246,51 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
                 
                 token = login_response.json().get("access_token")
                 
-                # Fetch members
-                members_response = await client.get(
-                    f"{config['api_base_url']}/api/members/",
-                    headers={"Authorization": f"Bearer {token}"}
-                )
+                # Fetch ALL members using pagination
+                all_members = []
+                page_size = 100
+                offset = 0
                 
-                if members_response.status_code != 200:
-                    raise Exception(f"Failed to fetch members: {members_response.text}")
+                while True:
+                    members_response = await client.get(
+                        f"{config['api_base_url']}/api/members/?limit={page_size}&skip={offset}",
+                        headers={"Authorization": f"Bearer {token}"}
+                    )
+                    
+                    if members_response.status_code != 200:
+                        raise Exception(f"Failed to fetch members: {members_response.text}")
+                    
+                    batch = members_response.json()
+                    
+                    # Handle both array response and paginated response
+                    if isinstance(batch, dict) and 'data' in batch:
+                        # Paginated response: {"data": [...], "pagination": {...}}
+                        batch_members = batch['data']
+                        all_members.extend(batch_members)
+                        
+                        # Check if there are more pages
+                        pagination = batch.get('pagination', {})
+                        if not pagination.get('has_more', False):
+                            break
+                    elif isinstance(batch, list):
+                        # Direct array response
+                        all_members.extend(batch)
+                        
+                        # If batch size is less than page_size, we've reached the end
+                        if len(batch) < page_size:
+                            break
+                    else:
+                        break
+                    
+                    offset += page_size
+                    
+                    # Safety limit to prevent infinite loop
+                    if offset > 10000:
+                        logger.warning(f"Reached safety limit of 10000 members")
+                        break
                 
-                core_members = members_response.json()
+                core_members = all_members
+                logger.info(f"Fetched {len(core_members)} total members from core API using pagination")
                 
                 # Stats
                 stats = {
