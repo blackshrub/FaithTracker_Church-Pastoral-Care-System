@@ -1,22 +1,18 @@
 [
   {
-    "content": "Backend: Add filter fields to SyncConfig model (gender, age_min, age_max, member_status)",
-    "status": "completed"
+    "content": "Backend: Add filter_mode field to SyncConfig (include/exclude)",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: Update sync logic to apply filters when processing members",
-    "status": "completed"
+    "content": "Backend: Update sync logic to handle include vs exclude filtering",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Add filter configuration UI in Sync tab",
-    "status": "completed"
+    "content": "Frontend: Add include/exclude toggle in filter section",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Show active filters summary",
-    "status": "completed"
-  },
-  {
-    "content": "Test sync with various filter combinations",
-    "status": "completed"
+    "content": "Frontend: Add clear explanation of include vs exclude mode",
+    "status": "pending"
   }
 ]
