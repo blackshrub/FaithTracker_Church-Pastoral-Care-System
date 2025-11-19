@@ -5439,6 +5439,28 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
                         await db.members.insert_one(new_member)
                         stats["created"] += 1
                 
+
+                # Archive members that no longer match filter (Option A)
+                # Get all core member IDs that passed filter
+                filtered_core_ids = set(m.get("id") for m in filtered_members)
+                
+                # Find existing synced members that are NOT in filtered list
+                for existing_member in existing_members:
+                    external_id = existing_member.get("external_member_id")
+                    if external_id and external_id not in filtered_core_ids and not existing_member.get("is_archived"):
+                        # This member was synced before but doesn't match new filter
+                        await db.members.update_one(
+                            {"id": existing_member["id"]},
+                            {"$set": {
+                                "is_archived": True,
+                                "archived_at": datetime.now(timezone.utc).isoformat(),
+                                "archived_reason": "No longer matches sync filter rules",
+                                "updated_at": datetime.now(timezone.utc).isoformat()
+                            }}
+                        )
+                        stats["archived"] += 1
+                        logger.info(f"Archived member {existing_member['name']} (no longer matches filter)")
+
                 # Update sync config
                 end_time = datetime.now(timezone.utc)
                 duration = (end_time - start_time).total_seconds()
