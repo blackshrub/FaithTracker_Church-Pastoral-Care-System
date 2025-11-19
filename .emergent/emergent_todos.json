@@ -1,10 +1,10 @@
 [
   {
     "content": "Clear all dashboard caches and verify complete database cleanup",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update test connection message to clarify it's a sample count, not total",
-    "status": "pending"
+    "status": "completed"
   }
 ]
