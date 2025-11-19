@@ -1,14 +1,14 @@
 [
   {
-    "content": "Add cascade delete for grief/accident followup stages when parent event is deleted",
-    "status": "completed"
+    "content": "Fix Activity Log page to display timestamps in campus timezone",
+    "status": "in_progress"
   },
   {
-    "content": "Remove duplicate ignored entry in grief tab (already shows in timeline)",
-    "status": "completed"
+    "content": "Ensure grief/accident tabs don't show timeline entries (only actual stages)",
+    "status": "pending"
   },
   {
-    "content": "Fix ignored badge positioning to not overlap three dots button",
-    "status": "completed"
+    "content": "Add cascade delete of activity logs when parent event is deleted",
+    "status": "pending"
   }
 ]
