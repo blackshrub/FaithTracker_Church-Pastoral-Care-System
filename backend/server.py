@@ -1653,7 +1653,7 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     "member_phone": member["phone"],
                     "member_photo_url": member.get("photo_url"),
                     "member_age": member.get("age"),
-                    "details": f"Birthday celebration",
+                    "details": "Birthday celebration",
                     "data": event
                 })
                 upcoming_birthdays.append({
@@ -2640,7 +2640,7 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
             "event_type": "grief_loss",
             "event_date": today_date,
             "title": f"Grief Support: {stage['stage'].replace('_', ' ')}",
-            "description": f"Completed grief follow-up stage" + (f"\n\nNotes: {notes}" if notes else ""),
+            "description": "Completed grief follow-up stage" + (f"\n\nNotes: {notes}" if notes else ""),
             "grief_stage_id": stage_id,  # Link for undo (but NOT care_event_id)
             "completed": True,
             "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -2923,7 +2923,7 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, cu
             "event_type": "accident_illness",
             "event_date": today_date,
             "title": f"Accident Follow-up: {stage['stage'].replace('_', ' ')}",
-            "description": f"Completed accident/illness follow-up" + (f"\n\nNotes: {notes}" if notes else ""),
+            "description": "Completed accident/illness follow-up" + (f"\n\nNotes: {notes}" if notes else ""),
             "accident_stage_id": stage_id,  # Link for undo
             "completed": True,
             "completed_at": datetime.now(timezone.utc).isoformat(),
