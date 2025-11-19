@@ -1,18 +1,18 @@
 [
   {
     "content": "Create database indexes for performance (campus_id, member_id, event_date, etc.)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add optimistic updates for mark complete action (instant UI feedback)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Optimize dashboard query to reduce load time",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test performance improvements",
-    "status": "pending"
+    "status": "completed"
   }
 ]
