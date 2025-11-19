@@ -42,5 +42,17 @@
   {
     "content": "Verify services are running without errors",
     "status": "completed"
+  },
+  {
+    "content": "Fix duplicate endpoints issue - remove duplicates after include_router",
+    "status": "completed"
+  },
+  {
+    "content": "Restart backend and test search API",
+    "status": "in_progress"
+  },
+  {
+    "content": "Debug activity logging - verify logs are created",
+    "status": "pending"
   }
 ]
