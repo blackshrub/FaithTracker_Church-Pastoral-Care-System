@@ -21,11 +21,11 @@
   },
   {
     "content": "Display user photos in Activity Log page",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Display user photos in Layout/Navigation",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Restart backend and test all features",
