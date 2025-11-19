@@ -1,38 +1,22 @@
 [
   {
-    "content": "Backend: Add sync_method field to SyncConfig (polling/webhook)",
-    "status": "completed"
+    "content": "Backend: Add filter fields to SyncConfig model (gender, age_min, age_max, member_status)",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: Generate webhook secret and add to SyncConfig",
-    "status": "completed"
+    "content": "Backend: Update sync logic to apply filters when processing members",
+    "status": "pending"
   },
   {
-    "content": "Backend: Create POST /api/sync/webhook endpoint with signature verification",
-    "status": "completed"
+    "content": "Frontend: Add filter configuration UI in Sync tab",
+    "status": "pending"
   },
   {
-    "content": "Backend: Add rate limiting for webhook endpoint",
-    "status": "completed"
+    "content": "Frontend: Show active filters summary",
+    "status": "pending"
   },
   {
-    "content": "Backend: Add webhook delivery logging",
-    "status": "completed"
-  },
-  {
-    "content": "Backend: Add scheduled polling job to APScheduler",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Add sync method selector (polling/webhook) in Settings",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Display webhook URL and secret for core system configuration",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: Show different instructions based on selected method",
-    "status": "completed"
+    "content": "Test sync with various filter combinations",
+    "status": "pending"
   }
 ]
