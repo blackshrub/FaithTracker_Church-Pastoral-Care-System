@@ -286,17 +286,17 @@ export const AdminDashboard = () => {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>{t('admin_dashboard_page.manage_users')}</CardTitle>
-                <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>
+                <Dialog open={userModalOpen} onOpenChange={(open) => { if (!open) closeUserModal(); else setUserModalOpen(open); }}>
                   <DialogTrigger asChild>
                     <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />{t('admin_dashboard_page.add_user')}</Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>{t('admin_dashboard_page.add_user')}</DialogTitle></DialogHeader>
-                    <form onSubmit={handleAddUser} className="space-y-3">
+                    <DialogHeader><DialogTitle>{editingUser ? 'Edit User' : t('admin_dashboard_page.add_user')}</DialogTitle></DialogHeader>
+                    <form onSubmit={editingUser ? handleUpdateUser : handleAddUser} className="space-y-3">
                       <div><Label>{t('admin_dashboard_page.name_required')}</Label><Input value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required /></div>
-                      <div><Label>{t('admin_dashboard_page.email_required')}</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required /></div>
-                      <div><Label>{t('admin_dashboard_page.phone_required')}</Label><Input value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} required /></div>
-                      <div><Label>{t('admin_dashboard_page.password_required')}</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} required /></div>
+                      <div><Label>{t('admin_dashboard_page.email_required')}</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required disabled={editingUser} /></div>
+                      <div><Label>{t('admin_dashboard_page.phone_required')}</Label><Input value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} placeholder="081234567890" /></div>
+                      <div><Label>{editingUser ? 'Password (leave blank to keep current)' : t('admin_dashboard_page.password_required')}</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} required={!editingUser} /></div>
                       <div><Label>{t('admin_dashboard_page.role_required')}</Label>
                         <Select value={newUser.role} onValueChange={(v) => setNewUser({...newUser, role: v})}>
                           <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
@@ -318,8 +318,8 @@ export const AdminDashboard = () => {
                         </div>
                       )}
                       <div className="flex gap-2 justify-end">
-                        <Button type="button" variant="outline" onClick={() => setUserModalOpen(false)}>{t('cancel')}</Button>
-                        <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">{t('admin_dashboard_page.create')}</Button>
+                        <Button type="button" variant="outline" onClick={closeUserModal}>{t('cancel')}</Button>
+                        <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">{editingUser ? 'Update' : t('admin_dashboard_page.create')}</Button>
                       </div>
                     </form>
                   </DialogContent>
