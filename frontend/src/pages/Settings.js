@@ -39,6 +39,33 @@ export const Settings = () => {
     { stage: 'second_followup', days: 7, name: 'Second Follow-up' },
     { stage: 'final_followup', days: 14, name: 'Final Follow-up' },
   ]);
+  const [uploading, setUploading] = useState(false);
+  
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await axios.post(`${API}/users/${user.id}/photo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      toast.success('Profile photo updated successfully');
+      
+      // Reload user data
+      window.location.reload();
+    } catch (error) {
+      toast.error('Failed to upload photo');
+      console.error('Photo upload error:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   
   useEffect(() => {
     loadCampusCount();
