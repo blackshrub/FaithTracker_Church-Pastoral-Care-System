@@ -1,14 +1,18 @@
 [
   {
-    "content": "Replace ignored badge with disabled grey 'Ignored' button in grief tab",
-    "status": "completed"
+    "content": "Remove email field from Member model in backend",
+    "status": "in_progress"
   },
   {
-    "content": "Fix accident ignore toast error (use queryClient invalidation)",
-    "status": "completed"
+    "content": "Remove email from member creation/edit forms in frontend",
+    "status": "pending"
   },
   {
-    "content": "Apply same button style to accident tab for ignored stages",
-    "status": "completed"
+    "content": "Remove email from member search query",
+    "status": "pending"
+  },
+  {
+    "content": "Remove email display from member cards/profiles",
+    "status": "pending"
   }
 ]
