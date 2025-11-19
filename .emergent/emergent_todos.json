@@ -1,42 +1,42 @@
 [
   {
     "content": "Backend: Create SyncConfig model and database schema",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Backend: Create POST /api/sync/config endpoint to save sync settings",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Create GET /api/sync/config endpoint to retrieve settings",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Create POST /api/sync/test-connection endpoint for validation",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Create POST /api/sync/members/pull endpoint for manual sync",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Create sync helper functions (fetch, merge, archive logic)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add Sync Configuration tab in Settings page",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add form for API URL, email, password with test connection button",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add manual 'Sync Now' button with progress indicator",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add sync logs/history viewer",
-    "status": "pending"
+    "status": "completed"
   }
 ]
