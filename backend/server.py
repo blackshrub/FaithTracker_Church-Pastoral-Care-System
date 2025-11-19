@@ -2220,7 +2220,7 @@ async def complete_care_event(event_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/care-events/{event_id}/send-reminder")
-async def send_care_event_reminder(event_id: str):
+async def send_care_event_reminder(event_id: str, current_user: dict = Depends(get_current_user)):
     """Send WhatsApp reminder for care event"""
     try:
         event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
@@ -2248,8 +2248,23 @@ async def send_care_event_reminder(event_id: str):
                 {"id": event_id},
                 {"$set": {
                     "reminder_sent": True,
-                    "reminder_sent_at": datetime.now(timezone.utc).isoformat()
+                    "reminder_sent_at": datetime.now(timezone.utc).isoformat(),
+                    "reminder_sent_by_user_id": current_user["id"],
+                    "reminder_sent_by_user_name": current_user["name"]
                 }}
+            )
+            
+            # Log activity
+            await log_activity(
+                campus_id=event["campus_id"],
+                user_id=current_user["id"],
+                user_name=current_user["name"],
+                action_type=ActivityActionType.SEND_REMINDER,
+                member_id=event["member_id"],
+                member_name=member["name"],
+                care_event_id=event_id,
+                event_type=EventType(event["event_type"]),
+                notes=f"Sent WhatsApp reminder for {event['event_type']}"
             )
         
         return result
