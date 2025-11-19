@@ -890,16 +890,24 @@ export const Settings = () => {
                   </div>
                   
                   {(syncConfig.filter_gender || syncConfig.filter_age_min || syncConfig.filter_age_max || (syncConfig.filter_member_status && syncConfig.filter_member_status.length > 0)) && (
-                    <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                      <p className="font-medium text-blue-900 mb-1">Active Filters:</p>
-                      <ul className="space-y-0.5 text-blue-700">
+                    <div className={`mt-3 p-3 rounded border ${syncConfig.filter_mode === 'include' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <p className={`font-medium text-sm mb-2 ${syncConfig.filter_mode === 'include' ? 'text-green-900' : 'text-red-900'}`}>
+                        {syncConfig.filter_mode === 'include' ? '✓ Will ONLY Sync:' : '✗ Will EXCLUDE:'}
+                      </p>
+                      <ul className={`space-y-1 text-xs ${syncConfig.filter_mode === 'include' ? 'text-green-700' : 'text-red-700'}`}>
                         {syncConfig.filter_gender && <li>• Gender: {syncConfig.filter_gender}</li>}
-                        {syncConfig.filter_age_min && <li>• Minimum Age: {syncConfig.filter_age_min}</li>}
-                        {syncConfig.filter_age_max && <li>• Maximum Age: {syncConfig.filter_age_max}</li>}
+                        {syncConfig.filter_age_min && <li>• Age ≥ {syncConfig.filter_age_min}</li>}
+                        {syncConfig.filter_age_max && <li>• Age ≤ {syncConfig.filter_age_max}</li>}
                         {syncConfig.filter_member_status && syncConfig.filter_member_status.length > 0 && (
                           <li>• Status: {syncConfig.filter_member_status.join(', ')}</li>
                         )}
                       </ul>
+                      <p className="mt-2 text-xs text-gray-600 italic">
+                        {syncConfig.filter_mode === 'include' 
+                          ? 'Members matching ALL criteria above will be synced'
+                          : 'Members matching ANY criteria above will be SKIPPED'
+                        }
+                      </p>
                     </div>
                   )}
                 </div>
