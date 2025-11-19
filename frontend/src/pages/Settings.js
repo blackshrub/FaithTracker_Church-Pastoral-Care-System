@@ -836,22 +836,45 @@ export const Settings = () => {
                   </div>
                 )}
                 
-                <div className="flex items-center gap-4 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-start gap-3">
                     <input 
                       type="checkbox"
                       checked={syncConfig.is_enabled}
                       onChange={(e) => setSyncConfig({...syncConfig, is_enabled: e.target.checked})}
-                      className="w-4 h-4 text-teal-600"
+                      className="w-5 h-5 text-teal-600 mt-0.5"
+                      id="enable-sync"
                     />
-                    <span className="text-sm font-medium">Enable Sync</span>
-                  </label>
-                  {syncConfig.sync_method === 'polling' && (
-                    <p className="text-xs text-gray-500">(Syncs every {syncConfig.polling_interval_hours} hours)</p>
-                  )}
-                  {syncConfig.sync_method === 'webhook' && (
-                    <p className="text-xs text-gray-500">(Real-time sync via webhooks)</p>
-                  )}
+                    <div className="flex-1">
+                      <label htmlFor="enable-sync" className="text-sm font-semibold text-gray-900 cursor-pointer">
+                        Enable Member Data Sync
+                      </label>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {syncConfig.is_enabled ? (
+                          <span className="text-green-700 font-medium">
+                            ✓ Sync is ACTIVE - {syncConfig.sync_method === 'polling' 
+                              ? `Automatically pulls data every ${syncConfig.polling_interval_hours} hours` 
+                              : 'Receives real-time updates via webhooks'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">
+                            ✗ Sync is DISABLED - You can manually create and edit members freely
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-2 text-xs text-gray-600 space-y-1 bg-gray-50 p-2 rounded">
+                        <p><strong>When ENABLED:</strong></p>
+                        <p>• Member data syncs from core system automatically</p>
+                        <p>• You CANNOT create new members manually (read-only)</p>
+                        <p>• Profile updates (name, phone, photo) come from core only</p>
+                        <p>• Care events and pastoral data remain fully editable</p>
+                        <p className="pt-1"><strong>When DISABLED:</strong></p>
+                        <p>• Works as standalone app</p>
+                        <p>• Full control to create/edit members</p>
+                        <p>• No automatic sync</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="flex gap-2 pt-4 border-t">
