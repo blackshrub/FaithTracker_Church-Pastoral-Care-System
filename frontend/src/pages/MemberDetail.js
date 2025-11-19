@@ -1025,7 +1025,7 @@ export const MemberDetail = () => {
                     <div className="mt-4">
                       <h5 className="text-sm font-semibold mb-3">Support Timeline:</h5>
                       <div className="space-y-3">
-                        {griefTimeline.filter(s => s.care_event_id === event.id && !s.ignored).map((stage, index) => {
+                        {griefTimeline.filter(s => s.care_event_id === event.id).map((stage, index) => {
                           const isIgnored = stage.ignored === true;
                           return (
                           <div key={stage.id} className={`flex items-center gap-3 p-2 bg-pink-50 rounded relative ${isIgnored ? 'opacity-60' : ''}`}>
@@ -1157,7 +1157,7 @@ export const MemberDetail = () => {
                     <div className="mt-4">
                       <h5 className="text-sm font-semibold mb-3">Follow-up Schedule:</h5>
                       <div className="space-y-3">
-                        {accidentTimeline.filter(t => t.care_event_id === event.id && !t.ignored).map((stage, index) => {
+                        {accidentTimeline.filter(t => t.care_event_id === event.id).map((stage, index) => {
                           const isIgnored = stage.ignored === true;
                           return (
                           <div key={stage.id} className={`flex items-center gap-3 p-2 bg-blue-50 rounded relative ${isIgnored ? 'opacity-60' : ''}`}>
