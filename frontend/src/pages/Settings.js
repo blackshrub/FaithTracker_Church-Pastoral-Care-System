@@ -81,6 +81,7 @@ export const Settings = () => {
   });
   const [syncLogs, setSyncLogs] = useState([]);
   const [availableFields, setAvailableFields] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
