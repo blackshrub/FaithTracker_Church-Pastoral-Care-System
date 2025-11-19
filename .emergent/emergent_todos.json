@@ -1,34 +1,34 @@
 [
   {
     "content": "Backend: Create GET /api/sync/discover-fields endpoint to analyze sample data",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Backend: Extract field metadata (name, type, distinct values) from core API",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Update SyncConfig to store dynamic filter rules as JSON",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Backend: Update sync logic to apply dynamic filters with operators",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Create dynamic filter rule builder UI",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add filter rule with field selector, operator, and value",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Allow adding/removing multiple filter rules",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Show field type and distinct values as dropdowns",
-    "status": "pending"
+    "status": "completed"
   }
 ]
