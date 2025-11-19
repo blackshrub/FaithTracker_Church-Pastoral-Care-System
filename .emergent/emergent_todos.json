@@ -1,18 +1,18 @@
 [
   {
     "content": "Remove creation of timeline care_events when completing/ignoring grief stages",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Remove creation of timeline care_events when completing/ignoring accident stages",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Remove .filter(!s.ignored) so ignored stages still show in tabs with badge",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test that grief/accident tabs show all stages with proper status badges",
-    "status": "pending"
+    "status": "completed"
   }
 ]
