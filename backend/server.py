@@ -5201,43 +5201,61 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
                     "message": "No access token received"
                 }
             
-            # Test members endpoint
+            # Test members endpoint - fetch with pagination to get actual total
             members_url = f"{config.api_base_url.rstrip('/')}/api/members/"
-            members_response = await client.get(
-                members_url,
-                headers={"Authorization": f"Bearer {token}"}
-            )
             
-            if members_response.status_code != 200:
-                return {
-                    "success": False,
-                    "message": f"Members API failed: {members_response.text}"
-                }
+            # Try to get total count by fetching with pagination
+            total_members = 0
+            offset = 0
+            page_size = 100
             
-            members = members_response.json()
+            while True:
+                members_response = await client.get(
+                    f"{members_url}?limit={page_size}&skip={offset}",
+                    headers={"Authorization": f"Bearer {token}"}
+                )
+                
+                if members_response.status_code != 200:
+                    return {
+                        "success": False,
+                        "message": f"Members API failed: {members_response.text}"
+                    }
+                
+                batch = members_response.json()
+                
+                # Handle both response formats
+                if isinstance(batch, dict):
+                    if 'pagination' in batch and 'total' in batch['pagination']:
+                        # Has pagination metadata - use total
+                        total_members = batch['pagination']['total']
+                        break
+                    elif 'data' in batch:
+                        # Paginated but count ourselves
+                        batch_members = batch['data']
+                        total_members += len(batch_members)
+                        if len(batch_members) < page_size:
+                            break
+                    else:
+                        break
+                elif isinstance(batch, list):
+                    total_members += len(batch)
+                    if len(batch) < page_size:
+                        break
+                else:
+                    break
+                
+                offset += page_size
+                
+                # Safety limit
+                if offset > 10000:
+                    total_members = f"{total_members}+ (stopped at 10,000)"
+                    break
             
-            # Handle both paginated and direct array response
-            if isinstance(members, dict) and 'pagination' in members:
-                # Paginated response with total count
-                total_members = members['pagination'].get('total', len(members.get('data', [])))
-                return {
-                    "success": True,
-                    "message": f"Connection successful! Core system has {total_members} total members. Sync will fetch all.",
-                    "member_count": total_members
-                }
-            elif isinstance(members, list):
-                member_count = len(members)
-                return {
-                    "success": True,
-                    "message": f"Connection successful! Found {member_count} members. Sync will fetch all pages if paginated.",
-                    "member_count": member_count
-                }
-            else:
-                return {
-                    "success": True,
-                    "message": "Connection successful! Core API is accessible.",
-                    "member_count": 0
-                }
+            return {
+                "success": True,
+                "message": f"Connection successful! Core system has {total_members} total members. Sync will fetch all.",
+                "member_count": total_members
+            }
     
     except httpx.TimeoutException:
         return {
