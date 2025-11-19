@@ -269,7 +269,7 @@ async def import_campuses_and_data():
             "id": str(uuid.uuid4()),
             "member_id": member["id"],
             "campus_id": member["campus_id"],
-            "event_type": "hospital_visit",
+            "event_type": "accident_illness",
             "event_date": admission_date.isoformat(),
             "title": f"Kunjungan Rumah Sakit - {member['name']}",
             "description": "Hospital admission",
