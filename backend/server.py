@@ -4965,10 +4965,7 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
             "api_password": config.api_password,
             "polling_interval_hours": config.polling_interval_hours,
             "filter_mode": config.filter_mode,
-            "filter_gender": config.filter_gender,
-            "filter_age_min": config.filter_age_min,
-            "filter_age_max": config.filter_age_max,
-            "filter_member_status": config.filter_member_status,
+            "filter_rules": config.filter_rules or [],
             "is_enabled": config.is_enabled,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
