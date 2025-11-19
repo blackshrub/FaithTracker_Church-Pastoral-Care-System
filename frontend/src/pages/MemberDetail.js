@@ -957,6 +957,11 @@ export const MemberDetail = () => {
                                   {event.aid_type && `${event.aid_type} - `}Rp {event.aid_amount.toLocaleString('id-ID')}
                                 </p>
                               )}
+                              {event.created_by_user_name && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  <span className="font-medium">Created by:</span> {event.created_by_user_name}
+                                </p>
+                              )}
                               {event.completed && event.completed_by_user_name && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                                   <span className="font-medium">Completed by:</span> {event.completed_by_user_name}
