@@ -1509,7 +1509,7 @@ async def list_at_risk_members():
             member['engagement_status'] = status
             member['days_since_last_contact'] = days
             
-            if status in [EngagementStatus.AT_RISK, EngagementStatus.INACTIVE]:
+            if status in [EngagementStatus.AT_RISK, EngagementStatus.DISCONNECTED]:
                 at_risk_members.append(member)
         
         # Sort by days descending
@@ -1690,7 +1690,7 @@ async def delete_care_event(event_id: str):
             elif days_since < 90:
                 engagement_status = "at_risk"
             else:
-                engagement_status = "inactive"
+                engagement_status = "disconnected"
                 
             await db.members.update_one(
                 {"id": member_id},
@@ -1708,7 +1708,7 @@ async def delete_care_event(event_id: str):
                 {"$set": {
                     "last_contact_date": None,
                     "days_since_last_contact": 999,
-                    "engagement_status": "inactive",
+                    "engagement_status": "disconnected",
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
@@ -3983,7 +3983,7 @@ async def get_engagement_statuses():
     return [
         {"value": "active", "label": "Active", "color": "green", "description": "Recent contact"},
         {"value": "at_risk", "label": "At Risk", "color": "amber", "description": "30-59 days no contact"},
-        {"value": "inactive", "label": "Inactive", "color": "red", "description": "60+ days no contact"}
+        {"value": "disconnected", "label": "Disconnected", "color": "red", "description": "90+ days no contact"}
     ]
 
 @api_router.get("/config/weekdays")
