@@ -1,18 +1,18 @@
 [
   {
     "content": "Remove email field from Member model in backend",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Remove email from member creation/edit forms in frontend",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Remove email from member search query",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Remove email display from member cards/profiles",
-    "status": "pending"
+    "status": "completed"
   }
 ]
