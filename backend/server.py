@@ -358,6 +358,9 @@ class CareEvent(BaseModel):
     ignored_by: Optional[str] = None
     ignored_by_name: Optional[str] = None
     
+    created_by_user_id: Optional[str] = None
+    created_by_user_name: Optional[str] = None
+    
     # Member information (enriched from members collection)
     member_name: Optional[str] = None
     
