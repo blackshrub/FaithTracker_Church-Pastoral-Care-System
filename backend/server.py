@@ -350,6 +350,13 @@ class CareEvent(BaseModel):
     description: Optional[str] = None
     completed: bool = False
     completed_at: Optional[datetime] = None
+    completed_by_user_id: Optional[str] = None
+    completed_by_user_name: Optional[str] = None
+    
+    ignored: bool = False
+    ignored_at: Optional[datetime] = None
+    ignored_by: Optional[str] = None
+    ignored_by_name: Optional[str] = None
     
     # Member information (enriched from members collection)
     member_name: Optional[str] = None
@@ -369,6 +376,8 @@ class CareEvent(BaseModel):
     
     reminder_sent: bool = False
     reminder_sent_at: Optional[datetime] = None
+    reminder_sent_by_user_id: Optional[str] = None
+    reminder_sent_by_user_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
