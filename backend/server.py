@@ -5140,7 +5140,7 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
     try:
         import httpx
         
-        # Test login
+        # Test login - send as 'email' key even if it's not email format (core API requirement)
         login_url = f"{config.api_base_url.rstrip('/')}/api/auth/login"
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
@@ -5149,9 +5149,16 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
             )
             
             if login_response.status_code != 200:
+                error_detail = login_response.text
+                try:
+                    error_json = login_response.json()
+                    error_detail = error_json.get("detail", error_detail)
+                except:
+                    pass
+                
                 return {
                     "success": False,
-                    "message": f"Login failed: {login_response.text}"
+                    "message": f"Login failed: {error_detail}"
                 }
             
             token = login_response.json().get("access_token")
