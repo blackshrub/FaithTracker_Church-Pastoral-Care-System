@@ -384,10 +384,10 @@ const ActivityLog = () => {
                     <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-gray-100">
-                          {new Date(log.created_at).toLocaleDateString()}
+                          {formatDateTime(log.created_at).date}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {new Date(log.created_at).toLocaleTimeString()}
+                          {formatDateTime(log.created_at).time}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
