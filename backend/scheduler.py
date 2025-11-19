@@ -263,14 +263,15 @@ async def send_daily_digest_to_pastoral_team():
             
             # Send to each team member
             for user in pastoral_team:
-                result = await send_whatsapp(
-                    user['phone'],
-                    digest['message'],
-                    {
-                        "id": str(uuid.uuid4()),
-                        "campus_id": campus_id,
-                        "pastoral_team_user_id": user['id']
-                    })
+                try:
+                    result = await send_whatsapp(
+                        user['phone'],
+                        digest['message'],
+                        {
+                            "id": str(uuid.uuid4()),
+                            "campus_id": campus_id,
+                            "pastoral_team_user_id": user['id']
+                        })
                     
                     logger.info(f"✅ Sent digest to {user['name']} ({user['phone']})")
                     
