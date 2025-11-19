@@ -1,22 +1,22 @@
 [
   {
     "content": "Backend: Add filter fields to SyncConfig model (gender, age_min, age_max, member_status)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Backend: Update sync logic to apply filters when processing members",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add filter configuration UI in Sync tab",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Show active filters summary",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test sync with various filter combinations",
-    "status": "pending"
+    "status": "completed"
   }
 ]
