@@ -25,14 +25,22 @@
   },
   {
     "content": "Frontend: Create ActivityLog page with filters and export to CSV",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add Activity Log to navigation menu under Administration",
+    "status": "completed"
+  },
+  {
+    "content": "Check frontend for compilation errors",
+    "status": "in_progress"
+  },
+  {
+    "content": "Restart backend service to apply changes",
     "status": "pending"
   },
   {
-    "content": "Test all features and ensure accountability tracking works",
+    "content": "Test all features with screenshots",
     "status": "pending"
   }
 ]
