@@ -381,9 +381,11 @@ export const AdminDashboard = () => {
                           <div>
                             <p className="font-medium text-sm">{u.name}</p>
                             <p className="text-xs text-muted-foreground md:hidden">{u.email}</p>
+                            <p className="text-xs text-muted-foreground lg:hidden">{u.phone}</p>
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">{u.email}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{u.phone || '-'}</TableCell>
                         <TableCell className="px-1">
                           <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                             {u.role === 'full_admin' ? 'Full Admin' : u.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
@@ -398,6 +400,10 @@ export const AdminDashboard = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-32">
+                                <DropdownMenuItem onClick={() => handleEditUser(u)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   className="text-red-600"
                                   onClick={() => handleDeleteUser(u.id, u.name)}
