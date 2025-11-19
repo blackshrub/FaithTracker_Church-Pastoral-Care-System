@@ -1,10 +1,18 @@
 [
   {
-    "content": "Debug search bar - check API call and response",
-    "status": "completed"
+    "content": "Create database indexes for performance (campus_id, member_id, event_date, etc.)",
+    "status": "in_progress"
   },
   {
-    "content": "Fix dashboard stats showing cached/incorrect member count",
-    "status": "completed"
+    "content": "Add optimistic updates for mark complete action (instant UI feedback)",
+    "status": "pending"
+  },
+  {
+    "content": "Optimize dashboard query to reduce load time",
+    "status": "pending"
+  },
+  {
+    "content": "Test performance improvements",
+    "status": "pending"
   }
 ]
