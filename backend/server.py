@@ -5075,37 +5075,6 @@ async def regenerate_webhook_secret(current_user: dict = Depends(get_current_use
         logger.error(f"Error regenerating webhook secret: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-            
-            # Update existing
-            await db.sync_configs.update_one(
-                {"campus_id": campus_id},
-                {"$set": sync_config_data}
-            )
-        else:
-            # Create new with generated webhook secret
-            sync_config = SyncConfig(
-                campus_id=campus_id,
-                sync_method=config.sync_method,
-                api_base_url=config.api_base_url.rstrip('/'),
-                api_email=config.api_email,
-                api_password=config.api_password,
-                polling_interval_hours=config.polling_interval_hours,
-                reconciliation_enabled=config.reconciliation_enabled,
-                reconciliation_time=config.reconciliation_time,
-                filter_mode=config.filter_mode,
-                filter_rules=config.filter_rules or [],
-                is_enabled=config.is_enabled
-            )
-            await db.sync_configs.insert_one(sync_config.model_dump())
-        
-        return {"success": True, "message": "Sync configuration saved"}
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error saving sync config: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @api_router.post("/sync/discover-fields")
 async def discover_fields_from_core(config_test: SyncConfigCreate, current_user: dict = Depends(get_current_user)):
