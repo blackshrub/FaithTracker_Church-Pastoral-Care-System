@@ -17,15 +17,15 @@
   },
   {
     "content": "Frontend: Create SearchBar component with live search and dropdown",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Add SearchBar to Layout component (visible on all pages)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Create ActivityLog page with filters and export to CSV",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Frontend: Add Activity Log to navigation menu under Administration",
