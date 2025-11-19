@@ -478,6 +478,13 @@ class UserCreate(BaseModel):
     campus_id: Optional[str] = None  # Required for campus_admin and pastor, null for full_admin
     phone: str  # Pastoral team member's phone for receiving reminders
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[UserRole] = None
+    campus_id: Optional[str] = None
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -492,6 +499,7 @@ class User(BaseModel):
     role: UserRole
     campus_id: Optional[str] = None
     phone: str  # For receiving pastoral care task reminders
+    photo_url: Optional[str] = None
     hashed_password: str
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -505,6 +513,7 @@ class UserResponse(BaseModel):
     campus_id: Optional[str] = None
     campus_name: Optional[str] = None
     phone: str
+    photo_url: Optional[str] = None
     is_active: bool
     created_at: datetime
 
