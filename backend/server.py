@@ -2560,7 +2560,32 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Grief stage not found")
         
-        # Log activity (no timeline entry created - stage itself tracks completion)
+        # Create timeline entry (will show in Timeline tab, NOT in Grief tab)
+        # This entry does NOT have care_event_id, so it won't appear in Grief tab filter
+        campus_tz = await get_campus_timezone(stage["campus_id"])
+        today_date = get_date_in_timezone(campus_tz)
+        
+        timeline_event_id = str(uuid.uuid4())
+        await db.care_events.insert_one({
+            "id": timeline_event_id,
+            "member_id": stage["member_id"],
+            "campus_id": stage["campus_id"],
+            "event_type": "grief_loss",
+            "event_date": today_date,
+            "title": f"Grief Support: {stage['stage'].replace('_', ' ')}",
+            "description": f"Completed grief follow-up stage" + (f"\n\nNotes: {notes}" if notes else ""),
+            "grief_stage_id": stage_id,  # Link for undo (but NOT care_event_id)
+            "completed": True,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_by_user_id": current_user["id"],
+            "completed_by_user_name": current_user["name"],
+            "created_by_user_id": current_user["id"],
+            "created_by_user_name": current_user["name"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Log activity
         await log_activity(
             campus_id=stage["campus_id"],
             user_id=current_user["id"],
@@ -2568,6 +2593,7 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
             action_type=ActivityActionType.COMPLETE_TASK,
             member_id=stage["member_id"],
             member_name=member_name,
+            care_event_id=timeline_event_id,
             event_type=EventType.GRIEF_LOSS,
             notes=f"Completed grief support stage: {stage['stage'].replace('_', ' ')}",
             user_photo_url=current_user.get("photo_url")
