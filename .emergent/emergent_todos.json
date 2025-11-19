@@ -40,11 +40,7 @@
     "status": "completed"
   },
   {
-    "content": "Test search bar functionality with screenshot",
-    "status": "in_progress"
-  },
-  {
-    "content": "Test Activity Log page with screenshot",
-    "status": "pending"
+    "content": "Verify services are running without errors",
+    "status": "completed"
   }
 ]
