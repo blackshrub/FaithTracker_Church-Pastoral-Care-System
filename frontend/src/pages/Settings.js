@@ -1149,6 +1149,78 @@ export const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Current Sync Status Card */}
+            {syncConfig.api_base_url && (
+              <Card className="bg-gradient-to-r from-teal-50 to-blue-50 border-teal-200">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <span>🔄 Active Sync Configuration</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      onClick={async () => {
+                        if (confirm('Disable sync? This will stop automatic syncing but preserve all data.')) {
+                          setSyncConfig({...syncConfig, is_enabled: false});
+                          await axios.post(`${API}/sync/config`, {...syncConfig, is_enabled: false});
+                          toast.success('Sync disabled');
+                          loadSyncConfig();
+                        }
+                      }}
+                    >
+                      Disable Sync
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600 text-xs uppercase">Method</p>
+                    <p className="font-medium">{syncConfig.sync_method === 'polling' ? '📊 Polling' : '⚡ Webhook'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 text-xs uppercase">Status</p>
+                    <p className={`font-medium ${syncConfig.is_enabled ? 'text-green-600' : 'text-gray-500'}`}>
+                      {syncConfig.is_enabled ? '✓ Enabled' : '✗ Disabled'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 text-xs uppercase">API URL</p>
+                    <p className="font-mono text-xs truncate">{syncConfig.api_base_url}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 text-xs uppercase">Username</p>
+                    <p className="font-mono text-xs truncate">{syncConfig.api_email}</p>
+                  </div>
+                  
+                  {syncConfig.sync_method === 'webhook' && syncConfig.webhook_secret && (
+                    <>
+                      <div className="md:col-span-2">
+                        <p className="text-gray-600 text-xs uppercase mb-1">Webhook URL for Core System</p>
+                        <div className="flex gap-2">
+                          <code className="flex-1 text-xs bg-white p-2 rounded border">{window.location.origin}/api/sync/webhook</code>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/api/sync/webhook`);
+                            toast.success('Copied!');
+                          }}>Copy</Button>
+                        </div>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-gray-600 text-xs uppercase mb-1">Webhook Secret</p>
+                        <div className="flex gap-2">
+                          <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">{syncConfig.webhook_secret}</code>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            navigator.clipboard.writeText(syncConfig.webhook_secret);
+                            toast.success('Copied!');
+                          }}>Copy</Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             
             <Card>
               <CardHeader>
