@@ -2621,31 +2621,7 @@ async def ignore_grief_stage(stage_id: str, user: dict = Depends(get_current_use
             }}
         )
         
-        # Create ignored timeline entry
-        campus_tz = await get_campus_timezone(stage["campus_id"])
-        today_date = get_date_in_timezone(campus_tz)
-        
-        ignored_event_id = str(uuid.uuid4())
-        await db.care_events.insert_one({
-            "id": ignored_event_id,
-            "member_id": stage["member_id"],
-            "campus_id": stage["campus_id"],
-            "event_type": "grief_loss",
-            "event_date": today_date,
-            "title": f"Grief Support: {stage['stage'].replace('_', ' ')} (Ignored)",
-            "description": f"Stage was marked as ignored/not applicable",
-            "grief_stage_id": stage_id,
-            "ignored": True,
-            "ignored_at": datetime.now(timezone.utc).isoformat(),
-            "ignored_by": user.get("id"),
-            "ignored_by_name": user.get("name"),
-            "created_by_user_id": user.get("id"),
-            "created_by_user_name": user.get("name"),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        })
-        
-        # Log activity
+        # Log activity (no timeline entry - stage itself shows ignored status)
         await log_activity(
             campus_id=stage["campus_id"],
             user_id=user["id"],
@@ -2653,7 +2629,6 @@ async def ignore_grief_stage(stage_id: str, user: dict = Depends(get_current_use
             action_type=ActivityActionType.IGNORE_TASK,
             member_id=stage["member_id"],
             member_name=member_name,
-            care_event_id=ignored_event_id,
             event_type=EventType.GRIEF_LOSS,
             notes=f"Ignored grief support stage: {stage['stage'].replace('_', ' ')}",
             user_photo_url=user.get("photo_url")
