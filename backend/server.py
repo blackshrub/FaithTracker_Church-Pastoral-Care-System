@@ -683,7 +683,9 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
         if not whatsapp_url:
             raise Exception("WhatsApp gateway URL not configured")
         
-        phone_formatted = phone if phone.endswith('@s.whatsapp.net') else f"{phone}@s.whatsapp.net"
+        # Normalize phone number to international format
+        phone_normalized = normalize_phone_number(phone)
+        phone_formatted = phone_normalized if phone_normalized.endswith('@s.whatsapp.net') else f"{phone_normalized}@s.whatsapp.net"
         
         payload = {
             "phone": phone_formatted,
