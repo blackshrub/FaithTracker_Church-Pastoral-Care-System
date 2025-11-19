@@ -2554,7 +2554,7 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
             "id": contact_event_id,
             "member_id": stage["member_id"],
             "campus_id": stage["campus_id"],
-            "event_type": "regular_contact",
+            "event_type": "grief_loss",
             "event_date": today_date,  # Use campus timezone date
             "title": f"Grief Support: {stage['stage'].replace('_', ' ')}",
             "description": (parent_event.get("description") if parent_event else "") + 
@@ -2580,7 +2580,7 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
             member_id=stage["member_id"],
             member_name=member_name,
             care_event_id=contact_event_id,
-            event_type=EventType.REGULAR_CONTACT,
+            event_type=EventType.GRIEF_LOSS,
             notes=f"Completed grief support stage: {stage['stage'].replace('_', ' ')}",
             user_photo_url=current_user.get("photo_url")
         )
@@ -2813,7 +2813,7 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, cu
             "id": contact_event_id,
             "member_id": stage["member_id"],
             "campus_id": stage["campus_id"],
-            "event_type": "regular_contact",
+            "event_type": "accident_illness",
             "event_date": today_date,  # Use campus timezone date
             "title": f"Accident Follow-up: {stage['stage'].replace('_', ' ')}",
             "description": (parent_event.get("description") if parent_event else "") + 
@@ -2839,7 +2839,7 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, cu
             member_id=stage["member_id"],
             member_name=member_name,
             care_event_id=contact_event_id,
-            event_type=EventType.REGULAR_CONTACT,
+            event_type=EventType.ACCIDENT_ILLNESS,
             notes=f"Completed accident/illness follow-up: {stage['stage'].replace('_', ' ')}",
             user_photo_url=current_user.get("photo_url")
         )
