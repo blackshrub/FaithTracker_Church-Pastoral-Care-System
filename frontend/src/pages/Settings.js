@@ -1198,7 +1198,7 @@ export const Settings = () => {
                     <p className="font-mono text-xs truncate">{syncConfig.api_email}</p>
                   </div>
                   
-                  {syncConfig.sync_method === 'webhook' && syncConfig.webhook_secret && (
+                  {syncConfig.sync_method === 'webhook' && (
                     <>
                       <div className="md:col-span-2">
                         <p className="text-gray-600 text-xs uppercase mb-1">Webhook URL for Core System</p>
@@ -1212,24 +1212,30 @@ export const Settings = () => {
                       </div>
                       <div className="md:col-span-2">
                         <p className="text-gray-600 text-xs uppercase mb-1">Webhook Secret</p>
-                        <div className="flex gap-2">
-                          <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">{syncConfig.webhook_secret}</code>
-                          <Button size="sm" variant="outline" onClick={() => {
-                            navigator.clipboard.writeText(syncConfig.webhook_secret);
-                            toast.success('Copied!');
-                          }}>Copy</Button>
-                          <Button size="sm" variant="outline" className="text-orange-600 border-orange-300" onClick={async () => {
-                            if (confirm('Regenerate webhook secret? You must update the core system with the new secret.')) {
-                              try {
-                                const response = await axios.post(`${API}/sync/regenerate-secret`);
-                                toast.success('Secret regenerated. Update core system!');
-                                await loadSyncConfig();
-                              } catch (error) {
-                                toast.error('Failed to regenerate secret');
+                        {syncConfig.webhook_secret ? (
+                          <div className="flex gap-2">
+                            <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">{syncConfig.webhook_secret}</code>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              navigator.clipboard.writeText(syncConfig.webhook_secret);
+                              toast.success('Copied!');
+                            }}>Copy</Button>
+                            <Button size="sm" variant="outline" className="text-orange-600 border-orange-300" onClick={async () => {
+                              if (confirm('Regenerate webhook secret? You must update the core system with the new secret.')) {
+                                try {
+                                  const response = await axios.post(`${API}/sync/regenerate-secret`);
+                                  toast.success('Secret regenerated. Update core system!');
+                                  await loadSyncConfig();
+                                } catch (error) {
+                                  toast.error('Failed to regenerate secret');
+                                }
                               }
-                            }
-                          }}>Regenerate</Button>
-                        </div>
+                            }}>Regenerate</Button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+                            ⚠️ Webhook secret will be generated when you save configuration
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
