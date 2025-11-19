@@ -582,6 +582,38 @@ def calculate_engagement_status(last_contact: Optional[datetime], at_risk_days: 
     else:
         return EngagementStatus.DISCONNECTED, days_since
 
+
+def normalize_phone_number(phone: str, default_country_code: str = "+62") -> str:
+    """
+    Normalize phone number to international format.
+    Handles Indonesian phone numbers starting with 0.
+    
+    Examples:
+        081234567890 -> +6281234567890
+        62812345678 -> +62812345678
+        +6281234567890 -> +6281234567890
+    """
+    if not phone:
+        return phone
+    
+    # Remove whitespace and common separators
+    phone = phone.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    
+    # Already has + prefix
+    if phone.startswith("+"):
+        return phone
+    
+    # Starts with country code without +
+    if phone.startswith("62"):
+        return f"+{phone}"
+    
+    # Starts with 0 (local Indonesian format)
+    if phone.startswith("0"):
+        return f"{default_country_code}{phone[1:]}"
+    
+    # No recognizable prefix - assume it needs country code
+    return f"{default_country_code}{phone}"
+
 def generate_accident_followup_timeline(event_date: date, care_event_id: str, member_id: str, campus_id: str) -> List[Dict[str, Any]]:
     """Generate 3-stage accident/illness follow-up timeline"""
     # Get settings from localStorage or use defaults
