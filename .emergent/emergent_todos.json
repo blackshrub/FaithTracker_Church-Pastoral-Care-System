@@ -1,10 +1,10 @@
 [
   {
     "content": "Backend: Change api_email from EmailStr to str in SyncConfig models",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Implement Option A: Archive members that no longer match filter rules",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
