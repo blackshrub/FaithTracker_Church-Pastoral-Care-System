@@ -4971,8 +4971,7 @@ async def global_search(q: str, current_user: dict = Depends(get_current_user)):
             **search_filter,
             "$or": [
                 {"name": {"$regex": q, "$options": "i"}},
-                {"phone": {"$regex": q, "$options": "i"}},
-                {"email": {"$regex": q, "$options": "i"}}
+                {"phone": {"$regex": q, "$options": "i"}}
             ]
         }
         
