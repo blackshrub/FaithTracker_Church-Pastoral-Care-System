@@ -1,18 +1,18 @@
 [
   {
     "content": "Add activity logging when care events are created (all event types)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add created_by user fields to care events",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Display creator info in member timeline",
-    "status": "pending"
+    "status": "completed"
   },
   {
-    "content": "Test creating all event types and verify logging",
-    "status": "pending"
+    "content": "Restart backend and test creating care events",
+    "status": "in_progress"
   }
 ]
