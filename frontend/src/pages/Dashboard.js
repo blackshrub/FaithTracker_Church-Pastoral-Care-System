@@ -132,23 +132,46 @@ const formatPhoneForWhatsApp = (phone) => {
 
 const markBirthdayComplete = async (eventId, queryClient, t) => {
   try {
+    // Optimistic update - remove from UI immediately
+    queryClient.setQueryData(['dashboard'], (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        today: old.today.filter(e => e.id !== eventId),
+        overdue: old.overdue.filter(e => e.id !== eventId)
+      };
+    });
+    
     await axios.post(`${API}/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
-    // Invalidate and refetch dashboard data
+    // Refetch to get accurate data
     await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
     toast.error(t('toasts.failed_complete'));
+    // Revert optimistic update on error
+    queryClient.invalidateQueries(['dashboard']);
   }
 };
 
 const markGriefStageComplete = async (stageId, queryClient, t) => {
   try {
+    // Optimistic update
+    queryClient.setQueryData(['dashboard'], (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        today: old.today.filter(e => e.id !== stageId),
+        overdue: old.overdue.filter(e => e.id !== stageId),
+        upcoming: old.upcoming.filter(e => e.id !== stageId)
+      };
+    });
+    
     await axios.post(`${API}/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
-    // Invalidate and refetch dashboard data
     await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
     toast.error(t('toasts.failed_complete'));
+    queryClient.invalidateQueries(['dashboard']);
   }
 };
 
