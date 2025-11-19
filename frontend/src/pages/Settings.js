@@ -73,6 +73,10 @@ export const Settings = () => {
     api_email: '',
     api_password: '',
     polling_interval_hours: 6,
+    filter_gender: '',
+    filter_age_min: '',
+    filter_age_max: '',
+    filter_member_status: [],
     webhook_secret: '',
     is_enabled: false
   });
