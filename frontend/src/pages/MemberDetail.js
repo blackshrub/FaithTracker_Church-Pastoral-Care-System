@@ -1030,7 +1030,7 @@ export const MemberDetail = () => {
                           return (
                           <div key={stage.id} className={`flex items-center gap-3 p-2 bg-pink-50 rounded relative ${isIgnored ? 'opacity-60' : ''}`}>
                             {isIgnored && (
-                              <div className="absolute top-1 right-1">
+                              <div className="absolute top-1 left-1">
                                 <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded">Ignored</span>
                               </div>
                             )}
