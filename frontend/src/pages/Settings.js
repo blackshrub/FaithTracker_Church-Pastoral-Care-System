@@ -1137,6 +1137,11 @@ export const Settings = () => {
                 <CardTitle>Manual Sync</CardTitle>
                 <CardDescription>
                   Manually trigger a sync to pull the latest member data from core system.
+                  {syncConfig.reconciliation_enabled && (
+                    <span className="block mt-2 text-blue-600">
+                      ℹ️ Automatic reconciliation runs daily at {syncConfig.reconciliation_time} (Asia/Jakarta timezone) to ensure data integrity.
+                    </span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
