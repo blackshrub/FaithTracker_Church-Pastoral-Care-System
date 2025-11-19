@@ -14,7 +14,8 @@ import {
   Upload,
   MessageSquare,
   Bell,
-  Church
+  Church,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
