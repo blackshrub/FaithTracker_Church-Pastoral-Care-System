@@ -818,7 +818,7 @@ async def register_user(user_data: UserCreate, current_admin: dict = Depends(get
             name=user_data.name,
             role=user_data.role,
             campus_id=user_data.campus_id,
-            phone=user_data.phone,
+            phone=normalize_phone_number(user_data.phone),
             hashed_password=get_password_hash(user_data.password)
         )
         
