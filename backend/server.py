@@ -3426,6 +3426,7 @@ async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = D
             action_type=ActivityActionType.CLEAR_IGNORED,
             member_id=schedule["member_id"],
             member_name=member_name,
+            event_type=EventType.FINANCIAL_AID,
             notes=f"Cleared all ignored occurrences for {schedule.get('aid_type', 'financial aid')} schedule",
             user_photo_url=current_user.get("photo_url")
         )
