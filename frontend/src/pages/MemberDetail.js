@@ -1172,11 +1172,14 @@ export const MemberDetail = () => {
                           size="sm"
                           variant="outline"
                           className="w-full gap-2 border-dashed"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            alert('Button clicked! Event ID: ' + event.id);
                             console.log('Log Additional Visit clicked for grief event:', event.id);
                             setSelectedParentEvent(event);
                             setAdditionalVisitModal(true);
-                            console.log('Modal should open now');
+                            console.log('Modal state set to true');
                           }}
                         >
                           <Plus className="w-4 h-4" />
