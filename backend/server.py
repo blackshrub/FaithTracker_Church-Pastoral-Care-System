@@ -5947,7 +5947,7 @@ async def setup_first_admin(request: SetupAdminRequest):
             name=request.name,
             role=UserRole.FULL_ADMIN,
             campus_id=None,
-            phone=None,  # Changed from "" to None
+            phone=normalize_phone_number(request.phone) if request.phone else None,
             hashed_password=get_password_hash(request.password)
         )
         
