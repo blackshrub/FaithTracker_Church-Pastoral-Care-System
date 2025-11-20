@@ -1,10 +1,18 @@
 [
   {
-    "content": "Fix sync history timezone to show Asia/Jakarta instead of UTC",
-    "status": "completed"
+    "content": "Implement single-member sync when webhook received",
+    "status": "in_progress"
   },
   {
-    "content": "Fix webhook church_id mismatch - store core church_id in sync config",
-    "status": "completed"
+    "content": "Add GET /api/members/{member_id} endpoint call to core API",
+    "status": "pending"
+  },
+  {
+    "content": "Update/create only the specific member, not all members",
+    "status": "pending"
+  },
+  {
+    "content": "Test webhook triggers targeted sync",
+    "status": "pending"
   }
 ]
