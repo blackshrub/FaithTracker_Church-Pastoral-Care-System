@@ -13,6 +13,7 @@ const ActivityLog = () => {
   const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [campusTimezone, setCampusTimezone] = useState('Asia/Jakarta');  // Default, will load from API
   
   // Filters
   const [selectedUser, setSelectedUser] = useState('all');
@@ -20,7 +21,7 @@ const ActivityLog = () => {
   const [startDate, setStartDate] = useState(getDefaultStartDate());
   const [endDate, setEndDate] = useState(getDefaultEndDate());
 
-  // Format date/time in local timezone (Asia/Jakarta for Indonesia)
+  // Format date/time using campus timezone
   const formatDateTime = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -29,13 +30,13 @@ const ActivityLog = () => {
       }
       return {
         date: date.toLocaleDateString('id-ID', { 
-          timeZone: 'Asia/Jakarta', 
+          timeZone: campusTimezone, 
           year: 'numeric', 
           month: 'short', 
           day: 'numeric' 
         }),
         time: date.toLocaleTimeString('id-ID', { 
-          timeZone: 'Asia/Jakarta', 
+          timeZone: campusTimezone, 
           hour: '2-digit', 
           minute: '2-digit',
           hour12: false 
