@@ -1,3 +1,9 @@
+/**
+ * FaithTracker Pastoral Care System - Main Backend API
+ * Multi-tenant pastoral care management with complete accountability
+ * Handles all API endpoints, authentication, database operations, and business logic
+ */
+
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse, StreamingResponse
