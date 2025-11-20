@@ -185,10 +185,6 @@ export const Settings = () => {
     }
   }, [activeTab]);
 
-    }
-  };
-
-
 
   const discoverFields = async () => {
     setDiscovering(true);
