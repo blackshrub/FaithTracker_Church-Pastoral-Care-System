@@ -28,6 +28,9 @@ const ActivityLog = () => {
       if (isNaN(date.getTime())) {
         return { date: 'Invalid date', time: '' };
       }
+      
+      console.log('Formatting with timezone:', campusTimezone);
+      
       return {
         date: date.toLocaleDateString('id-ID', { 
           timeZone: campusTimezone, 
@@ -43,7 +46,7 @@ const ActivityLog = () => {
         })
       };
     } catch (error) {
-      console.error('Error formatting date:', dateString, error);
+      console.error('Error formatting date:', dateString, 'with timezone:', campusTimezone, error);
       return { date: String(dateString), time: '' };
     }
   };
