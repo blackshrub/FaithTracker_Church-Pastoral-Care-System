@@ -1173,24 +1173,69 @@ export const MemberDetail = () => {
 
                       
                       {/* Button to log additional visit */}
+                      {/* Inline form to log additional visit */}
                       <div className="mt-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full gap-2 border-dashed"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            alert('Button clicked! Event ID: ' + event.id);
-                            console.log('Log Additional Visit clicked for grief event:', event.id);
-                            setSelectedParentEvent(event);
-                            setAdditionalVisitModal(true);
-                            console.log('Modal state set to true');
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Log Additional Visit
-                        </Button>
+                        {!additionalVisitForm[event.id] ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-2 border-dashed"
+                            onClick={() => toggleAdditionalForm(event.id)}
+                          >
+                            <Plus className="w-4 h-4" />
+                            Log Additional Visit
+                          </Button>
+                        ) : (
+                          <div className="space-y-3 p-3 bg-white rounded border border-pink-300">
+                            <h6 className="font-medium text-sm">Log Additional Visit</h6>
+                            <div>
+                              <Label className="text-xs">Visit Date</Label>
+                              <Input
+                                type="date"
+                                value={additionalVisit.visit_date}
+                                onChange={(e) => setAdditionalVisit({...additionalVisit, visit_date: e.target.value})}
+                                className="h-9"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Visit Type</Label>
+                              <Select
+                                value={additionalVisit.visit_type}
+                                onValueChange={(v) => setAdditionalVisit({...additionalVisit, visit_type: v})}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Phone Call">Phone Call</SelectItem>
+                                  <SelectItem value="Home Visit">Home Visit</SelectItem>
+                                  <SelectItem value="Hospital Visit">Hospital Visit</SelectItem>
+                                  <SelectItem value="Office Visit">Office Visit</SelectItem>
+                                  <SelectItem value="Emergency Visit">Emergency Visit</SelectItem>
+                                  <SelectItem value="Other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Notes</Label>
+                              <Textarea
+                                placeholder="What happened during this visit..."
+                                value={additionalVisit.notes}
+                                onChange={(e) => setAdditionalVisit({...additionalVisit, notes: e.target.value})}
+                                rows={2}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => toggleAdditionalForm(event.id)}>
+                                Cancel
+                              </Button>
+                              <Button size="sm" onClick={() => logAdditionalVisit(event)} className="bg-teal-500 hover:bg-teal-600">
+                                Log Visit
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Display additional visits */}
