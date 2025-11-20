@@ -204,9 +204,6 @@ export const MemberDetail = () => {
     });
   };
 
-    }
-  };
-
   
   // The useQuery automatically fetches when id changes, no need for useEffect
   
