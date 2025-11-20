@@ -3796,6 +3796,7 @@ async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(g
             action_type=ActivityActionType.IGNORE_TASK,
             member_id=schedule["member_id"],
             member_name=member_name,
+            event_type=EventType.FINANCIAL_AID,
             notes=f"Ignored {schedule.get('aid_type', 'financial aid')} payment on {current_occurrence}",
             user_photo_url=user.get("photo_url")
         )
