@@ -289,16 +289,36 @@ Comprehensive documentation is available in the `/docs` directory:
 ## 📸 Screenshots
 
 ### Dashboard (Mobile-First Design)
-![Dashboard](docs/images/dashboard.png)
 *Task-oriented dashboard with Today, Overdue, and Upcoming tabs*
+- View all tasks at a glance
+- Complete tasks with one click
+- Optimistic UI updates for instant feedback
+
+### Global Search
+*Lightning-fast search across members and events*
+- Live search results as you type
+- Member photos and engagement badges
+- Visible on all pages
+
+### Activity Log
+*Complete staff accountability tracking*
+- Filter by staff member, action type, date
+- Export to CSV for reporting
+- Timezone-aware timestamps
 
 ### Member Detail View
-![Member Detail](docs/images/member-detail.png)
 *Complete member profile with care event history*
+- All care events in one place
+- Grief/Accident follow-up tracking
+- Additional visits logging
 
-### Analytics
-![Analytics](docs/images/analytics.png)
-*Member engagement trends and event distribution*
+### API Sync Configuration
+*Seamless integration with FaithFlow Enterprise*
+- Polling or Webhook sync methods
+- Dynamic filters for selective sync
+- Real-time updates
+
+*Note: Actual screenshots will be added after deployment*
 
 ---
 
