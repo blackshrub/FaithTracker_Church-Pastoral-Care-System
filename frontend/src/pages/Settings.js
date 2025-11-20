@@ -1,3 +1,9 @@
+/**
+ * Settings Page - Application configuration and administration
+ * Includes Profile, Automation, Grief Support, Accident, System, and API Sync tabs
+ * Full admin can configure timezone, WhatsApp, sync settings, and automation
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
