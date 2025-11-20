@@ -396,6 +396,18 @@ class CareEvent(BaseModel):
     
     # Member information (enriched from members collection)
     member_name: Optional[str] = None
+
+
+class SetupAdminRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class SetupCampusRequest(BaseModel):
+    campus_name: str
+    location: str
+    timezone: str
+
     
     # Grief support fields (only relationship, use event_date as mourning date)
     grief_relationship: Optional[str] = None
