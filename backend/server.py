@@ -5744,8 +5744,13 @@ async def receive_sync_webhook(request: Request):
         if not campus_id:
             raise HTTPException(status_code=400, detail="Missing campus_id in payload")
         
-        # Get sync config for this campus
-        config = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
+        # Get sync config for this campus by core church_id or campus_id
+        config = await db.sync_configs.find_one({
+            "$or": [
+                {"core_church_id": campus_id},
+                {"campus_id": campus_id}
+            ]
+        }, {"_id": 0})
         if not config:
             logger.warning(f"Webhook received for campus {campus_id} with no sync config")
             raise HTTPException(status_code=404, detail="Sync not configured for this campus")
