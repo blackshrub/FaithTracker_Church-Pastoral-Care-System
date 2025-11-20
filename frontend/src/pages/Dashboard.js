@@ -1671,17 +1671,23 @@ export const Dashboard = () => {
                             <Button 
                               size="default" 
                               variant="outline" 
-                              onClick={async () => {
+                              onClick={() => {
                                 triggerHaptic();
-                                if (window.confirm(t('confirmations.mark_distributed', {name: schedule.member_name}))) {
-                                  try {
-                                    await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
-                                    toast.success(t('toasts.payment_distributed_advanced'));
-                                    await queryClient.invalidateQueries(['dashboard']);
-                                  } catch (error) {
-                                    toast.error('Failed to mark as distributed');
+                                showConfirm(
+                                  'Mark Payment as Distributed',
+                                  t('confirmations.mark_distributed', {name: schedule.member_name}),
+                                  async () => {
+                                    try {
+                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                      toast.success(t('toasts.payment_distributed_advanced'));
+                                      await queryClient.invalidateQueries(['dashboard']);
+                                      closeConfirm();
+                                    } catch (error) {
+                                      toast.error('Failed to mark as distributed');
+                                      closeConfirm();
+                                    }
                                   }
-                                }
+                                );
                               }}
                               className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50"
                             >
