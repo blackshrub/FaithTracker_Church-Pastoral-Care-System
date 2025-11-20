@@ -99,14 +99,21 @@ export const AdminDashboard = () => {
   };
   
   const handleDeleteUser = async (id, name) => {
-    if (!window.confirm(`Delete ${name}?`)) return;
-    try {
-      await axios.delete(`${API}/users/${id}`);
-      toast.success(t('toasts.deleted'));
-      loadData();
-    } catch (error) {
-      toast.error(t('toasts.failed'));
-    }
+    showConfirm(
+      'Delete User',
+      `Are you sure you want to delete ${name}? This action cannot be undone.`,
+      async () => {
+        try {
+          await axios.delete(`${API}/users/${id}`);
+          toast.success(t('toasts.deleted'));
+          loadData();
+          closeConfirm();
+        } catch (error) {
+          toast.error(t('toasts.failed'));
+          closeConfirm();
+        }
+      }
+    );
   };
 
   const handleEditUser = (userToEdit) => {
@@ -219,14 +226,21 @@ export const AdminDashboard = () => {
                           <DropdownMenuItem 
                             className="text-red-600"
                             onClick={async () => {
-                              if (!window.confirm(`Delete ${c.campus_name}?`)) return;
-                              try {
-                                await axios.delete(`${API}/campuses/${c.id}`);
-                                toast.success(t('toasts.deleted'));
-                                loadData();
-                              } catch (e) {
-                                toast.error(t('toasts.cannot_delete_has_members'));
-                              }
+                              showConfirm(
+                                'Delete Campus',
+                                `Delete ${c.campus_name}? This will also delete all members and data for this campus.`,
+                                async () => {
+                                  try {
+                                    await axios.delete(`${API}/campuses/${c.id}`);
+                                    toast.success(t('toasts.deleted'));
+                                    loadData();
+                                    closeConfirm();
+                                  } catch (e) {
+                                    toast.error(t('toasts.cannot_delete_has_members'));
+                                    closeConfirm();
+                                  }
+                                }
+                              );
                             }}
                           >
                             Delete
@@ -275,14 +289,21 @@ export const AdminDashboard = () => {
                               <DropdownMenuItem 
                                 className="text-red-600"
                                 onClick={async () => {
-                                  if (!window.confirm(`Delete ${c.campus_name}?`)) return;
-                                  try {
-                                    await axios.delete(`${API}/campuses/${c.id}`);
-                                    toast.success(t('toasts.deleted'));
-                                    loadData();
-                                  } catch (e) {
-                                    toast.error(t('toasts.cannot_delete_has_members'));
-                                  }
+                                  showConfirm(
+                                    'Delete Campus',
+                                    `Delete ${c.campus_name}? This will also delete all members and data for this campus.`,
+                                    async () => {
+                                      try {
+                                        await axios.delete(`${API}/campuses/${c.id}`);
+                                        toast.success(t('toasts.deleted'));
+                                        loadData();
+                                        closeConfirm();
+                                      } catch (e) {
+                                        toast.error(t('toasts.cannot_delete_has_members'));
+                                        closeConfirm();
+                                      }
+                                    }
+                                  );
                                 }}
                               >
                                 Delete
