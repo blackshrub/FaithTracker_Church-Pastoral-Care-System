@@ -44,9 +44,14 @@ const ActivityLog = () => {
         hour12: false
       });
       
+      const formattedDate = dateFormatter.format(date);
+      const formattedTime = timeFormatter.format(date);
+      
+      console.log(`Input: ${dateString} | Output: ${formattedDate} ${formattedTime} | Timezone: ${campusTimezone}`);
+      
       return {
-        date: dateFormatter.format(date),
-        time: timeFormatter.format(date)
+        date: formattedDate,
+        time: formattedTime
       };
     } catch (error) {
       console.error('Error formatting date:', dateString, 'timezone:', campusTimezone, error);
