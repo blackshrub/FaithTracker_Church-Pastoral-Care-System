@@ -1,18 +1,18 @@
 [
   {
     "content": "Implement single-member sync when webhook received",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add GET /api/members/{member_id} endpoint call to core API",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update/create only the specific member, not all members",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test webhook triggers targeted sync",
-    "status": "pending"
+    "status": "completed"
   }
 ]
