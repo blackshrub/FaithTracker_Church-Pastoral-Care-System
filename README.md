@@ -34,6 +34,10 @@
 - **Smart Scheduling**: Flexible recurring schedules with timezone-aware notifications
 - **Member Engagement Monitoring**: Track and visualize member participation over time
 - **Bilingual Interface**: Full English and Indonesian (Bahasa Indonesia) support
+- **🆕 Global Search**: Lightning-fast member and event search across the app
+- **🆕 Complete Accountability**: Track WHO did WHAT on WHICH member (13 action types)
+- **🆕 API Sync**: Bi-directional sync with FaithFlow Enterprise (polling + webhooks)
+- **🆕 User Management**: Profile photos, edit capabilities, and role management
 
 ---
 
