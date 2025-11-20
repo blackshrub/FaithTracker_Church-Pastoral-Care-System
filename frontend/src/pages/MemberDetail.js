@@ -1597,6 +1597,7 @@ export const MemberDetail = () => {
 
 
       {/* Additional Visit Modal */}
+      {console.log('additionalVisitModal state:', additionalVisitModal)}
       <Dialog open={additionalVisitModal} onOpenChange={setAdditionalVisitModal}>
         <DialogContent>
           <DialogHeader>
