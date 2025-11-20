@@ -1748,16 +1748,22 @@ export const MemberDetail = () => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-40">
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Mark this scheduled payment as distributed?')) {
-                                    try {
-                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
-                                      toast.success('Payment distributed! Schedule advanced to next occurrence.');
-                                      queryClient.invalidateQueries(['member', id]);
-                                      queryClient.invalidateQueries(['dashboard']);
-                                    } catch (error) {
-                                      toast.error('Failed to mark payment');
+                                  showConfirm(
+                                    'Mark Payment as Distributed',
+                                    'Mark this scheduled payment as distributed? This will advance the schedule to the next occurrence.',
+                                    async () => {
+                                      try {
+                                        await axios.post(`${API}/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                        toast.success('Payment distributed! Schedule advanced to next occurrence.');
+                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries(['dashboard']);
+                                        closeConfirm();
+                                      } catch (error) {
+                                        toast.error('Failed to mark payment');
+                                        closeConfirm();
+                                      }
                                     }
-                                  }
+                                  );
                                 }} className="text-green-600">
                                   <Check className="w-4 h-4 mr-2" />
                                   Distributed
