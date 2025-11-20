@@ -1163,21 +1163,39 @@ export const Settings = () => {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center justify-between">
                     <span>🔄 Active Sync Configuration</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="text-red-600 border-red-300 hover:bg-red-50"
-                      onClick={async () => {
-                        if (confirm('Disable sync? This will stop automatic syncing but preserve all data.')) {
-                          setSyncConfig({...syncConfig, is_enabled: false});
-                          await axios.post(`${API}/sync/config`, {...syncConfig, is_enabled: false});
-                          toast.success('Sync disabled');
-                          loadSyncConfig();
-                        }
-                      }}
-                    >
-                      Disable Sync
-                    </Button>
+                    {syncConfig.is_enabled ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-red-600 border-red-300 hover:bg-red-50"
+                        onClick={async () => {
+                          if (confirm('Disable sync? This will stop automatic syncing but preserve all data.')) {
+                            const updated = {...syncConfig, is_enabled: false};
+                            await axios.post(`${API}/sync/config`, updated);
+                            toast.success('Sync disabled');
+                            loadSyncConfig();
+                          }
+                        }}
+                      >
+                        Disable Sync
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-green-600 border-green-300 hover:bg-green-50"
+                        onClick={async () => {
+                          if (confirm('Enable sync? This will start automatic syncing from core API.')) {
+                            const updated = {...syncConfig, is_enabled: true};
+                            await axios.post(`${API}/sync/config`, updated);
+                            toast.success('Sync enabled');
+                            loadSyncConfig();
+                          }
+                        }}
+                      >
+                        Enable Sync
+                      </Button>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
