@@ -200,11 +200,19 @@ install_nodejs() {
     
     if command_exists node; then
         NODE_VERSION=$(node --version)
-        print_info "Node.js $NODE_VERSION already installed"
+        NODE_MAJOR=$(node --version | cut -d'.' -f1 | sed 's/v//')
+        
+        if [ "$NODE_MAJOR" -lt 20 ]; then
+            print_warning "Node.js $NODE_VERSION is too old. Upgrading to Node.js 20..."
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1
+            apt install -y nodejs >> "$LOG_FILE" 2>&1
+        else
+            print_info "Node.js $NODE_VERSION already installed"
+        fi
     else
-        print_info "Installing Node.js 18.x LTS..."
+        print_info "Installing Node.js 20.x LTS..."
         {
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
             apt install -y nodejs
         } >> "$LOG_FILE" 2>&1
     fi
