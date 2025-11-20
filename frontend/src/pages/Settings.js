@@ -424,19 +424,55 @@ export const Settings = () => {
               <div className="space-y-4 pt-6 border-t">
                 <div>
                   <Label className="text-gray-700">Name</Label>
-                  <Input value={user?.name} disabled className="bg-gray-50" />
+                  <Input 
+                    value={editingProfile ? profileData.name : user?.name} 
+                    onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                    disabled={!editingProfile} 
+                    className={!editingProfile ? "bg-gray-50" : ""} 
+                  />
                 </div>
                 <div>
                   <Label className="text-gray-700">Email</Label>
-                  <Input value={user?.email} disabled className="bg-gray-50" />
+                  <Input 
+                    value={editingProfile ? profileData.email : user?.email} 
+                    onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                    disabled={!editingProfile} 
+                    className={!editingProfile ? "bg-gray-50" : ""} 
+                  />
                 </div>
                 <div>
                   <Label className="text-gray-700">Phone</Label>
-                  <Input value={user?.phone} disabled className="bg-gray-50" />
+                  <Input 
+                    value={editingProfile ? profileData.phone : user?.phone} 
+                    onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                    disabled={!editingProfile} 
+                    className={!editingProfile ? "bg-gray-50" : ""} 
+                  />
                 </div>
                 <div>
                   <Label className="text-gray-700">Role</Label>
                   <Input value={user?.role === 'full_admin' ? 'Full Administrator' : user?.role === 'campus_admin' ? 'Campus Administrator' : 'Pastor'} disabled className="bg-gray-50" />
+                </div>
+                
+                {/* Edit/Save buttons */}
+                <div className="flex gap-2">
+                  {!editingProfile ? (
+                    <Button onClick={() => setEditingProfile(true)} variant="outline">
+                      Edit Profile
+                    </Button>
+                  ) : (
+                    <>
+                      <Button onClick={() => {
+                        setEditingProfile(false);
+                        setProfileData({name: user.name, email: user.email, phone: user.phone});
+                      }} variant="outline">
+                        Cancel
+                      </Button>
+                      <Button onClick={saveProfile} className="bg-teal-500 hover:bg-teal-600">
+                        Save Changes
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               
