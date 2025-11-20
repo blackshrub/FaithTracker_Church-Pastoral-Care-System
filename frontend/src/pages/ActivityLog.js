@@ -21,10 +21,16 @@ const ActivityLog = () => {
   const [startDate, setStartDate] = useState(getDefaultStartDate());
   const [endDate, setEndDate] = useState(getDefaultEndDate());
 
-  // Format date/time using campus timezone - Proper implementation
+  // Format date/time using campus timezone - Fix UTC timestamp handling
   const formatDateTime = (dateString) => {
     try {
-      const date = new Date(dateString);
+      // Ensure timestamp is treated as UTC by adding Z if missing
+      let utcTimestamp = dateString;
+      if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
+        utcTimestamp = dateString.replace(' ', 'T') + 'Z';  // Convert to ISO format with Z
+      }
+      
+      const date = new Date(utcTimestamp);
       if (isNaN(date.getTime())) {
         return { date: 'Invalid date', time: '' };
       }
@@ -47,7 +53,7 @@ const ActivityLog = () => {
       const formattedDate = dateFormatter.format(date);
       const formattedTime = timeFormatter.format(date);
       
-      console.log(`Input: ${dateString} | Output: ${formattedDate} ${formattedTime} | Timezone: ${campusTimezone}`);
+      console.log(`Input: ${dateString} | UTC: ${utcTimestamp} | Output: ${formattedDate} ${formattedTime} | TZ: ${campusTimezone}`);
       
       return {
         date: formattedDate,
@@ -55,7 +61,6 @@ const ActivityLog = () => {
       };
     } catch (error) {
       console.error('Error formatting date:', dateString, 'timezone:', campusTimezone, error);
-      // Fallback: show raw date
       return { 
         date: new Date(dateString).toLocaleDateString('id-ID'),
         time: new Date(dateString).toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit', hour12: false})
