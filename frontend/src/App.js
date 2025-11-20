@@ -1,3 +1,8 @@
+/**
+ * App.js - Root React component and routing
+ * Sets up React Query, authentication context, and application routes
+ */
+
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
