@@ -1,3 +1,9 @@
+"""
+Scheduler Module - Background jobs for FaithTracker Pastoral Care System
+Handles daily reminders, cache refresh, and member data reconciliation
+Uses APScheduler for timezone-aware job scheduling
+"""
+
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import date, datetime, timedelta, timezone
