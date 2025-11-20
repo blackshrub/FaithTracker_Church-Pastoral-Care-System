@@ -29,24 +29,26 @@ const ActivityLog = () => {
         return { date: 'Invalid date', time: '' };
       }
       
-      console.log('Formatting with timezone:', campusTimezone);
+      // For Asia/Jakarta (UTC+7), manually add offset
+      const jakartaOffset = 7 * 60; // 7 hours in minutes
+      const localDate = new Date(date.getTime() + jakartaOffset * 60 * 1000);
       
       return {
-        date: date.toLocaleDateString('id-ID', { 
-          timeZone: campusTimezone, 
+        date: localDate.toLocaleDateString('id-ID', { 
           year: 'numeric', 
           month: 'short', 
-          day: 'numeric' 
+          day: 'numeric',
+          timeZone: 'UTC'  // Use UTC since we already adjusted
         }),
-        time: date.toLocaleTimeString('id-ID', { 
-          timeZone: campusTimezone, 
+        time: localDate.toLocaleTimeString('id-ID', { 
           hour: '2-digit', 
           minute: '2-digit',
-          hour12: false 
+          hour12: false,
+          timeZone: 'UTC'  // Use UTC since we already adjusted
         })
       };
     } catch (error) {
-      console.error('Error formatting date:', dateString, 'with timezone:', campusTimezone, error);
+      console.error('Error formatting date:', dateString, error);
       return { date: String(dateString), time: '' };
     }
   };
