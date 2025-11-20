@@ -1593,11 +1593,10 @@ export const MemberDetail = () => {
                             </div>
                           ))}
                         {careEvents.filter(e => e.care_event_id === event.id && e.followup_type === "additional").length === 0 && (
-                          <p className="text-xs text-gray-500 italic">No additional visits yet</p>
+                          <p className="text-xs text-gray-500 italic mb-3">No additional visits yet</p>
                         )}
                       </div>
 
-                    
                     {event.visitation_log && event.visitation_log.length > 0 && (
                       <div className="space-y-2 mt-4">
                         <h5 className="text-sm font-medium">Visitation Log:</h5>
