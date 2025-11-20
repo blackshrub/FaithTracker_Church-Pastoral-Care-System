@@ -18,7 +18,8 @@ const SetupWizard = ({ onComplete }) => {
     email: '',
     password: '',
     confirmPassword: '',
-    name: ''
+    name: '',
+    phone: ''
   });
   const [campusData, setCampusData] = useState({
     campus_name: '',
