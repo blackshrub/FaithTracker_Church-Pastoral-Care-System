@@ -117,6 +117,23 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
           <span className="text-teal-700 font-semibold text-xs">
             {getInitials(member.name)}
           </span>
+
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
+  
+  const showConfirm = (title, description, onConfirm) => {
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  };
+  
+  const closeConfirm = () => {
+    setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
+  };
+
         )}
       </div>
       <div>
