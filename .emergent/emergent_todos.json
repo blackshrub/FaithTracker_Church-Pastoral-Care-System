@@ -1,10 +1,10 @@
 [
   {
     "content": "Debug additional visit modal not opening (check state initialization)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add delete button for grief parent event (like accident has)",
-    "status": "pending"
+    "status": "completed"
   }
 ]
