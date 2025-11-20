@@ -29,6 +29,23 @@ export const AdminDashboard = () => {
   const [newCampus, setNewCampus] = useState({ id: null, campus_name: '', location: '' });
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
+  
+  const showConfirm = (title, description, onConfirm) => {
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  };
+  
+  const closeConfirm = () => {
+    setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
+  };
+
   const [newUser, setNewUser] = useState({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
   
   useEffect(() => {
