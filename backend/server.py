@@ -5192,7 +5192,7 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
             async with httpx.AsyncClient(timeout=10.0) as client:
                 login_response = await client.post(
                     f"{config.api_base_url.rstrip('/')}/api/auth/login",
-                    json={"email": config.api_email, "password": config.api_password}
+                    json={"email": config.api_email, "password": decrypt_password(config.api_password)}
                 )
                 if login_response.status_code == 200:
                     login_data = login_response.json()
@@ -5432,7 +5432,7 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 login_url,
-                json={"email": config.api_email, "password": config.api_password}
+                json={"email": config.api_email, "password": decrypt_password(config.api_password)}
             )
             
             if login_response.status_code != 200:
