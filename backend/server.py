@@ -5206,7 +5206,7 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
             "sync_method": config.sync_method,
             "api_base_url": config.api_base_url.rstrip('/'),
             "api_email": config.api_email,
-            "api_password": config.api_password,
+            "api_password": encrypt_password(config.api_password),  # Encrypt password
             "polling_interval_hours": config.polling_interval_hours,
             "reconciliation_enabled": config.reconciliation_enabled,
             "reconciliation_time": config.reconciliation_time,
