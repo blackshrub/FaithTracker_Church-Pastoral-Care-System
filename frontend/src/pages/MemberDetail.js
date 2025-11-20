@@ -175,6 +175,8 @@ export const MemberDetail = () => {
       console.error('Full error:', error);
       const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
       toast.error('Failed to log visit: ' + errorMsg);
+    }
+  };
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
