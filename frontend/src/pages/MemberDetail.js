@@ -1175,8 +1175,58 @@ export const MemberDetail = () => {
 
                       
                       {/* Button to log additional visit */}
-                      {/* Inline form to log additional visit */}
+                      
+                      {/* Display additional visits - Simplified approach */}
                       <div className="mt-4">
+                        <h5 className="text-sm font-semibold mb-3 text-gray-700">📝 Additional Visits:</h5>
+                        {careEvents
+                          .filter(e => e.care_event_id === event.id && e.followup_type === "additional")
+                          .map((visit) => (
+                            <div key={visit.id} className="flex items-start gap-3 p-2 bg-gray-50 rounded border border-gray-200 mb-2">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-300">
+                                <span className="text-white text-xs">✓</span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-800">
+                                  {visit.title}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  {formatDate(visit.event_date, 'dd MMM yyyy')}
+                                </p>
+                                {visit.description && (
+                                  <p className="text-xs text-gray-600 mt-1">{visit.description}</p>
+                                )}
+                                {visit.created_by_user_name && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    By: {visit.created_by_user_name}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-700"
+                                onClick={async () => {
+                                  if (confirm('Delete this additional visit?')) {
+                                    try {
+                                      await axios.delete(`${API}/care-events/${visit.id}`);
+                                      toast.success('Visit deleted');
+                                      queryClient.invalidateQueries(['member', id]);
+                                    } catch (error) {
+                                      toast.error('Failed to delete');
+                                    }
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        {careEvents.filter(e => e.care_event_id === event.id && e.followup_type === "additional").length === 0 && (
+                          <p className="text-xs text-gray-500 italic mb-3">No additional visits yet</p>
+                        )}
+                        
+                        {/* Button to log additional visit - now at bottom */}
                         {!additionalVisitForm[event.id] ? (
                           <Button
                             size="sm"
@@ -1237,57 +1287,6 @@ export const MemberDetail = () => {
                               </Button>
                             </div>
                           </div>
-                        )}
-                      </div>
-                      
-                      {/* Display additional visits - Simplified approach */}
-                      <div className="mt-4">
-                        <h5 className="text-sm font-semibold mb-3 text-gray-700">📝 Additional Visits:</h5>
-                        {careEvents
-                          .filter(e => e.care_event_id === event.id && e.followup_type === "additional")
-                          .map((visit) => (
-                            <div key={visit.id} className="flex items-start gap-3 p-2 bg-gray-50 rounded border border-gray-200 mb-2">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-300">
-                                <span className="text-white text-xs">✓</span>
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-800">
-                                  {visit.title}
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  {formatDate(visit.event_date, 'dd MMM yyyy')}
-                                </p>
-                                {visit.description && (
-                                  <p className="text-xs text-gray-600 mt-1">{visit.description}</p>
-                                )}
-                                {visit.created_by_user_name && (
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    By: {visit.created_by_user_name}
-                                  </p>
-                                )}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-500 hover:text-red-700"
-                                onClick={async () => {
-                                  if (confirm('Delete this additional visit?')) {
-                                    try {
-                                      await axios.delete(`${API}/care-events/${visit.id}`);
-                                      toast.success('Visit deleted');
-                                      queryClient.invalidateQueries(['member', id]);
-                                    } catch (error) {
-                                      toast.error('Failed to delete');
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        {careEvents.filter(e => e.care_event_id === event.id && e.followup_type === "additional").length === 0 && (
-                          <p className="text-xs text-gray-500 italic">No additional visits yet</p>
                         )}
                       </div>
 
