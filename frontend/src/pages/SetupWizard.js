@@ -123,7 +123,7 @@ const SetupWizard = ({ onComplete }) => {
               <Button 
                 onClick={createAdmin}
                 className="w-full bg-teal-500 hover:bg-teal-600"
-                disabled={!adminData.name || !adminData.email || !adminData.password || adminData.password.length < 8}
+                disabled={!adminData.name || !adminData.email || !adminData.phone || !adminData.password || adminData.password.length < 8}
               >
                 Create Admin Account
               </Button>
