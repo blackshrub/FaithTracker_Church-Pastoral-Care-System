@@ -219,6 +219,23 @@ const markMemberContacted = async (memberId, memberName, user, queryClient, t) =
 
 export const Dashboard = () => {
   const { t } = useTranslation();
+
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
+  
+  const showConfirm = (title, description, onConfirm) => {
+    setConfirmDialog({ open: true, title, description, onConfirm });
+  };
+  
+  const closeConfirm = () => {
+    setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
+  };
+
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
