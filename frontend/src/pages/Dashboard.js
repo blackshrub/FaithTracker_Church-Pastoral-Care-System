@@ -142,14 +142,7 @@ const Dashboard = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
 
-        )}
-      </div>
-      <div>
-        <p className="font-semibold hover:underline">{member.name}</p>
-      </div>
-    </Link>
-  );
-};
+  // Data fetching with React Query
 
 const formatPhoneForWhatsApp = (phone) => {
   if (!phone) return '#';
