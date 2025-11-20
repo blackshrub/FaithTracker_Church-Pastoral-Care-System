@@ -259,6 +259,7 @@ export const Settings = () => {
         try {
           const campusRes = await axios.get(`${API}/campuses/${user.campus_id}`);
           setCampusTimezone(campusRes.data.timezone || 'Asia/Jakarta');
+          setCampusData(campusRes.data);  // Store full campus data
         } catch (error) {
           console.error('Error loading campus timezone:', error);
           setCampusTimezone('Asia/Jakarta');
