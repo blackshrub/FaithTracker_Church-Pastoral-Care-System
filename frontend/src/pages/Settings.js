@@ -1330,7 +1330,7 @@ export const Settings = () => {
                               {log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1)} Sync
                             </p>
                             <p className="text-xs text-gray-600">
-                              {new Date(log.started_at).toLocaleString()} 
+                              {new Date(log.started_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 
                               {log.duration_seconds && ` • ${log.duration_seconds.toFixed(1)}s`}
                             </p>
                           </div>
