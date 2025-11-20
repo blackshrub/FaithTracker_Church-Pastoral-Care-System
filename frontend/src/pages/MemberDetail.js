@@ -1038,7 +1038,7 @@ export const MemberDetail = () => {
                         </p>
                         {event.grief_relationship && (
                           <p className="text-sm text-muted-foreground">
-                            Relationship: {event.grief_relationship}
+                            Relationship: {event.grief_relationship.charAt(0).toUpperCase() + event.grief_relationship.slice(1)}
                           </p>
                         )}
                         {event.description && (
