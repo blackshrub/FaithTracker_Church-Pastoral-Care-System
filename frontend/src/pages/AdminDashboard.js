@@ -517,6 +517,15 @@ export const AdminDashboard = () => {
           </div>
         </TabsContent>
       </Tabs>
+      
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => !open && closeConfirm()}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 };
