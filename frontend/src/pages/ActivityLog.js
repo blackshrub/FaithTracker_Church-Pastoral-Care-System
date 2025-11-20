@@ -48,6 +48,35 @@ const ActivityLog = () => {
     }
   };
 
+
+  // Load campus timezone
+  useEffect(() => {
+    const loadCampusTimezone = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const userResponse = await axios.get(
+          `${process.env.REACT_APP_BACKEND_URL}/api/auth/me`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        const campusId = userResponse.data.campus_id;
+        if (campusId && campusId !== 'campus_id') {
+          const campusResponse = await axios.get(
+            `${process.env.REACT_APP_BACKEND_URL}/api/campuses/${campusId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setCampusTimezone(campusResponse.data.timezone || 'Asia/Jakarta');
+        }
+      } catch (error) {
+        console.error('Error loading campus timezone:', error);
+        // Fallback to Asia/Jakarta
+      }
+    };
+    
+    loadCampusTimezone();
+  }, []);
+
+
   // Get default start date (30 days ago)
   function getDefaultStartDate() {
     const date = new Date();
