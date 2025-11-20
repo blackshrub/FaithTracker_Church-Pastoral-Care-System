@@ -49,7 +49,6 @@ echo -e "${BLUE}[3/6]${NC} Updating frontend..."
 cd /opt/faithtracker/frontend
 yarn install --silent
 yarn build --silent
-cd ..
 
 # Restart backend service
 echo -e "${BLUE}[4/6]${NC} Restarting backend service..."
