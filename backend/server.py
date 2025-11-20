@@ -2320,12 +2320,15 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
 
 
 
+class AdditionalVisitRequest(BaseModel):
+    visit_date: str
+    visit_type: str
+    notes: str
+
 @api_router.post("/care-events/{parent_event_id}/additional-visit")
 async def log_additional_visit(
     parent_event_id: str,
-    visit_date: str,
-    visit_type: str,
-    notes: str,
+    request: AdditionalVisitRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -2354,9 +2357,9 @@ async def log_additional_visit(
             "event_type": parent["event_type"],  # Same type as parent (grief_loss or accident_illness)
             "care_event_id": parent_event_id,  # Link to parent
             "followup_type": "additional",  # Marker for additional visit
-            "event_date": visit_date,
-            "title": f"Additional Visit - {visit_type}",
-            "description": notes,
+            "event_date": request.visit_date,
+            "title": f"Additional Visit - {request.visit_type}",
+            "description": request.notes,
             "completed": True,  # Always completed (already happened)
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "completed_by_user_id": current_user["id"],
