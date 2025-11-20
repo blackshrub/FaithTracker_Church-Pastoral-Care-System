@@ -1864,17 +1864,23 @@ export const MemberDetail = () => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Clear all ignored payments for this schedule? Future payments will continue.')) {
-                                    try {
-                                      // Use new endpoint to clear ignored occurrences
-                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/clear-ignored`);
-                                      toast.success('All ignored payments cleared');
-                                      queryClient.invalidateQueries(['member', id]);
-                                      queryClient.invalidateQueries(['dashboard']);
-                                    } catch (error) {
-                                      toast.error(t('toasts.failed_delete'));
+                                  showConfirm(
+                                    'Clear All Ignored Payments',
+                                    'Clear all ignored payments for this schedule? Future payments will continue as scheduled.',
+                                    async () => {
+                                      try {
+                                        // Use new endpoint to clear ignored occurrences
+                                        await axios.post(`${API}/financial-aid-schedules/${schedule.id}/clear-ignored`);
+                                        toast.success('All ignored payments cleared');
+                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries(['dashboard']);
+                                        closeConfirm();
+                                      } catch (error) {
+                                        toast.error(t('toasts.failed_delete'));
+                                        closeConfirm();
+                                      }
                                     }
-                                  }
+                                  );
                                 }} className="text-red-600">
                                   <Trash2 className="w-4 h-4 mr-2" />Clear All Ignored Payments
                                 </DropdownMenuItem>
