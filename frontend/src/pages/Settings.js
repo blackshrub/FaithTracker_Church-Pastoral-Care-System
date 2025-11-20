@@ -1243,7 +1243,6 @@ export const Settings = () => {
                   )}
                 </CardContent>
               </Card>
-            )}
 
             
             <Card>
