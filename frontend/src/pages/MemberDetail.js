@@ -1695,62 +1695,6 @@ export const MemberDetail = () => {
                                   <span className="inline-flex items-center gap-1">
 
 
-      {/* Additional Visit Modal - Force high z-index */}
-      {console.log('additionalVisitModal state:', additionalVisitModal)}
-      <Dialog open={additionalVisitModal} onOpenChange={setAdditionalVisitModal}>
-        <DialogContent className="z-[9999]">
-          <DialogHeader>
-            <DialogTitle>Log Additional Visit</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Visit Date</Label>
-              <Input
-                type="date"
-                value={additionalVisit.visit_date}
-                onChange={(e) => setAdditionalVisit({...additionalVisit, visit_date: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label>Visit Type</Label>
-              <Select
-                value={additionalVisit.visit_type}
-                onValueChange={(v) => setAdditionalVisit({...additionalVisit, visit_type: v})}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Phone Call">Phone Call</SelectItem>
-                  <SelectItem value="Home Visit">Home Visit</SelectItem>
-                  <SelectItem value="Hospital Visit">Hospital Visit</SelectItem>
-                  <SelectItem value="Office Visit">Office Visit</SelectItem>
-                  <SelectItem value="Emergency Visit">Emergency Visit</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                placeholder="Describe what happened during this visit..."
-                value={additionalVisit.notes}
-                onChange={(e) => setAdditionalVisit({...additionalVisit, notes: e.target.value})}
-                rows={3}
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAdditionalVisitModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={logAdditionalVisit} className="bg-teal-500 hover:bg-teal-600">
-                Log Visit
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
                                     🔄 {schedule.frequency?.charAt(0).toUpperCase() + schedule.frequency?.slice(1)}
                                   </span>
                                   <span>•</span>
