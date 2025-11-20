@@ -1559,6 +1559,15 @@ export const Settings = () => {
           </div>
         </TabsContent>
       </Tabs>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => !open && closeConfirm()}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+      />
     </div>
   );
 };
