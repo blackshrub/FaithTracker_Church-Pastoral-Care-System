@@ -199,28 +199,41 @@ export const MembersList = () => {
   };
   
   const handleDeleteMember = async (id, name) => {
-    if (!window.confirm(`Delete ${name}?`)) return;
-    try {
-      await axios.delete(`${API}/members/${id}`);
-      toast.success('Member deleted');
-      loadMembers();
-    } catch (error) {
-      toast.error('Failed to delete');
-    }
+    showConfirm(
+      'Delete Member',
+      `Delete ${name}? This will also delete all care events and history for this member.`,
+      async () => {
+        try {
+          await axios.delete(`${API}/members/${id}`);
+          toast.success('Member deleted');
+          loadMembers();
+          closeConfirm();
+        } catch (error) {
+          toast.error('Failed to delete member');
+          closeConfirm();
+        }
+      }
+    );
   };
   
   const handleBulkDelete = async () => {
     if (selectedMembers.length === 0) return;
-    if (!window.confirm(`Delete ${selectedMembers.length} members?`)) return;
-    
-    try {
-      await Promise.all(selectedMembers.map(id => axios.delete(`${API}/members/${id}`)));
-      toast.success(`${selectedMembers.length} members deleted`);
-      setSelectedMembers([]);
-      loadMembers();
-    } catch (error) {
-      toast.error('Bulk delete failed');
-    }
+    showConfirm(
+      'Delete Selected Members',
+      `Delete ${selectedMembers.length} members? This will delete all their care events and history.`,
+      async () => {
+        try {
+          await Promise.all(selectedMembers.map(id => axios.delete(`${API}/members/${id}`)));
+          toast.success(`Deleted ${selectedMembers.length} members`);
+          setSelectedMembers([]);
+          loadMembers();
+          closeConfirm();
+        } catch (error) {
+          toast.error('Failed to delete members');
+          closeConfirm();
+        }
+      }
+    );
   };
   
   const toggleSelectMember = (id) => {
