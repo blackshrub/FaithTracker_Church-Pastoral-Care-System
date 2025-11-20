@@ -385,10 +385,28 @@ configure_environment() {
         fi
     done
     
-    # Church name
+    # Church name (will be used as first campus name)
     echo ""
-    read -p "Church name [GKBJ]: " CHURCH_NAME
-    CHURCH_NAME=${CHURCH_NAME:-GKBJ}
+    echo -e "${YELLOW}First Campus Information${NC}"
+    read -p "Campus name [GKBJ Main Campus]: " CAMPUS_NAME
+    CAMPUS_NAME=${CAMPUS_NAME:-"GKBJ Main Campus"}
+    
+    read -p "Campus location/address: " CAMPUS_LOCATION
+    CAMPUS_LOCATION=${CAMPUS_LOCATION:-"Jakarta, Indonesia"}
+    
+    echo "Select timezone:"
+    echo "  1) Asia/Jakarta (UTC+7)"
+    echo "  2) Asia/Singapore (UTC+8)"
+    echo "  3) Asia/Tokyo (UTC+9)"
+    read -p "Choice [1]: " TZ_CHOICE
+    TZ_CHOICE=${TZ_CHOICE:-1}
+    
+    case $TZ_CHOICE in
+        1) CAMPUS_TIMEZONE="Asia/Jakarta" ;;
+        2) CAMPUS_TIMEZONE="Asia/Singapore" ;;
+        3) CAMPUS_TIMEZONE="Asia/Tokyo" ;;
+        *) CAMPUS_TIMEZONE="Asia/Jakarta" ;;
+    esac
     
     # WhatsApp (optional)
     echo ""
