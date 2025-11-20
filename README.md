@@ -84,6 +84,39 @@
 - Send reminders via WhatsApp
 - Log and track message delivery
 
+### 🔍 **Global Search** *(NEW)*
+- Live search across members and care events
+- Visible on all pages (mobile + desktop)
+- Displays member photos and engagement status
+- Click to navigate directly to member details
+
+### 📝 **Activity Log & Accountability** *(NEW)*
+- Track WHO performed WHAT action on WHICH member
+- 13 action types logged (complete, ignore, create, delete, etc.)
+- Filter by staff member, action type, date range
+- Export to CSV for reporting
+- Timeline shows creator, completer, ignorer for all events
+- User profile photos throughout the app
+
+### 🔄 **API Sync** *(NEW)*
+- Connect to FaithFlow Enterprise (core system)
+- Two sync methods:
+  - **Polling**: Pull data every 1-24 hours (configurable)
+  - **Webhooks**: Real-time updates with HMAC-SHA256 security
+- Dynamic filter system (include/exclude by gender, age, status)
+- Field discovery - adapts to any core API structure
+- Daily reconciliation at 3 AM for data integrity
+- Smart archival - members stay archived when not matching filters
+- One-click enable/disable
+- Sync history with detailed statistics
+
+### 👤 **User Management** *(NEW)*
+- Edit users in Admin Dashboard
+- Upload profile photos (Settings → Profile)
+- Photos displayed in navigation, activity log, search results
+- Phone number normalization for WhatsApp
+- API key-style usernames supported
+
 ---
 
 ## 🛠️ Tech Stack
