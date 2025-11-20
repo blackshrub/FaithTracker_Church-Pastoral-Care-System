@@ -5946,11 +5946,16 @@ async def setup_first_admin(request: SetupAdminRequest):
             name=request.name,
             role=UserRole.FULL_ADMIN,
             campus_id=None,
-            phone="",
+            phone=None,  # Changed from "" to None
             hashed_password=get_password_hash(request.password)
         )
         
-        await db.users.insert_one(admin_user.model_dump())
+        # Convert to dict and ensure proper serialization
+        user_dict = admin_user.model_dump()
+        user_dict['created_at'] = user_dict['created_at'].isoformat() if isinstance(user_dict['created_at'], datetime) else user_dict['created_at']
+        user_dict['updated_at'] = user_dict['updated_at'].isoformat() if isinstance(user_dict['updated_at'], datetime) else user_dict['updated_at']
+        
+        await db.users.insert_one(user_dict)
         
         return {"success": True, "message": "Admin account created"}
     
