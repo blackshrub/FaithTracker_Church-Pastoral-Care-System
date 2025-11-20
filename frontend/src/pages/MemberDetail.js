@@ -165,7 +165,9 @@ export const MemberDetail = () => {
       });
       queryClient.invalidateQueries(['member', id]);
     } catch (error) {
-      toast.error('Failed to log visit: ' + (error.response?.data?.detail || error.message));
+      console.error('Full error:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
+      toast.error('Failed to log visit: ' + errorMsg);
     }
   };
 
