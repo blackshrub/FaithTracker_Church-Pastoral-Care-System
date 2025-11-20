@@ -87,11 +87,6 @@ export const Settings = () => {
 
   const [campusData, setCampusData] = useState(null);
 
-    { stage: '1_month', days: 30, name: 'Third Follow-up' },
-    { stage: '3_months', days: 90, name: 'Fourth Follow-up' },
-    { stage: '6_months', days: 180, name: 'Fifth Follow-up' },
-    { stage: '1_year', days: 365, name: 'Sixth Follow-up (1 Year Anniversary)' },
-  ]);
   const [accidentFollowUp, setAccidentFollowUp] = useState([
     { stage: 'first_followup', days: 3, name: 'First Follow-up' },
     { stage: 'second_followup', days: 7, name: 'Second Follow-up' },
