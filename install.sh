@@ -327,6 +327,12 @@ setup_app_directory() {
 configure_environment() {
     show_progress "Configuring application"
     
+    # Initialize variables
+    DOMAIN_NAME=""
+    ADMIN_EMAIL=""
+    ADMIN_PASSWORD=""
+    ADMIN_PASSWORD_CONFIRM=""
+    
     # Generate JWT secret
     JWT_SECRET=$(openssl rand -hex 32)
     
