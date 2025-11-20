@@ -85,6 +85,58 @@
 - Log and track message delivery
 
 ### 🔍 **Global Search** *(NEW)*
+- Lightning-fast live search (300ms debounce)
+- Search members by name or phone
+- Search care events by title or description
+- Visible on ALL pages
+- Member photos in results
+- Engagement status badges
+- Click to navigate
+
+### 📊 **Activity Log & Accountability** *(NEW)*
+- Complete audit trail of all staff actions
+- Track WHO did WHAT on WHICH member
+- 13 action types logged:
+  - Create/complete/ignore care events
+  - Grief & accident follow-ups
+  - Financial aid operations
+  - Member contact actions
+  - WhatsApp reminders
+- Filter by staff, action, date range
+- Export to CSV
+- Timezone-aware (Asia/Jakarta)
+- User photos in logs
+- Timeline shows actor for all events
+
+### 🔄 **API Sync with FaithFlow Enterprise** *(NEW)*
+- **Dual Sync Methods:**
+  - Polling: Auto-sync every 1-24 hours
+  - Webhooks: Real-time updates (1-2 seconds)
+- **Security:**
+  - HMAC-SHA256 signature verification
+  - Auto-generated webhook secrets
+  - Secure credential storage
+- **Smart Features:**
+  - Dynamic field discovery
+  - Custom filter rules (unlimited)
+  - Include/Exclude modes
+  - Smart archival
+  - Daily reconciliation (3 AM)
+  - One-click enable/disable
+- **Efficiency:**
+  - Pagination (fetches ALL members)
+  - Targeted webhook sync (single member)
+  - Photo sync from base64
+  - Age calculation
+
+### 👤 **User Management** *(NEW)*
+- Edit user profiles (name, phone, role, campus)
+- Upload profile photos
+- Phone number column in admin panel
+- Photos in navigation & activity logs
+- Profile tab in Settings
+
+### 🔍 **Global Search** *(NEW)*
 - Live search across members and care events
 - Visible on all pages (mobile + desktop)
 - Displays member photos and engagement status
