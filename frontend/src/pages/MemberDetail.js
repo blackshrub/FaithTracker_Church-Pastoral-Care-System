@@ -134,6 +134,35 @@ export const MemberDetail = () => {
     end_month: null,
     end_year: null
   });
+
+  const [additionalVisitModal, setAdditionalVisitModal] = useState(false);
+  const [selectedParentEvent, setSelectedParentEvent] = useState(null);
+  const [additionalVisit, setAdditionalVisit] = useState({
+    visit_date: new Date().toISOString().split('T')[0],
+    visit_type: 'Phone Call',
+    notes: ''
+  });
+  
+  const logAdditionalVisit = async () => {
+    try {
+      await axios.post(`${API}/care-events/${selectedParentEvent.id}/additional-visit`, {
+        visit_date: additionalVisit.visit_date,
+        visit_type: additionalVisit.visit_type,
+        notes: additionalVisit.notes
+      });
+      toast.success('Additional visit logged successfully');
+      setAdditionalVisitModal(false);
+      setAdditionalVisit({
+        visit_date: new Date().toISOString().split('T')[0],
+        visit_type: 'Phone Call',
+        notes: ''
+      });
+      queryClient.invalidateQueries(['member', id]);
+    } catch (error) {
+      toast.error('Failed to log visit: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
   
   // The useQuery automatically fetches when id changes, no need for useEffect
   
