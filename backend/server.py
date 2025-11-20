@@ -4066,16 +4066,10 @@ async def get_dashboard_stats():
         # Active grief support count
         active_grief = await db.grief_support.count_documents({"completed": False})
         
-        # At-risk members
-        members = await db.members.find({}, {"_id": 0, "last_contact_date": 1}).to_list(1000)
-        at_risk_count = 0
-        for member in members:
-            last_contact = member.get('last_contact_date')
-            if last_contact and isinstance(last_contact, str):
-                last_contact = datetime.fromisoformat(last_contact)
-            status, _ = calculate_engagement_status(last_contact)
-            if status in [EngagementStatus.AT_RISK, EngagementStatus.DISCONNECTED]:
-                at_risk_count += 1
+        # At-risk members - use stored engagement_status
+        at_risk_count = await db.members.count_documents({
+            "engagement_status": {"$in": ["at_risk", "disconnected"]}
+        })
         
         # This month's financial aid
         today = date.today()
