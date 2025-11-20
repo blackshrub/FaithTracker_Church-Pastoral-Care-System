@@ -1030,19 +1030,33 @@ export const MemberDetail = () => {
           ) : (
             careEvents.filter(e => e.event_type === 'grief_loss' && !e.grief_stage_id).map(event => (
                   <div key={event.id} className="space-y-4 mb-6 p-4 border border-pink-200 bg-pink-50 rounded-lg shadow-sm">
-                    <div>
-                      <h4 className="font-semibold">💔 {event.title || 'Grief/Loss Event'}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Date: {formatDate(event.event_date, 'dd MMM yyyy')}
-                      </p>
-                      {event.grief_relationship && (
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold">💔 {event.title || 'Grief/Loss Event'}</h4>
                         <p className="text-sm text-muted-foreground">
-                          Relationship: {event.grief_relationship}
+                          Date: {formatDate(event.event_date, 'dd MMM yyyy')}
                         </p>
-                      )}
-                      {event.description && (
-                        <p className="text-sm mt-2">{event.description}</p>
-                      )}
+                        {event.grief_relationship && (
+                          <p className="text-sm text-muted-foreground">
+                            Relationship: {event.grief_relationship}
+                          </p>
+                        )}
+                        {event.description && (
+                          <p className="text-sm mt-2">{event.description}</p>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDeleteEvent(event.id)} className="text-red-600">
+                            <Trash2 className="w-4 h-4 mr-2" />Delete Event
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     
                     {/* Grief Timeline within each grief event */}
