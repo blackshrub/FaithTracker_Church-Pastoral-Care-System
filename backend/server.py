@@ -2269,6 +2269,31 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
         )
         
 
+        # Update member's last contact date for completed one-time events or non-birthday events
+        if is_one_time or (event.event_type != EventType.BIRTHDAY):
+            now = datetime.now(timezone.utc)
+            await db.members.update_one(
+                {"id": event.member_id},
+                {"$set": {
+                    "last_contact_date": now.isoformat(),
+                    "days_since_last_contact": 0,
+                    "engagement_status": "active",
+                    "updated_at": now.isoformat()
+                }}
+            )
+        
+        # Invalidate dashboard cache
+        await invalidate_dashboard_cache(campus_id)
+        
+        return care_event
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @api_router.post("/care-events/{parent_event_id}/additional-visit")
 async def log_additional_visit(
