@@ -5794,21 +5794,153 @@ async def receive_sync_webhook(request: Request):
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         elif event_type in ["member.created", "member.updated", "member.deleted"]:
-            # Trigger a sync for this specific member (or full sync)
-            # For simplicity, we'll trigger a full sync
-            # In production, you could optimize to sync just this member
+            # Sync this specific member immediately
+            if not member_id:
+                return {
+                    "success": False,
+                    "message": "member_id required in webhook payload for member events"
+                }
             
-            logger.info(f"Webhook {event_type} received for campus {campus_id}, triggering sync")
+            logger.info(f"Webhook {event_type} received for member {member_id}, syncing...")
             
-            # Trigger sync in background (don't wait)
-            # Note: For production, use background task or queue
-            # For now, we'll just log and let scheduled sync handle it
+            try:
+                import httpx
+                from io import BytesIO
+                import base64
+                
+                # Login to core API
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    login_response = await client.post(
+                        f"{config['api_base_url']}/api/auth/login",
+                        json={"email": config["api_email"], "password": config["api_password"]}
+                    )
+                    
+                    if login_response.status_code != 200:
+                        raise Exception("Login failed")
+                    
+                    token = login_response.json().get("access_token")
+                    
+                    if event_type == "member.deleted":
+                        # Archive the member
+                        await db.members.update_one(
+                            {"external_member_id": member_id},
+                            {"$set": {
+                                "is_archived": True,
+                                "archived_at": datetime.now(timezone.utc).isoformat(),
+                                "archived_reason": "Deleted in core system"
+                            }}
+                        )
+                        logger.info(f"Archived member {member_id}")
+                        return {
+                            "success": True,
+                            "message": f"Member archived: {member_id}"
+                        }
+                    else:
+                        # Fetch specific member from core
+                        members_response = await client.get(
+                            f"{config['api_base_url']}/api/members/",
+                            headers={"Authorization": f"Bearer {token}"}
+                        )
+                        
+                        if members_response.status_code != 200:
+                            raise Exception("Failed to fetch members")
+                        
+                        all_members = members_response.json()
+                        if isinstance(all_members, dict) and 'data' in all_members:
+                            all_members = all_members['data']
+                        
+                        # Find the specific member
+                        core_member = next((m for m in all_members if m.get("id") == member_id), None)
+                        
+                        if not core_member:
+                            return {
+                                "success": False,
+                                "message": f"Member {member_id} not found in core system"
+                            }
+                        
+                        # Prepare member data
+                        member_data = {
+                            "external_member_id": member_id,
+                            "name": core_member.get("full_name"),
+                            "phone": normalize_phone_number(core_member.get("phone_whatsapp", "")) if core_member.get("phone_whatsapp") else None,
+                            "birth_date": core_member.get("date_of_birth"),
+                            "gender": core_member.get("gender"),
+                            "category": core_member.get("member_status"),
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }
+                        
+                        # Calculate age
+                        if core_member.get("date_of_birth"):
+                            try:
+                                dob = core_member["date_of_birth"]
+                                birth_date = date.fromisoformat(dob) if isinstance(dob, str) else dob
+                                age = (date.today() - birth_date).days // 365
+                                member_data["age"] = age
+                            except:
+                                member_data["age"] = None
+                        
+                        # Handle photo if exists
+                        photo_base64 = core_member.get("photo_base64")
+                        if photo_base64 and photo_base64.startswith("data:image"):
+                            try:
+                                image_data = photo_base64.split(",")[1] if "," in photo_base64 else photo_base64
+                                image_bytes = base64.b64decode(image_data)
+                                
+                                upload_dir = Path(ROOT_DIR) / "uploads"
+                                upload_dir.mkdir(exist_ok=True)
+                                
+                                ext = "jpg"
+                                if "png" in photo_base64: ext = "png"
+                                filename = f"JEMAAT-{member_id[:5]}.{ext}"
+                                filepath = upload_dir / filename
+                                
+                                img = Image.open(BytesIO(image_bytes))
+                                img = img.convert('RGB')
+                                img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+                                img.save(filepath, 'JPEG', quality=85)
+                                
+                                member_data["photo_url"] = f"/uploads/{filename}"
+                            except Exception as e:
+                                logger.error(f"Error processing photo: {str(e)}")
+                        
+                        # Check if member exists
+                        existing = await db.members.find_one({"external_member_id": member_id}, {"_id": 0})
+                        
+                        if existing:
+                            # Update existing
+                            await db.members.update_one(
+                                {"id": existing["id"]},
+                                {"$set": member_data}
+                            )
+                            logger.info(f"Updated member {core_member.get('full_name')} via webhook")
+                            action = "updated"
+                        else:
+                            # Create new
+                            new_member = {
+                                "id": str(uuid.uuid4()),
+                                "campus_id": config["campus_id"],
+                                **member_data,
+                                "is_archived": not core_member.get("is_active", True),
+                                "engagement_status": "active",
+                                "days_since_last_contact": 999,
+                                "created_at": datetime.now(timezone.utc).isoformat()
+                            }
+                            await db.members.insert_one(new_member)
+                            logger.info(f"Created member {core_member.get('full_name')} via webhook")
+                            action = "created"
+                        
+                        return {
+                            "success": True,
+                            "message": f"Member {action}: {core_member.get('full_name')}",
+                            "member_id": member_id
+                        }
             
-            return {
-                "success": True,
-                "message": f"Webhook received: {event_type}",
-                "will_sync": "Sync will occur on next scheduled run or manual trigger"
-            }
+            except Exception as sync_error:
+                logger.error(f"Error syncing member from webhook: {str(sync_error)}")
+                return {
+                    "success": False,
+                    "message": f"Failed to sync member: {str(sync_error)}"
+                }
         else:
             return {
                 "success": True,
