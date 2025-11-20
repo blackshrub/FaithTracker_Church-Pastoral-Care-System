@@ -143,12 +143,12 @@ export const Settings = () => {
   const loadSyncConfig = async () => {
     try {
       const response = await axios.get(`${API}/sync/config`);
-      console.log('Sync config API response:', response.data);
+      // Debug: console.log('Sync config API response:', response.data);
       if (response.data) {
-        console.log('Setting sync config to:', response.data);
+        // Debug: console.log('Setting sync config to:', response.data);
         setSyncConfig(response.data);
       } else {
-        console.log('No sync config data returned');
+        // Debug: console.log('No sync config data returned');
       }
     } catch (error) {
       console.error('Error loading sync config:', error);
@@ -157,11 +157,11 @@ export const Settings = () => {
   
   const loadSyncLogs = async () => {
     try {
-      console.log('Loading sync logs...');
+      // Debug: console.log('Loading sync logs...');
       const response = await axios.get(`${API}/sync/logs?limit=10`);
-      console.log('Sync logs response:', response.data);
+      // Debug: console.log('Sync logs response:', response.data);
       setSyncLogs(response.data);
-      console.log('Sync logs set to state:', response.data.length, 'logs');
+      // Debug: console.log('Sync logs set to state:', response.data.length, 'logs');
     } catch (error) {
       console.error('Error loading sync logs:', error);
     }
@@ -231,7 +231,7 @@ export const Settings = () => {
 
   useEffect(() => {
     if (activeTab === 'sync') {
-      console.log('API Sync tab activated, loading config...');
+      // Debug: console.log('API Sync tab activated, loading config...');
       loadSyncConfig();
       loadSyncLogs();
     }
