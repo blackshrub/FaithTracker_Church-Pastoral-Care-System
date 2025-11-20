@@ -1,42 +1,34 @@
 [
   {
-    "content": "Check all frontend files for compilation errors and warnings",
-    "status": "completed"
+    "content": "Remove console.log debug statements from production code",
+    "status": "in_progress"
   },
   {
-    "content": "Check backend for Python syntax errors and import issues",
-    "status": "completed"
+    "content": "Replace native confirm() dialogs with custom Dialog component",
+    "status": "pending"
   },
   {
-    "content": "Verify all database models have required fields",
-    "status": "completed"
+    "content": "Add one-line comment at top of main files explaining purpose",
+    "status": "pending"
   },
   {
-    "content": "Check for unused console.log and debug code",
-    "status": "completed"
+    "content": "Implement encryption for sync credentials (cryptography library)",
+    "status": "pending"
   },
   {
-    "content": "Verify all API endpoints have proper error handling",
-    "status": "completed"
+    "content": "Verify .env and .env.example have all required variables",
+    "status": "pending"
   },
   {
-    "content": "Check for hardcoded values that should be configurable",
-    "status": "completed"
+    "content": "Update version number to 2.0.0 in package.json",
+    "status": "pending"
   },
   {
-    "content": "Verify all translations exist for both EN and ID",
-    "status": "completed"
+    "content": "Add MIT LICENSE file",
+    "status": "pending"
   },
   {
-    "content": "Check for missing indexes or performance issues",
-    "status": "completed"
-  },
-  {
-    "content": "Verify cascade deletes work for all entity types",
-    "status": "completed"
-  },
-  {
-    "content": "Final smoke test of critical workflows",
-    "status": "completed"
+    "content": "Add screenshots section to README",
+    "status": "pending"
   }
 ]
