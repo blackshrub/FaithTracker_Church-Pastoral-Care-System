@@ -20,6 +20,32 @@ from zoneinfo import ZoneInfo
 # Jakarta timezone (UTC+7)
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
+
+# Credential encryption for security
+from cryptography.fernet import Fernet
+import base64
+
+# Get encryption key from environment or generate one
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
+if not ENCRYPTION_KEY:
+    # Generate a key for development (in production, set in .env)
+    ENCRYPTION_KEY = Fernet.generate_key().decode()
+    logger.warning("ENCRYPTION_KEY not set in .env - using temporary key. Set ENCRYPTION_KEY in production!")
+
+cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+
+def encrypt_password(password: str) -> str:
+    """Encrypt password for storage"""
+    return cipher_suite.encrypt(password.encode()).decode()
+
+def decrypt_password(encrypted: str) -> str:
+    """Decrypt password for use"""
+    try:
+        return cipher_suite.decrypt(encrypted.encode()).decode()
+    except:
+        # If decryption fails, assume it's already plain text (backward compatibility)
+        return encrypted
+
 def now_jakarta():
     """Get current time in Jakarta timezone"""
     return datetime.now(JAKARTA_TZ)
