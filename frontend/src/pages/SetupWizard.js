@@ -93,6 +93,15 @@ const SetupWizard = ({ onComplete }) => {
                 />
               </div>
               <div>
+                <Label>Phone Number (WhatsApp)</Label>
+                <Input
+                  type="tel"
+                  value={adminData.phone}
+                  onChange={(e) => setAdminData({...adminData, phone: e.target.value})}
+                  placeholder="+6281234567890 or 081234567890"
+                />
+              </div>
+              <div>
                 <Label>Password</Label>
                 <Input
                   type="password"
