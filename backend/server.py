@@ -3443,13 +3443,22 @@ async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = D
 
 @api_router.delete("/financial-aid-schedules/{schedule_id}")
 async def delete_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete a financial aid schedule"""
+    """Delete a financial aid schedule and related activity logs"""
     try:
-        # Get schedule first to get campus_id
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0, "campus_id": 1})
+        # Get schedule details before deleting
+        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
         
+        # Delete activity logs related to this schedule
+        # Match by member_id and notes containing aid_type or "financial aid"
+        await db.activity_logs.delete_many({
+            "member_id": schedule["member_id"],
+            "event_type": "financial_aid",
+            "notes": {"$regex": schedule.get('aid_type', 'financial aid'), "$options": "i"}
+        })
+        
+        # Delete the schedule
         result = await db.financial_aid_schedules.delete_one({"id": schedule_id})
         
         if result.deleted_count == 0:
@@ -3458,7 +3467,7 @@ async def delete_aid_schedule(schedule_id: str, current_user: dict = Depends(get
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(schedule["campus_id"])
         
-        return {"success": True, "message": "Financial aid schedule deleted"}
+        return {"success": True, "message": "Financial aid schedule and related logs deleted"}
     except HTTPException:
         raise
     except Exception as e:
