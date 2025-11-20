@@ -1381,8 +1381,10 @@ export const MemberDetail = () => {
                           variant="outline"
                           className="w-full gap-2 border-dashed"
                           onClick={() => {
+                            console.log('Log Additional Visit clicked for accident event:', event.id);
                             setSelectedParentEvent(event);
                             setAdditionalVisitModal(true);
+                            console.log('Modal should open now');
                           }}
                         >
                           <Plus className="w-4 h-4" />
