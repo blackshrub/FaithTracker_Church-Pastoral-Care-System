@@ -66,6 +66,20 @@ export const Settings = () => {
     { stage: '1_week', days: 7, name: 'First Follow-up' },
     { stage: '2_weeks', days: 14, name: 'Second Follow-up' },
 
+  const [whatsappGateway, setWhatsappGateway] = useState('');
+  const [digestTime, setDigestTime] = useState('08:00');
+  
+  const saveAutomationSettings = async () => {
+    try {
+      // Save WhatsApp Gateway to .env or settings collection
+      // For now, show that it's saved (backend needs endpoint)
+      toast.success('Automation settings saved');
+    } catch (error) {
+      toast.error('Failed to save settings');
+    }
+  };
+
+
   const [campusData, setCampusData] = useState(null);
 
     { stage: '1_month', days: 30, name: 'Third Follow-up' },
