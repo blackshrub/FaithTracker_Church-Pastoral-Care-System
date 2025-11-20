@@ -1769,16 +1769,22 @@ export const MemberDetail = () => {
                                   Distributed
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={async () => {
-                                  if (window.confirm('Stop this aid schedule? (Ignored history will be preserved)')) {
-                                    try {
-                                      await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
-                                      toast.success('Schedule stopped');
-                                      queryClient.invalidateQueries(['member', id]);
-                                      queryClient.invalidateQueries(['dashboard']);
-                                    } catch (error) {
-                                      toast.error('Failed to stop schedule');
+                                  showConfirm(
+                                    'Stop Aid Schedule',
+                                    'Stop this aid schedule? Ignored history will be preserved. You can re-enable it later.',
+                                    async () => {
+                                      try {
+                                        await axios.post(`${API}/financial-aid-schedules/${schedule.id}/stop`);
+                                        toast.success('Schedule stopped');
+                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries(['dashboard']);
+                                        closeConfirm();
+                                      } catch (error) {
+                                        toast.error('Failed to stop schedule');
+                                        closeConfirm();
+                                      }
                                     }
-                                  }
+                                  );
                                 }} className="text-red-600">
                                   <Trash2 className="w-4 h-4 mr-2" />
                                   Stop Schedule
