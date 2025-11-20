@@ -1615,7 +1615,6 @@ export const MemberDetail = () => {
                     )}
                   </div>
                 ))
-          )}
         </TabsContent>
         
         {/* Financial Aid Tab */}
