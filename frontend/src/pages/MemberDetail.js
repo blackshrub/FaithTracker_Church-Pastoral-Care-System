@@ -1435,9 +1435,6 @@ export const MemberDetail = () => {
                           );
                         })}
                       </div>
-                    </div>
-
-                      
                       
                       {/* Display additional visits for accident - Simplified */}
                       <div className="mt-4">
