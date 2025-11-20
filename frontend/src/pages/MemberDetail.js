@@ -968,7 +968,7 @@ export const MemberDetail = () => {
                               )}
                               {event.grief_relationship && (
                                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                                  Relationship: {event.grief_relationship}
+                                  Relationship: {event.grief_relationship.charAt(0).toUpperCase() + event.grief_relationship.slice(1)}
                                 </p>
                               )}
                               {event.hospital_name && event.hospital_name !== 'N/A' && event.hospital_name !== 'null' && event.hospital_name !== 'NULL' && (
