@@ -565,7 +565,8 @@ class SyncConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    campus_id: str
+    campus_id: str  # FaithTracker campus ID
+    core_church_id: Optional[str] = None  # Core system's church_id (for webhook matching)
     sync_method: str = "polling"  # "polling" or "webhook"
     api_base_url: str  # e.g., https://faithflow.yourdomain.com
     api_email: str
