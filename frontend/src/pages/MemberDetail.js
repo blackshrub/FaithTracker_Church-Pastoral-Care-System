@@ -1307,7 +1307,7 @@ export const MemberDetail = () => {
           {careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id).length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
           ) : (
-            careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id).map(event => (
+            careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id && e.followup_type !== 'additional').map(event => (
                   <div key={event.id} className="space-y-4 mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg shadow-sm relative">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
