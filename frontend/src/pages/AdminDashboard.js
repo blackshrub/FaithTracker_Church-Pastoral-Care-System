@@ -473,23 +473,29 @@ export const AdminDashboard = () => {
                     {t('admin_dashboard_page.recalculate_description')}
                   </p>
                   <Button 
-                    onClick={async () => {
-                      if (window.confirm(t('admin_dashboard_page.recalculate_confirm'))) {
-                        try {
-                          // Fire the request (don't wait for response due to long processing time)
-                          axios.post(`${API}/admin/recalculate-engagement`, {}, {
-                            timeout: 90000
-                          }).catch(() => {
-                            // Ignore timeout errors - backend still processing
-                          });
-                          
-                          toast.success(t('admin_dashboard_page.recalculation_started'), {
-                            duration: 8000
-                          });
-                        } catch (error) {
-                          toast.error(t('admin_dashboard_page.failed_start_recalculation'));
+                    onClick={() => {
+                      showConfirm(
+                        'Recalculate Engagement',
+                        t('admin_dashboard_page.recalculate_confirm'),
+                        async () => {
+                          try {
+                            // Fire the request (don't wait for response due to long processing time)
+                            axios.post(`${API}/admin/recalculate-engagement`, {}, {
+                              timeout: 90000
+                            }).catch(() => {
+                              // Ignore timeout errors - backend still processing
+                            });
+                            
+                            toast.success(t('admin_dashboard_page.recalculation_started'), {
+                              duration: 8000
+                            });
+                            closeConfirm();
+                          } catch (error) {
+                            toast.error(t('admin_dashboard_page.failed_start_recalculation'));
+                            closeConfirm();
+                          }
                         }
-                      }
+                      );
                     }}
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
