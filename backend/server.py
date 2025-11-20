@@ -5786,7 +5786,14 @@ async def receive_sync_webhook(request: Request):
         event_type = payload.get("event_type")
         member_id = payload.get("member_id")
         
-        if event_type in ["member.created", "member.updated", "member.deleted"]:
+        if event_type == "test" or event_type == "ping":
+            # Test webhook - just confirm it works
+            return {
+                "success": True,
+                "message": "Webhook test successful! FaithTracker is ready to receive member updates.",
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        elif event_type in ["member.created", "member.updated", "member.deleted"]:
             # Trigger a sync for this specific member (or full sync)
             # For simplicity, we'll trigger a full sync
             # In production, you could optimize to sync just this member
