@@ -1,3 +1,9 @@
+/**
+ * Dashboard Page - Main task-oriented interface
+ * Displays today's tasks, overdue items, and upcoming events
+ * Uses React Query for optimized data fetching and caching
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
