@@ -1,14 +1,42 @@
 [
   {
-    "content": "Fix full admin profile edit (enable name, email, phone fields)",
-    "status": "completed"
+    "content": "Check all frontend files for compilation errors and warnings",
+    "status": "in_progress"
   },
   {
-    "content": "Fix PUT /api/campuses/{id} 422 error when saving timezone",
-    "status": "completed"
+    "content": "Check backend for Python syntax errors and import issues",
+    "status": "pending"
   },
   {
-    "content": "Make automation settings editable for full admin (schedule time, WhatsApp URL)",
-    "status": "completed"
+    "content": "Verify all database models have required fields",
+    "status": "pending"
+  },
+  {
+    "content": "Check for unused console.log and debug code",
+    "status": "pending"
+  },
+  {
+    "content": "Verify all API endpoints have proper error handling",
+    "status": "pending"
+  },
+  {
+    "content": "Check for hardcoded values that should be configurable",
+    "status": "pending"
+  },
+  {
+    "content": "Verify all translations exist for both EN and ID",
+    "status": "pending"
+  },
+  {
+    "content": "Check for missing indexes or performance issues",
+    "status": "pending"
+  },
+  {
+    "content": "Verify cascade deletes work for all entity types",
+    "status": "pending"
+  },
+  {
+    "content": "Final smoke test of critical workflows",
+    "status": "pending"
   }
 ]
