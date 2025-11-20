@@ -572,7 +572,7 @@ class UserResponse(BaseModel):
     role: UserRole
     campus_id: Optional[str] = None
     campus_name: Optional[str] = None
-    phone: str
+    phone: Optional[str] = None
     photo_url: Optional[str] = None
     is_active: bool
     created_at: datetime
