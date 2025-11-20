@@ -1,6 +1,6 @@
-# 🏛️ FaithTracker - Multi-Campus Pastoral Care Management System
+# 🏛️ FaithTracker Pastoral Care System
 
-**FaithTracker** is a comprehensive, multi-tenant pastoral care management system designed specifically for the GKBJ church. It enables the pastoral care department to efficiently monitor, schedule, and manage all interactions with church members across multiple campuses.
+**FaithTracker Pastoral Care System** is a comprehensive, multi-tenant pastoral care management system designed specifically for the GKBJ church. It enables the pastoral care department to efficiently monitor, schedule, and manage all interactions with church members across multiple campuses.
 
 ![Status](https://img.shields.io/badge/status-production--ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-FastAPI%20%2B%20React-blue)
