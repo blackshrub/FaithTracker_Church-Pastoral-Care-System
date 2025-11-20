@@ -22,11 +22,29 @@ const ActivityLog = () => {
 
   // Format date/time in local timezone (Asia/Jakarta for Indonesia)
   const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
-    return {
-      date: date.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'short', day: 'numeric' }),
-      time: date.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' })
-    };
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return { date: 'Invalid date', time: '' };
+      }
+      return {
+        date: date.toLocaleDateString('id-ID', { 
+          timeZone: 'Asia/Jakarta', 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric' 
+        }),
+        time: date.toLocaleTimeString('id-ID', { 
+          timeZone: 'Asia/Jakarta', 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        })
+      };
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return { date: String(dateString), time: '' };
+    }
   };
 
   // Get default start date (30 days ago)
