@@ -25,6 +25,41 @@ export const Settings = () => {
   const [writeoffBirthday, setWriteoffBirthday] = useState(7);
   const [writeoffFinancialAid, setWriteoffFinancialAid] = useState(0);
   const [writeoffAccident, setWriteoffAccident] = useState(14);
+
+  // Profile edit state
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+  
+  const saveProfile = async () => {
+    try {
+      await axios.put(`${API}/users/${user.id}`, {
+        name: profileData.name,
+        email: profileData.email,
+        phone: profileData.phone
+      });
+      toast.success('Profile updated successfully');
+      setEditingProfile(false);
+      // Reload user data
+      window.location.reload();
+    } catch (error) {
+      toast.error('Failed to update profile: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+  
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || ''
+      });
+    }
+  }, [user]);
+
   const [writeoffGrief, setWriteoffGrief] = useState(14);
   const [activeTab, setActiveTab] = useState('automation');
   const [griefStages, setGriefStages] = useState([
