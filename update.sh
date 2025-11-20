@@ -31,14 +31,22 @@ git pull origin main
 
 # Update backend
 echo -e "${BLUE}[2/6]${NC} Updating backend..."
-cd backend
+cd /opt/faithtracker/backend
+
+# Check if venv exists, create if not
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+fi
+
 source venv/bin/activate
 pip install -r requirements.txt --quiet
-cd ..
+deactivate
+cd /opt/faithtracker
 
 # Update frontend
 echo -e "${BLUE}[3/6]${NC} Updating frontend..."
-cd frontend
+cd /opt/faithtracker/frontend
 yarn install --silent
 yarn build --silent
 cd ..
