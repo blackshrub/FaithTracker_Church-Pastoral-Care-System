@@ -4,7 +4,7 @@
  * Uses React Query for optimized data fetching and caching
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -438,14 +438,32 @@ export const Dashboard = () => {
     );
     setMemberSearch('');
   };
-  
-  const filteredMembers = allMembers.filter(m => 
-    m.name.toLowerCase().includes(memberSearch.toLowerCase())
+
+  // Memoize filtered members to prevent unnecessary re-filtering on every render
+  const filteredMembers = useMemo(() => {
+    if (!memberSearch) return allMembers;
+    const searchLower = memberSearch.toLowerCase();
+    return allMembers.filter(m => m.name.toLowerCase().includes(searchLower));
+  }, [allMembers, memberSearch]);
+
+  // Memoize incomplete tasks calculations (used multiple times in render)
+  const incompleteBirthdaysCount = useMemo(() =>
+    birthdaysToday.filter(b => !b.completed).length,
+    [birthdaysToday]
   );
 
-  
+  const incompleteTodayTasksCount = useMemo(() =>
+    todayTasks.filter(t => !t.completed).length,
+    [todayTasks]
+  );
+
+  const totalIncompleteTasks = useMemo(() =>
+    incompleteBirthdaysCount + incompleteTodayTasksCount,
+    [incompleteBirthdaysCount, incompleteTodayTasksCount]
+  );
+
   if (isLoading) return <div>{t('loading')}</div>;
-  
+
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   
   return (
@@ -885,7 +903,7 @@ export const Dashboard = () => {
       <div>
         <h2 className="text-2xl font-playfair font-bold mb-4">{t('todays_tasks_reminders')}</h2>
         <p className="text-muted-foreground mb-4">
-          {birthdaysToday.filter(b => !b.completed).length + todayTasks.filter(t => !t.completed).length} {t('tasks_need_attention')}
+          {totalIncompleteTasks} {t('tasks_need_attention')}
         </p>
       </div>
       
@@ -895,7 +913,7 @@ export const Dashboard = () => {
             <TabsTrigger value="today" className="flex-1">
               <Bell className="w-4 h-4 mr-2" />
               <span>{t('main_tabs.today')}</span>
-              <span className="ml-1 text-xs">({birthdaysToday.filter(b => !b.completed).length + todayTasks.filter(t => !t.completed).length})</span>
+              <span className="ml-1 text-xs">({totalIncompleteTasks})</span>
             </TabsTrigger>
             <TabsTrigger value="overdue" className="flex-1">
               <AlertTriangle className="w-4 h-4 mr-2" />

@@ -1463,11 +1463,11 @@ async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_
         # Save file
         contents = await file.read()
         
-        # Resize image to 400x400
+        # Resize image to 400x400 and optimize
         img = Image.open(BytesIO(contents))
         img = img.convert('RGB')
         img.thumbnail((400, 400), Image.Resampling.LANCZOS)
-        img.save(filepath, 'JPEG', quality=85)
+        img.save(filepath, 'JPEG', quality=85, optimize=True, progressive=True)
         
         # Update user record
         photo_url = f"/api/user-photos/{filename}"
@@ -2423,10 +2423,10 @@ async def upload_member_photo(member_id: str, file: UploadFile = File(...)):
             resized = image.copy()
             resized.thumbnail((width, height), Image.Resampling.LANCZOS)
             
-            # Save with optimization
+            # Save with optimization (progressive JPEG for faster loading)
             filename = f"{base_filename}_{size_name}.jpg"
             filepath = Path(ROOT_DIR) / "uploads" / filename
-            resized.save(filepath, "JPEG", quality=85, optimize=True)
+            resized.save(filepath, "JPEG", quality=85, optimize=True, progressive=True)
             
             photo_urls[size_name] = f"/uploads/{filename}"
         

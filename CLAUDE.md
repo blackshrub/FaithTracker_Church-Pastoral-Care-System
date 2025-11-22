@@ -133,6 +133,27 @@ See `backend/TESTING_GUIDE.md` for details.
   - `maxIdleTimeMS=45000` - Close idle connections after 45s
   - Better connection reuse under load
 
+**Image Optimization:**
+- **Member photos:** 3 sizes (thumbnail/medium/large) with progressive JPEG
+  - Quality: 85, LANCZOS resampling, progressive=True
+  - Auto-generated on upload (100x100, 300x300, 600x600)
+- **User photos:** Single 400x400 size with progressive JPEG
+  - Quality: 85, optimize=True, progressive=True
+- **Progressive JPEG benefits:** Faster perceived loading, better UX on slow connections
+
+**Modular Refactoring Recommendation:**
+**Status:** Keep monolithic (tactical refactoring done)
+**Reasoning:**
+- Current size (~6500 lines) is manageable with good organization
+- Tactical optimizations applied (constants, helpers, caching)
+- Monolithic simplifies deployment and debugging
+- Full modular split (models/, routes/, services/) recommended only if:
+  - Team grows beyond 3-4 backend developers
+  - File exceeds 10,000 lines despite refactoring
+  - Multiple microservices planned
+  - Frequent merge conflicts occur
+- **Cost/benefit:** High effort, moderate benefit at current scale
+
 **Encryption & Security:**
 - JWT tokens for authentication
 - Bcrypt for password hashing
@@ -166,6 +187,17 @@ When breaking down large components (>500 lines):
 3. Keep **data fetching and business logic** in parent component
 4. Pass data via props, callbacks for actions
 5. Use barrel exports (`index.js`) for clean imports
+
+**Performance Optimizations:**
+- **Debouncing:** Search inputs use 2-second debounce (MembersList.js)
+  - Implemented with `use-debounce` library
+  - Reduces API calls by ~80% during typing
+  - Custom hook available: `src/hooks/useDebounce.js`
+- **Memoization:** Expensive computations use `useMemo` (Dashboard.js)
+  - `filteredMembers` - Client-side search filtering
+  - `incompleteBirthdaysCount` - Repeated filter calculations
+  - `incompleteTodayTasksCount` - Repeated filter calculations
+  - **Impact:** Prevents unnecessary re-computation on every render
 
 **Key Patterns:**
 - Uses `@/` path alias for imports (`import { Button } from "@/components/ui/button"`)
