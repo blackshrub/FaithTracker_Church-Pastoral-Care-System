@@ -13,7 +13,7 @@
 #################################################################################
 
 # Exit on error but allow us to handle it gracefully
-set -eo pipefail  # Removed -u flag to allow unbound variables during prompts
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -178,10 +178,6 @@ install_python() {
         apt install -y python3 python3-pip python3-venv python3-dev >> "$LOG_FILE" 2>&1
     fi
     
-    # Ensure python3-venv is installed (even if Python was already there)
-    print_info "Ensuring python3-venv is installed..."
-    apt install -y python3-venv >> "$LOG_FILE" 2>&1
-    
     # Verify Python version is 3.9+
     PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
     PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
@@ -200,19 +196,11 @@ install_nodejs() {
     
     if command_exists node; then
         NODE_VERSION=$(node --version)
-        NODE_MAJOR=$(node --version | cut -d'.' -f1 | sed 's/v//')
-        
-        if [ "$NODE_MAJOR" -lt 20 ]; then
-            print_warning "Node.js $NODE_VERSION is too old. Upgrading to Node.js 20..."
-            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1
-            apt install -y nodejs >> "$LOG_FILE" 2>&1
-        else
-            print_info "Node.js $NODE_VERSION already installed"
-        fi
+        print_info "Node.js $NODE_VERSION already installed"
     else
-        print_info "Installing Node.js 20.x LTS..."
+        print_info "Installing Node.js 18.x LTS..."
         {
-            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
             apt install -y nodejs
         } >> "$LOG_FILE" 2>&1
     fi
@@ -339,12 +327,6 @@ setup_app_directory() {
 configure_environment() {
     show_progress "Configuring application"
     
-    # Initialize variables
-    DOMAIN_NAME=""
-    ADMIN_EMAIL=""
-    ADMIN_PASSWORD=""
-    ADMIN_PASSWORD_CONFIRM=""
-    
     # Generate JWT secret
     JWT_SECRET=$(openssl rand -hex 32)
     
@@ -384,29 +366,23 @@ configure_environment() {
             print_error "Domain name cannot be empty"
         fi
     done
-    
-    # Church name (will be used as first campus name)
+
+    # Backend port
     echo ""
-    echo -e "${YELLOW}First Campus Information${NC}"
-    read -p "Campus name [GKBJ Main Campus]: " CAMPUS_NAME
-    CAMPUS_NAME=${CAMPUS_NAME:-"GKBJ Main Campus"}
-    
-    read -p "Campus location/address: " CAMPUS_LOCATION
-    CAMPUS_LOCATION=${CAMPUS_LOCATION:-"Jakarta, Indonesia"}
-    
-    echo "Select timezone:"
-    echo "  1) Asia/Jakarta (UTC+7)"
-    echo "  2) Asia/Singapore (UTC+8)"
-    echo "  3) Asia/Tokyo (UTC+9)"
-    read -p "Choice [1]: " TZ_CHOICE
-    TZ_CHOICE=${TZ_CHOICE:-1}
-    
-    case $TZ_CHOICE in
-        1) CAMPUS_TIMEZONE="Asia/Jakarta" ;;
-        2) CAMPUS_TIMEZONE="Asia/Singapore" ;;
-        3) CAMPUS_TIMEZONE="Asia/Tokyo" ;;
-        *) CAMPUS_TIMEZONE="Asia/Jakarta" ;;
-    esac
+    echo -e "${CYAN}Backend API Port Configuration${NC}"
+    read -p "Backend port [8001]: " BACKEND_PORT
+    BACKEND_PORT=${BACKEND_PORT:-8001}
+
+    # Validate port number
+    if ! [[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || [ "$BACKEND_PORT" -lt 1024 ] || [ "$BACKEND_PORT" -gt 65535 ]; then
+        print_warning "Invalid port. Using default 8001"
+        BACKEND_PORT=8001
+    fi
+
+    # Church name
+    echo ""
+    read -p "Church name [GKBJ]: " CHURCH_NAME
+    CHURCH_NAME=${CHURCH_NAME:-GKBJ}
     
     # WhatsApp (optional)
     echo ""
@@ -420,21 +396,6 @@ configure_environment() {
     echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
     echo ""
     
-
-    while [ -z "$ADMIN_NAME" ]; do
-        read -p "Admin full name: " ADMIN_NAME
-        if [ -z "$ADMIN_NAME" ]; then
-            print_error "Name cannot be empty"
-        fi
-    done
-    
-    while [ -z "$ADMIN_PHONE" ]; do
-        read -p "Admin phone number: " ADMIN_PHONE
-        if [ -z "$ADMIN_PHONE" ]; then
-            print_error "Phone cannot be empty"
-        fi
-    done
-
     while [ -z "$ADMIN_EMAIL" ]; do
         read -p "Admin email: " ADMIN_EMAIL
         if [ -z "$ADMIN_EMAIL" ]; then
@@ -464,6 +425,26 @@ configure_environment() {
         fi
     done
     
+    # SSL/HTTPS Setup
+    echo ""
+    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║    SSL/HTTPS Configuration             ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Enable SSL/HTTPS with Let's Encrypt?${NC}"
+    echo "This requires your domain to be pointing to this server's IP"
+    echo ""
+    read -p "Enable SSL now? (y/n): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        ENABLE_SSL=true
+        HTTP_PROTO="https"
+    else
+        ENABLE_SSL=false
+        HTTP_PROTO="http"
+        print_info "You can enable SSL later with: sudo certbot --nginx"
+    fi
+
     # Show summary
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
@@ -472,6 +453,8 @@ configure_environment() {
     echo -e "  MongoDB:       ${CYAN}$MONGO_URL${NC}"
     echo -e "  Database:      ${CYAN}$DB_NAME${NC}"
     echo -e "  Domain:        ${CYAN}$DOMAIN_NAME${NC}"
+    echo -e "  Backend Port:  ${CYAN}$BACKEND_PORT${NC}"
+    echo -e "  SSL/HTTPS:     ${CYAN}$([ "$ENABLE_SSL" = true ] && echo "Enabled" || echo "Disabled")${NC}"
     echo -e "  Church:        ${CYAN}$CHURCH_NAME${NC}"
     echo -e "  Admin:         ${CYAN}$ADMIN_EMAIL${NC}"
     echo ""
@@ -481,21 +464,26 @@ configure_environment() {
         print_error "Installation cancelled"
         exit 1
     fi
-    
+
+    # Generate encryption key for API credentials
+    ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+
     # Create backend .env
     cat > "$INSTALL_DIR/backend/.env" << EOF
 MONGO_URL="$MONGO_URL"
 DB_NAME="$DB_NAME"
-CORS_ORIGINS="https://$DOMAIN_NAME"
+CORS_ORIGINS="${HTTP_PROTO}://$DOMAIN_NAME,${HTTP_PROTO}://www.$DOMAIN_NAME"
 JWT_SECRET_KEY="$JWT_SECRET"
+ENCRYPTION_KEY="$ENCRYPTION_KEY"
 CHURCH_NAME="$CHURCH_NAME"
 WHATSAPP_GATEWAY_URL="$WHATSAPP_URL"
+BACKEND_PORT="$BACKEND_PORT"
 EOF
     
     # Create frontend .env
     cat > "$INSTALL_DIR/frontend/.env" << EOF
-REACT_APP_BACKEND_URL="https://$DOMAIN_NAME"
-WDS_SOCKET_PORT=443
+REACT_APP_BACKEND_URL="${HTTP_PROTO}://$DOMAIN_NAME"
+WDS_SOCKET_PORT=$([ "$ENABLE_SSL" = true ] && echo "443" || echo "80")
 REACT_APP_ENABLE_VISUAL_EDITS=false
 ENABLE_HEALTH_CHECK=false
 EOF
@@ -520,73 +508,15 @@ setup_backend() {
         sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/pip" install --upgrade pip
         sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/pip" install -r requirements.txt
     } >> "$LOG_FILE" 2>&1
-    
-    print_info "Creating database indexes..."
-    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" create_indexes.py >> "$LOG_FILE" 2>&1 || true
-    
-    print_info "Creating admin user and first campus..."
-    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" - << PYTHON_SCRIPT >> "$LOG_FILE" 2>&1
-import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
-from passlib.context import CryptContext
-from datetime import datetime, timezone
-import uuid
 
-mongo_url = "$MONGO_URL"
-db_name = "$DB_NAME"
-admin_email = "$ADMIN_EMAIL"
-admin_password = "$ADMIN_PASSWORD"
-admin_name = "$ADMIN_NAME"
-admin_phone = "$ADMIN_PHONE"
-campus_name = "$CAMPUS_NAME"
-campus_location = "$CAMPUS_LOCATION"
-campus_timezone = "$CAMPUS_TIMEZONE"
-
-client = AsyncIOMotorClient(mongo_url)
-db = client[db_name]
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-async def setup_database():
-    # Create first admin user
-    user = {
-        "id": str(uuid.uuid4()),
-        "email": admin_email,
-        "password_hash": pwd_context.hash(admin_password),
-        "hashed_password": pwd_context.hash(admin_password),
-        "name": admin_name,
-        "phone": admin_phone,
-        "role": "full_admin",
-        "campus_id": None,
-        "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
+    print_info "Initializing database (indexes, admin user, default campus)..."
+    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" init_db.py \
+        --admin-email "$ADMIN_EMAIL" \
+        --admin-password "$ADMIN_PASSWORD" \
+        --church-name "$CHURCH_NAME" || {
+        print_error "Database initialization failed"
+        exit 1
     }
-    
-    existing_user = await db.users.find_one({"email": user["email"]})
-    if existing_user:
-        print("Admin user already exists")
-    else:
-        await db.users.insert_one(user)
-        print(f"Admin user created: {admin_name} ({admin_email})")
-    
-    # Create first campus
-    campus = {
-        "id": str(uuid.uuid4()),
-        "campus_name": campus_name,
-        "location": campus_location,
-        "timezone": campus_timezone,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    existing_campus = await db.campuses.find_one({"campus_name": campus_name})
-    if existing_campus:
-        print("Campus already exists")
-    else:
-        await db.campuses.insert_one(campus)
-        print(f"Campus created: {campus_name}")
-
-asyncio.run(setup_database())
-PYTHON_SCRIPT
     
     print_success "Backend setup complete"
 }
@@ -609,8 +539,8 @@ setup_frontend() {
 # Create systemd service
 create_systemd_service() {
     show_progress "Creating system service"
-    
-    cat > /etc/systemd/system/faithtracker-backend.service << 'EOF'
+
+    cat > /etc/systemd/system/faithtracker-backend.service << EOF
 [Unit]
 Description=FaithTracker FastAPI Backend
 After=network.target mongod.service
@@ -621,7 +551,7 @@ User=faithtracker
 Group=faithtracker
 WorkingDirectory=/opt/faithtracker/backend
 Environment="PATH=/opt/faithtracker/backend/venv/bin"
-ExecStart=/opt/faithtracker/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --workers 4
+ExecStart=/opt/faithtracker/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port $BACKEND_PORT --workers 4
 Restart=always
 RestartSec=10
 
@@ -664,7 +594,7 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8001;
+        proxy_pass http://127.0.0.1:$BACKEND_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -673,7 +603,7 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
-        
+
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
@@ -714,25 +644,37 @@ EOF
 # Setup SSL
 setup_ssl() {
     show_progress "Setting up SSL certificate"
-    
+
+    # Skip if SSL was not enabled in configuration
+    if [ "$ENABLE_SSL" != true ]; then
+        print_info "SSL not enabled during configuration"
+        print_info "You can enable it later with: sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME"
+        return
+    fi
+
+    # Install certbot if needed
     if ! command_exists certbot; then
+        print_info "Installing certbot..."
         apt install -y certbot python3-certbot-nginx >> "$LOG_FILE" 2>&1
     fi
-    
+
     echo ""
-    echo -e "${YELLOW}SSL Certificate Setup${NC}"
-    echo "This requires your domain to be pointing to this server's IP"
-    echo ""
-    read -p "Install SSL certificate now? (y/n): " -n 1 -r
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        certbot --nginx -d "$DOMAIN_NAME" -d "www.$DOMAIN_NAME" --non-interactive --agree-tos --email "$ADMIN_EMAIL" --redirect >> "$LOG_FILE" 2>&1 && \
-        print_success "SSL certificate installed" || \
-        print_warning "SSL setup incomplete. Run manually: sudo certbot --nginx"
-    else
-        print_info "Skipping SSL. Run later: sudo certbot --nginx"
-    fi
+    print_info "Installing SSL certificate with Let's Encrypt..."
+    print_warning "Make sure your domain is pointing to this server's IP address"
+
+    # Attempt automatic SSL setup
+    certbot --nginx -d "$DOMAIN_NAME" -d "www.$DOMAIN_NAME" \
+        --non-interactive \
+        --agree-tos \
+        --email "$ADMIN_EMAIL" \
+        --redirect >> "$LOG_FILE" 2>&1 && \
+    print_success "SSL certificate installed and configured" || {
+        print_warning "SSL setup failed - possible causes:"
+        print_warning "  • Domain not pointing to this server"
+        print_warning "  • Firewall blocking port 80/443"
+        print_warning "  • Domain DNS not propagated yet"
+        print_info "You can retry manually: sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME"
+    }
 }
 
 # Run smoke tests
@@ -742,7 +684,7 @@ run_smoke_tests() {
     sleep 2
     
     # Test backend
-    if curl -sf http://localhost:8001/api/config/all > /dev/null; then
+    if curl -sf http://localhost:$BACKEND_PORT/api/config/all > /dev/null; then
         print_success "Backend API responding"
     else
         print_warning "Backend API test failed"
