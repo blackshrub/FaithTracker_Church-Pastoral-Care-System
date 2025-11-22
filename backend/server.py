@@ -74,9 +74,16 @@ import json as json_lib
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from scheduler import start_scheduler, stop_scheduler, daily_reminder_job
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Validate configuration on startup
+from config import validate_config
+validate_config(exit_on_error=False)  # Show warnings but don't exit
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -85,6 +92,11 @@ db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
 
 # Create the main app without a prefix
 app = FastAPI()
+
+# Rate limiting configuration
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -1066,8 +1078,9 @@ async def register_user(user_data: UserCreate, current_admin: dict = Depends(get
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/auth/login", response_model=TokenResponse)
-async def login(user_data: UserLogin):
-    """Login and get access token"""
+@limiter.limit("5/minute")
+async def login(request: Request, user_data: UserLogin):
+    """Login and get access token (rate limited: 5 attempts per minute)"""
     try:
         user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
         if not user:
