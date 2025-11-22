@@ -186,11 +186,49 @@ class ActivityActionType(str, Enum):
     UPDATE_CARE_EVENT = "update_care_event"
     DELETE_CARE_EVENT = "delete_care_event"
 
+# ==================== CONSTANTS ====================
+
+# Engagement Status Thresholds (defaults - can be overridden by settings)
+ENGAGEMENT_AT_RISK_DAYS_DEFAULT = 60
+ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT = 90
+ENGAGEMENT_NO_CONTACT_DAYS = 999  # Used when member has never been contacted
+
+# Grief Support Timeline (days after mourning date)
+GRIEF_ONE_WEEK_DAYS = 7
+GRIEF_TWO_WEEKS_DAYS = 14
+GRIEF_ONE_MONTH_DAYS = 30
+GRIEF_THREE_MONTHS_DAYS = 90
+GRIEF_SIX_MONTHS_DAYS = 180
+GRIEF_ONE_YEAR_DAYS = 365
+
+# Accident/Illness Follow-up Timeline (days after event)
+ACCIDENT_FIRST_FOLLOWUP_DAYS = 3
+ACCIDENT_SECOND_FOLLOWUP_DAYS = 7
+ACCIDENT_FINAL_FOLLOWUP_DAYS = 14
+
+# Reminder Settings (days before event)
+DEFAULT_REMINDER_DAYS_BIRTHDAY = 7
+DEFAULT_REMINDER_DAYS_CHILDBIRTH = 14
+DEFAULT_REMINDER_DAYS_FINANCIAL_AID = 0
+DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS = 14
+DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT = 14
+
+# JWT Token Settings
+JWT_TOKEN_EXPIRE_HOURS = 24
+
+# Pagination Defaults
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 1000
+
+# Dashboard Lookback (days)
+DEFAULT_ANALYTICS_DAYS = 30
+DEFAULT_UPCOMING_DAYS = 7
+
 # ==================== AUTH CONFIGURATION ====================
 
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = JWT_TOKEN_EXPIRE_HOURS * 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
@@ -726,18 +764,18 @@ async def get_writeoff_settings():
 async def calculate_engagement_status_async(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
     """Calculate engagement status using configurable thresholds"""
     settings = await get_engagement_settings()
-    at_risk_days = settings.get("atRiskDays", 60)
-    disconnected_days = settings.get("disconnectedDays", 90)
-    
+    at_risk_days = settings.get("atRiskDays", ENGAGEMENT_AT_RISK_DAYS_DEFAULT)
+    disconnected_days = settings.get("disconnectedDays", ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT)
+
     if not last_contact:
-        return EngagementStatus.DISCONNECTED, 999
+        return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
     
     # Handle string dates
     if isinstance(last_contact, str):
         try:
             last_contact = datetime.fromisoformat(last_contact)
         except:
-            return EngagementStatus.DISCONNECTED, 999
+            return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
     
     # Make timezone-aware if needed
     if last_contact.tzinfo is None:
@@ -753,17 +791,17 @@ async def calculate_engagement_status_async(last_contact: Optional[datetime]) ->
     else:
         return EngagementStatus.DISCONNECTED, days_since
 
-def calculate_engagement_status(last_contact: Optional[datetime], at_risk_days: int = 60, disconnected_days: int = 90) -> tuple[EngagementStatus, int]:
+def calculate_engagement_status(last_contact: Optional[datetime], at_risk_days: int = ENGAGEMENT_AT_RISK_DAYS_DEFAULT, disconnected_days: int = ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT) -> tuple[EngagementStatus, int]:
     """Calculate engagement status and days since last contact (with configurable thresholds)"""
     if not last_contact:
-        return EngagementStatus.DISCONNECTED, 999
+        return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
     
     # Handle string dates
     if isinstance(last_contact, str):
         try:
             last_contact = datetime.fromisoformat(last_contact)
         except:
-            return EngagementStatus.DISCONNECTED, 999
+            return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
     
     # Make timezone-aware if needed
     if last_contact.tzinfo is None:
@@ -845,13 +883,73 @@ async def log_activity(
         # Don't fail the main operation if logging fails
         pass
 
+# ==================== HELPER FUNCTIONS ====================
+
+async def get_member_or_404(member_id: str, projection: Optional[dict] = None) -> dict:
+    """
+    Get member by ID or raise 404 HTTPException
+
+    Args:
+        member_id: The member's ID
+        projection: Optional MongoDB projection dict to limit fields returned
+
+    Returns:
+        Member document
+
+    Raises:
+        HTTPException: 404 if member not found
+    """
+    projection_dict = projection if projection else {"_id": 0}
+    member = await db.members.find_one({"id": member_id}, projection_dict)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    return member
+
+async def get_care_event_or_404(event_id: str, projection: Optional[dict] = None) -> dict:
+    """
+    Get care event by ID or raise 404 HTTPException
+
+    Args:
+        event_id: The event's ID
+        projection: Optional MongoDB projection dict to limit fields returned
+
+    Returns:
+        Care event document
+
+    Raises:
+        HTTPException: 404 if care event not found
+    """
+    projection_dict = projection if projection else {"_id": 0}
+    event = await db.care_events.find_one({"id": event_id}, projection_dict)
+    if not event:
+        raise HTTPException(status_code=404, detail="Care event not found")
+    return event
+
+async def get_campus_or_404(campus_id: str) -> dict:
+    """
+    Get campus by ID or raise 404 HTTPException
+
+    Args:
+        campus_id: The campus's ID
+
+    Returns:
+        Campus document
+
+    Raises:
+        HTTPException: 404 if campus not found
+    """
+    campus = await db.campuses.find_one({"id": campus_id}, {"_id": 0})
+    if not campus:
+        raise HTTPException(status_code=404, detail="Campus not found")
+    return campus
+
 def generate_accident_followup_timeline(event_date: date, care_event_id: str, member_id: str, campus_id: str) -> List[Dict[str, Any]]:
     """Generate 3-stage accident/illness follow-up timeline"""
     # Get settings from localStorage or use defaults
     stages = [
-        ("first_followup", 3),
-        ("second_followup", 7),
-        ("final_followup", 14),
+        ("first_followup", ACCIDENT_FIRST_FOLLOWUP_DAYS),
+        ("second_followup", ACCIDENT_SECOND_FOLLOWUP_DAYS),
+        ("final_followup", ACCIDENT_FINAL_FOLLOWUP_DAYS),
     ]
     
     timeline = []
@@ -878,12 +976,12 @@ def generate_accident_followup_timeline(event_date: date, care_event_id: str, me
 def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: str) -> List[Dict[str, Any]]:
     """Generate 6-stage grief support timeline"""
     stages = [
-        (GriefStage.ONE_WEEK, 7),
-        (GriefStage.TWO_WEEKS, 14),
-        (GriefStage.ONE_MONTH, 30),
-        (GriefStage.THREE_MONTHS, 90),
-        (GriefStage.SIX_MONTHS, 180),
-        (GriefStage.ONE_YEAR, 365),
+        (GriefStage.ONE_WEEK, GRIEF_ONE_WEEK_DAYS),
+        (GriefStage.TWO_WEEKS, GRIEF_TWO_WEEKS_DAYS),
+        (GriefStage.ONE_MONTH, GRIEF_ONE_MONTH_DAYS),
+        (GriefStage.THREE_MONTHS, GRIEF_THREE_MONTHS_DAYS),
+        (GriefStage.SIX_MONTHS, GRIEF_SIX_MONTHS_DAYS),
+        (GriefStage.ONE_YEAR, GRIEF_ONE_YEAR_DAYS),
     ]
     
     timeline = []

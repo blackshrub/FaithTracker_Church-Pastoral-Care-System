@@ -85,16 +85,33 @@ See `backend/TESTING_GUIDE.md` for details.
 **Structure of `server.py`:**
 1. Imports & configuration
 2. Enums (EventType, UserRole, EngagementStatus, etc.)
-3. Pydantic models (User, Member, CareEvent, Campus, etc.)
-4. Auth functions (JWT, bcrypt password hashing)
-5. Helper functions (timezone handling, engagement calculation)
-6. ~100 API endpoints grouped by resource
-7. Startup/shutdown events (scheduler, database)
+3. **Constants** - All magic numbers extracted for easy maintenance
+   - Engagement thresholds (60/90 days defaults)
+   - Grief timeline stages (7, 14, 30, 90, 180, 365 days)
+   - Accident followup stages (3, 7, 14 days)
+   - JWT token expiration, pagination defaults, etc.
+4. Pydantic models (User, Member, CareEvent, Campus, etc.)
+5. Auth functions (JWT, bcrypt password hashing)
+6. Utility functions (timezone handling, engagement calculation)
+7. **Helper functions** - DRY patterns to reduce code duplication
+   - `get_member_or_404()` - Fetch member or raise 404
+   - `get_care_event_or_404()` - Fetch care event or raise 404
+   - `get_campus_or_404()` - Fetch campus or raise 404
+   - `log_activity()` - Activity logging with accountability
+   - `generate_grief_timeline()` - Auto-generate 6-stage grief support
+   - `generate_accident_followup_timeline()` - Auto-generate 3-stage followups
+8. ~100 API endpoints grouped by resource (clearly marked with section headers)
+9. Startup/shutdown events (scheduler, database)
 
 **When editing `server.py`:**
 - Use search to locate relevant sections (the file is large)
+- **Use constants instead of magic numbers** - Check CONSTANTS section for existing values
+- **Use helper functions to reduce duplication**:
+  - Use `get_member_or_404()` instead of `find_one()` + manual 404 check
+  - Use `get_care_event_or_404()` for care events
+  - Use `log_activity()` for consistent accountability tracking
 - Pydantic models are defined near the top (~lines 100-500)
-- API endpoints are grouped by resource type
+- API endpoints are grouped by resource type with clear section markers
 - All database operations use Motor async driver (`await db.collection.find()`)
 - All queries auto-scope by `church_id` for multi-tenancy
 
