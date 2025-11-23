@@ -262,6 +262,15 @@ update_backend() {
         exit 1
     fi
 
+    # Create/update database indexes
+    print_step "Updating database indexes"
+    python create_indexes.py >> "$LOG_FILE" 2>&1
+    if [ $? -eq 0 ]; then
+        print_success "Database indexes updated"
+    else
+        print_warning "Index update failed (non-critical)"
+    fi
+
     deactivate
 
     # Restart backend service

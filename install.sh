@@ -517,7 +517,12 @@ setup_backend() {
         print_error "Database initialization failed"
         exit 1
     }
-    
+
+    print_info "Creating database indexes for performance..."
+    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" create_indexes.py >> "$LOG_FILE" 2>&1 || {
+        print_warning "Index creation failed (non-critical)"
+    }
+
     print_success "Backend setup complete"
 }
 
