@@ -63,13 +63,19 @@ async def create_database_indexes():
     # Family groups indexes
     await db.family_groups.create_index("campus_id")
     print("✅ Family groups indexes created")
-    
+
+    # Job locks indexes (for distributed scheduler locking)
+    await db.job_locks.create_index("lock_id", unique=True)
+    await db.job_locks.create_index("expires_at")
+    print("✅ Job locks indexes created")
+
     print("\n🚀 All database indexes created successfully!")
     print("Expected performance improvements:")
     print("  - Member queries: 5-10x faster")
-    print("  - Dashboard loading: 3-5x faster") 
+    print("  - Dashboard loading: 3-5x faster")
     print("  - Analytics: 2-3x faster")
     print("  - Search: 10x faster")
+    print("  - Scheduler: Prevents duplicate job execution across workers")
     
     client.close()
 
