@@ -28,15 +28,22 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8001
 # Run tests
 ./test_api.sh
 
-# Database utilities
+# Database utilities (automatically run by install.sh and update.sh)
 python create_indexes.py                # Create MongoDB indexes
+python migrate.py                       # Run database migrations
+
+# Data import utilities (manual)
 python import_data.py                   # Bulk import members from CSV
+python import_photos.py                 # Import member photos from directory
 
 # Engagement status updates
 python bulk_engagement_update.py        # FAST: Bulk update (10-100x faster, RECOMMENDED)
 python bulk_engagement_update.py --dry-run  # Preview changes without updating
 python bulk_engagement_update.py --campus-id <ID>  # Update specific campus
 python recalculate_engagement.py        # SLOW: Legacy individual updates (deprecated)
+
+# One-time migrations (safe to run multiple times)
+python normalize_user_phones.py         # Normalize phone numbers to international format
 ```
 
 ### Frontend
@@ -320,6 +327,70 @@ frontend/
 ├── tailwind.config.js           # Tailwind CSS config
 └── craco.config.js              # Create React App overrides
 ```
+
+## Backend Utility Scripts
+
+### Automated (Run by install.sh/update.sh)
+
+**`create_indexes.py`** - Creates MongoDB indexes for performance
+- Automatically run during installation and updates
+- Creates indexes on all collections including job_locks (for scheduler)
+- Safe to run multiple times (idempotent)
+- Run manually: `python create_indexes.py`
+
+**`migrate.py`** - Database schema migrations
+- Automatically run during updates
+- Handles schema changes between versions
+- Run manually: `python migrate.py`
+
+**`init_db.py`** - Initialize database
+- Automatically run during installation only
+- Creates admin user and default campus
+- Usage: `python init_db.py --admin-email EMAIL --admin-password PASS --church-name NAME`
+
+### Manual Data Import
+
+**`import_data.py`** - Bulk import members from CSV
+- Import hundreds/thousands of members at once
+- CSV format: name, phone, email, family_group_name, notes
+- Usage: `python import_data.py --campus-id ID --file members.csv`
+- See script for CSV template
+
+**`import_photos.py`** - Import member photos
+- Bulk import photos matched by member phone number
+- Photos named like: 6281234567890.jpg
+- Usage: `python import_photos.py --directory /path/to/photos --campus-id ID`
+
+### Performance & Maintenance
+
+**`bulk_engagement_update.py`** ⭐ RECOMMENDED
+- Fast bulk update of member engagement status (10-100x faster)
+- Uses MongoDB aggregation pipeline
+- Usage:
+  ```bash
+  python bulk_engagement_update.py                 # Update all
+  python bulk_engagement_update.py --dry-run       # Preview only
+  python bulk_engagement_update.py --campus-id ID  # Specific campus
+  ```
+
+**`recalculate_engagement.py`** (Deprecated)
+- Legacy individual updates - much slower
+- Only use if bulk_engagement_update fails
+- Usage: `python recalculate_engagement.py`
+
+### One-Time Migrations
+
+**`normalize_user_phones.py`**
+- Converts phone numbers to international format (+62...)
+- Safe to run multiple times
+- Usage: `python normalize_user_phones.py`
+
+### Testing
+
+**`test_api.sh`**
+- Comprehensive API testing script
+- Tests all 40+ endpoints
+- Usage: `cd backend && ./test_api.sh`
 
 ## Common Tasks
 
