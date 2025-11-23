@@ -230,24 +230,27 @@ async def send_daily_digest_to_pastoral_team():
         logger.info("="*60)
         logger.info("SENDING DAILY DIGEST TO PASTORAL TEAM")
         logger.info("="*60)
-        
+
         # Get all active campuses
         campuses = await db.campuses.find({"is_active": True}, {"_id": 0}).to_list(200)
         logger.info(f"Found {len(campuses)} active campuses")
-        
+
         total_sent = 0
         total_failed = 0
-        
+
+        # Track users who have already received the digest to prevent duplicates
+        sent_to_users = set()  # Track by user_id
+
         for campus in campuses:
             campus_id = campus["id"]
             campus_name = campus["campus_name"]
-            
+
             # Generate digest for this campus
             digest = await generate_daily_digest_for_campus(campus_id, campus_name)
-            
+
             if not digest:
                 continue
-            
+
             # Skip if no tasks
             if digest["stats"]["birthdays_today"] == 0 and \
                digest["stats"]["grief_due"] == 0 and \
@@ -255,20 +258,22 @@ async def send_daily_digest_to_pastoral_team():
                digest["stats"]["at_risk"] == 0:
                 logger.info(f"  Skipping {campus_name} - no urgent tasks")
                 continue
-            
-            # Get all pastoral team members for this campus
+
+            # Get pastoral team members for this specific campus only (no full_admin here)
             pastoral_team = await db.users.find({
-                "$or": [
-                    {"campus_id": campus_id, "role": {"$in": ["campus_admin", "pastor"]}},
-                    {"role": "full_admin"}  # Full admin gets digests from all campuses
-                ],
+                "campus_id": campus_id,
+                "role": {"$in": ["campus_admin", "pastor"]},
                 "is_active": True
             }, {"_id": 0}).to_list(100)
-            
+
             logger.info(f"  {campus_name}: {len(pastoral_team)} team members, {sum(digest['stats'].values())} tasks")
-            
-            # Send to each team member
+
+            # Send to each team member (skip if already sent)
             for user in pastoral_team:
+                if user['id'] in sent_to_users:
+                    logger.info(f"  ⏭️  Skipping {user['name']} (already received digest)")
+                    continue
+
                 try:
                     result = await send_whatsapp(
                         user['phone'],
@@ -278,14 +283,64 @@ async def send_daily_digest_to_pastoral_team():
                             "campus_id": campus_id,
                             "pastoral_team_user_id": user['id']
                         })
-                    
-                    logger.info(f"✅ Sent digest to {user['name']} ({user['phone']})")
-                    
+
+                    sent_to_users.add(user['id'])
+                    total_sent += 1
+                    logger.info(f"  ✅ Sent digest to {user['name']} ({user['phone']})")
+
                 except Exception as user_error:
-                    logger.error(f"Error sending digest to user {user.get('email')}: {str(user_error)}")
-        
-        logger.info(f"✅ Daily reminder job completed for {len(campuses)} campuses")
-        
+                    total_failed += 1
+                    logger.error(f"  ❌ Error sending digest to user {user.get('email')}: {str(user_error)}")
+
+        # Handle full_admin users separately - send consolidated digest from first campus with tasks
+        full_admins = await db.users.find({
+            "role": "full_admin",
+            "is_active": True
+        }, {"_id": 0}).to_list(100)
+
+        if full_admins:
+            logger.info(f"\n  Sending digest to {len(full_admins)} full_admin users...")
+
+            # Find first campus with tasks to send digest
+            first_campus_digest = None
+            for campus in campuses:
+                digest = await generate_daily_digest_for_campus(campus["id"], campus["campus_name"])
+                if digest and (digest["stats"]["birthdays_today"] > 0 or
+                              digest["stats"]["grief_due"] > 0 or
+                              digest["stats"]["hospital_followups"] > 0 or
+                              digest["stats"]["at_risk"] > 0):
+                    first_campus_digest = digest
+                    break
+
+            if first_campus_digest:
+                for admin in full_admins:
+                    if admin['id'] in sent_to_users:
+                        logger.info(f"  ⏭️  Skipping {admin['name']} (already received digest)")
+                        continue
+
+                    try:
+                        result = await send_whatsapp(
+                            admin['phone'],
+                            first_campus_digest['message'],
+                            {
+                                "id": str(uuid.uuid4()),
+                                "campus_id": "all",
+                                "pastoral_team_user_id": admin['id']
+                            })
+
+                        sent_to_users.add(admin['id'])
+                        total_sent += 1
+                        logger.info(f"  ✅ Sent digest to full_admin {admin['name']} ({admin['phone']})")
+
+                    except Exception as admin_error:
+                        total_failed += 1
+                        logger.error(f"  ❌ Error sending digest to full_admin {admin.get('email')}: {str(admin_error)}")
+
+        logger.info(f"\n✅ Daily reminder job completed")
+        logger.info(f"   Campuses processed: {len(campuses)}")
+        logger.info(f"   Messages sent: {total_sent}")
+        logger.info(f"   Messages failed: {total_failed}")
+
     except Exception as e:
         logger.error(f"Error in daily reminder job: {str(e)}")
 
