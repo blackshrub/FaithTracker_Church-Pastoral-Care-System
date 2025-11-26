@@ -549,9 +549,32 @@ copy_files() {
     print_section "Updating Files"
 
     print_step "Syncing files to application directory"
-    rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' \
+
+    # Log what files will be transferred (verbose mode to log file)
+    echo "=== rsync file transfer log ===" >> "$LOG_FILE"
+
+    rsync -av --exclude='.git' --exclude='node_modules' --exclude='venv' \
         --exclude='__pycache__' --exclude='*.pyc' --exclude='build' --exclude='.env' \
         --exclude='uploads' "$GIT_DIR/" "$APP_DIR/" >> "$LOG_FILE" 2>&1
+
+    # Verify critical backend scripts were copied
+    local critical_scripts=("migrate.py" "init_db.py" "create_indexes.py" "server.py")
+    local missing_scripts=()
+
+    for script in "${critical_scripts[@]}"; do
+        if [ -f "$GIT_DIR/backend/$script" ] && [ ! -f "$APP_DIR/backend/$script" ]; then
+            missing_scripts+=("$script")
+        fi
+    done
+
+    # If any critical scripts are missing, copy them explicitly
+    if [ ${#missing_scripts[@]} -gt 0 ]; then
+        print_warning "Some scripts were not synced, copying explicitly..."
+        for script in "${missing_scripts[@]}"; do
+            cp "$GIT_DIR/backend/$script" "$APP_DIR/backend/$script"
+            echo "Explicitly copied: $script" >> "$LOG_FILE"
+        done
+    fi
 
     chown -R faithtracker:faithtracker "$APP_DIR"
     print_success "Files synchronized"
