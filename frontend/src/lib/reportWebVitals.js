@@ -25,14 +25,16 @@ const reportWebVitals = (onPerfEntry) => {
  * @param {Object} metric - Web Vitals metric object
  */
 export const sendToAnalytics = (metric) => {
-  // Log to console in development
+  // Log to console in development only
+  // Production analytics endpoint not implemented - metrics logged locally only
   if (process.env.NODE_ENV === 'development') {
-    const { name, value, rating, delta, id } = metric;
+    const { name, value, rating } = metric;
     console.log(`[Web Vitals] ${name}: ${Math.round(value)} (${rating})`);
   }
 
-  // In production, you can send to your analytics service
-  // Example: Send to backend analytics endpoint
+  // Note: To enable production analytics, implement /api/analytics/vitals endpoint
+  // and uncomment the code below:
+  /*
   if (process.env.NODE_ENV === 'production') {
     const body = JSON.stringify({
       name: metric.name,
@@ -43,22 +45,11 @@ export const sendToAnalytics = (metric) => {
       navigationType: metric.navigationType,
       timestamp: Date.now()
     });
-
-    // Use sendBeacon for reliable delivery even on page unload
     if (navigator.sendBeacon) {
       navigator.sendBeacon('/api/analytics/vitals', body);
-    } else {
-      // Fallback to fetch
-      fetch('/api/analytics/vitals', {
-        method: 'POST',
-        body,
-        headers: { 'Content-Type': 'application/json' },
-        keepalive: true
-      }).catch(() => {
-        // Silently fail - analytics shouldn't break the app
-      });
     }
   }
+  */
 };
 
 export default reportWebVitals;

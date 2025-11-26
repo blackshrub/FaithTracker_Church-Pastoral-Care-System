@@ -167,6 +167,7 @@ async def create_default_campus(db, church_name):
         "city": "",
         "phone": "",
         "head_pastor": "",
+        "is_active": True,  # Required for campus to show in login selection
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }

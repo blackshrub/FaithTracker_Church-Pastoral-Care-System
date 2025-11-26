@@ -146,6 +146,15 @@ async def migration_005_add_deleted_fields(db):
     return f"Added soft delete fields to {total_updated} documents"
 
 
+async def migration_006_ensure_campus_is_active(db):
+    """Ensure all campuses have is_active field (required for login selection)"""
+    result = await db.campuses.update_many(
+        {"is_active": {"$exists": False}},
+        {"$set": {"is_active": True}}
+    )
+    return f"Set is_active=True on {result.modified_count} campus(es)"
+
+
 # ==================== MIGRATION REGISTRY ====================
 
 # List of all migrations in order
@@ -156,6 +165,7 @@ MIGRATIONS: List[tuple[int, str, Callable]] = [
     (3, "API sync collections", migration_003_add_api_sync_collections),
     (4, "Normalize phone numbers", migration_004_normalize_phone_numbers),
     (5, "Add soft delete fields", migration_005_add_deleted_fields),
+    (6, "Ensure campus is_active field", migration_006_ensure_campus_is_active),
 ]
 
 
