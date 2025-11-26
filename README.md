@@ -166,8 +166,12 @@ Docker deployment is the easiest way to get FaithTracker running with automatic 
 #### Prerequisites
 - A Linux server (Ubuntu 20.04+, Debian 11+, or any Docker-compatible OS)
 - Docker and Docker Compose installed
-- A domain name pointing to your server
+- A domain with **two DNS records** pointing to your server:
+  - `yourdomain.com` → your server IP (for frontend)
+  - `api.yourdomain.com` → your server IP (for API)
 - Ports 80 and 443 open
+
+> See [Domain & DNS Configuration](#domain--dns-configuration) for detailed DNS setup instructions.
 
 #### Step 1: Install Docker (if not installed)
 
