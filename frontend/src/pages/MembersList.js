@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
+import { MembersListSkeleton } from '@/components/skeletons';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Label } from '@/components/ui/label';
@@ -246,12 +246,7 @@ export const MembersList = () => {
   });
   
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
+    return <MembersListSkeleton />;
   }
   
   return (

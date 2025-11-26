@@ -1210,7 +1210,8 @@ async def update_campus(campus_id: str, update: CampusCreate, current_admin: dic
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
 @api_router.post("/auth/register", response_model=UserResponse)
-async def register_user(user_data: UserCreate, current_admin: dict = Depends(get_current_admin)):
+@limiter.limit("10/minute")
+async def register_user(request: Request, user_data: UserCreate, current_admin: dict = Depends(get_current_admin)):
     """Register a new user (admin only)"""
     try:
         # Check if email already exists

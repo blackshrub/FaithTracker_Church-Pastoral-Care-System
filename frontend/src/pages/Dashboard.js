@@ -30,6 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Phone, Cake, CalendarIcon } from 'lucide-react';
 import { DashboardStats, BirthdaySection } from '@/components/dashboard';
+import { DashboardSkeleton } from '@/components/skeletons';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -468,7 +469,7 @@ export const Dashboard = () => {
     [overdueBirthdays]
   );
 
-  if (isLoading) return <div>{t('loading')}</div>;
+  if (isLoading) return <DashboardSkeleton />;
 
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   

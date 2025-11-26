@@ -1,280 +1,641 @@
-# FaithTracker REST API Documentation v2.0
+# FaithTracker REST API Documentation
 
-**Base URL:** `{BACKEND_URL}/api`  
-**Authentication:** Bearer token (JWT) in `Authorization` header  
-**All requests/responses:** `Content-Type: application/json`
+**Version**: 2.1
+**Base URL**: `{BACKEND_URL}/api`
+**Authentication**: Bearer token (JWT)
+**Content-Type**: `application/json`
 
 ---
 
-## 🆕 What's New (v2.0)
+## Table of Contents
 
-- ✅ **Campus Timezone Configuration:** Per-campus timezone settings (45+ international timezones)
-- ✅ **Birthday Auto-Generation:** Birthdays created from birth_date, manual entry disabled
-- ✅ **Enhanced Photo Support:** photo_url in all member responses
-- ✅ **Bilingual Support:** 180+ translation keys (Indonesian/English)
-- ✅ **Performance Optimizations:** Faster responses, better caching
+- [Authentication](#authentication)
+- [Health Endpoints](#health-endpoints)
+- [Members](#members)
+- [Care Events](#care-events)
+- [Dashboard](#dashboard)
+- [Activity Logs](#activity-logs)
+- [Campuses](#campuses)
+- [Users](#users)
+- [Error Handling](#error-handling)
+- [Rate Limiting](#rate-limiting)
+- [Postman Collection](#postman-collection)
 
 ---
 
 ## Authentication
 
-### POST `/auth/register`
-Create new user (admin only)
+### Login
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
 
-### POST `/auth/login`  
-User login - Returns JWT token
+**Request Body**:
+```json
+{
+  "email": "admin@church.org",
+  "password": "your-password"
+}
+```
 
-### GET `/auth/me`
-Get current user info
+**Response** (200 OK):
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "admin@church.org",
+    "name": "Admin User",
+    "role": "full_admin",
+    "campus_id": null,
+    "campus_name": null,
+    "phone": "+6281234567890",
+    "photo_url": "/api/uploads/users/admin-photo.jpg"
+  }
+}
+```
+
+**Error Response** (401 Unauthorized):
+```json
+{
+  "detail": "Incorrect email or password"
+}
+```
+
+**Rate Limit**: 5 requests per minute
+
+### Using the Token
+Include the token in all subsequent requests:
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
 
 ---
 
-## Campus Management 🆕
+## Health Endpoints
 
-### GET `/campuses`
-List all campuses
+These endpoints do not require authentication.
 
-### GET `/campuses/{campus_id}` 🆕 Updated
-Get campus details **including timezone**
+### Liveness Probe
+```http
+GET /health
+```
+
+**Response** (200 OK):
 ```json
-Response: {
-  "id": "uuid",
-  "campus_name": "string",
-  "location": "string",
-  "timezone": "Asia/Jakarta",  // 🆕 NEW FIELD
-  "is_active": boolean
+{
+  "status": "healthy",
+  "service": "faithtracker-api",
+  "timestamp": "2024-01-15T10:30:00.000Z"
 }
 ```
 
-### PUT `/campuses/{campus_id}` 🆕 Updated
-Update campus **including timezone**
+### Readiness Probe
+```http
+GET /ready
+```
+
+**Response** (200 OK):
 ```json
-Request: {
-  "timezone": "Asia/Singapore"  // 🆕 Update timezone
+{
+  "status": "ready",
+  "database": "connected",
+  "timestamp": "2024-01-15T10:30:00.000Z"
 }
 ```
 
-**Available Timezones:**
-- Asia: Jakarta, Singapore, Tokyo, Seoul, Manila, Bangkok, Dubai, Riyadh, Kolkata, Hong Kong, Shanghai, Taipei
-- Australia/Pacific: Sydney, Melbourne, Perth, Auckland, Fiji
-- Americas: New York, Los Angeles, Toronto, Mexico City, São Paulo
-- Europe: London, Paris, Berlin, Moscow, Istanbul
-- Africa: Cairo, Johannesburg, Lagos, Nairobi
+**Response** (503 Service Unavailable):
+```json
+{
+  "status": "not_ready",
+  "database": "disconnected",
+  "error": "Connection refused"
+}
+```
 
 ---
 
 ## Members
 
-### GET `/members`
-List with search, pagination, filtering
+### List Members
+```http
+GET /api/members?page=1&limit=25&engagement_status=active&search=john
+Authorization: Bearer {token}
+```
 
-**Query Params:**
-- `search`: Name or phone search
-- `skip`, `limit`: Pagination
-- `engagement_status`: Filter by status
+**Query Parameters**:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| page | int | 1 | Page number |
+| limit | int | 50 | Items per page (max 1000) |
+| engagement_status | string | - | Filter: active, at_risk, disconnected |
+| search | string | - | Search by name or phone |
+| show_archived | bool | false | Include archived members |
 
-### GET `/members/{member_id}` 🆕 Updated
-Includes `photo_url`, `engagement_status`, `days_since_last_contact`
+**Response Headers**:
+```
+X-Total-Count: 150
+```
 
-### POST `/members`
-Create member
-
-### PUT `/members/{member_id}`
-Update member
-
-### DELETE `/members/{member_id}`
-Delete member + all related events
-
-### POST `/members/{member_id}/photo`
-Upload photo - Returns `photo_url`
-
----
-
-## Care Events 🆕 Updated
-
-### GET `/care-events`
-List events with filters
-
-**Event Types:**
-- ✅ `childbirth` - Childbirth
-- ✅ `grief_loss` - Grief/Loss (auto-generates 6-stage timeline)
-- ✅ `new_house` - New House
-- ✅ `accident_illness` - Accident/Illness (auto-generates 3-stage follow-up)
-- ✅ `hospital_visit` - Hospital Visit
-- ✅ `financial_aid` - Financial Aid
-- ✅ `regular_contact` - Regular Contact
-- ⚠️ `birthday` - **AUTO-GENERATED ONLY** (do not allow manual creation)
-
-### POST `/care-events` 🆕 Updated
-**Important:** Do NOT allow `event_type: "birthday"` from mobile app
-- Birthdays auto-created from member's `birth_date`
-- Use completion endpoint to mark birthdays complete
-
-### POST `/care-events/{event_id}/complete` 🆕
-Mark event complete (including birthdays)
-
-**Use for:**
-- Birthday completion (updates engagement status)
-- Regular contact logging
-- Event follow-up tracking
-
----
-
-## Financial Aid 🆕 Updated
-
-### GET `/financial-aid/summary`
-Total aid statistics by type
-
-### GET `/financial-aid/recipients` 🆕 Enhanced
-Recipients with photo URLs
+**Response** (200 OK):
 ```json
-Response: [
+[
   {
-    "member_id": "uuid",
-    "member_name": "string",
-    "photo_url": "string",  // 🆕 Includes photo
-    "total_amount": float,
-    "aid_count": int
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "name": "John Doe",
+    "phone": "+6281234567890",
+    "campus_id": "campus-001",
+    "photo_url": "/api/uploads/members/john-doe.jpg",
+    "engagement_status": "active",
+    "days_since_last_contact": 5,
+    "last_contact_date": "2024-01-10T08:00:00.000Z",
+    "age": 35,
+    "gender": "male"
   }
 ]
 ```
 
-### GET `/financial-aid/member/{member_id}`
-All aid for specific member
+### Get Member
+```http
+GET /api/members/{id}
+Authorization: Bearer {token}
+```
 
-### GET `/financial-aid-schedules`
-List all recurring schedules
+**Response** (200 OK):
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "name": "John Doe",
+  "phone": "+6281234567890",
+  "email": "john@example.com",
+  "birth_date": "1990-01-15",
+  "gender": "male",
+  "address": "123 Main St",
+  "campus_id": "campus-001",
+  "photo_url": "/api/uploads/members/john-doe.jpg",
+  "engagement_status": "active",
+  "days_since_last_contact": 5,
+  "last_contact_date": "2024-01-10T08:00:00.000Z",
+  "notes": "Active church member",
+  "family_group_name": "Doe Family",
+  "created_at": "2023-06-01T10:00:00.000Z"
+}
+```
 
-### POST `/financial-aid-schedules`
-Create recurring aid schedule
+### Create Member
+```http
+POST /api/members
+Authorization: Bearer {token}
+Content-Type: application/json
+```
 
-### POST `/financial-aid-schedules/{id}/mark-distributed`
-Mark monthly distribution complete
+**Request Body**:
+```json
+{
+  "name": "Jane Smith",
+  "phone": "+6289876543210",
+  "email": "jane@example.com",
+  "birth_date": "1985-05-20",
+  "gender": "female",
+  "address": "456 Oak Ave",
+  "notes": "New member"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "name": "Jane Smith",
+  "phone": "+6289876543210",
+  "email": "jane@example.com",
+  "birth_date": "1985-05-20",
+  "gender": "female",
+  "campus_id": "campus-001",
+  "engagement_status": "active",
+  "created_at": "2024-01-15T10:30:00.000Z"
+}
+```
+
+### Update Member
+```http
+PUT /api/members/{id}
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "name": "Jane Smith-Johnson",
+  "phone": "+6289876543210",
+  "address": "789 New Address"
+}
+```
+
+### Delete Member
+```http
+DELETE /api/members/{id}
+Authorization: Bearer {token}
+```
+
+### Upload Member Photo
+```http
+POST /api/members/{id}/photo
+Authorization: Bearer {token}
+Content-Type: multipart/form-data
+```
+
+**Form Data**:
+- `file`: Image file (JPEG, PNG)
 
 ---
 
-## Analytics
+## Care Events
 
-### GET `/analytics/grief-completion-rate`
-Grief support metrics
+### List Care Events
+```http
+GET /api/care-events?member_id={member_id}
+Authorization: Bearer {token}
+```
 
-### GET `/analytics/engagement-summary`
-Member engagement statistics
+**Response** (200 OK):
+```json
+[
+  {
+    "id": "event-001",
+    "member_id": "550e8400-e29b-41d4-a716-446655440001",
+    "event_type": "birthday",
+    "event_date": "2024-01-15",
+    "completed": false,
+    "ignored": false,
+    "notes": "35th birthday",
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "created_by": "admin-user-id",
+    "created_by_name": "Admin User"
+  }
+]
+```
+
+### Create Care Event
+```http
+POST /api/care-events
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "member_id": "550e8400-e29b-41d4-a716-446655440001",
+  "event_type": "grief_loss",
+  "event_date": "2024-01-15",
+  "notes": "Loss of father"
+}
+```
+
+**Event Types**:
+- `birthday` - Birthday celebration
+- `grief_loss` - Grief/loss support (auto-generates 6-stage timeline)
+- `accident_illness` - Hospital/illness visits (auto-generates follow-ups)
+- `financial_aid` - Financial assistance
+- `childbirth` - New baby celebration
+- `new_house` - New house blessing
+- `regular_contact` - Regular check-in
+
+**Response** (200 OK) - Grief Loss Example:
+```json
+{
+  "id": "event-002",
+  "member_id": "550e8400-e29b-41d4-a716-446655440001",
+  "event_type": "grief_loss",
+  "event_date": "2024-01-15",
+  "notes": "Loss of father",
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "grief_stages": [
+    {"stage": "mourning_service", "scheduled_date": "2024-01-15"},
+    {"stage": "3_day", "scheduled_date": "2024-01-18"},
+    {"stage": "7_day", "scheduled_date": "2024-01-22"},
+    {"stage": "40_day", "scheduled_date": "2024-02-24"},
+    {"stage": "100_day", "scheduled_date": "2024-04-24"},
+    {"stage": "1_year", "scheduled_date": "2025-01-15"}
+  ]
+}
+```
+
+### Complete Care Event
+```http
+POST /api/care-events/{id}/complete
+Authorization: Bearer {token}
+```
+
+### Ignore Care Event
+```http
+POST /api/care-events/{id}/ignore
+Authorization: Bearer {token}
+```
+
+### Delete Care Event
+```http
+DELETE /api/care-events/{id}
+Authorization: Bearer {token}
+```
 
 ---
 
-## Mobile App Development Guide
+## Dashboard
 
-### 1. Initial Setup
-```javascript
-// On app start/login:
-const user = await login(email, password);
-const campus = await getCampus(user.campus_id);
-const timezone = campus.timezone; // Store globally
-
-// Load translations
-import id from './locales/id.json';
-import en from './locales/en.json';
+### Get Dashboard Data
+```http
+GET /api/dashboard/reminders
+Authorization: Bearer {token}
 ```
 
-### 2. Date/Time Handling 🆕
-```javascript
-// Always use campus timezone for display
-import { formatInTimeZone } from 'date-fns-tz';
-
-const displayDate = formatInTimeZone(
-  serverDate,
-  campusTimezone,  // From campus.timezone
-  'dd MMM yyyy'
-);
-
-// Send dates in ISO format
-const dateToSend = '2025-11-14'; // YYYY-MM-DD
-```
-
-### 3. Birthday Handling 🆕
-```javascript
-// DO NOT create birthday events manually
-// ❌ BAD:
-await createCareEvent({ event_type: 'birthday', ... });
-
-// ✅ GOOD: Birthdays auto-generated from birth_date
-// Just display and allow completion:
-const birthdays = events.filter(e => 
-  e.event_type === 'birthday' && !e.completed
-);
-
-// Show in UI with Mark Complete button:
-await axios.post(`/api/care-events/${birthdayId}/complete`);
-```
-
-### 4. Translation Keys 🆕
-Use translation keys from `/app/frontend/src/locales/`:
-```javascript
-t('dashboard')  // "Dasbor" (ID) / "Dashboard" (EN)
-t('total_members')  // "Total Jemaat" / "Total Members"
-t('event_types.grief_loss')  // "Dukacita/Kehilangan" / "Grief/Loss"
-```
-
-### 5. Photo Display 🆕
-```javascript
-// Photos now included in member responses
-const photoUrl = `${BACKEND_URL}${member.photo_url}`;
-// Or use in recipient lists:
-const recipients = await getFinancialAidRecipients();
-// Each recipient has photo_url field
-```
-
-### 6. Engagement Status
-```javascript
-// Auto-calculated, read-only
-member.engagement_status;  // "active" | "at_risk" | "inactive" | "disconnected"
-member.days_since_last_contact;  // Number of days
-
-// Updates automatically when care events added/completed
+**Response** (200 OK):
+```json
+{
+  "birthdays_today": [
+    {
+      "id": "event-001",
+      "member_id": "member-001",
+      "member_name": "John Doe",
+      "member_phone": "+6281234567890",
+      "member_photo_url": "/api/uploads/members/john.jpg",
+      "member_age": 35,
+      "completed": false
+    }
+  ],
+  "overdue_birthdays": [],
+  "upcoming_birthdays": [],
+  "today_tasks": [],
+  "grief_today": [],
+  "accident_followup": [],
+  "at_risk_members": [],
+  "disconnected_members": [],
+  "financial_aid_due": [],
+  "upcoming_tasks": [],
+  "total_tasks": 5,
+  "total_members": 150
+}
 ```
 
 ---
 
-## Breaking Changes from v1.0
+## Activity Logs
 
-### ⚠️ Birthday Events
-- **OLD:** Could create birthday events manually
-- **NEW:** Birthday events auto-generated only, manual creation disabled
+### Get Activity Logs
+```http
+GET /api/activity-logs?page=1&limit=50&action_type=complete_task&user_id={user_id}
+Authorization: Bearer {token}
+```
 
-### 🆕 Required Fields
-- **Campus:** Now includes `timezone` field (default: "Asia/Jakarta")
-- **Financial Aid Recipients:** Now includes `photo_url`
+**Query Parameters**:
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| page | int | Page number |
+| limit | int | Items per page |
+| action_type | string | Filter by action type |
+| user_id | string | Filter by user |
+| start_date | string | Start date (YYYY-MM-DD) |
+| end_date | string | End date (YYYY-MM-DD) |
 
-### 🆕 Recommended Updates
-- Implement timezone-aware date display
-- Add Indonesian/English language toggle
-- Remove birthday from event type selectors
-- Show birthdays 7 days before actual date
+**Action Types**:
+- `complete_task`, `ignore_task`, `undo_task`
+- `create_event`, `delete_event`
+- `complete_grief`, `ignore_grief`, `undo_grief`
+- `complete_accident`, `ignore_accident`, `undo_accident`
+- `financial_distributed`, `financial_stopped`, `financial_ignored`
+- `send_reminder`, `contact_member`
+
+**Response** (200 OK):
+```json
+{
+  "logs": [
+    {
+      "id": "log-001",
+      "user_id": "user-001",
+      "user_name": "Pastor John",
+      "user_photo_url": "/api/uploads/users/john.jpg",
+      "action_type": "complete_task",
+      "member_id": "member-001",
+      "member_name": "Jane Doe",
+      "event_type": "birthday",
+      "notes": "Called and wished happy birthday",
+      "timestamp": "2024-01-15T10:30:00+07:00"
+    }
+  ],
+  "total": 100,
+  "page": 1,
+  "limit": 50
+}
+```
 
 ---
 
-## Testing Endpoints
+## Campuses
 
-**Base URL:** https://church-care.preview.emergentagent.com/api
+### List Campuses
+```http
+GET /api/campuses
+Authorization: Bearer {token}
+```
 
-**Test Account:**
-- Email: `admin@gkbj.church`
-- Password: `admin123`
-- Role: Full Administrator
+**Response** (200 OK):
+```json
+[
+  {
+    "id": "campus-001",
+    "campus_name": "Main Campus",
+    "location": "Jakarta",
+    "timezone": "Asia/Jakarta",
+    "is_active": true
+  }
+]
+```
 
-**Sample Data:**
-- 805 members imported
-- 1000+ care events
-- Multiple grief timelines
-- Financial aid schedules active
+### Create Campus (Admin Only)
+```http
+POST /api/campuses
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "campus_name": "North Campus",
+  "location": "North Jakarta",
+  "timezone": "Asia/Jakarta"
+}
+```
 
 ---
 
-**API Version:** 2.0  
-**Last Updated:** 2025-11-14  
-**Total Endpoints:** 85+  
-**Mobile-Ready:** ✅ Fully supported  
-**Timezone-Aware:** ✅ Campus-level configuration  
-**Bilingual:** ✅ Indonesian & English (180+ keys)  
-**Photo Support:** ✅ All member/recipient endpoints
+## Users
+
+### List Users (Admin Only)
+```http
+GET /api/users
+Authorization: Bearer {token}
+```
+
+### Create User (Admin Only)
+```http
+POST /api/auth/register
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "email": "pastor@church.org",
+  "password": "secure-password",
+  "name": "Pastor Name",
+  "role": "pastor",
+  "campus_id": "campus-001",
+  "phone": "+6281234567890"
+}
+```
+
+**Roles**:
+- `full_admin` - Access all campuses
+- `campus_admin` - Manage single campus
+- `pastor` - Regular staff
+
+**Rate Limit**: 10 requests per minute
+
+---
+
+## Error Handling
+
+### Error Response Format
+```json
+{
+  "detail": "Error message here"
+}
+```
+
+### HTTP Status Codes
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 400 | Bad Request - Invalid input |
+| 401 | Unauthorized - Invalid/missing token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Resource doesn't exist |
+| 422 | Validation Error - Invalid data format |
+| 429 | Too Many Requests - Rate limit exceeded |
+| 500 | Internal Server Error |
+
+### Validation Error Example
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "email"],
+      "msg": "value is not a valid email address",
+      "type": "value_error.email"
+    }
+  ]
+}
+```
+
+---
+
+## Rate Limiting
+
+| Endpoint | Limit |
+|----------|-------|
+| POST /api/auth/login | 5/minute |
+| POST /api/auth/register | 10/minute |
+| All other endpoints | No limit |
+
+**Rate Limit Exceeded Response** (429):
+```json
+{
+  "error": "Rate limit exceeded: 5 per 1 minute"
+}
+```
+
+---
+
+## Postman Collection
+
+### Import to Postman
+
+1. Open Postman
+2. Click "Import"
+3. Select "Link" tab
+4. Enter: `{BACKEND_URL}/openapi.json`
+5. Click "Import"
+
+### Environment Variables
+
+Create a Postman environment with:
+```
+base_url: http://localhost:8001
+token: (set after login)
+```
+
+### Collection Runner
+
+Use the collection runner for automated testing:
+1. Run "Login" request first
+2. Set `token` variable from response
+3. Run other requests
+
+### Export OpenAPI
+
+Download the OpenAPI specification:
+```bash
+curl {BACKEND_URL}/openapi.json > openapi.json
+```
+
+Convert to Postman collection:
+```bash
+npx openapi-to-postmanv2 -s openapi.json -o faithtracker.postman_collection.json
+```
+
+---
+
+## SDK Generation
+
+Generate client SDKs from OpenAPI spec:
+
+### Python
+```bash
+pip install openapi-python-client
+openapi-python-client generate --url {BACKEND_URL}/openapi.json
+```
+
+### TypeScript
+```bash
+npx openapi-typescript-codegen --input {BACKEND_URL}/openapi.json --output ./api-client
+```
+
+### Mobile (React Native / Flutter)
+```bash
+# React Native (using openapi-generator)
+npx @openapitools/openapi-generator-cli generate \
+  -i {BACKEND_URL}/openapi.json \
+  -g typescript-fetch \
+  -o ./mobile-api-client
+
+# Flutter
+npx @openapitools/openapi-generator-cli generate \
+  -i {BACKEND_URL}/openapi.json \
+  -g dart \
+  -o ./flutter-api-client
+```
+
+---
+
+## Interactive Documentation
+
+- **Swagger UI**: `{BACKEND_URL}/docs`
+- **ReDoc**: `{BACKEND_URL}/redoc`
+
+Both provide interactive API exploration with request/response examples.

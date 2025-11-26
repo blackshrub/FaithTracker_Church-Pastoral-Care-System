@@ -1,32 +1,33 @@
-# 🏛️ FaithTracker Pastoral Care System
+# FaithTracker Pastoral Care System
 
-**FaithTracker Pastoral Care System** is a comprehensive, multi-tenant pastoral care management system designed specifically for the GKBJ church. It enables the pastoral care department to efficiently monitor, schedule, and manage all interactions with church members across multiple campuses.
+**FaithTracker** is a comprehensive, multi-tenant pastoral care management system designed for churches. It enables pastoral care departments to efficiently monitor, schedule, and manage all interactions with church members across multiple campuses.
 
 ![Status](https://img.shields.io/badge/status-production--ready-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-FastAPI%20%2B%20React-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.9+-blue)
+![React](https://img.shields.io/badge/react-19-61DAFB)
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Quick Start](#quick-start)
-  - [One-Command Installation](#one-command-installation-recommended)
-  - [Manual Installation](#manual-installation-optional)
+- [API Documentation](#api-documentation)
+- [Testing](#testing)
+- [Project Structure](#project-structure)
 - [Documentation](#documentation)
-- [Screenshots](#screenshots)
-- [Multi-Language Support](#multi-language-support)
 - [Contributing](#contributing)
-- [Support](#support)
+- [License](#license)
 
 ---
 
-## 🎯 Overview
+## Overview
 
-**FaithTracker** is built to solve the complex challenge of managing pastoral care across multiple church campuses. The system provides:
+FaithTracker solves the complex challenge of managing pastoral care across multiple church campuses:
 
 - **Multi-Tenant Architecture**: Complete data isolation between campuses with role-based access control
 - **Task-Oriented Dashboards**: Intelligent task categorization (Today, Overdue, Upcoming)
@@ -34,345 +35,386 @@
 - **Smart Scheduling**: Flexible recurring schedules with timezone-aware notifications
 - **Member Engagement Monitoring**: Track and visualize member participation over time
 - **Bilingual Interface**: Full English and Indonesian (Bahasa Indonesia) support
-- **🆕 Global Search**: Lightning-fast member and event search across the app
-- **🆕 Complete Accountability**: Track WHO did WHAT on WHICH member (13 action types)
-- **🆕 API Sync**: Bi-directional sync with FaithFlow Enterprise (polling + webhooks)
-- **🆕 User Management**: Profile photos, edit capabilities, and role management
+- **Complete Accountability**: Track WHO did WHAT on WHICH member (13 action types logged)
+- **Enterprise API Sync**: Bi-directional sync with external systems (polling + webhooks)
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🔐 **Multi-Tenant & Role-Based Access**
+### Multi-Tenant & Role-Based Access
 - **Full Administrator**: Access all campuses, switch views dynamically
 - **Campus Administrator**: Manage a single campus with full control
 - **Pastor Role**: Regular pastoral care staff with task management
 
-### 👥 **Member Management**
+### Member Management
 - Complete CRUD operations for church members
-- Photo upload and management
+- Photo upload with automatic optimization (thumbnail/medium/large)
 - Family grouping and relationship tracking
 - Engagement status monitoring (Active, At Risk, Disconnected)
+- Bulk import from CSV with field mapping
 
-### 📅 **Care Event System**
-- **Birthday Celebrations**: Automated tracking and reminders
-- **Grief & Loss Support**: Multi-stage grief care (mourning → 1 year)
-- **Financial Aid**: Track and schedule ongoing assistance (education, medical, emergency, housing, food)
-- **Hospital Visits**: Accident, illness, and recovery follow-ups
-- **Life Events**: New house, childbirth, and other celebrations
-- **Regular Contact**: Scheduled check-ins with at-risk members
+### Care Event System
+| Event Type | Description |
+|------------|-------------|
+| Birthday | Automated tracking with age calculation |
+| Grief & Loss | Multi-stage support (mourning, 7-day, 40-day, 100-day, 1-year) |
+| Financial Aid | Recurring schedules (weekly, monthly, quarterly) with amount tracking |
+| Accident/Illness | Hospital visits with 3-14 day follow-up timeline |
+| Life Events | New house, childbirth celebrations |
+| Regular Contact | Scheduled check-ins with at-risk members |
 
-### 🔔 **Smart Task Management**
+### Smart Task Management
 - Automatic task generation from events
-- Priority-based sorting (overdue → today → upcoming)
-- One-click task completion
-- "Ignore" functionality for non-applicable tasks
-- Clear ignored history per member
+- Priority-based sorting (overdue > today > upcoming)
+- One-click task completion with optimistic UI
+- "Ignore" functionality with history tracking
+- Configurable writeoff thresholds per event type
 
-### 📊 **Analytics & Reporting**
+### Analytics & Reporting
 - Member engagement trends over time
-- Event type distribution
+- Event type distribution charts
 - Campus-level statistics
-- At-risk member identification
+- Demographic breakdowns (age, gender, membership status)
+- Financial aid tracking with totals
 
-### 🌐 **Import/Export**
-- CSV import for bulk member data
-- Field mapping for custom CSV formats
-- Data export for reporting and backup
-
-### 💬 **WhatsApp Integration** *(Optional)*
-- Send reminders via WhatsApp
-- Log and track message delivery
-
-### 🔍 **Global Search** *(NEW)*
+### Global Search
 - Lightning-fast live search (300ms debounce)
 - Search members by name or phone
-- Search care events by title or description
-- Visible on ALL pages
-- Member photos in results
-- Engagement status badges
-- Click to navigate
-
-### 📊 **Activity Log & Accountability** *(NEW)*
-- Complete audit trail of all staff actions
-- Track WHO did WHAT on WHICH member
-- 13 action types logged:
-  - Create/complete/ignore care events
-  - Grief & accident follow-ups
-  - Financial aid operations
-  - Member contact actions
-  - WhatsApp reminders
-- Filter by staff, action, date range
-- Export to CSV
-- Timezone-aware (Asia/Jakarta)
-- User photos in logs
-- Timeline shows actor for all events
-
-### 🔄 **API Sync with FaithFlow Enterprise** *(NEW)*
-- **Dual Sync Methods:**
-  - Polling: Auto-sync every 1-24 hours
-  - Webhooks: Real-time updates (1-2 seconds)
-- **Security:**
-  - HMAC-SHA256 signature verification
-  - Auto-generated webhook secrets
-  - Secure credential storage
-- **Smart Features:**
-  - Dynamic field discovery
-  - Custom filter rules (unlimited)
-  - Include/Exclude modes
-  - Smart archival
-  - Daily reconciliation (3 AM)
-  - One-click enable/disable
-- **Efficiency:**
-  - Pagination (fetches ALL members)
-  - Targeted webhook sync (single member)
-  - Photo sync from base64
-  - Age calculation
-
-### 👤 **User Management** *(NEW)*
-- Edit user profiles (name, phone, role, campus)
-- Upload profile photos
-- Phone number column in admin panel
-- Photos in navigation & activity logs
-- Profile tab in Settings
-
-### 🔍 **Global Search** *(NEW)*
-- Live search across members and care events
+- Member photos and engagement badges in results
 - Visible on all pages (mobile + desktop)
-- Displays member photos and engagement status
-- Click to navigate directly to member details
 
-### 📝 **Activity Log & Accountability** *(NEW)*
-- Track WHO performed WHAT action on WHICH member
-- 13 action types logged (complete, ignore, create, delete, etc.)
+### Activity Log & Accountability
+- Complete audit trail of all staff actions
+- 13 action types tracked (complete, ignore, create, delete, etc.)
 - Filter by staff member, action type, date range
 - Export to CSV for reporting
-- Timeline shows creator, completer, ignorer for all events
-- User profile photos throughout the app
+- Timezone-aware timestamps (Asia/Jakarta)
 
-### 🔄 **API Sync** *(NEW)*
-- Connect to FaithFlow Enterprise (core system)
-- Two sync methods:
-  - **Polling**: Pull data every 1-24 hours (configurable)
-  - **Webhooks**: Real-time updates with HMAC-SHA256 security
+### API Sync (Enterprise Integration)
+- **Dual Sync Methods**:
+  - Polling: Auto-sync every 1-24 hours (configurable)
+  - Webhooks: Real-time updates with HMAC-SHA256 security
 - Dynamic filter system (include/exclude by gender, age, status)
-- Field discovery - adapts to any core API structure
 - Daily reconciliation at 3 AM for data integrity
-- Smart archival - members stay archived when not matching filters
 - One-click enable/disable
-- Sync history with detailed statistics
 
-### 👤 **User Management** *(NEW)*
-- Edit users in Admin Dashboard
-- Upload profile photos (Settings → Profile)
-- Photos displayed in navigation, activity log, search results
-- Phone number normalization for WhatsApp
-- API key-style usernames supported
+### Security & Performance
+- Rate limiting on authentication endpoints (5 req/min for login)
+- Health check endpoints (`/health`, `/ready`) for monitoring
+- JWT authentication with bcrypt password hashing
+- GZIP compression for responses
+- Security headers (HSTS, X-Frame-Options, CSP)
+- MongoDB connection pooling optimization
+
+### User Experience
+- Loading skeletons for smooth perceived performance
+- Mobile-first responsive design
+- Progressive JPEG images for faster loading
+- TanStack React Query for smart caching
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.9+)
-- **Database**: [MongoDB](https://www.mongodb.com/) with Motor (async driver)
-- **Authentication**: JWT (JSON Web Tokens) with bcrypt password hashing
-- **Scheduling**: APScheduler for background jobs
-- **Image Processing**: Pillow
+| Technology | Purpose |
+|------------|---------|
+| FastAPI | Python web framework (async) |
+| MongoDB | Database with Motor async driver |
+| APScheduler | Background job scheduling |
+| JWT + bcrypt | Authentication |
+| Pillow | Image processing & optimization |
+| slowapi | Rate limiting |
 
 ### Frontend
-- **Framework**: [React](https://react.dev/) 18+
-- **State Management**: [TanStack React Query](https://tanstack.com/query) (for Dashboard & MemberDetail)
-- **UI Components**: [Shadcn/UI](https://ui.shadcn.com/) + [Tailwind CSS](https://tailwindcss.com/)
-- **Internationalization**: [react-i18next](https://react.i18next.com/)
-- **Charts**: Recharts
-- **HTTP Client**: Axios
+| Technology | Purpose |
+|------------|---------|
+| React 19 | UI framework |
+| TanStack React Query | Server state management |
+| Shadcn/UI | Component library |
+| Tailwind CSS | Styling |
+| react-i18next | Internationalization |
+| Recharts | Data visualization |
 
 ### Infrastructure
-- **Process Management**: Supervisord
-- **Reverse Proxy**: Nginx
-- **OS**: Debian 12 / Ubuntu 20.04+
+| Technology | Purpose |
+|------------|---------|
+| Nginx | Reverse proxy |
+| Supervisord | Process management |
+| Debian 12 / Ubuntu | Operating system |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### One-Command Installation (Recommended)
-
-**For a fresh Debian 12 server**, run this single command:
+### One-Command Installation
 
 ```bash
-wget https://raw.githubusercontent.com/YOUR-USERNAME/faithtracker/main/install.sh -O install.sh && chmod +x install.sh && sudo ./install.sh
+wget https://raw.githubusercontent.com/tesarfrr/FaithTracker_Church-Pastoral-Care-System/main/install.sh -O install.sh && chmod +x install.sh && sudo ./install.sh
 ```
 
-**What the installer does:**
-1. ✅ Checks system prerequisites (Python, Node.js, MongoDB, Nginx)
-2. ✅ Installs missing dependencies automatically
-3. ✅ Clones the repository
-4. ✅ Configures environment variables (interactive prompts)
-5. ✅ Sets up systemd services for auto-restart
-6. ✅ Configures Nginx reverse proxy
-7. ✅ Runs smoke tests to verify installation
+The installer will:
+1. Check system prerequisites
+2. Install dependencies (Python, Node.js, MongoDB, Nginx)
+3. Configure environment variables interactively
+4. Set up systemd services
+5. Configure Nginx reverse proxy
+6. Run verification tests
 
-**Interactive Configuration:**
-The installer will prompt you for:
-- MongoDB connection string
-- JWT secret key (auto-generated if not provided)
-- Domain name (for Nginx configuration)
-- WhatsApp gateway URL (optional)
-
-**Post-Installation:**
-```bash
-# Check service status
-sudo systemctl status faithtracker-backend
-sudo systemctl status nginx
-
-# View logs
-sudo journalctl -u faithtracker-backend -f
-```
-
----
-
-### Manual Installation (Optional)
-
-If you prefer to install manually or need customization, follow the **[Detailed Deployment Guide](/docs/DEPLOYMENT_DEBIAN.md)**.
+### Manual Installation
 
 #### Prerequisites
 - Python 3.9+
-- Node.js 16+ & Yarn
+- Node.js 18+ with Yarn
 - MongoDB 4.4+
 - Nginx
 
-#### Quick Manual Setup
+#### Setup
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/YOUR-USERNAME/faithtracker.git
-cd faithtracker
+# Clone repository
+git clone https://github.com/tesarfrr/FaithTracker_Church-Pastoral-Care-System.git
+cd FaithTracker_Church-Pastoral-Care-System
 
-# 2. Configure environment
-cp .env.example backend/.env
-cp .env.example frontend/.env
-# Edit both .env files with your configuration
-
-# 3. Backend setup
+# Backend setup
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-uvicorn server:app --host 0.0.0.0 --port 8001 &
+cp .env.example .env  # Edit with your configuration
+uvicorn server:app --reload --host 0.0.0.0 --port 8001
 
-# 4. Frontend setup
-cd ../frontend
+# Frontend setup (new terminal)
+cd frontend
 yarn install
-yarn build
-# Serve with Nginx or `yarn start` for development
+cp .env.example .env  # Edit REACT_APP_BACKEND_URL
+yarn start  # Development
+yarn build  # Production
 ```
 
-For complete step-by-step instructions, see **[/docs/DEPLOYMENT_DEBIAN.md](/docs/DEPLOYMENT_DEBIAN.md)**.
+### Environment Variables
+
+**Backend (.env)**:
+```bash
+MONGODB_URI=mongodb://localhost:27017/faithtracker
+JWT_SECRET=your-secret-key-here
+ENCRYPTION_KEY=your-fernet-key-here
+WHATSAPP_API_URL=https://api.whatsapp.com  # Optional
+```
+
+**Frontend (.env)**:
+```bash
+REACT_APP_BACKEND_URL=http://localhost:8001/api
+```
 
 ---
 
-## 📚 Documentation
+## API Documentation
 
-Comprehensive documentation is available in the `/docs` directory:
+### Base URL
+```
+{BACKEND_URL}/api
+```
+
+### Authentication
+All endpoints (except `/auth/login`) require JWT Bearer token:
+```
+Authorization: Bearer <token>
+```
+
+### Health Endpoints (No Auth Required)
+```bash
+GET /health   # Liveness probe
+GET /ready    # Readiness probe (checks DB)
+```
+
+### Key Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/login` | POST | Authenticate user |
+| `/auth/register` | POST | Create user (admin only) |
+| `/members` | GET | List members (paginated) |
+| `/members` | POST | Create member |
+| `/members/{id}` | GET | Get member details |
+| `/care-events` | GET | List care events |
+| `/care-events` | POST | Create care event |
+| `/dashboard/reminders` | GET | Get dashboard data |
+| `/activity-logs` | GET | Get activity logs |
+
+### Example: Login
+```bash
+curl -X POST ${API}/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@church.org", "password": "secret"}'
+```
+
+Response:
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "bearer",
+  "user": {
+    "id": "user-uuid",
+    "email": "admin@church.org",
+    "name": "Admin User",
+    "role": "full_admin"
+  }
+}
+```
+
+### Example: Create Member
+```bash
+curl -X POST ${API}/members \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Doe",
+    "phone": "+6281234567890",
+    "birth_date": "1990-01-15",
+    "gender": "male"
+  }'
+```
+
+For complete API documentation, see [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) or the interactive Swagger UI at `/docs`.
+
+### OpenAPI / Swagger
+- **Swagger UI**: `{BACKEND_URL}/docs`
+- **ReDoc**: `{BACKEND_URL}/redoc`
+- **OpenAPI JSON**: `{BACKEND_URL}/openapi.json`
+
+---
+
+## Testing
+
+### Backend Tests (pytest)
+```bash
+cd backend
+pytest tests/ -v                    # Run all tests
+pytest tests/ -v --cov=. --cov-report=term-missing  # With coverage
+pytest tests/ -v -n auto            # Parallel execution
+```
+
+**Test Coverage**:
+- Scheduler & job locks
+- Multi-tenancy data isolation
+- Member CRUD operations
+- Care event management
+- Authentication
+
+### Frontend Tests
+
+**Unit Tests (Jest)**:
+```bash
+cd frontend
+yarn test                # Run all tests
+yarn test --coverage     # With coverage
+yarn test --watch        # Watch mode
+```
+
+**E2E Tests (Playwright)**:
+```bash
+yarn test:e2e            # Headless
+yarn test:e2e:ui         # Interactive UI
+yarn test:e2e:headed     # Visible browser
+```
+
+**E2E Test Coverage**:
+- Authentication flow
+- Member CRUD operations
+- Care event creation/completion
+- Dashboard interactions
+
+---
+
+## Project Structure
+
+```
+faithtracker/
+├── backend/
+│   ├── server.py              # Main API (monolithic ~6500 lines)
+│   ├── scheduler.py           # Background jobs
+│   ├── requirements.txt       # Python dependencies
+│   ├── tests/                 # pytest tests
+│   └── uploads/               # User-uploaded files
+├── frontend/
+│   ├── src/
+│   │   ├── pages/             # Page components
+│   │   ├── components/        # Reusable components
+│   │   │   ├── ui/            # Shadcn/UI components
+│   │   │   ├── dashboard/     # Dashboard components
+│   │   │   ├── skeletons/     # Loading skeletons
+│   │   │   └── member/        # Member components
+│   │   ├── context/           # React contexts
+│   │   ├── locales/           # i18n translations
+│   │   └── lib/               # Utilities
+│   ├── e2e/                   # Playwright tests
+│   └── package.json
+├── docs/                      # Documentation
+├── CLAUDE.md                  # AI assistant instructions
+└── README.md                  # This file
+```
+
+---
+
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| **[FEATURES.md](/docs/FEATURES.md)** | Detailed feature documentation with user workflows |
-| **[API.md](/docs/API.md)** | Complete API endpoint reference with request/response examples |
-| **[STRUCTURE.md](/docs/STRUCTURE.md)** | Codebase architecture and file organization |
-| **[DEPLOYMENT_DEBIAN.md](/docs/DEPLOYMENT_DEBIAN.md)** | Step-by-step deployment guide for Debian servers |
+| [CLAUDE.md](./CLAUDE.md) | Development guidelines for AI assistants |
+| [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) | REST API quick reference |
+| [docs/FEATURES.md](./docs/FEATURES.md) | Detailed feature documentation |
+| [docs/API.md](./docs/API.md) | Complete API endpoint reference |
+| [docs/DEPLOYMENT_DEBIAN.md](./docs/DEPLOYMENT_DEBIAN.md) | Production deployment guide |
+| [docs/STRUCTURE.md](./docs/STRUCTURE.md) | Codebase architecture |
+| [CHANGELOG.md](./CHANGELOG.md) | Version history |
 
 ---
 
-## 📸 Screenshots
+## Multi-Language Support
 
-### Dashboard (Mobile-First Design)
-*Task-oriented dashboard with Today, Overdue, and Upcoming tabs*
-- View all tasks at a glance
-- Complete tasks with one click
-- Optimistic UI updates for instant feedback
-
-### Global Search
-*Lightning-fast search across members and events*
-- Live search results as you type
-- Member photos and engagement badges
-- Visible on all pages
-
-### Activity Log
-*Complete staff accountability tracking*
-- Filter by staff member, action type, date
-- Export to CSV for reporting
-- Timezone-aware timestamps
-
-### Member Detail View
-*Complete member profile with care event history*
-- All care events in one place
-- Grief/Accident follow-up tracking
-- Additional visits logging
-
-### API Sync Configuration
-*Seamless integration with FaithFlow Enterprise*
-- Polling or Webhook sync methods
-- Dynamic filters for selective sync
-- Real-time updates
-
-*Note: Actual screenshots will be added after deployment*
-
----
-
-## 🌐 Multi-Language Support
-
-FaithTracker is fully internationalized and supports:
+FaithTracker supports:
 - **English (en)**: Complete translation
 - **Bahasa Indonesia (id)**: Complete translation
 
-All UI text is externalized in JSON translation files (`/frontend/src/locales/`). Adding a new language is straightforward:
-
+Translation files are in `/frontend/src/locales/`. To add a new language:
 1. Copy `en.json` to `[language-code].json`
 2. Translate all strings
 3. Update `i18n.js` to include the new language
 
-No code changes required!
-
 ---
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! Here's how you can help:
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/AmazingFeature`
+3. Commit changes: `git commit -m 'feat: add amazing feature'`
+4. Push to branch: `git push origin feature/AmazingFeature`
+5. Open a Pull Request
 
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/AmazingFeature`
-3. **Commit your changes**: `git commit -m 'Add some AmazingFeature'`
-4. **Push to the branch**: `git push origin feature/AmazingFeature`
-5. **Open a Pull Request**
+### Commit Message Format
+```
+<type>: <description>
+
+Types: feat, fix, docs, style, refactor, test, chore
+```
 
 ### Development Guidelines
-- Follow existing code style (Python: PEP 8, JavaScript: ESLint config)
-- Write clear commit messages
+- Follow existing code style
 - Add tests for new features
 - Update documentation as needed
+- Use the TodoWrite tool for task tracking
 
 ---
 
-## 📞 Support
+## License
 
-For questions, issues, or feature requests:
-
-- **GitHub Issues**: [github.com/YOUR-USERNAME/faithtracker/issues](https://github.com/YOUR-USERNAME/faithtracker/issues)
-- **Email**: support@yourdomain.com
-- **Documentation**: Check `/docs` directory first
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built for **GKBJ Church** pastoral care department
 - Powered by **FastAPI** and **React**
@@ -381,4 +423,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ for pastoral care excellence**
+**Made with care for pastoral excellence**
