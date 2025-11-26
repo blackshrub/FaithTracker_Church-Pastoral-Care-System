@@ -15,7 +15,10 @@
 - [Overview](#overview)
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
-- [Quick Start](#quick-start)
+- [Deployment](#deployment)
+  - [Docker Deployment (Recommended)](#docker-deployment-recommended)
+  - [Manual Installation](#manual-installation)
+- [Domain & DNS Configuration](#domain--dns-configuration)
 - [API Documentation](#api-documentation)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
@@ -140,15 +143,141 @@ FaithTracker solves the complex challenge of managing pastoral care across multi
 ### Infrastructure
 | Technology | Purpose |
 |------------|---------|
-| Nginx | Reverse proxy |
-| Supervisord | Process management |
-| Debian 12 / Ubuntu | Operating system |
+| Docker + Docker Compose | Container orchestration (recommended) |
+| Traefik v3 | Reverse proxy with automatic SSL (Docker) |
+| Nginx | Reverse proxy (manual installation) |
+| Let's Encrypt | Free SSL certificates |
+| Supervisord | Process management (manual installation) |
 
 ---
 
-## Quick Start
+## Deployment
 
-### One-Command Installation
+FaithTracker uses a **subdomain architecture**:
+- **Frontend**: `https://yourdomain.com`
+- **API**: `https://api.yourdomain.com`
+
+Choose your deployment method:
+
+### Docker Deployment (Recommended)
+
+Docker deployment is the easiest way to get FaithTracker running with automatic SSL certificates.
+
+#### Prerequisites
+- A Linux server (Ubuntu 20.04+, Debian 11+, or any Docker-compatible OS)
+- Docker and Docker Compose installed
+- A domain name pointing to your server
+- Ports 80 and 443 open
+
+#### Step 1: Install Docker (if not installed)
+
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com | bash
+
+# Start Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+#### Step 2: Clone the Repository
+
+```bash
+git clone https://github.com/tesarfrr/FaithTracker_Church-Pastoral-Care-System.git
+cd FaithTracker_Church-Pastoral-Care-System
+```
+
+#### Step 3: Run the Docker Installer
+
+```bash
+sudo bash docker-install.sh
+```
+
+The wizard will prompt you for:
+| Setting | Example | Description |
+|---------|---------|-------------|
+| Domain | `faithtracker.mychurch.org` | Your main domain |
+| Email | `admin@mychurch.org` | For SSL certificate notifications |
+| Admin Email | `pastor@mychurch.org` | Login credentials |
+| Admin Password | `SecurePass123` | Minimum 8 characters |
+| Church Name | `My Church` | Displayed in the app |
+
+#### Step 4: Wait for Deployment
+
+The installer will:
+1. Generate secure MongoDB password and JWT secrets
+2. Build Docker containers (~5-10 minutes first time)
+3. Start all services (Traefik, MongoDB, Backend, Frontend)
+4. Automatically obtain SSL certificates from Let's Encrypt
+
+#### Step 5: Access Your Application
+
+Once complete, access:
+- **Frontend**: `https://yourdomain.com`
+- **API**: `https://api.yourdomain.com`
+- **API Docs**: `https://api.yourdomain.com/docs`
+
+> **Note**: SSL certificates may take 1-2 minutes to be issued. If you see certificate errors, wait and refresh.
+
+#### Docker Management Commands
+
+```bash
+# View running containers
+docker compose ps
+
+# View logs (all services)
+docker compose logs -f
+
+# View logs (specific service)
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Restart all services
+docker compose restart
+
+# Stop all services
+docker compose down
+
+# Rebuild and restart (after code changes)
+docker compose build --no-cache
+docker compose up -d
+
+# View resource usage
+docker stats
+```
+
+#### Updating FaithTracker (Docker)
+
+```bash
+cd /path/to/FaithTracker_Church-Pastoral-Care-System
+
+# Pull latest changes
+git pull origin main
+
+# Rebuild and restart
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+### Manual Installation
+
+For servers without Docker, or if you prefer traditional deployment with Nginx.
+
+#### Prerequisites
+- Ubuntu 20.04+ or Debian 11+
+- Python 3.9+
+- Node.js 18+ with Yarn
+- MongoDB 4.4+
+- Nginx
+- Certbot (for SSL)
+
+#### One-Command Installation
 
 ```bash
 wget https://raw.githubusercontent.com/tesarfrr/FaithTracker_Church-Pastoral-Care-System/main/install.sh -O install.sh && chmod +x install.sh && sudo ./install.sh
@@ -159,18 +288,11 @@ The installer will:
 2. Install dependencies (Python, Node.js, MongoDB, Nginx)
 3. Configure environment variables interactively
 4. Set up systemd services
-5. Configure Nginx reverse proxy
-6. Run verification tests
+5. Configure dual-domain Nginx (main + api subdomain)
+6. Obtain SSL certificates for both domains
+7. Run verification tests
 
-### Manual Installation
-
-#### Prerequisites
-- Python 3.9+
-- Node.js 18+ with Yarn
-- MongoDB 4.4+
-- Nginx
-
-#### Setup
+#### Manual Setup (Development)
 
 ```bash
 # Clone repository
@@ -193,20 +315,115 @@ yarn start  # Development
 yarn build  # Production
 ```
 
-### Environment Variables
+#### Environment Variables
 
 **Backend (.env)**:
 ```bash
-MONGODB_URI=mongodb://localhost:27017/faithtracker
-JWT_SECRET=your-secret-key-here
+MONGO_URL=mongodb://localhost:27017/faithtracker
+JWT_SECRET_KEY=your-secret-key-here
 ENCRYPTION_KEY=your-fernet-key-here
-WHATSAPP_API_URL=https://api.whatsapp.com  # Optional
+ALLOWED_ORIGINS=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
 ```
 
 **Frontend (.env)**:
 ```bash
-REACT_APP_BACKEND_URL=http://localhost:8001/api
+REACT_APP_BACKEND_URL=https://api.yourdomain.com
 ```
+
+---
+
+## Domain & DNS Configuration
+
+FaithTracker requires **two DNS records** pointing to your server:
+
+### Required DNS Records
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | `@` (or `yourdomain.com`) | `YOUR_SERVER_IP` | 300 |
+| A | `api` | `YOUR_SERVER_IP` | 300 |
+
+### Step-by-Step DNS Setup
+
+#### 1. Find Your Server's IP Address
+
+```bash
+# On your server
+curl -4 ifconfig.me
+```
+
+#### 2. Configure DNS at Your Registrar
+
+**Example for Cloudflare:**
+1. Log in to Cloudflare Dashboard
+2. Select your domain
+3. Go to **DNS** → **Records**
+4. Add records:
+   - **Type**: A, **Name**: `@`, **IPv4**: `YOUR_SERVER_IP`, **Proxy**: DNS only (gray cloud)
+   - **Type**: A, **Name**: `api`, **IPv4**: `YOUR_SERVER_IP`, **Proxy**: DNS only (gray cloud)
+
+**Example for Namecheap:**
+1. Log in to Namecheap
+2. Go to **Domain List** → **Manage** → **Advanced DNS**
+3. Add records:
+   - **Type**: A Record, **Host**: `@`, **Value**: `YOUR_SERVER_IP`
+   - **Type**: A Record, **Host**: `api`, **Value**: `YOUR_SERVER_IP`
+
+**Example for GoDaddy:**
+1. Log in to GoDaddy
+2. Go to **My Products** → **DNS**
+3. Add records:
+   - **Type**: A, **Name**: `@`, **Value**: `YOUR_SERVER_IP`
+   - **Type**: A, **Name**: `api`, **Value**: `YOUR_SERVER_IP`
+
+#### 3. Verify DNS Propagation
+
+```bash
+# Check main domain
+dig yourdomain.com +short
+
+# Check API subdomain
+dig api.yourdomain.com +short
+
+# Both should return your server IP
+```
+
+Or use online tools:
+- [whatsmydns.net](https://www.whatsmydns.net/)
+- [dnschecker.org](https://dnschecker.org/)
+
+> **Note**: DNS propagation can take 5 minutes to 48 hours. Most changes propagate within 15-30 minutes.
+
+#### 4. Verify from Your Server
+
+```bash
+# Test that your server can be reached
+curl -I http://yourdomain.com
+curl -I http://api.yourdomain.com
+```
+
+### SSL Certificate Details
+
+**Docker (Traefik)**:
+- Certificates are automatically obtained and renewed
+- Stored in Docker volume `faithtracker_traefik-letsencrypt`
+- Renewal happens automatically before expiry
+
+**Manual (Certbot)**:
+- Certificates stored in `/etc/letsencrypt/live/`
+- Auto-renewal via systemd timer
+- Check renewal: `sudo certbot renew --dry-run`
+
+### Troubleshooting DNS/SSL
+
+| Issue | Solution |
+|-------|----------|
+| SSL certificate error | Wait 1-2 minutes for Let's Encrypt to issue certificate |
+| DNS not resolving | Wait for propagation (up to 48 hours), verify DNS records |
+| "Connection refused" | Check firewall: `sudo ufw allow 80,443/tcp` |
+| Traefik not getting cert | Ensure DNS is propagated, check Traefik logs: `docker compose logs traefik` |
+| Certbot failed | Verify DNS A records point to server, ensure ports 80/443 are open |
 
 ---
 
@@ -214,11 +431,13 @@ REACT_APP_BACKEND_URL=http://localhost:8001/api
 
 ### Base URL
 ```
-{BACKEND_URL}/api
+https://api.yourdomain.com
 ```
 
+The API uses subdomain routing. All endpoints are accessed directly at `api.yourdomain.com/*` (no `/api` prefix).
+
 ### Authentication
-All endpoints (except `/auth/login`) require JWT Bearer token:
+All endpoints (except `/auth/login` and health checks) require JWT Bearer token:
 ```
 Authorization: Bearer <token>
 ```
@@ -245,7 +464,7 @@ GET /ready    # Readiness probe (checks DB)
 
 ### Example: Login
 ```bash
-curl -X POST ${API}/auth/login \
+curl -X POST https://api.yourdomain.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "admin@church.org", "password": "secret"}'
 ```
@@ -266,7 +485,7 @@ Response:
 
 ### Example: Create Member
 ```bash
-curl -X POST ${API}/members \
+curl -X POST https://api.yourdomain.com/members \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -277,12 +496,12 @@ curl -X POST ${API}/members \
   }'
 ```
 
-For complete API documentation, see [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) or the interactive Swagger UI at `/docs`.
+For complete API documentation, see [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) or the interactive Swagger UI.
 
 ### OpenAPI / Swagger
-- **Swagger UI**: `{BACKEND_URL}/docs`
-- **ReDoc**: `{BACKEND_URL}/redoc`
-- **OpenAPI JSON**: `{BACKEND_URL}/openapi.json`
+- **Swagger UI**: `https://api.yourdomain.com/docs`
+- **ReDoc**: `https://api.yourdomain.com/redoc`
+- **OpenAPI JSON**: `https://api.yourdomain.com/openapi.json`
 
 ---
 
@@ -335,6 +554,7 @@ faithtracker/
 ├── backend/
 │   ├── server.py              # Main API (monolithic ~6500 lines)
 │   ├── scheduler.py           # Background jobs
+│   ├── Dockerfile             # Backend container
 │   ├── requirements.txt       # Python dependencies
 │   ├── tests/                 # pytest tests
 │   └── uploads/               # User-uploaded files
@@ -349,8 +569,18 @@ faithtracker/
 │   │   ├── context/           # React contexts
 │   │   ├── locales/           # i18n translations
 │   │   └── lib/               # Utilities
+│   ├── Dockerfile             # Frontend container (multi-stage)
+│   ├── nginx.conf             # Static file serving config
 │   ├── e2e/                   # Playwright tests
 │   └── package.json
+├── docker/
+│   └── mongo-init.js          # MongoDB initialization
+├── nginx/                     # Nginx templates (manual install)
+├── docker-compose.yml         # Docker orchestration with Traefik
+├── docker-install.sh          # Docker deployment wizard
+├── install.sh                 # Manual installation script
+├── update.sh                  # Update script
+├── .env.example               # Environment template
 ├── docs/                      # Documentation
 ├── CLAUDE.md                  # AI assistant instructions
 └── README.md                  # This file
