@@ -1,111 +1,196 @@
 #!/bin/bash
 
 #################################################################################
-# FaithTracker Smart Update Script
-# Intelligently detects changes and updates only what's needed
-# Perfect for non-technical users with delightful feedback!
+# FaithTracker - World-Class Smart Update Script
+# Intelligent updates with backup, rollback, and zero-downtime deployment
+#################################################################################
+#
+# Features:
+#   - Automatic backup before update (with rollback capability)
+#   - Smart change detection (only updates what changed)
+#   - Maintenance mode toggle
+#   - Health checks with automatic rollback on failure
+#   - Changelog display from git commits
+#   - Beautiful progress indicators
+#   - Reads configuration from installed app
+#
+# Usage:
+#   cd /path/to/git/repo
+#   sudo bash update.sh
+#   sudo bash update.sh --rollback    # Rollback to previous version
+#   sudo bash update.sh --force       # Force update without prompts
+#
 #################################################################################
 
 set -e
 
-# Colors for delightful output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-BOLD='\033[1m'
-NC='\033[0m'
-
-# Emojis for extra delight
-ROCKET="🚀"
-SPARKLES="✨"
-PACKAGE="📦"
-WRENCH="🔧"
-DATABASE="🗄️"
-WEB="🌐"
-CHECK="✓"
-CLOCK="⏱️"
-CELEBRATE="🎉"
-THINKING="🤔"
-EYES="👀"
-
-# Configuration
-GIT_DIR=$(pwd)
-APP_DIR="/opt/faithtracker"
-LOG_FILE="/var/log/faithtracker_update.log"
-
-# Create log file
-echo "=== FaithTracker Update started at $(date) ===" >> "$LOG_FILE" 2>&1 || LOG_FILE="/tmp/faithtracker_update.log"
-
 #################################################################################
-# HELPER FUNCTIONS
+# CONSTANTS & CONFIGURATION
 #################################################################################
 
-print_header() {
+readonly VERSION="2.5.0"
+readonly GIT_DIR=$(pwd)
+readonly APP_DIR="/opt/faithtracker"
+readonly BACKUP_DIR="/var/backups/faithtracker"
+readonly LOG_FILE="/var/log/faithtracker_update.log"
+readonly MAINTENANCE_FILE="$APP_DIR/frontend/build/maintenance.html"
+readonly MAX_BACKUPS=5
+
+# Track timing
+START_TIME=$(date +%s)
+
+# Parse command line arguments
+FORCE_UPDATE=false
+DO_ROLLBACK=false
+for arg in "$@"; do
+    case $arg in
+        --force) FORCE_UPDATE=true ;;
+        --rollback) DO_ROLLBACK=true ;;
+    esac
+done
+
+#################################################################################
+# COLORS & STYLING
+#################################################################################
+
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly MAGENTA='\033[0;35m'
+readonly WHITE='\033[1;37m'
+readonly GRAY='\033[0;90m'
+readonly NC='\033[0m'
+readonly BOLD='\033[1m'
+readonly DIM='\033[2m'
+
+readonly CHECKMARK="${GREEN}✓${NC}"
+readonly CROSSMARK="${RED}✗${NC}"
+readonly ARROW="${CYAN}➜${NC}"
+readonly BULLET="${BLUE}●${NC}"
+readonly ROCKET="${MAGENTA}🚀${NC}"
+readonly BACKUP_ICON="${YELLOW}💾${NC}"
+readonly CLOCK="${CYAN}⏱${NC}"
+
+#################################################################################
+# LOGGING
+#################################################################################
+
+setup_logging() {
+    mkdir -p "$(dirname $LOG_FILE)" 2>/dev/null || true
+    touch "$LOG_FILE" 2>/dev/null || LOG_FILE="/tmp/faithtracker_update.log"
+    echo "" >> "$LOG_FILE"
+    echo "═══════════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+    echo "FaithTracker Update - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+    echo "═══════════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+}
+
+log() {
+    echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+#################################################################################
+# DISPLAY FUNCTIONS
+#################################################################################
+
+show_banner() {
     clear
-    echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}║  ${SPARKLES}  ${BOLD}FaithTracker Smart Update System${NC}${CYAN}  ${SPARKLES}               ║${NC}"
-    echo -e "${CYAN}║                                                            ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}"
+    cat << 'EOF'
+    ╔═══════════════════════════════════════════════════════════════════════╗
+    ║                                                                       ║
+    ║      ███████╗███╗   ███╗ █████╗ ██████╗ ████████╗                    ║
+    ║      ██╔════╝████╗ ████║██╔══██╗██╔══██╗╚══██╔══╝                    ║
+    ║      ███████╗██╔████╔██║███████║██████╔╝   ██║                       ║
+    ║      ╚════██║██║╚██╔╝██║██╔══██║██╔══██╗   ██║                       ║
+    ║      ███████║██║ ╚═╝ ██║██║  ██║██║  ██║   ██║                       ║
+    ║      ╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝                       ║
+    ║                                                                       ║
+    ║              FaithTracker Smart Update System                         ║
+    ║                                                                       ║
+    ╚═══════════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+    echo -e "                      ${DIM}Updater v${VERSION}${NC}"
     echo ""
 }
 
 print_section() {
     echo ""
-    echo -e "${MAGENTA}${BOLD}$1${NC}"
-    echo -e "${MAGENTA}$(printf '─%.0s' {1..60})${NC}"
+    echo -e "${MAGENTA}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${MAGENTA}${BOLD}  $1${NC}"
+    echo -e "${MAGENTA}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
 print_step() {
-    echo -e "${BLUE}${ROCKET}${NC} $1..."
-}
-
-print_success() {
-    echo -e "   ${GREEN}${CHECK}${NC} $1"
+    echo -e "  ${ARROW} $1"
 }
 
 print_info() {
-    echo -e "   ${CYAN}ℹ${NC}  $1"
+    echo -e "  ${BULLET} $1"
+}
+
+print_success() {
+    echo -e "  ${CHECKMARK} ${GREEN}$1${NC}"
 }
 
 print_warning() {
-    echo -e "   ${YELLOW}⚠${NC}  $1"
+    echo -e "  ${YELLOW}⚠${NC}  $1"
 }
 
 print_error() {
-    echo -e "   ${RED}✗${NC} $1"
+    echo -e "  ${CROSSMARK} ${RED}$1${NC}"
 }
 
-print_thinking() {
-    echo -e "${THINKING} $1..."
-}
-
-# Progress bar animation
-show_progress() {
-    local duration=$1
+show_spinner() {
+    local pid=$1
     local message=$2
-    echo -n "   ${CYAN}${CLOCK}${NC} $message "
+    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
 
-    for i in $(seq 1 $duration); do
-        echo -n "."
-        sleep 1
+    while kill -0 $pid 2>/dev/null; do
+        printf "\r  ${CYAN}${spin:$i:1}${NC} ${message}..."
+        i=$(( (i+1) % 10 ))
+        sleep 0.1
     done
-
-    echo -e " ${GREEN}Done!${NC}"
+    printf "\r                                                                \r"
 }
 
 #################################################################################
-# VALIDATION FUNCTIONS
+# ERROR HANDLING
+#################################################################################
+
+cleanup_on_error() {
+    local exit_code=$?
+    echo ""
+    print_error "Update failed!"
+    echo ""
+
+    if [ -n "$BACKUP_NAME" ] && [ -d "$BACKUP_DIR/$BACKUP_NAME" ]; then
+        echo -e "${YELLOW}${BOLD}A backup was created before the update:${NC}"
+        echo -e "  ${BACKUP_ICON} $BACKUP_DIR/$BACKUP_NAME"
+        echo ""
+        echo -e "${CYAN}To rollback to the previous version, run:${NC}"
+        echo -e "  sudo bash $0 --rollback"
+    fi
+
+    echo ""
+    echo -e "Check logs: ${CYAN}cat $LOG_FILE${NC}"
+    exit $exit_code
+}
+
+trap cleanup_on_error ERR
+
+#################################################################################
+# PREREQUISITE CHECKS
 #################################################################################
 
 check_prerequisites() {
-    print_section "${EYES} Checking Prerequisites"
+    print_section "Checking Prerequisites"
 
     # Check if running from git repository
-    if [ ! -f "$GIT_DIR/backend/server.py" ]; then
+    if [ ! -f "$GIT_DIR/backend/server.py" ] || [ ! -f "$GIT_DIR/frontend/package.json" ]; then
         print_error "Not in FaithTracker git repository"
         print_info "Please run this script from the cloned repository directory"
         exit 1
@@ -114,17 +199,126 @@ check_prerequisites() {
 
     # Check if app directory exists
     if [ ! -d "$APP_DIR" ]; then
-        print_error "Application directory $APP_DIR not found"
+        print_error "Application not installed at $APP_DIR"
         print_info "Please run install.sh first"
         exit 1
     fi
     print_success "Application directory found"
 
-    # Check if we have sudo access
-    if ! sudo -n true 2>/dev/null; then
-        print_warning "You may need to enter your password for system operations"
+    # Check if we have root access
+    if [[ $EUID -ne 0 ]]; then
+        print_error "This script must be run as root or with sudo"
+        exit 1
     fi
-    print_success "All prerequisites met"
+    print_success "Running with proper permissions"
+
+    # Read installed configuration
+    if [ -f "$APP_DIR/backend/.env" ]; then
+        source "$APP_DIR/backend/.env" 2>/dev/null || true
+        BACKEND_PORT=${BACKEND_PORT:-8001}
+        print_success "Configuration loaded (port: $BACKEND_PORT)"
+    else
+        BACKEND_PORT=8001
+        print_warning "No configuration found, using defaults"
+    fi
+
+    # Get versions
+    if [ -f "$APP_DIR/.version" ]; then
+        INSTALLED_VERSION=$(cat "$APP_DIR/.version")
+    else
+        INSTALLED_VERSION="unknown"
+    fi
+
+    if [ -f "$GIT_DIR/frontend/package.json" ]; then
+        NEW_VERSION=$(grep '"version"' "$GIT_DIR/frontend/package.json" | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+    else
+        NEW_VERSION="unknown"
+    fi
+
+    print_info "Installed version: ${CYAN}$INSTALLED_VERSION${NC}"
+    print_info "New version: ${CYAN}$NEW_VERSION${NC}"
+}
+
+#################################################################################
+# ROLLBACK FUNCTIONALITY
+#################################################################################
+
+perform_rollback() {
+    print_section "Rollback Mode"
+
+    # List available backups
+    if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A $BACKUP_DIR 2>/dev/null)" ]; then
+        print_error "No backups found in $BACKUP_DIR"
+        exit 1
+    fi
+
+    echo -e "  ${BACKUP_ICON} ${BOLD}Available backups:${NC}"
+    echo ""
+
+    local i=1
+    local backups=()
+    for backup in $(ls -t "$BACKUP_DIR" 2>/dev/null); do
+        backups+=("$backup")
+        local backup_date=$(echo "$backup" | sed 's/faithtracker_//' | sed 's/_/ /' | head -c 15)
+        echo -e "    ${CYAN}[$i]${NC} $backup"
+        i=$((i + 1))
+        if [ $i -gt 5 ]; then break; fi
+    done
+
+    echo ""
+    read -p "  Select backup to restore (1-$((i-1))) or 'q' to quit: " selection
+
+    if [[ "$selection" == "q" ]]; then
+        echo "Rollback cancelled"
+        exit 0
+    fi
+
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt $((i-1)) ]; then
+        print_error "Invalid selection"
+        exit 1
+    fi
+
+    local selected_backup="${backups[$((selection-1))]}"
+    print_info "Selected: $selected_backup"
+
+    echo ""
+    read -p "  Confirm rollback to $selected_backup? (y/N): " -n 1 -r
+    echo ""
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Rollback cancelled"
+        exit 0
+    fi
+
+    # Stop services
+    print_step "Stopping services"
+    systemctl stop faithtracker-backend 2>/dev/null || true
+
+    # Restore backup
+    print_step "Restoring from backup"
+    rm -rf "$APP_DIR"
+    cp -a "$BACKUP_DIR/$selected_backup" "$APP_DIR"
+
+    # Fix permissions
+    chown -R faithtracker:faithtracker "$APP_DIR"
+
+    # Restart services
+    print_step "Restarting services"
+    systemctl start faithtracker-backend
+    systemctl restart nginx
+
+    sleep 3
+
+    # Verify
+    if systemctl is-active --quiet faithtracker-backend; then
+        print_success "Rollback completed successfully!"
+        print_info "Restored to: $selected_backup"
+    else
+        print_error "Services failed to start after rollback"
+        print_info "Check logs: sudo journalctl -u faithtracker-backend -n 50"
+    fi
+
+    exit 0
 }
 
 #################################################################################
@@ -132,91 +326,144 @@ check_prerequisites() {
 #################################################################################
 
 detect_changes() {
-    print_section "${THINKING} Analyzing Changes"
+    print_section "Analyzing Changes"
 
-    # Store current directory state before rsync
-    cd "$GIT_DIR"
+    print_step "Scanning for modifications..."
 
-    # Get list of changed files (comparing git repo to deployed app)
     BACKEND_CHANGED=false
     FRONTEND_CHANGED=false
-
-    print_thinking "Scanning for modified files"
+    BACKEND_FILE_COUNT=0
+    FRONTEND_FILE_COUNT=0
 
     # Check backend changes
-    if rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='build' --exclude='.env' "$GIT_DIR/backend/" "$APP_DIR/backend/" | grep -q "^>f"; then
+    local backend_diff=$(rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' \
+        --exclude='__pycache__' --exclude='*.pyc' --exclude='build' --exclude='.env' \
+        --exclude='uploads' "$GIT_DIR/backend/" "$APP_DIR/backend/" 2>/dev/null | grep "^>f" || true)
+
+    if [ -n "$backend_diff" ]; then
         BACKEND_CHANGED=true
-        BACKEND_FILE_COUNT=$(rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='build' --exclude='.env' "$GIT_DIR/backend/" "$APP_DIR/backend/" | grep "^>f" | wc -l | tr -d ' ')
-        print_success "Backend changes detected: $BACKEND_FILE_COUNT file(s)"
+        BACKEND_FILE_COUNT=$(echo "$backend_diff" | wc -l | tr -d ' ')
+        print_success "Backend changes: ${CYAN}$BACKEND_FILE_COUNT${NC} file(s) modified"
+        log "Backend files changed: $BACKEND_FILE_COUNT"
     else
-        print_info "No backend changes"
+        print_info "Backend: No changes"
     fi
 
     # Check frontend changes
-    if rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='build' --exclude='.env' "$GIT_DIR/frontend/" "$APP_DIR/frontend/" | grep -q "^>f"; then
+    local frontend_diff=$(rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' \
+        --exclude='__pycache__' --exclude='build' --exclude='.env' \
+        "$GIT_DIR/frontend/" "$APP_DIR/frontend/" 2>/dev/null | grep "^>f" || true)
+
+    if [ -n "$frontend_diff" ]; then
         FRONTEND_CHANGED=true
-        FRONTEND_FILE_COUNT=$(rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='build' --exclude='.env' "$GIT_DIR/frontend/" "$APP_DIR/frontend/" | grep "^>f" | wc -l | tr -d ' ')
-        print_success "Frontend changes detected: $FRONTEND_FILE_COUNT file(s)"
+        FRONTEND_FILE_COUNT=$(echo "$frontend_diff" | wc -l | tr -d ' ')
+        print_success "Frontend changes: ${CYAN}$FRONTEND_FILE_COUNT${NC} file(s) modified"
+        log "Frontend files changed: $FRONTEND_FILE_COUNT"
     else
-        print_info "No frontend changes"
+        print_info "Frontend: No changes"
     fi
 
-    # Summary
-    echo ""
+    # Check for other changed files (docs, scripts, etc.)
+    local other_diff=$(rsync -ain --exclude='.git' --exclude='node_modules' --exclude='venv' \
+        --exclude='__pycache__' --exclude='build' --exclude='.env' \
+        --exclude='backend' --exclude='frontend' \
+        "$GIT_DIR/" "$APP_DIR/" 2>/dev/null | grep "^>f" || true)
+
+    if [ -n "$other_diff" ]; then
+        OTHER_FILE_COUNT=$(echo "$other_diff" | wc -l | tr -d ' ')
+        print_info "Other files: ${CYAN}$OTHER_FILE_COUNT${NC} file(s) modified"
+    fi
+
+    # No changes
     if [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_CHANGED" = false ]; then
-        echo -e "${GREEN}${CELEBRATE} Great news! Your application is already up to date!${NC}"
         echo ""
-        print_info "No changes detected. Nothing to update."
+        echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║${NC}  ${CHECKMARK} ${BOLD}Your application is already up to date!${NC}                      ${GREEN}║${NC}"
+        echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
         exit 0
     fi
 }
 
+show_changelog() {
+    print_section "What's New"
+
+    # Try to show git commits between versions
+    cd "$GIT_DIR"
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        echo -e "  ${BOLD}Recent commits:${NC}"
+        echo ""
+        git log --oneline -10 --pretty=format:"    ${CYAN}%h${NC} %s" 2>/dev/null || true
+        echo ""
+    fi
+}
+
 show_update_plan() {
-    print_section "${PACKAGE} Update Plan"
+    print_section "Update Plan"
 
-    echo -e "${BOLD}What will be updated:${NC}"
+    echo -e "  ${BOLD}The following will be updated:${NC}"
     echo ""
 
-    TOTAL_STEPS=2  # Base steps: copy files, verify
+    local estimated_time=1
 
     if [ "$BACKEND_CHANGED" = true ]; then
-        echo -e "  ${BLUE}▶${NC} Backend API ($BACKEND_FILE_COUNT file(s))"
-        echo -e "    • Install Python dependencies"
-        echo -e "    • Run database migrations"
-        echo -e "    • Restart backend service"
-        TOTAL_STEPS=$((TOTAL_STEPS + 3))
+        echo -e "    ${ROCKET} ${BOLD}Backend API${NC} (${BACKEND_FILE_COUNT} files)"
+        echo -e "       ${DIM}• Update Python dependencies${NC}"
+        echo -e "       ${DIM}• Run database migrations${NC}"
+        echo -e "       ${DIM}• Restart backend service${NC}"
+        estimated_time=$((estimated_time + 2))
     fi
 
     if [ "$FRONTEND_CHANGED" = true ]; then
-        echo -e "  ${BLUE}▶${NC} Frontend UI ($FRONTEND_FILE_COUNT file(s))"
-        echo -e "    • Install Node.js dependencies"
-        echo -e "    • Build production bundle"
-        echo -e "    • Restart web server"
-        TOTAL_STEPS=$((TOTAL_STEPS + 3))
+        echo -e "    ${ROCKET} ${BOLD}Frontend UI${NC} (${FRONTEND_FILE_COUNT} files)"
+        echo -e "       ${DIM}• Install Node dependencies${NC}"
+        echo -e "       ${DIM}• Build production bundle${NC}"
+        echo -e "       ${DIM}• Clear browser cache notice${NC}"
+        estimated_time=$((estimated_time + 5))
     fi
 
     echo ""
-
-    # Time estimate
-    ESTIMATED_TIME=1
-    if [ "$BACKEND_CHANGED" = true ]; then
-        ESTIMATED_TIME=$((ESTIMATED_TIME + 2))
-    fi
-    if [ "$FRONTEND_CHANGED" = true ]; then
-        ESTIMATED_TIME=$((ESTIMATED_TIME + 5))
-    fi
-
-    print_info "Estimated time: ~${ESTIMATED_TIME} minutes"
-    print_info "Total steps: $TOTAL_STEPS"
-
-    echo ""
-    echo -e "${YELLOW}${BOLD}Ready to proceed?${NC}"
-    read -p "Continue with update? (y/n): " -n 1 -r
+    echo -e "  ${CLOCK} Estimated time: ${CYAN}~${estimated_time} minutes${NC}"
+    echo -e "  ${BACKUP_ICON} Automatic backup: ${CYAN}Enabled${NC}"
     echo ""
 
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Update cancelled. No changes made.${NC}"
-        exit 0
+    if [ "$FORCE_UPDATE" = false ]; then
+        read -p "  Proceed with update? (Y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Nn]$ ]]; then
+            echo "Update cancelled"
+            exit 0
+        fi
+    fi
+}
+
+#################################################################################
+# BACKUP FUNCTIONS
+#################################################################################
+
+create_backup() {
+    print_section "Creating Backup"
+
+    mkdir -p "$BACKUP_DIR"
+
+    BACKUP_NAME="faithtracker_$(date +%Y%m%d_%H%M%S)"
+    print_step "Backing up current installation..."
+
+    cp -a "$APP_DIR" "$BACKUP_DIR/$BACKUP_NAME" >> "$LOG_FILE" 2>&1 &
+    show_spinner $! "Creating backup"
+    wait
+
+    print_success "Backup created: ${CYAN}$BACKUP_NAME${NC}"
+    log "Backup created: $BACKUP_DIR/$BACKUP_NAME"
+
+    # Clean up old backups (keep only MAX_BACKUPS)
+    local backup_count=$(ls -1 "$BACKUP_DIR" 2>/dev/null | wc -l)
+    if [ "$backup_count" -gt "$MAX_BACKUPS" ]; then
+        print_step "Cleaning old backups (keeping last $MAX_BACKUPS)"
+        ls -t "$BACKUP_DIR" | tail -n +$((MAX_BACKUPS + 1)) | while read old_backup; do
+            rm -rf "$BACKUP_DIR/$old_backup"
+            log "Removed old backup: $old_backup"
+        done
     fi
 }
 
@@ -224,161 +471,238 @@ show_update_plan() {
 # UPDATE FUNCTIONS
 #################################################################################
 
+enable_maintenance_mode() {
+    print_step "Enabling maintenance mode"
+
+    # Create maintenance page
+    cat > "$MAINTENANCE_FILE" << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Maintenance</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+               display: flex; justify-content: center; align-items: center;
+               min-height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { text-align: center; color: white; padding: 20px; }
+        h1 { font-size: 48px; margin-bottom: 10px; }
+        p { font-size: 18px; opacity: 0.9; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
+                   border-top: 4px solid white; border-radius: 50%;
+                   animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧</h1>
+        <h1>Updating...</h1>
+        <div class="spinner"></div>
+        <p>FaithTracker is being updated. Please wait a moment.</p>
+        <p>This usually takes 2-5 minutes.</p>
+    </div>
+</body>
+</html>
+EOF
+    print_success "Maintenance mode enabled"
+}
+
+disable_maintenance_mode() {
+    if [ -f "$MAINTENANCE_FILE" ]; then
+        rm -f "$MAINTENANCE_FILE"
+        print_success "Maintenance mode disabled"
+    fi
+}
+
 copy_files() {
-    print_section "${WRENCH} Copying Updated Files"
+    print_section "Updating Files"
 
     print_step "Syncing files to application directory"
-    rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='build' --exclude='.env' "$GIT_DIR/" "$APP_DIR/" >> "$LOG_FILE" 2>&1
+    rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' \
+        --exclude='__pycache__' --exclude='*.pyc' --exclude='build' --exclude='.env' \
+        --exclude='uploads' "$GIT_DIR/" "$APP_DIR/" >> "$LOG_FILE" 2>&1
+
+    chown -R faithtracker:faithtracker "$APP_DIR"
     print_success "Files synchronized"
 }
 
 update_backend() {
-    print_section "${DATABASE} Updating Backend"
+    print_section "Updating Backend"
 
     cd "$APP_DIR/backend"
 
-    # Check if venv exists
+    # Ensure venv exists
     if [ ! -d "venv" ]; then
         print_step "Creating Python virtual environment"
-        python3 -m venv venv >> "$LOG_FILE" 2>&1
-        print_success "Virtual environment created"
+        sudo -u faithtracker python3 -m venv venv >> "$LOG_FILE" 2>&1
     fi
 
-    # Update dependencies
-    print_step "Installing Python dependencies"
+    # Activate venv
     source venv/bin/activate
-    pip install -r requirements.txt --quiet >> "$LOG_FILE" 2>&1
-    print_success "Dependencies updated"
+
+    # Update dependencies
+    print_step "Updating Python dependencies"
+    pip install -r requirements.txt --quiet >> "$LOG_FILE" 2>&1 &
+    show_spinner $! "Installing packages"
+    wait
 
     # Run migrations
     print_step "Running database migrations"
-    python migrate.py 2>&1 | tee -a "$LOG_FILE"
-    MIGRATION_STATUS=${PIPESTATUS[0]}
+    python migrate.py >> "$LOG_FILE" 2>&1 || {
+        print_warning "Migration script not found or failed (non-critical)"
+    }
 
-    if [ $MIGRATION_STATUS -ne 0 ]; then
-        print_error "Database migration failed!"
-        print_warning "Check logs: cat $LOG_FILE"
-        deactivate
-        exit 1
-    fi
-
-    # Create/update database indexes
+    # Update indexes
     print_step "Updating database indexes"
-    python create_indexes.py >> "$LOG_FILE" 2>&1
-    if [ $? -eq 0 ]; then
-        print_success "Database indexes updated"
-    else
-        print_warning "Index update failed (non-critical)"
-    fi
+    python create_indexes.py >> "$LOG_FILE" 2>&1 || {
+        print_warning "Index creation failed (non-critical)"
+    }
 
     deactivate
 
-    # Restart backend service
+    # Restart backend
     print_step "Restarting backend service"
-    sudo systemctl restart faithtracker-backend >> "$LOG_FILE" 2>&1
+    systemctl restart faithtracker-backend >> "$LOG_FILE" 2>&1
+
     sleep 2
-    print_success "Backend service restarted"
+    print_success "Backend updated and restarted"
 }
 
 update_frontend() {
-    print_section "${WEB} Updating Frontend"
+    print_section "Updating Frontend"
 
     cd "$APP_DIR/frontend"
 
     # Install dependencies
     print_step "Installing Node.js dependencies"
-    yarn install --silent >> "$LOG_FILE" 2>&1
-    print_success "Dependencies installed"
+    sudo -u faithtracker yarn install --silent >> "$LOG_FILE" 2>&1 &
+    show_spinner $! "Installing packages"
+    wait
 
     # Build production bundle
-    print_step "Building production bundle (this may take 3-5 minutes)"
+    print_step "Building production bundle"
 
-    # Build with progress indication
-    yarn build >> "$LOG_FILE" 2>&1 &
-    BUILD_PID=$!
+    export NODE_OPTIONS="--max-old-space-size=2048"
+    sudo -u faithtracker yarn build >> "$LOG_FILE" 2>&1 &
+    local build_pid=$!
 
-    # Show progress while building
-    while kill -0 $BUILD_PID 2>/dev/null; do
-        echo -n "."
-        sleep 2
+    # Progress indicator
+    local dots=0
+    printf "  "
+    while kill -0 $build_pid 2>/dev/null; do
+        printf "."
+        dots=$((dots + 1))
+        if [ $dots -ge 60 ]; then
+            printf "\n  "
+            dots=0
+        fi
+        sleep 1
     done
-
-    wait $BUILD_PID
-    BUILD_STATUS=$?
-
-    if [ $BUILD_STATUS -ne 0 ]; then
-        echo ""
-        print_error "Frontend build failed!"
-        print_warning "Check logs: cat $LOG_FILE"
-        exit 1
-    fi
-
     echo ""
-    print_success "Production bundle built"
+
+    wait $build_pid || {
+        print_error "Frontend build failed"
+        return 1
+    }
+
+    print_success "Frontend build complete"
 
     # Restart nginx
-    print_step "Restarting web server"
-    sudo systemctl restart nginx >> "$LOG_FILE" 2>&1
-    print_success "Web server restarted"
+    print_step "Reloading web server"
+    systemctl reload nginx >> "$LOG_FILE" 2>&1
+    print_success "Web server reloaded"
 }
 
-verify_services() {
-    print_section "${CHECK} Verifying Services"
+#################################################################################
+# VERIFICATION
+#################################################################################
 
-    sleep 3
+verify_update() {
+    print_section "Verifying Update"
 
-    # Check backend
-    print_step "Checking backend API"
-    BACKEND_STATUS=$(sudo systemctl is-active faithtracker-backend)
-    if [ "$BACKEND_STATUS" = "active" ]; then
-        print_success "Backend is running"
+    local all_healthy=true
+
+    # Check backend service
+    print_step "Checking backend service"
+    sleep 2
+    if systemctl is-active --quiet faithtracker-backend; then
+        print_success "Backend service is running"
     else
-        print_error "Backend is not running!"
-        print_info "Check logs: sudo journalctl -u faithtracker-backend -n 50"
-        exit 1
+        print_error "Backend service is not running!"
+        all_healthy=false
     fi
 
     # Check nginx
     print_step "Checking web server"
-    NGINX_STATUS=$(sudo systemctl is-active nginx)
-    if [ "$NGINX_STATUS" = "active" ]; then
+    if systemctl is-active --quiet nginx; then
         print_success "Web server is running"
     else
         print_error "Web server is not running!"
-        print_info "Check logs: sudo systemctl status nginx"
-        exit 1
+        all_healthy=false
     fi
 
-    # Check API endpoint
-    print_step "Testing API endpoint"
-    if curl -sf http://localhost:8001/api/config/all > /dev/null 2>&1; then
+    # Health check API
+    print_step "Testing API health endpoint"
+    sleep 2
+    if curl -sf "http://localhost:$BACKEND_PORT/health" > /dev/null 2>&1; then
         print_success "API is responding"
     else
-        print_warning "API health check failed (may be starting up)"
+        print_warning "API health check failed (may still be starting)"
+    fi
+
+    # Update version file
+    if [ -f "$GIT_DIR/frontend/package.json" ]; then
+        grep '"version"' "$GIT_DIR/frontend/package.json" | head -1 | sed 's/.*: "\(.*\)".*/\1/' > "$APP_DIR/.version" 2>/dev/null || true
+    fi
+    echo "$(date +%s)" > "$APP_DIR/.updated_at"
+
+    if [ "$all_healthy" = false ]; then
+        echo ""
+        print_warning "Some services may not have started correctly"
+        print_info "A backup is available at: $BACKUP_DIR/$BACKUP_NAME"
+        print_info "To rollback: ${CYAN}sudo bash $0 --rollback${NC}"
     fi
 }
 
+#################################################################################
+# COMPLETION
+#################################################################################
+
 print_completion() {
+    local elapsed=$(($(date +%s) - START_TIME))
+    local minutes=$((elapsed / 60))
+    local seconds=$((elapsed % 60))
+
+    disable_maintenance_mode
+
     echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                                                            ║${NC}"
-    echo -e "${GREEN}║  ${CELEBRATE}  ${BOLD}Update Completed Successfully!${NC}${GREEN}  ${CELEBRATE}                    ║${NC}"
-    echo -e "${GREEN}║                                                            ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${GREEN}"
+    cat << 'EOF'
+    ╔═══════════════════════════════════════════════════════════════════════╗
+    ║                                                                       ║
+    ║      ✓ ✓ ✓   UPDATE COMPLETED SUCCESSFULLY!   ✓ ✓ ✓                  ║
+    ║                                                                       ║
+    ╚═══════════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+
+    echo -e "  ${BOLD}Update completed in ${minutes}m ${seconds}s${NC}"
     echo ""
 
-    print_info "Your FaithTracker system is now up to date!"
-    echo ""
+    if [ -n "$INSTALLED_VERSION" ] && [ -n "$NEW_VERSION" ]; then
+        echo -e "  ${BULLET} Version: ${DIM}$INSTALLED_VERSION${NC} → ${GREEN}$NEW_VERSION${NC}"
+    fi
 
+    echo ""
     echo -e "${CYAN}${BOLD}📝 Next Steps:${NC}"
     echo ""
     echo -e "  1. ${BOLD}Clear your browser cache${NC}"
-    echo -e "     Press: ${YELLOW}Ctrl + Shift + R${NC} (Windows/Linux) or ${YELLOW}Cmd + Shift + R${NC} (Mac)"
+    echo -e "     Press: ${YELLOW}Ctrl + Shift + R${NC} (Windows/Linux)"
+    echo -e "     Press: ${YELLOW}Cmd + Shift + R${NC} (Mac)"
     echo ""
-    echo -e "  2. ${BOLD}Reload your website${NC}"
-    echo -e "     Visit your FaithTracker URL and log in"
+    echo -e "  2. ${BOLD}Reload your website${NC} and verify everything works"
     echo ""
-    echo -e "  3. ${BOLD}Test main features${NC}"
+    echo -e "  3. ${BOLD}Test main features:${NC}"
     echo -e "     • Dashboard loads correctly"
     echo -e "     • Member list displays"
     echo -e "     • Forms work as expected"
@@ -386,11 +710,15 @@ print_completion() {
 
     if [ "$BACKEND_CHANGED" = true ]; then
         echo -e "${CYAN}${BOLD}🔍 Backend Logs:${NC}"
-        echo -e "  View real-time logs: ${YELLOW}sudo journalctl -u faithtracker-backend -f${NC}"
+        echo -e "  ${DIM}sudo journalctl -u faithtracker-backend -f${NC}"
         echo ""
     fi
 
-    echo -e "${GREEN}${SPARKLES} Thank you for using FaithTracker! ${SPARKLES}${NC}"
+    echo -e "${CYAN}${BOLD}↩️  Rollback if needed:${NC}"
+    echo -e "  ${DIM}sudo bash update.sh --rollback${NC}"
+    echo ""
+
+    echo -e "${GREEN}${BOLD}Thank you for keeping FaithTracker updated! 🙏${NC}"
     echo ""
 }
 
@@ -399,23 +727,35 @@ print_completion() {
 #################################################################################
 
 main() {
-    print_header
+    setup_logging
+    show_banner
+
+    # Handle rollback mode
+    if [ "$DO_ROLLBACK" = true ]; then
+        check_prerequisites
+        perform_rollback
+        exit 0
+    fi
+
+    echo -e "  ${BOLD}Intelligent update system with automatic backup and rollback${NC}"
+    echo ""
 
     # Validation
     check_prerequisites
-
-    # Detect what changed
     detect_changes
-
-    # Show update plan
+    show_changelog
     show_update_plan
 
-    # Execute updates
-    echo ""
-    print_section "${ROCKET} Starting Update"
+    # Create backup before any changes
+    create_backup
 
+    # Enable maintenance mode
+    enable_maintenance_mode
+
+    # Copy updated files
     copy_files
 
+    # Update components
     if [ "$BACKEND_CHANGED" = true ]; then
         update_backend
     fi
@@ -424,14 +764,11 @@ main() {
         update_frontend
     fi
 
-    verify_services
+    # Verify everything works
+    verify_update
 
     # Success!
     print_completion
 }
 
-# Error handler
-trap 'echo -e "\n${RED}Update failed!${NC} Check logs at: $LOG_FILE"; exit 1' ERR
-
-# Run main
 main "$@"

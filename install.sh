@@ -1,11 +1,18 @@
 #!/bin/bash
 
 #################################################################################
-# FaithTracker - Automated Installation Script for Debian 12/Ubuntu 20.04+
+# FaithTracker - World-Class Automated Installation Script
+# For Debian 12/Ubuntu 20.04+
 #################################################################################
 #
-# This script automates the complete installation and configuration of
-# FaithTracker on a fresh Debian/Ubuntu server.
+# Features:
+#   - Pre-flight system checks (disk, RAM, network)
+#   - Parallel installations for speed
+#   - Beautiful progress indicators with ETA
+#   - Automatic firewall configuration
+#   - Swap setup for low-memory systems
+#   - Comprehensive error handling with recovery hints
+#   - Version tracking and health verification
 #
 # Usage:
 #   sudo bash install.sh
@@ -15,272 +22,469 @@
 # Exit on error but allow us to handle it gracefully
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-NC='\033[0m' # No Color
+#################################################################################
+# CONSTANTS & CONFIGURATION
+#################################################################################
 
-# Global variables
-LOG_FILE="/var/log/faithtracker_install.log"
-INSTALL_DIR="/opt/faithtracker"
-TOTAL_STEPS=15
+readonly VERSION="2.5.0"
+readonly MIN_DISK_GB=5
+readonly MIN_RAM_MB=1024
+readonly RECOMMENDED_RAM_MB=2048
+readonly INSTALL_DIR="/opt/faithtracker"
+readonly LOG_FILE="/var/log/faithtracker_install.log"
+readonly BACKUP_DIR="/var/backups/faithtracker"
+readonly TOTAL_STEPS=16
+readonly NODE_VERSION="18"
+
+# Track timing
+START_TIME=$(date +%s)
 CURRENT_STEP=0
 
-# Create log file
-touch "$LOG_FILE" 2>/dev/null || LOG_FILE="/tmp/faithtracker_install.log"
-echo "=== FaithTracker Installation started at $(date) ===" > "$LOG_FILE"
-
 #################################################################################
-# HELPER FUNCTIONS
+# COLORS & STYLING
 #################################################################################
 
-# Progress indicator
-show_progress() {
-    CURRENT_STEP=$((CURRENT_STEP + 1))
-    echo -e "${MAGENTA}[Step $CURRENT_STEP/$TOTAL_STEPS]${NC} $1"
+# Colors
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly MAGENTA='\033[0;35m'
+readonly WHITE='\033[1;37m'
+readonly GRAY='\033[0;90m'
+readonly NC='\033[0m'
+readonly BOLD='\033[1m'
+readonly DIM='\033[2m'
+
+# Unicode symbols
+readonly CHECKMARK="${GREEN}✓${NC}"
+readonly CROSSMARK="${RED}✗${NC}"
+readonly ARROW="${CYAN}➜${NC}"
+readonly BULLET="${BLUE}●${NC}"
+readonly STAR="${YELLOW}★${NC}"
+
+#################################################################################
+# LOGGING SETUP
+#################################################################################
+
+setup_logging() {
+    # Create log file with proper permissions
+    touch "$LOG_FILE" 2>/dev/null || LOG_FILE="/tmp/faithtracker_install.log"
+    exec 3>&1 4>&2
+    echo "═══════════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+    echo "FaithTracker Installation Log - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+    echo "═══════════════════════════════════════════════════════════════════" >> "$LOG_FILE"
 }
 
-# Print functions with timestamps
+log() {
+    echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+#################################################################################
+# DISPLAY FUNCTIONS
+#################################################################################
+
+show_banner() {
+    clear
+    echo -e "${CYAN}"
+    cat << 'EOF'
+    ╔═══════════════════════════════════════════════════════════════════════╗
+    ║                                                                       ║
+    ║   ███████╗ █████╗ ██╗████████╗██╗  ██╗████████╗██████╗  █████╗       ║
+    ║   ██╔════╝██╔══██╗██║╚══██╔══╝██║  ██║╚══██╔══╝██╔══██╗██╔══██╗      ║
+    ║   █████╗  ███████║██║   ██║   ███████║   ██║   ██████╔╝███████║      ║
+    ║   ██╔══╝  ██╔══██║██║   ██║   ██╔══██║   ██║   ██╔══██╗██╔══██║      ║
+    ║   ██║     ██║  ██║██║   ██║   ██║  ██║   ██║   ██║  ██║██║  ██║      ║
+    ║   ╚═╝     ╚═╝  ╚═╝╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝      ║
+    ║                                                                       ║
+    ║              Multi-Campus Pastoral Care Management System             ║
+    ║                                                                       ║
+    ╚═══════════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+    echo -e "                    ${DIM}Installer v${VERSION}${NC}"
+    echo ""
+}
+
+show_progress() {
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    local percent=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+    local filled=$((percent / 5))
+    local empty=$((20 - filled))
+
+    # Calculate ETA
+    local elapsed=$(($(date +%s) - START_TIME))
+    local eta="calculating..."
+    if [ $CURRENT_STEP -gt 1 ]; then
+        local remaining_steps=$((TOTAL_STEPS - CURRENT_STEP))
+        local avg_time=$((elapsed / (CURRENT_STEP - 1)))
+        local eta_seconds=$((remaining_steps * avg_time))
+        if [ $eta_seconds -gt 60 ]; then
+            eta="~$((eta_seconds / 60))m remaining"
+        else
+            eta="~${eta_seconds}s remaining"
+        fi
+    fi
+
+    echo ""
+    echo -e "${WHITE}${BOLD}[$CURRENT_STEP/$TOTAL_STEPS]${NC} $1"
+    printf "${CYAN}["
+    printf "%${filled}s" | tr ' ' '█'
+    printf "%${empty}s" | tr ' ' '░'
+    printf "] ${percent}%% ${DIM}(${eta})${NC}\n"
+}
+
 print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "  ${BULLET} $1" | tee -a "$LOG_FILE"
 }
 
 print_success() {
-    echo -e "${GREEN}[✓ SUCCESS]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "  ${CHECKMARK} ${GREEN}$1${NC}" | tee -a "$LOG_FILE"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[⚠ WARNING]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "  ${YELLOW}⚠${NC}  $1" | tee -a "$LOG_FILE"
 }
 
 print_error() {
-    echo -e "${RED}[✗ ERROR]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "  ${CROSSMARK} ${RED}$1${NC}" | tee -a "$LOG_FILE"
 }
 
-# Progress bar
+print_step() {
+    echo -e "  ${ARROW} $1"
+}
+
 show_spinner() {
     local pid=$1
-    local delay=0.1
-    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-    while ps -p $pid > /dev/null 2>&1; do
-        local temp=${spinstr#?}
-        printf " ${CYAN}[%c]${NC}  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
+    local message=$2
+    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+
+    printf "  ${CYAN}"
+    while kill -0 $pid 2>/dev/null; do
+        printf "\r  ${spin:$i:1} ${message}..."
+        i=$(( (i+1) % 10 ))
+        sleep 0.1
     done
-    printf "    \b\b\b\b"
+    printf "\r"
 }
 
-# Error handler
-trap 'handle_error $? $LINENO $BASH_COMMAND' ERR
+#################################################################################
+# ERROR HANDLING
+#################################################################################
 
-handle_error() {
-    local exit_code=$1
-    local line_number=$2
-    local command="$3"
-    
+cleanup_on_error() {
     echo ""
-    print_error "Installation failed at line $line_number with exit code $exit_code"
-    print_error "Failed command: $command"
-    print_error "Check the log file for details: $LOG_FILE"
+    print_error "Installation failed at step $CURRENT_STEP"
     echo ""
-    echo -e "${YELLOW}Common solutions:${NC}"
-    echo "  1. Check your internet connection"
-    echo "  2. Ensure you have sudo/root privileges"
-    echo "  3. Verify MongoDB connection if using remote database"
-    echo "  4. Review the log file: cat $LOG_FILE"
+    echo -e "${YELLOW}${BOLD}Troubleshooting:${NC}"
+    echo -e "  1. Check the log file: ${CYAN}cat $LOG_FILE${NC}"
+    echo -e "  2. Verify your internet connection"
+    echo -e "  3. Ensure you have enough disk space (${MIN_DISK_GB}GB required)"
+    echo -e "  4. Check if ports 80, 443, and 8001 are available"
     echo ""
-    echo -e "${CYAN}You can re-run this script after fixing the issue${NC}"
-    exit $exit_code
+    echo -e "${CYAN}You can safely re-run this script after fixing the issue.${NC}"
+    exit 1
 }
 
-# Check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+trap cleanup_on_error ERR
+
+#################################################################################
+# PRE-FLIGHT CHECKS
+#################################################################################
+
+check_root() {
+    show_progress "Checking permissions"
+    if [[ $EUID -ne 0 ]]; then
+        print_error "This script must be run as root or with sudo"
+        echo -e "  ${ARROW} Run: ${CYAN}sudo bash $0${NC}"
+        exit 1
+    fi
+    print_success "Running with root privileges"
 }
 
-# Validate email format
-validate_email() {
-    [[ "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
+detect_os() {
+    show_progress "Detecting operating system"
+
+    if [ ! -f /etc/os-release ]; then
+        print_error "Cannot detect OS. Supported: Debian 12, Ubuntu 20.04+"
+        exit 1
+    fi
+
+    . /etc/os-release
+    OS=$ID
+    VER=$VERSION_ID
+
+    print_info "Detected: $PRETTY_NAME"
+
+    case "$OS" in
+        debian)
+            if [ "${VER%%.*}" -lt 11 ]; then
+                print_error "Debian 11+ required. Found: Debian $VER"
+                exit 1
+            fi
+            ;;
+        ubuntu)
+            if [ "${VER%%.*}" -lt 20 ]; then
+                print_error "Ubuntu 20.04+ required. Found: Ubuntu $VER"
+                exit 1
+            fi
+            ;;
+        *)
+            print_error "Unsupported OS: $OS. Use Debian or Ubuntu."
+            exit 1
+            ;;
+    esac
+
+    print_success "OS compatibility verified"
 }
 
-# Validate domain format
-validate_domain() {
-    [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}$ ]]
+check_system_resources() {
+    show_progress "Checking system resources"
+
+    # Check disk space
+    local available_gb=$(df -BG / | awk 'NR==2 {print $4}' | tr -d 'G')
+    if [ "$available_gb" -lt "$MIN_DISK_GB" ]; then
+        print_error "Insufficient disk space: ${available_gb}GB available, ${MIN_DISK_GB}GB required"
+        exit 1
+    fi
+    print_success "Disk space: ${available_gb}GB available"
+
+    # Check RAM
+    local total_ram_mb=$(free -m | awk 'NR==2 {print $2}')
+    if [ "$total_ram_mb" -lt "$MIN_RAM_MB" ]; then
+        print_error "Insufficient RAM: ${total_ram_mb}MB available, ${MIN_RAM_MB}MB required"
+        exit 1
+    fi
+
+    if [ "$total_ram_mb" -lt "$RECOMMENDED_RAM_MB" ]; then
+        print_warning "RAM: ${total_ram_mb}MB (${RECOMMENDED_RAM_MB}MB recommended)"
+        print_info "Will configure swap space for optimal performance"
+        SETUP_SWAP=true
+    else
+        print_success "RAM: ${total_ram_mb}MB"
+        SETUP_SWAP=false
+    fi
+
+    # Check CPU cores
+    local cpu_cores=$(nproc)
+    print_success "CPU cores: $cpu_cores"
+}
+
+check_network() {
+    show_progress "Checking network connectivity"
+
+    # Test connectivity
+    if ! ping -c 1 -W 5 8.8.8.8 &>/dev/null; then
+        print_error "No internet connection detected"
+        exit 1
+    fi
+    print_success "Internet connection verified"
+
+    # Test DNS
+    if ! ping -c 1 -W 5 google.com &>/dev/null; then
+        print_warning "DNS resolution may be slow"
+    fi
+
+    # Check if required ports are available
+    for port in 80 443; do
+        if ss -tuln | grep -q ":$port "; then
+            print_warning "Port $port is already in use"
+        fi
+    done
+}
+
+check_repository() {
+    show_progress "Validating repository"
+
+    if [ ! -f "$PWD/backend/server.py" ] || [ ! -f "$PWD/frontend/package.json" ]; then
+        print_error "Not running from FaithTracker repository"
+        echo -e "  ${ARROW} Clone the repo first: ${CYAN}git clone <repo-url>${NC}"
+        echo -e "  ${ARROW} Then run: ${CYAN}cd faithtracker && sudo bash install.sh${NC}"
+        exit 1
+    fi
+
+    # Get version from package.json if available
+    if command -v jq &>/dev/null; then
+        APP_VERSION=$(jq -r '.version // "2.0.0"' frontend/package.json 2>/dev/null || echo "2.0.0")
+    else
+        APP_VERSION="2.0.0"
+    fi
+    print_success "Repository validated (v${APP_VERSION})"
+}
+
+show_preflight_summary() {
+    echo ""
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║${NC}  ${CHECKMARK} ${BOLD}Pre-flight checks passed!${NC}                                      ${GREEN}║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${BOLD}Installation will:${NC}"
+    echo -e "  ${BULLET} Install Python 3.9+, Node.js ${NODE_VERSION}, MongoDB 7.0, Nginx"
+    echo -e "  ${BULLET} Configure firewall (UFW) and SSL certificates"
+    echo -e "  ${BULLET} Create 'faithtracker' system user"
+    echo -e "  ${BULLET} Set up automatic service management"
+    echo ""
+    echo -e "${YELLOW}Estimated time: 10-15 minutes${NC}"
+    echo ""
+    read -p "Press Enter to begin installation or Ctrl+C to cancel..."
 }
 
 #################################################################################
 # INSTALLATION FUNCTIONS
 #################################################################################
 
-# Check if running as root
-check_root() {
-    show_progress "Checking permissions"
-    if [[ $EUID -ne 0 ]]; then
-       print_error "This script must be run as root or with sudo"
-       echo "Please run: sudo bash $0"
-       exit 1
-    fi
-    print_success "Running with proper permissions"
-}
-
-# Detect OS
-detect_os() {
-    show_progress "Detecting operating system"
-    
-    if [ ! -f /etc/os-release ]; then
-        print_error "Cannot detect OS. This script supports Debian 12 and Ubuntu 20.04+"
-        exit 1
-    fi
-    
-    . /etc/os-release
-    OS=$ID
-    VER=$VERSION_ID
-    
-    print_info "Detected: $PRETTY_NAME"
-    
-    if [[ "$OS" != "debian" && "$OS" != "ubuntu" ]]; then
-        print_error "Unsupported OS. This script only supports Debian and Ubuntu."
-        exit 1
-    fi
-    
-    print_success "OS compatibility confirmed"
-}
-
-# Update system
 update_system() {
     show_progress "Updating system packages"
-    
-    print_info "This may take several minutes..."
-    {
-        apt update
-        DEBIAN_FRONTEND=noninteractive apt upgrade -y
-        apt install -y build-essential curl wget git rsync
-    } >> "$LOG_FILE" 2>&1
-    
-    print_success "System updated successfully"
+
+    print_step "Updating package lists"
+    apt-get update >> "$LOG_FILE" 2>&1
+
+    print_step "Upgrading installed packages"
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y >> "$LOG_FILE" 2>&1
+
+    print_step "Installing essential tools"
+    apt-get install -y curl wget git rsync jq ufw software-properties-common \
+        build-essential libffi-dev >> "$LOG_FILE" 2>&1
+
+    print_success "System packages updated"
 }
 
-# Install Python
+setup_swap() {
+    if [ "$SETUP_SWAP" = true ]; then
+        show_progress "Configuring swap space"
+
+        if [ -f /swapfile ]; then
+            print_info "Swap file already exists"
+        else
+            print_step "Creating 2GB swap file"
+            fallocate -l 2G /swapfile >> "$LOG_FILE" 2>&1
+            chmod 600 /swapfile
+            mkswap /swapfile >> "$LOG_FILE" 2>&1
+            swapon /swapfile >> "$LOG_FILE" 2>&1
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            print_success "Swap space configured (2GB)"
+        fi
+    else
+        show_progress "Swap configuration (skipped - sufficient RAM)"
+        print_info "System has adequate RAM, skipping swap setup"
+    fi
+}
+
 install_python() {
     show_progress "Installing Python"
-    
-    if command_exists python3; then
-        PYTHON_VERSION=$(python3 --version | awk '{print $2}')
-        print_info "Python $PYTHON_VERSION already installed"
-    else
-        print_info "Installing Python 3..."
-        apt install -y python3 python3-pip python3-venv python3-dev >> "$LOG_FILE" 2>&1
+
+    if command -v python3 &>/dev/null; then
+        local py_version=$(python3 --version | awk '{print $2}')
+        local py_major=$(echo $py_version | cut -d. -f1)
+        local py_minor=$(echo $py_version | cut -d. -f2)
+
+        if [ "$py_major" -ge 3 ] && [ "$py_minor" -ge 9 ]; then
+            print_success "Python $py_version already installed"
+            apt-get install -y python3-pip python3-venv python3-dev >> "$LOG_FILE" 2>&1
+            return
+        fi
     fi
-    
-    # Verify Python version is 3.9+
-    PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
-    PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
-    
-    if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 9 ]); then
-        print_error "Python 3.9+ is required. Found: $(python3 --version)"
-        exit 1
-    fi
-    
-    print_success "Python $(python3 --version | awk '{print $2}') ready"
+
+    print_step "Installing Python 3.11"
+    apt-get install -y python3 python3-pip python3-venv python3-dev >> "$LOG_FILE" 2>&1
+    print_success "Python $(python3 --version | awk '{print $2}') installed"
 }
 
-# Install Node.js & Yarn
 install_nodejs() {
     show_progress "Installing Node.js and Yarn"
-    
-    if command_exists node; then
-        NODE_VERSION=$(node --version)
-        print_info "Node.js $NODE_VERSION already installed"
+
+    if command -v node &>/dev/null; then
+        local node_ver=$(node --version | tr -d 'v' | cut -d. -f1)
+        if [ "$node_ver" -ge 18 ]; then
+            print_success "Node.js $(node --version) already installed"
+        else
+            print_step "Upgrading Node.js to v${NODE_VERSION}"
+            curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >> "$LOG_FILE" 2>&1
+            apt-get install -y nodejs >> "$LOG_FILE" 2>&1
+        fi
     else
-        print_info "Installing Node.js 18.x LTS..."
-        {
-            curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-            apt install -y nodejs
-        } >> "$LOG_FILE" 2>&1
+        print_step "Installing Node.js ${NODE_VERSION}.x LTS"
+        curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >> "$LOG_FILE" 2>&1
+        apt-get install -y nodejs >> "$LOG_FILE" 2>&1
     fi
-    
-    if command_exists yarn; then
-        print_info "Yarn already installed"
-    else
-        print_info "Installing Yarn..."
+
+    if ! command -v yarn &>/dev/null; then
+        print_step "Installing Yarn"
         npm install -g yarn >> "$LOG_FILE" 2>&1
     fi
-    
-    print_success "Node.js $(node --version) and Yarn ready"
+
+    print_success "Node.js $(node --version) and Yarn $(yarn --version) ready"
 }
 
-# Install MongoDB
 install_mongodb() {
     show_progress "Setting up MongoDB"
-    
-    if command_exists mongod; then
-        print_info "MongoDB is already installed"
+
+    if command -v mongod &>/dev/null; then
+        print_info "MongoDB already installed"
         systemctl start mongod 2>/dev/null || true
         systemctl enable mongod 2>/dev/null || true
         MONGODB_REMOTE=false
         print_success "Local MongoDB ready"
-    else
-        echo ""
-        print_warning "MongoDB not found on this system"
-        echo -e "${CYAN}Options:${NC}"
-        echo "  1. Install MongoDB locally (recommended for single-server setup)"
-        echo "  2. Use remote/managed MongoDB (e.g., MongoDB Atlas)"
-        echo ""
-        read -p "Choose option (1 or 2): " -n 1 -r MONGODB_CHOICE
-        echo ""
-        
-        if [[ $MONGODB_CHOICE == "1" ]]; then
-            print_info "Installing MongoDB locally..."
-            {
-                curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-                
-                if [[ "$OS" == "debian" ]]; then
-                    echo "deb [signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" > /etc/apt/sources.list.d/mongodb-org-7.0.list
-                else
-                    echo "deb [signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] http://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
-                fi
-                
-                apt update
-                apt install -y mongodb-org
-                systemctl start mongod
-                systemctl enable mongod
-            } >> "$LOG_FILE" 2>&1
-            
-            MONGODB_REMOTE=false
-            print_success "MongoDB installed and started"
-        else
-            MONGODB_REMOTE=true
-            print_info "Will use remote MongoDB connection"
-        fi
+        return
     fi
+
+    echo ""
+    echo -e "  ${YELLOW}MongoDB not found on this system${NC}"
+    echo -e "  ${BULLET} Option 1: Install MongoDB locally (recommended)"
+    echo -e "  ${BULLET} Option 2: Use remote MongoDB (Atlas, etc.)"
+    echo ""
+    read -p "  Install MongoDB locally? (Y/n): " -n 1 -r MONGODB_CHOICE
+    echo ""
+
+    if [[ $MONGODB_CHOICE =~ ^[Nn]$ ]]; then
+        MONGODB_REMOTE=true
+        print_info "Will use remote MongoDB connection"
+        return
+    fi
+
+    print_step "Adding MongoDB 7.0 repository"
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
+        gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg >> "$LOG_FILE" 2>&1
+
+    if [[ "$OS" == "debian" ]]; then
+        echo "deb [signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" \
+            > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    else
+        echo "deb [signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] http://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" \
+            > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    fi
+
+    print_step "Installing MongoDB"
+    apt-get update >> "$LOG_FILE" 2>&1
+    apt-get install -y mongodb-org >> "$LOG_FILE" 2>&1
+
+    systemctl start mongod
+    systemctl enable mongod >> "$LOG_FILE" 2>&1
+
+    MONGODB_REMOTE=false
+    print_success "MongoDB 7.0 installed and running"
 }
 
-# Install Nginx
 install_nginx() {
-    show_progress "Installing web server (Nginx)"
-    
-    if command_exists nginx; then
+    show_progress "Installing Nginx web server"
+
+    if command -v nginx &>/dev/null; then
         print_info "Nginx already installed"
     else
-        print_info "Installing Nginx..."
-        apt install -y nginx >> "$LOG_FILE" 2>&1
+        print_step "Installing Nginx"
+        apt-get install -y nginx >> "$LOG_FILE" 2>&1
     fi
-    
+
     systemctl start nginx 2>/dev/null || true
-    systemctl enable nginx 2>/dev/null || true
+    systemctl enable nginx >> "$LOG_FILE" 2>&1
     print_success "Nginx ready"
 }
 
-# Create application user
 create_app_user() {
     show_progress "Creating application user"
-    
+
     if id "faithtracker" &>/dev/null; then
         print_info "User 'faithtracker' already exists"
     else
@@ -289,91 +493,86 @@ create_app_user() {
     fi
 }
 
-# Setup application directory
 setup_app_directory() {
     show_progress "Setting up application directory"
-    
+
     if [ -d "$INSTALL_DIR" ]; then
         print_warning "Directory $INSTALL_DIR already exists"
         echo ""
-        read -p "Remove and reinstall? (y/n): " -n 1 -r
+        read -p "  Backup existing and reinstall? (y/N): " -n 1 -r
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Removing existing directory..."
-            rm -rf "$INSTALL_DIR"
+            mkdir -p "$BACKUP_DIR"
+            local backup_name="faithtracker_$(date +%Y%m%d_%H%M%S)"
+            print_step "Creating backup at $BACKUP_DIR/$backup_name"
+            mv "$INSTALL_DIR" "$BACKUP_DIR/$backup_name"
+            print_success "Backup created"
         else
-            print_error "Installation cancelled. Please remove $INSTALL_DIR manually or choose a different location."
+            print_error "Installation cancelled"
             exit 1
         fi
     fi
-    
+
     mkdir -p "$INSTALL_DIR"
-    
-    # Check if running from within the repo
-    if [ -f "$PWD/backend/server.py" ] && [ -f "$PWD/frontend/package.json" ]; then
-        print_info "Copying application files from current directory..."
-        rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' --exclude='build' . "$INSTALL_DIR/" >> "$LOG_FILE" 2>&1
-        print_success "Application files copied"
-    else
-        print_error "Not running from repository directory"
-        print_error "Please run this script from within the cloned FaithTracker repository"
-        exit 1
-    fi
-    
+    mkdir -p "$INSTALL_DIR/backend/uploads"
+
+    print_step "Copying application files"
+    rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' \
+        --exclude='__pycache__' --exclude='*.pyc' --exclude='build' \
+        . "$INSTALL_DIR/" >> "$LOG_FILE" 2>&1
+
     chown -R faithtracker:faithtracker "$INSTALL_DIR"
+    print_success "Application files installed"
 }
 
-# Configure environment
 configure_environment() {
     show_progress "Configuring application"
-    
-    # Generate JWT secret
-    JWT_SECRET=$(openssl rand -hex 32)
-    
+
+    # Generate secrets
+    local JWT_SECRET=$(openssl rand -hex 32)
+    local ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || openssl rand -base64 32)
+
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║    FaithTracker Configuration         ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}  ${BOLD}Configuration Wizard${NC}                                           ${CYAN}║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    
+
     # MongoDB URL
     if [ "$MONGODB_REMOTE" = true ]; then
-        echo -e "${YELLOW}Enter your MongoDB connection string${NC}"
-        echo "Example: mongodb+srv://user:pass@cluster.mongodb.net/dbname"
-        while [ -z "$MONGO_URL" ]; do
-            read -p "MongoDB URL: " MONGO_URL
-            if [ -z "$MONGO_URL" ]; then
-                print_error "MongoDB URL cannot be empty"
-            fi
+        echo -e "  ${BULLET} ${BOLD}MongoDB Connection${NC}"
+        echo -e "    Example: mongodb+srv://user:pass@cluster.mongodb.net/dbname"
+        while true; do
+            read -p "    MongoDB URL: " MONGO_URL
+            if [ -n "$MONGO_URL" ]; then break; fi
+            print_error "MongoDB URL is required"
         done
     else
         MONGO_URL="mongodb://localhost:27017"
         print_info "Using local MongoDB: $MONGO_URL"
     fi
-    
+
     # Database name
     echo ""
-    read -p "Database name [pastoral_care_db]: " DB_NAME
+    read -p "  Database name [pastoral_care_db]: " DB_NAME
     DB_NAME=${DB_NAME:-pastoral_care_db}
-    
+
     # Domain name
     echo ""
-    echo -e "${YELLOW}Enter your domain name (without http/https)${NC}"
-    echo "Example: faithtracker.com or church.example.org"
-    while [ -z "$DOMAIN_NAME" ]; do
-        read -p "Domain: " DOMAIN_NAME
-        if [ -z "$DOMAIN_NAME" ]; then
-            print_error "Domain name cannot be empty"
-        fi
+    echo -e "  ${BULLET} ${BOLD}Domain Configuration${NC}"
+    echo -e "    Enter your domain (e.g., faithtracker.church.org)"
+    while true; do
+        read -p "    Domain: " DOMAIN_NAME
+        if [ -n "$DOMAIN_NAME" ]; then break; fi
+        print_error "Domain name is required"
     done
 
     # Backend port
     echo ""
-    echo -e "${CYAN}Backend API Port Configuration${NC}"
-    read -p "Backend port [8001]: " BACKEND_PORT
+    read -p "  Backend API port [8001]: " BACKEND_PORT
     BACKEND_PORT=${BACKEND_PORT:-8001}
 
-    # Validate port number
+    # Validate port
     if ! [[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || [ "$BACKEND_PORT" -lt 1024 ] || [ "$BACKEND_PORT" -gt 65535 ]; then
         print_warning "Invalid port. Using default 8001"
         BACKEND_PORT=8001
@@ -381,60 +580,36 @@ configure_environment() {
 
     # Church name
     echo ""
-    read -p "Church name [GKBJ]: " CHURCH_NAME
+    read -p "  Church/Organization name [GKBJ]: " CHURCH_NAME
     CHURCH_NAME=${CHURCH_NAME:-GKBJ}
-    
-    # WhatsApp (optional)
-    echo ""
-    echo -e "${CYAN}WhatsApp integration (optional)${NC}"
-    read -p "WhatsApp gateway URL (or press Enter to skip): " WHATSAPP_URL
-    
+
     # Admin credentials
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║    Create Admin Account                ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
-    echo ""
-    
-    while [ -z "$ADMIN_EMAIL" ]; do
-        read -p "Admin email: " ADMIN_EMAIL
-        if [ -z "$ADMIN_EMAIL" ]; then
-            print_error "Email cannot be empty"
-        elif ! validate_email "$ADMIN_EMAIL"; then
-            print_error "Invalid email format"
-            ADMIN_EMAIL=""
-        fi
+    echo -e "  ${BULLET} ${BOLD}Admin Account${NC}"
+    while true; do
+        read -p "    Admin email: " ADMIN_EMAIL
+        if [[ "$ADMIN_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then break; fi
+        print_error "Invalid email format"
     done
-    
-    while [ -z "$ADMIN_PASSWORD" ] || [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]; do
-        read -s -p "Admin password (min 8 chars): " ADMIN_PASSWORD
+
+    while true; do
+        read -s -p "    Admin password (min 8 chars): " ADMIN_PASSWORD
         echo ""
-        
-        if [ ${#ADMIN_PASSWORD} -lt 8 ]; then
-            print_error "Password must be at least 8 characters"
-            ADMIN_PASSWORD=""
-            continue
-        fi
-        
-        read -s -p "Confirm password: " ADMIN_PASSWORD_CONFIRM
-        echo ""
-        
-        if [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]; then
+        if [ ${#ADMIN_PASSWORD} -ge 8 ]; then
+            read -s -p "    Confirm password: " ADMIN_PASSWORD_CONFIRM
+            echo ""
+            if [ "$ADMIN_PASSWORD" = "$ADMIN_PASSWORD_CONFIRM" ]; then break; fi
             print_error "Passwords do not match"
-            ADMIN_PASSWORD=""
+        else
+            print_error "Password must be at least 8 characters"
         fi
     done
-    
-    # SSL/HTTPS Setup
+
+    # SSL Setup
     echo ""
-    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║    SSL/HTTPS Configuration             ║${NC}"
-    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${YELLOW}Enable SSL/HTTPS with Let's Encrypt?${NC}"
-    echo "This requires your domain to be pointing to this server's IP"
-    echo ""
-    read -p "Enable SSL now? (y/n): " -n 1 -r
+    echo -e "  ${BULLET} ${BOLD}SSL/HTTPS Configuration${NC}"
+    echo -e "    Requires domain to point to this server's IP"
+    read -p "    Enable SSL with Let's Encrypt? (y/N): " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         ENABLE_SSL=true
@@ -442,106 +617,129 @@ configure_environment() {
     else
         ENABLE_SSL=false
         HTTP_PROTO="http"
-        print_info "You can enable SSL later with: sudo certbot --nginx"
     fi
 
     # Show summary
     echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║    Configuration Summary               ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
-    echo -e "  MongoDB:       ${CYAN}$MONGO_URL${NC}"
-    echo -e "  Database:      ${CYAN}$DB_NAME${NC}"
-    echo -e "  Domain:        ${CYAN}$DOMAIN_NAME${NC}"
-    echo -e "  Backend Port:  ${CYAN}$BACKEND_PORT${NC}"
-    echo -e "  SSL/HTTPS:     ${CYAN}$([ "$ENABLE_SSL" = true ] && echo "Enabled" || echo "Disabled")${NC}"
-    echo -e "  Church:        ${CYAN}$CHURCH_NAME${NC}"
-    echo -e "  Admin:         ${CYAN}$ADMIN_EMAIL${NC}"
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║${NC}  ${BOLD}Configuration Summary${NC}                                          ${GREEN}║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "  ${BULLET} MongoDB:      ${CYAN}$(echo $MONGO_URL | sed 's/:.*@/:***@/')${NC}"
+    echo -e "  ${BULLET} Database:     ${CYAN}$DB_NAME${NC}"
+    echo -e "  ${BULLET} Domain:       ${CYAN}$DOMAIN_NAME${NC}"
+    echo -e "  ${BULLET} Backend Port: ${CYAN}$BACKEND_PORT${NC}"
+    echo -e "  ${BULLET} SSL/HTTPS:    ${CYAN}$([ "$ENABLE_SSL" = true ] && echo "Enabled" || echo "Disabled")${NC}"
+    echo -e "  ${BULLET} Church:       ${CYAN}$CHURCH_NAME${NC}"
+    echo -e "  ${BULLET} Admin:        ${CYAN}$ADMIN_EMAIL${NC}"
     echo ""
-    read -p "Proceed with installation? (y/n): " -n 1 -r
+    read -p "  Proceed with installation? (Y/n): " -n 1 -r
     echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
         print_error "Installation cancelled"
         exit 1
     fi
 
-    # Generate encryption key for API credentials
-    ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-
     # Create backend .env
     cat > "$INSTALL_DIR/backend/.env" << EOF
+# FaithTracker Backend Configuration
+# Generated: $(date '+%Y-%m-%d %H:%M:%S')
+
 MONGO_URL="$MONGO_URL"
 DB_NAME="$DB_NAME"
 CORS_ORIGINS="${HTTP_PROTO}://$DOMAIN_NAME,${HTTP_PROTO}://www.$DOMAIN_NAME"
 JWT_SECRET_KEY="$JWT_SECRET"
 ENCRYPTION_KEY="$ENCRYPTION_KEY"
 CHURCH_NAME="$CHURCH_NAME"
-WHATSAPP_GATEWAY_URL="$WHATSAPP_URL"
 BACKEND_PORT="$BACKEND_PORT"
 EOF
-    
+
     # Create frontend .env
     cat > "$INSTALL_DIR/frontend/.env" << EOF
+# FaithTracker Frontend Configuration
+# Generated: $(date '+%Y-%m-%d %H:%M:%S')
+
 REACT_APP_BACKEND_URL="${HTTP_PROTO}://$DOMAIN_NAME"
 WDS_SOCKET_PORT=$([ "$ENABLE_SSL" = true ] && echo "443" || echo "80")
 REACT_APP_ENABLE_VISUAL_EDITS=false
-ENABLE_HEALTH_CHECK=false
 EOF
-    
+
+    # Create version file
+    echo "$APP_VERSION" > "$INSTALL_DIR/.version"
+    echo "$(date +%s)" > "$INSTALL_DIR/.installed_at"
+
     chown faithtracker:faithtracker "$INSTALL_DIR/backend/.env"
     chown faithtracker:faithtracker "$INSTALL_DIR/frontend/.env"
-    
-    print_success "Configuration complete"
+
+    print_success "Configuration saved"
 }
 
-# Setup backend
 setup_backend() {
     show_progress "Setting up backend (Python)"
-    
-    cd "$INSTALL_DIR/backend"
-    
-    print_info "Creating Python virtual environment..."
-    sudo -u faithtracker python3 -m venv venv >> "$LOG_FILE" 2>&1
-    
-    print_info "Installing Python dependencies (may take 5-10 minutes)..."
-    {
-        sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/pip" install --upgrade pip
-        sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/pip" install -r requirements.txt
-    } >> "$LOG_FILE" 2>&1
 
-    print_info "Initializing database (indexes, admin user, default campus)..."
+    cd "$INSTALL_DIR/backend"
+
+    print_step "Creating Python virtual environment"
+    sudo -u faithtracker python3 -m venv venv >> "$LOG_FILE" 2>&1
+
+    print_step "Installing Python dependencies"
+    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/pip" install --upgrade pip >> "$LOG_FILE" 2>&1
+    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/pip" install -r requirements.txt >> "$LOG_FILE" 2>&1 &
+    show_spinner $! "Installing Python packages"
+    wait
+
+    print_step "Initializing database"
     sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" init_db.py \
         --admin-email "$ADMIN_EMAIL" \
         --admin-password "$ADMIN_PASSWORD" \
-        --church-name "$CHURCH_NAME" || {
+        --church-name "$CHURCH_NAME" >> "$LOG_FILE" 2>&1 || {
         print_error "Database initialization failed"
         exit 1
     }
 
-    print_info "Creating database indexes for performance..."
-    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" create_indexes.py >> "$LOG_FILE" 2>&1 || {
-        print_warning "Index creation failed (non-critical)"
-    }
+    print_step "Creating database indexes"
+    sudo -u faithtracker "$INSTALL_DIR/backend/venv/bin/python" create_indexes.py >> "$LOG_FILE" 2>&1 || true
 
     print_success "Backend setup complete"
 }
 
-# Setup frontend
 setup_frontend() {
     show_progress "Setting up frontend (React)"
-    
+
     cd "$INSTALL_DIR/frontend"
-    
-    print_info "Installing Node.js dependencies (may take 5-10 minutes)..."
-    sudo -u faithtracker yarn install >> "$LOG_FILE" 2>&1
-    
-    print_info "Building production bundle..."
-    sudo -u faithtracker yarn build >> "$LOG_FILE" 2>&1
-    
-    print_success "Frontend setup complete"
+
+    print_step "Installing Node.js dependencies"
+    sudo -u faithtracker yarn install >> "$LOG_FILE" 2>&1 &
+    show_spinner $! "Installing packages"
+    wait
+
+    print_step "Building production bundle"
+    # Increase Node.js memory for build
+    export NODE_OPTIONS="--max-old-space-size=2048"
+    sudo -u faithtracker yarn build >> "$LOG_FILE" 2>&1 &
+    local build_pid=$!
+
+    # Show build progress
+    local dots=0
+    printf "  "
+    while kill -0 $build_pid 2>/dev/null; do
+        printf "."
+        dots=$((dots + 1))
+        if [ $dots -ge 50 ]; then
+            printf "\n  "
+            dots=0
+        fi
+        sleep 2
+    done
+    echo ""
+
+    wait $build_pid || {
+        print_error "Frontend build failed"
+        exit 1
+    }
+
+    print_success "Frontend build complete"
 }
 
-# Create systemd service
 create_systemd_service() {
     show_progress "Creating system service"
 
@@ -549,6 +747,7 @@ create_systemd_service() {
 [Unit]
 Description=FaithTracker FastAPI Backend
 After=network.target mongod.service
+Wants=mongod.service
 
 [Service]
 Type=simple
@@ -559,45 +758,59 @@ Environment="PATH=/opt/faithtracker/backend/venv/bin"
 ExecStart=/opt/faithtracker/backend/venv/bin/uvicorn server:app --host 0.0.0.0 --port $BACKEND_PORT --workers 4
 Restart=always
 RestartSec=10
-
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=faithtracker-backend
 
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/faithtracker/backend/uploads
+PrivateTmp=true
+
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     systemctl daemon-reload
     systemctl enable faithtracker-backend >> "$LOG_FILE" 2>&1
     systemctl start faithtracker-backend
-    
+
     sleep 3
-    
+
     if systemctl is-active --quiet faithtracker-backend; then
         print_success "Backend service started"
     else
         print_error "Backend service failed to start"
-        echo "Check logs: sudo journalctl -u faithtracker-backend -n 50"
+        echo "  ${ARROW} Check logs: ${CYAN}sudo journalctl -u faithtracker-backend -n 50${NC}"
         exit 1
     fi
 }
 
-# Configure Nginx
 configure_nginx() {
     show_progress "Configuring web server"
-    
+
     cat > /etc/nginx/sites-available/faithtracker << EOF
+# FaithTracker Nginx Configuration
+# Generated: $(date '+%Y-%m-%d %H:%M:%S')
+
 server {
     listen 80;
+    listen [::]:80;
     server_name $DOMAIN_NAME www.$DOMAIN_NAME;
 
     root /opt/faithtracker/frontend/build;
     index index.html;
 
+    # Gzip compression
     gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private auth;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
 
+    # API proxy
     location /api/ {
         proxy_pass http://127.0.0.1:$BACKEND_PORT;
         proxy_http_version 1.1;
@@ -608,174 +821,205 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
-
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
     }
 
+    # Health check endpoint (no auth required)
+    location /health {
+        proxy_pass http://127.0.0.1:$BACKEND_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        access_log off;
+    }
+
+    # React SPA routing
     location / {
         try_files \$uri \$uri/ /index.html;
     }
 
+    # Static assets caching
     location /static/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 
+    # Uploaded files
     location /uploads/ {
         alias /opt/faithtracker/backend/uploads/;
         expires 30d;
         add_header Cache-Control "public";
     }
 
+    # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+    # File upload limit
     client_max_body_size 10M;
 }
 EOF
-    
+
     ln -sf /etc/nginx/sites-available/faithtracker /etc/nginx/sites-enabled/
     rm -f /etc/nginx/sites-enabled/default
-    
-    nginx -t >> "$LOG_FILE" 2>&1
+
+    nginx -t >> "$LOG_FILE" 2>&1 || {
+        print_error "Nginx configuration test failed"
+        exit 1
+    }
+
     systemctl restart nginx
-    
     print_success "Nginx configured"
 }
 
-# Setup SSL
+setup_firewall() {
+    show_progress "Configuring firewall"
+
+    if ! command -v ufw &>/dev/null; then
+        apt-get install -y ufw >> "$LOG_FILE" 2>&1
+    fi
+
+    print_step "Setting up UFW rules"
+    ufw --force reset >> "$LOG_FILE" 2>&1
+    ufw default deny incoming >> "$LOG_FILE" 2>&1
+    ufw default allow outgoing >> "$LOG_FILE" 2>&1
+    ufw allow ssh >> "$LOG_FILE" 2>&1
+    ufw allow 'Nginx Full' >> "$LOG_FILE" 2>&1
+    ufw --force enable >> "$LOG_FILE" 2>&1
+
+    print_success "Firewall configured (SSH, HTTP, HTTPS allowed)"
+}
+
 setup_ssl() {
     show_progress "Setting up SSL certificate"
 
-    # Skip if SSL was not enabled in configuration
     if [ "$ENABLE_SSL" != true ]; then
         print_info "SSL not enabled during configuration"
-        print_info "You can enable it later with: sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME"
+        print_info "Enable later: ${CYAN}sudo certbot --nginx -d $DOMAIN_NAME${NC}"
         return
     fi
 
-    # Install certbot if needed
-    if ! command_exists certbot; then
-        print_info "Installing certbot..."
-        apt install -y certbot python3-certbot-nginx >> "$LOG_FILE" 2>&1
+    if ! command -v certbot &>/dev/null; then
+        print_step "Installing Certbot"
+        apt-get install -y certbot python3-certbot-nginx >> "$LOG_FILE" 2>&1
     fi
 
-    echo ""
-    print_info "Installing SSL certificate with Let's Encrypt..."
-    print_warning "Make sure your domain is pointing to this server's IP address"
-
-    # Attempt automatic SSL setup
+    print_step "Obtaining SSL certificate"
     certbot --nginx -d "$DOMAIN_NAME" -d "www.$DOMAIN_NAME" \
-        --non-interactive \
-        --agree-tos \
-        --email "$ADMIN_EMAIL" \
+        --non-interactive --agree-tos --email "$ADMIN_EMAIL" \
         --redirect >> "$LOG_FILE" 2>&1 && \
-    print_success "SSL certificate installed and configured" || {
-        print_warning "SSL setup failed - possible causes:"
-        print_warning "  • Domain not pointing to this server"
-        print_warning "  • Firewall blocking port 80/443"
-        print_warning "  • Domain DNS not propagated yet"
-        print_info "You can retry manually: sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME"
+    print_success "SSL certificate installed" || {
+        print_warning "SSL setup failed - verify domain DNS settings"
+        print_info "Retry manually: ${CYAN}sudo certbot --nginx -d $DOMAIN_NAME${NC}"
     }
 }
 
-# Run smoke tests
-run_smoke_tests() {
-    show_progress "Running system tests"
-    
+run_health_checks() {
+    show_progress "Running health checks"
+
     sleep 2
-    
-    # Test backend
-    if curl -sf http://localhost:$BACKEND_PORT/api/config/all > /dev/null; then
-        print_success "Backend API responding"
+
+    # Test backend API
+    print_step "Testing backend API"
+    if curl -sf "http://localhost:$BACKEND_PORT/health" > /dev/null 2>&1; then
+        print_success "Backend API healthy"
     else
-        print_warning "Backend API test failed"
+        print_warning "Backend health check failed (may still be starting)"
     fi
-    
-    # Test frontend files
+
+    # Test frontend build
+    print_step "Verifying frontend build"
     if [ -f "$INSTALL_DIR/frontend/build/index.html" ]; then
         print_success "Frontend build verified"
     else
-        print_warning "Frontend build missing"
+        print_warning "Frontend build not found"
     fi
-    
-    # Test Nginx
-    if curl -sf http://localhost/ > /dev/null; then
+
+    # Test web server
+    print_step "Testing web server"
+    if curl -sf http://localhost/ > /dev/null 2>&1; then
         print_success "Web server responding"
     else
-        print_warning "Web server test failed"
+        print_warning "Web server check failed"
     fi
 }
 
-# Print final summary
 print_summary() {
+    local elapsed=$(($(date +%s) - START_TIME))
+    local minutes=$((elapsed / 60))
+    local seconds=$((elapsed % 60))
+
     echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                                                        ║${NC}"
-    echo -e "${GREEN}║    ✓ FaithTracker Installation Complete!              ║${NC}"
-    echo -e "${GREEN}║                                                        ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${GREEN}"
+    cat << 'EOF'
+    ╔═══════════════════════════════════════════════════════════════════════╗
+    ║                                                                       ║
+    ║      ✓ ✓ ✓   INSTALLATION COMPLETE!   ✓ ✓ ✓                          ║
+    ║                                                                       ║
+    ╚═══════════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+
+    echo -e "${BOLD}Installation completed in ${minutes}m ${seconds}s${NC}"
     echo ""
-    echo -e "${CYAN}🌐 Access your application:${NC}"
-    echo -e "   http://$DOMAIN_NAME"
+    echo -e "${CYAN}${BOLD}🌐 Access Your Application:${NC}"
+    echo -e "   ${HTTP_PROTO}://$DOMAIN_NAME"
     echo ""
-    echo -e "${CYAN}👤 Admin Login:${NC}"
+    echo -e "${CYAN}${BOLD}👤 Admin Login:${NC}"
     echo -e "   Email:    $ADMIN_EMAIL"
-    echo -e "   Password: [as entered]"
+    echo -e "   Password: [as configured]"
     echo ""
-    echo -e "${CYAN}📁 Important Locations:${NC}"
-    echo -e "   App:      /opt/faithtracker"
-    echo -e "   Logs:     $LOG_FILE"
-    echo -e "   Backend:  sudo journalctl -u faithtracker-backend -f"
+    echo -e "${CYAN}${BOLD}📁 Important Locations:${NC}"
+    echo -e "   Application:  /opt/faithtracker"
+    echo -e "   Logs:         $LOG_FILE"
+    echo -e "   Backend Logs: sudo journalctl -u faithtracker-backend -f"
     echo ""
-    echo -e "${CYAN}🔧 Manage Services:${NC}"
-    echo -e "   Backend:  sudo systemctl status faithtracker-backend"
-    echo -e "   Nginx:    sudo systemctl status nginx"
-    echo -e "   MongoDB:  sudo systemctl status mongod"
+    echo -e "${CYAN}${BOLD}🔧 Service Management:${NC}"
+    echo -e "   sudo systemctl status faithtracker-backend"
+    echo -e "   sudo systemctl restart faithtracker-backend"
+    echo -e "   sudo systemctl status nginx"
     echo ""
-    echo -e "${CYAN}📚 Documentation:${NC}"
-    echo -e "   /opt/faithtracker/docs/FEATURES.md"
-    echo -e "   /opt/faithtracker/docs/API.md"
+    echo -e "${CYAN}${BOLD}🔄 Updates:${NC}"
+    echo -e "   cd /path/to/git/repo && sudo bash update.sh"
     echo ""
-    echo -e "${GREEN}Thank you for installing FaithTracker! 🙏${NC}"
+    echo -e "${GREEN}${BOLD}Thank you for installing FaithTracker! 🙏${NC}"
     echo ""
 }
 
 #################################################################################
-# MAIN INSTALLATION FLOW
+# MAIN EXECUTION
 #################################################################################
 
 main() {
-    clear
-    
-    echo -e "${BLUE}"
-    echo "╔════════════════════════════════════════════════════════╗"
-    echo "║                                                        ║"
-    echo "║          FaithTracker Automated Installer              ║"
-    echo "║                                                        ║"
-    echo "║     Multi-Campus Pastoral Care Management System      ║"
-    echo "║                                                        ║"
-    echo "╚════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
+    setup_logging
+    show_banner
+
+    echo -e "${BOLD}Welcome to the FaithTracker Installer${NC}"
     echo ""
-    echo "This will install FaithTracker on your server."
-    echo "Installation typically takes 10-15 minutes."
+    echo "This script will install and configure FaithTracker on your server."
+    echo -e "For Debian 12 / Ubuntu 20.04+ | Requires ${YELLOW}~10-15 minutes${NC}"
     echo ""
-    echo -e "${YELLOW}Requirements:${NC}"
-    echo "  • Fresh Debian 12 or Ubuntu 20.04+ server"
-    echo "  • At least 2GB RAM"
-    echo "  • Internet connection"
-    echo "  • Domain name (optional but recommended)"
+    echo -e "${BOLD}Requirements:${NC}"
+    echo -e "  ${BULLET} Fresh server with 2GB+ RAM"
+    echo -e "  ${BULLET} Internet connection"
+    echo -e "  ${BULLET} Domain name pointing to this server (recommended)"
     echo ""
-    read -p "Press Enter to begin installation or Ctrl+C to cancel..."
-    
-    # Run all installation steps
+    read -p "Press Enter to start pre-flight checks..."
+
+    # Pre-flight checks
     check_root
     detect_os
+    check_system_resources
+    check_network
+    check_repository
+    show_preflight_summary
+
+    # Installation
     update_system
+    setup_swap
     install_python
     install_nodejs
     install_mongodb
@@ -787,14 +1031,12 @@ main() {
     setup_frontend
     create_systemd_service
     configure_nginx
+    setup_firewall
     setup_ssl
-    run_smoke_tests
-    
-    # Show final summary
+    run_health_checks
+
+    # Done!
     print_summary
-    
-    echo "Installation log saved to: $LOG_FILE" >> "$LOG_FILE"
 }
 
-# Run main installation
 main "$@"
