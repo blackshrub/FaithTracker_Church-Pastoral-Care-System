@@ -393,14 +393,22 @@ detect_changes() {
         print_info "Other files: ${CYAN}$OTHER_FILE_COUNT${NC} file(s) modified"
     fi
 
-    # No changes
+    # No changes detected
     if [ "$BACKEND_CHANGED" = false ] && [ "$FRONTEND_CHANGED" = false ]; then
-        echo ""
-        echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║${NC}  ${CHECKMARK} ${BOLD}Your application is already up to date!${NC}                      ${GREEN}║${NC}"
-        echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════════╝${NC}"
-        echo ""
-        exit 0
+        if [ "$FORCE_UPDATE" = true ]; then
+            echo ""
+            print_warning "No changes detected, but --force flag is set"
+            print_info "Will rebuild backend and frontend anyway..."
+        else
+            echo ""
+            echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════════╗${NC}"
+            echo -e "${GREEN}║${NC}  ${CHECKMARK} ${BOLD}Your application is already up to date!${NC}                      ${GREEN}║${NC}"
+            echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════════╝${NC}"
+            echo ""
+            echo -e "  ${DIM}Tip: Use ${NC}--force${DIM} to rebuild anyway${NC}"
+            echo ""
+            exit 0
+        fi
     fi
 }
 
@@ -425,16 +433,20 @@ show_update_plan() {
 
     local estimated_time=1
 
-    if [ "$BACKEND_CHANGED" = true ]; then
-        echo -e "    ${ROCKET} ${BOLD}Backend API${NC} (${BACKEND_FILE_COUNT} files)"
+    if [ "$BACKEND_CHANGED" = true ] || [ "$FORCE_UPDATE" = true ]; then
+        local backend_label="Backend API"
+        [ "$FORCE_UPDATE" = true ] && [ "$BACKEND_CHANGED" = false ] && backend_label="Backend API (forced rebuild)"
+        echo -e "    ${ROCKET} ${BOLD}${backend_label}${NC} (${BACKEND_FILE_COUNT:-0} files)"
         echo -e "       ${DIM}• Update Python dependencies${NC}"
         echo -e "       ${DIM}• Run database migrations${NC}"
         echo -e "       ${DIM}• Restart backend service${NC}"
         estimated_time=$((estimated_time + 2))
     fi
 
-    if [ "$FRONTEND_CHANGED" = true ]; then
-        echo -e "    ${ROCKET} ${BOLD}Frontend UI${NC} (${FRONTEND_FILE_COUNT} files)"
+    if [ "$FRONTEND_CHANGED" = true ] || [ "$FORCE_UPDATE" = true ]; then
+        local frontend_label="Frontend UI"
+        [ "$FORCE_UPDATE" = true ] && [ "$FRONTEND_CHANGED" = false ] && frontend_label="Frontend UI (forced rebuild)"
+        echo -e "    ${ROCKET} ${BOLD}${frontend_label}${NC} (${FRONTEND_FILE_COUNT:-0} files)"
         echo -e "       ${DIM}• Install Node dependencies${NC}"
         echo -e "       ${DIM}• Build production bundle${NC}"
         echo -e "       ${DIM}• Clear browser cache notice${NC}"
@@ -786,11 +798,11 @@ main() {
     copy_files
 
     # Update components
-    if [ "$BACKEND_CHANGED" = true ]; then
+    if [ "$BACKEND_CHANGED" = true ] || [ "$FORCE_UPDATE" = true ]; then
         update_backend
     fi
 
-    if [ "$FRONTEND_CHANGED" = true ]; then
+    if [ "$FRONTEND_CHANGED" = true ] || [ "$FORCE_UPDATE" = true ]; then
         update_frontend
     fi
 
