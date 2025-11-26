@@ -172,6 +172,25 @@ async def migration_007_fix_user_password_field(db):
     return f"Fixed password field on {result.modified_count} user(s)"
 
 
+async def migration_008_ensure_campus_id_field(db):
+    """Ensure all campuses have an 'id' field (required for frontend selection)"""
+    import uuid
+
+    campuses_updated = 0
+    cursor = db.campuses.find({"id": {"$exists": False}})
+
+    async for campus in cursor:
+        # Generate a UUID for the campus id field
+        new_id = str(uuid.uuid4())
+        await db.campuses.update_one(
+            {"_id": campus["_id"]},
+            {"$set": {"id": new_id}}
+        )
+        campuses_updated += 1
+
+    return f"Added id field to {campuses_updated} campus(es)"
+
+
 # ==================== MIGRATION REGISTRY ====================
 
 # List of all migrations in order
@@ -184,6 +203,7 @@ MIGRATIONS: List[tuple[int, str, Callable]] = [
     (5, "Add soft delete fields", migration_005_add_deleted_fields),
     (6, "Ensure campus is_active field", migration_006_ensure_campus_is_active),
     (7, "Fix user password field name", migration_007_fix_user_password_field),
+    (8, "Ensure campus id field", migration_008_ensure_campus_id_field),
 ]
 
 
