@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MemberAvatar } from '@/components/MemberAvatar';
@@ -36,10 +37,13 @@ export const TaskCard = ({
   triggerHaptic = () => {}
 }) => {
   return (
-    <div className={`p-4 ${config.bgClass} rounded-lg border ${config.borderClass} relative hover:shadow-lg transition-all`}>
+    <article
+      className={`p-4 ${config.bgClass} rounded-lg border ${config.borderClass} relative hover:shadow-lg transition-all`}
+      aria-label={`Task for ${event.member_name}${event.days_overdue > 0 ? `, ${event.days_overdue} days overdue` : ''}`}
+    >
       {/* Overdue Badge - Top Right */}
       {event.days_overdue > 0 && (
-        <span className="absolute top-3 right-3 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10">
+        <span className="absolute top-3 right-3 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded shadow-sm z-10" aria-hidden="true">
           {event.days_overdue}d overdue
         </span>
       )}
@@ -121,8 +125,32 @@ export const TaskCard = ({
           </Button>
         )}
       </div>
-    </div>
+    </article>
   );
+};
+
+TaskCard.propTypes = {
+  event: PropTypes.shape({
+    id: PropTypes.string,
+    member_id: PropTypes.string.isRequired,
+    member_name: PropTypes.string.isRequired,
+    member_phone: PropTypes.string,
+    member_photo_url: PropTypes.string,
+    days_overdue: PropTypes.number,
+    completed: PropTypes.bool
+  }).isRequired,
+  config: PropTypes.shape({
+    bgClass: PropTypes.string,
+    borderClass: PropTypes.string,
+    btnClass: PropTypes.string,
+    ringClass: PropTypes.string
+  }),
+  onComplete: PropTypes.func,
+  children: PropTypes.node,
+  actionLabel: PropTypes.string,
+  completedLabel: PropTypes.string,
+  contactLabel: PropTypes.string,
+  triggerHaptic: PropTypes.func
 };
 
 export default TaskCard;

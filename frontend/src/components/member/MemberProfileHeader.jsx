@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,20 @@ export const MemberProfileHeader = ({
       </div>
     </div>
   );
+};
+
+MemberProfileHeader.propTypes = {
+  member: PropTypes.shape({
+    id: PropTypes.string,
+    name: PropTypes.string.isRequired,
+    phone: PropTypes.string,
+    photo_url: PropTypes.string,
+    engagement_status: PropTypes.string,
+    days_since_last_contact: PropTypes.number,
+    last_contact_date: PropTypes.string
+  }),
+  onAddCareEvent: PropTypes.func.isRequired,
+  backLink: PropTypes.string
 };
 
 export default MemberProfileHeader;

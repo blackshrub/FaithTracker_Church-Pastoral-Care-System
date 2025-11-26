@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Bell, Heart, AlertTriangle } from 'lucide-react';
@@ -90,6 +91,17 @@ export const DashboardStats = ({
       </Card>
     </div>
   );
+};
+
+DashboardStats.propTypes = {
+  totalMembers: PropTypes.number,
+  birthdaysToday: PropTypes.array,
+  todayTasks: PropTypes.array,
+  griefDue: PropTypes.array,
+  accidentFollowUp: PropTypes.array,
+  financialAidDue: PropTypes.array,
+  atRiskMembers: PropTypes.array,
+  disconnectedMembers: PropTypes.array
 };
 
 export default DashboardStats;

@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -177,6 +178,29 @@ export const TimelineEventCard = ({
       </Card>
     </div>
   );
+};
+
+TimelineEventCard.propTypes = {
+  event: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    event_type: PropTypes.string.isRequired,
+    event_date: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+    description: PropTypes.string,
+    completed: PropTypes.bool,
+    ignored: PropTypes.bool,
+    grief_relationship: PropTypes.string,
+    hospital_name: PropTypes.string,
+    aid_type: PropTypes.string,
+    aid_amount: PropTypes.number,
+    created_by_user_name: PropTypes.string,
+    completed_by_user_name: PropTypes.string,
+    completed_at: PropTypes.string,
+    ignored_by_name: PropTypes.string,
+    ignored_at: PropTypes.string
+  }).isRequired,
+  onDelete: PropTypes.func,
+  children: PropTypes.node
 };
 
 export default TimelineEventCard;
