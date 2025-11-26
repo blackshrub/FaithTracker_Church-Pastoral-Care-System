@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import './i18n';
 import '@/App.css';
 import LoginPage from '@/pages/LoginPage';
@@ -112,16 +113,18 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading GKBJ Care...</div>}>
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-            <Toaster />
-          </AuthProvider>
-        </BrowserRouter>
-      </Suspense>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading GKBJ Care...</div>}>
+          <BrowserRouter>
+            <AuthProvider>
+              <AppRoutes />
+              <Toaster />
+            </AuthProvider>
+          </BrowserRouter>
+        </Suspense>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

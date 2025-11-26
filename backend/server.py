@@ -305,8 +305,8 @@ def get_campus_filter(current_user: dict):
 # ==================== MODELS ====================
 
 class CampusCreate(BaseModel):
-    campus_name: str
-    location: Optional[str] = None
+    campus_name: str = Field(..., min_length=1, max_length=200)
+    location: Optional[str] = Field(None, max_length=500)
     timezone: str = "Asia/Jakarta"  # Default to UTC+7
 
 class Campus(BaseModel):
@@ -321,32 +321,32 @@ class Campus(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MemberCreate(BaseModel):
-    name: str
-    phone: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=200)
+    phone: Optional[str] = Field(None, max_length=20)
     campus_id: str
-    external_member_id: Optional[str] = None
-    notes: Optional[str] = None
+    external_member_id: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None, max_length=2000)
     birth_date: Optional[date] = None
-    address: Optional[str] = None
-    category: Optional[str] = None
-    gender: Optional[str] = None
-    blood_type: Optional[str] = None
-    marital_status: Optional[str] = None
-    membership_status: Optional[str] = None
-    age: Optional[int] = None
+    address: Optional[str] = Field(None, max_length=500)
+    category: Optional[str] = Field(None, max_length=100)
+    gender: Optional[str] = Field(None, max_length=20)
+    blood_type: Optional[str] = Field(None, max_length=10)
+    marital_status: Optional[str] = Field(None, max_length=50)
+    membership_status: Optional[str] = Field(None, max_length=50)
+    age: Optional[int] = Field(None, ge=0, le=150)
 
 class MemberUpdate(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    external_member_id: Optional[str] = None
-    notes: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    phone: Optional[str] = Field(None, max_length=20)
+    external_member_id: Optional[str] = Field(None, max_length=100)
+    notes: Optional[str] = Field(None, max_length=2000)
     birth_date: Optional[date] = None
-    address: Optional[str] = None
-    category: Optional[str] = None
-    gender: Optional[str] = None
-    blood_type: Optional[str] = None
-    marital_status: Optional[str] = None
-    membership_status: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=500)
+    category: Optional[str] = Field(None, max_length=100)
+    gender: Optional[str] = Field(None, max_length=20)
+    blood_type: Optional[str] = Field(None, max_length=10)
+    marital_status: Optional[str] = Field(None, max_length=50)
+    membership_status: Optional[str] = Field(None, max_length=50)
 
 class Member(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -376,9 +376,9 @@ class Member(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class VisitationLogEntry(BaseModel):
-    visitor_name: str
+    visitor_name: str = Field(..., min_length=1, max_length=200)
     visit_date: date
-    notes: str
+    notes: str = Field(..., max_length=2000)
     prayer_offered: bool = False
 
 class CareEventCreate(BaseModel):
@@ -386,28 +386,28 @@ class CareEventCreate(BaseModel):
     campus_id: str
     event_type: EventType
     event_date: date
-    title: str
-    description: Optional[str] = None
-    
+    title: str = Field(..., min_length=1, max_length=300)
+    description: Optional[str] = Field(None, max_length=5000)
+
     # Grief support fields
-    grief_relationship: Optional[str] = None
-    
+    grief_relationship: Optional[str] = Field(None, max_length=200)
+
     # Accident/illness fields (merged from hospital)
-    hospital_name: Optional[str] = None
+    hospital_name: Optional[str] = Field(None, max_length=200)
     initial_visitation: Optional[VisitationLogEntry] = None
-    
+
     # Financial aid fields
     aid_type: Optional[AidType] = None
-    aid_amount: Optional[float] = None
-    aid_notes: Optional[str] = None
+    aid_amount: Optional[float] = Field(None, ge=0, le=1000000000)  # Max 1 billion
+    aid_notes: Optional[str] = Field(None, max_length=2000)
 
 class CareEventUpdate(BaseModel):
     event_type: Optional[EventType] = None
     event_date: Optional[date] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=300)
+    description: Optional[str] = Field(None, max_length=5000)
     completed: Optional[bool] = None
-    
+
     # Hospital fields
     discharge_date: Optional[date] = None
 
@@ -574,16 +574,16 @@ class FinancialAidSchedule(BaseModel):
 # User Authentication Models
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
-    name: str
+    password: str = Field(..., min_length=8, max_length=128)
+    name: str = Field(..., min_length=1, max_length=200)
     role: UserRole = UserRole.PASTOR
     campus_id: Optional[str] = None  # Required for campus_admin and pastor, null for full_admin
-    phone: str  # Pastoral team member's phone for receiving reminders
+    phone: str = Field(..., max_length=20)  # Pastoral team member's phone for receiving reminders
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    password: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    phone: Optional[str] = Field(None, max_length=20)
+    password: Optional[str] = Field(None, min_length=8, max_length=128)
     role: Optional[UserRole] = None
     campus_id: Optional[str] = None
 
@@ -2758,9 +2758,11 @@ async def list_care_events(
     event_type: Optional[EventType] = None,
     member_id: Optional[str] = None,
     completed: Optional[bool] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=500),
     current_user: dict = Depends(get_current_user)
 ):
-    """List care events with optional filters"""
+    """List care events with optional filters and pagination"""
     try:
         # Apply campus filter for multi-tenancy
         query = get_campus_filter(current_user)
@@ -2774,7 +2776,10 @@ async def list_care_events(
         if completed is not None:
             query["completed"] = completed
 
-        events = await db.care_events.find(query, {"_id": 0}).sort("event_date", -1).to_list(1000)
+        # Calculate skip for pagination
+        skip = (page - 1) * limit
+
+        events = await db.care_events.find(query, {"_id": 0}).sort("event_date", -1).skip(skip).limit(limit).to_list(limit)
 
         # Enrich events with member names
         for event in events:
@@ -3057,28 +3062,39 @@ async def get_hospital_followup_due():
 # ==================== GRIEF SUPPORT ENDPOINTS ====================
 
 @api_router.get("/grief-support", response_model=List[GriefSupport])
-async def list_grief_support(completed: Optional[bool] = None):
-    """List all grief support stages"""
+async def list_grief_support(
+    completed: Optional[bool] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=500),
+    current_user: dict = Depends(get_current_user)
+):
+    """List grief support stages with pagination"""
     try:
-        query = {}
+        query = get_campus_filter(current_user)
         if completed is not None:
             query["completed"] = completed
-        
-        stages = await db.grief_support.find(query, {"_id": 0}).sort("scheduled_date", 1).to_list(1000)
+
+        skip = (page - 1) * limit
+        stages = await db.grief_support.find(query, {"_id": 0}).sort("scheduled_date", 1).skip(skip).limit(limit).to_list(limit)
         return stages
     except Exception as e:
         logger.error(f"Error listing grief support: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/grief-support/member/{member_id}", response_model=List[GriefSupport])
-async def get_member_grief_timeline(member_id: str):
+async def get_member_grief_timeline(member_id: str, current_user: dict = Depends(get_current_user)):
     """Get grief timeline for specific member"""
     try:
+        # Build query with campus filter
+        query = {"member_id": member_id}
+        campus_filter = get_campus_filter(current_user)
+        query.update(campus_filter)
+
         timeline = await db.grief_support.find(
-            {"member_id": member_id},
+            query,
             {"_id": 0}
         ).sort("scheduled_date", 1).to_list(100)
-        
+
         return timeline
     except Exception as e:
         logger.error(f"Error getting member grief timeline: {str(e)}")
@@ -3326,43 +3342,40 @@ async def send_grief_reminder(stage_id: str):
         logger.error(f"Error sending grief reminder: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@api_router.get("/accident-followup/member/{member_id}")
-async def get_member_accident_timeline(member_id: str):
-    """Get accident follow-up timeline for specific member"""
-    try:
-        timeline = await db.accident_followup.find(
-            {"member_id": member_id},
-            {"_id": 0}
-        ).sort("scheduled_date", 1).to_list(100)
-        
-        return timeline
-    except Exception as e:
-        logger.error(f"Error getting member accident timeline: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @api_router.get("/accident-followup")
-async def list_accident_followup(completed: Optional[bool] = None, current_user: dict = Depends(get_current_user)):
-    """List all accident follow-up stages"""
+async def list_accident_followup(
+    completed: Optional[bool] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=500),
+    current_user: dict = Depends(get_current_user)
+):
+    """List all accident follow-up stages with pagination"""
     try:
         query = get_campus_filter(current_user)
         if completed is not None:
             query["completed"] = completed
-        
-        stages = await db.accident_followup.find(query, {"_id": 0}).sort("scheduled_date", 1).to_list(1000)
+
+        skip = (page - 1) * limit
+        stages = await db.accident_followup.find(query, {"_id": 0}).sort("scheduled_date", 1).skip(skip).limit(limit).to_list(limit)
         return stages
     except Exception as e:
         logger.error(f"Error listing accident follow-up: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/accident-followup/member/{member_id}")
-async def get_member_accident_timeline(member_id: str):
+async def get_member_accident_timeline(member_id: str, current_user: dict = Depends(get_current_user)):
     """Get accident follow-up timeline for specific member"""
     try:
+        # Build query with campus filter
+        query = {"member_id": member_id}
+        campus_filter = get_campus_filter(current_user)
+        query.update(campus_filter)
+
         timeline = await db.accident_followup.find(
-            {"member_id": member_id},
+            query,
             {"_id": 0}
         ).sort("scheduled_date", 1).to_list(100)
-        
+
         return timeline
     except Exception as e:
         logger.error(f"Error getting member accident timeline: {str(e)}")
@@ -3627,22 +3640,25 @@ async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_c
 async def list_aid_schedules(
     member_id: Optional[str] = None,
     active_only: bool = True,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=500),
     current_user: dict = Depends(get_current_user)
 ):
-    """List financial aid schedules"""
+    """List financial aid schedules with pagination"""
     try:
         query = get_campus_filter(current_user)
-        
+
         if member_id:
             query['member_id'] = member_id
-        
+
         if active_only:
             query['is_active'] = True
-        
-        schedules = await db.financial_aid_schedules.find(query, {"_id": 0}).to_list(1000)
+
+        skip = (page - 1) * limit
+        schedules = await db.financial_aid_schedules.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
         return schedules
     except Exception as e:
-        logger.error(f"Error listing aid schedules: {str(e)}")
+        logger.error(f"Error listing aid schedules: {str(e})")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.delete("/financial-aid-schedules/{schedule_id}/ignored-occurrence/{date}")
