@@ -768,10 +768,7 @@ export const MemberDetail = () => {
               </form>
             </DialogContent>
           </Dialog>
-          </div>
-        </div>
-      </div>
-      
+
       {/* Member Info Card */}
       <Card className="border-border max-w-full">
         <CardContent className="p-4 sm:p-6">
