@@ -135,14 +135,18 @@ async def create_indexes(db):
 
 async def create_admin_user(db, email, password, name="Administrator"):
     """Create admin user if doesn't exist"""
+    import uuid
+
     existing = await db.users.find_one({"email": email})
     if existing:
         return False, "Admin user already exists"
 
     user = {
+        "id": str(uuid.uuid4()),  # Required: unique user ID for JWT tokens
         "email": email,
         "hashed_password": pwd_context.hash(password),  # Must match server.py field name
         "name": name,
+        "phone": "",  # Required: phone field (can be empty)
         "role": "full_admin",
         "campus_id": None,  # Full admin has no specific campus
         "is_active": True,

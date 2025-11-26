@@ -191,6 +191,53 @@ async def migration_008_ensure_campus_id_field(db):
     return f"Added id field to {campuses_updated} campus(es)"
 
 
+async def migration_009_ensure_user_required_fields(db):
+    """Ensure all users have required fields for login (id, phone, created_at, name)"""
+    import uuid
+
+    users_fixed = 0
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Find all users and ensure they have all required fields
+    cursor = db.users.find({})
+    async for user in cursor:
+        updates = {}
+
+        # Add 'id' if missing
+        if "id" not in user:
+            updates["id"] = str(uuid.uuid4())
+
+        # Add 'phone' if missing (can be empty string)
+        if "phone" not in user:
+            updates["phone"] = ""
+
+        # Add 'name' if missing
+        if "name" not in user:
+            updates["name"] = user.get("email", "Unknown User").split("@")[0]
+
+        # Add 'created_at' if missing
+        if "created_at" not in user:
+            updates["created_at"] = now
+
+        # Add 'updated_at' if missing
+        if "updated_at" not in user:
+            updates["updated_at"] = now
+
+        # Add 'is_active' if missing
+        if "is_active" not in user:
+            updates["is_active"] = True
+
+        # Apply updates if any
+        if updates:
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": updates}
+            )
+            users_fixed += 1
+
+    return f"Fixed {users_fixed} user(s) with missing required fields"
+
+
 # ==================== MIGRATION REGISTRY ====================
 
 # List of all migrations in order
@@ -204,6 +251,7 @@ MIGRATIONS: List[tuple[int, str, Callable]] = [
     (6, "Ensure campus is_active field", migration_006_ensure_campus_is_active),
     (7, "Fix user password field name", migration_007_fix_user_password_field),
     (8, "Ensure campus id field", migration_008_ensure_campus_id_field),
+    (9, "Ensure user required fields", migration_009_ensure_user_required_fields),
 ]
 
 
