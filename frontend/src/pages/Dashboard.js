@@ -147,7 +147,7 @@ const markBirthdayComplete = async (eventId, queryClient, t) => {
       };
     });
     
-    await api.post('/care-events/${eventId}/complete`);
+    await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
     // Refetch to get accurate data
     await queryClient.invalidateQueries(['dashboard']);
@@ -171,7 +171,7 @@ const markGriefStageComplete = async (stageId, queryClient, t) => {
       };
     });
     
-    await api.post('/grief-support/${stageId}/complete`);
+    await api.post(`/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
     await queryClient.invalidateQueries(['dashboard']);
   } catch (error) {
@@ -182,7 +182,7 @@ const markGriefStageComplete = async (stageId, queryClient, t) => {
 
 const markAccidentComplete = async (eventId, queryClient, t) => {
   try {
-    await api.post('/care-events/${eventId}/complete`);
+    await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.accident_completed'));
     // Invalidate and refetch dashboard data
     await queryClient.invalidateQueries(['dashboard']);
@@ -194,7 +194,7 @@ const markAccidentComplete = async (eventId, queryClient, t) => {
 const markMemberContacted = async (memberId, memberName, user, queryClient, t) => {
   try {
     // Create a regular contact event which updates last_contact_date
-    const response = await api.post('/care-events`, {
+    const response = await api.post(`/care-events`, {
       member_id: memberId,
       campus_id: user?.campus_id || '2b3f9094-eef4-4af4-a3ff-730ef4adeb8a',
       event_type: 'regular_contact',
@@ -206,7 +206,7 @@ const markMemberContacted = async (memberId, memberName, user, queryClient, t) =
     
     // If the event was created, mark it as completed to trigger activity logging
     if (response.data && response.data.id) {
-      await api.post('/care-events/${response.data.id}/complete`);
+      await api.post(`/care-events/${response.data.id}/complete`);
     }
     
     toast.success(t('toasts.member_contacted', {name: memberName}));
@@ -244,7 +244,7 @@ export const Dashboard = () => {
   const { data: dashboardData, isLoading, refetch: refetchDashboard } = useQuery({
     queryKey: ['dashboard', 'reminders', user?.campus_id],
     queryFn: async () => {
-      const response = await api.get('/dashboard/reminders`, {
+      const response = await api.get(`/dashboard/reminders`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -263,7 +263,7 @@ export const Dashboard = () => {
   const { data: allMembers = [] } = useQuery({
     queryKey: ['members', 'all'],
     queryFn: async () => {
-      const response = await api.get('/members?limit=1000`);
+      const response = await api.get(`/members?limit=1000`);
       return response.data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes (member list changes infrequently)
@@ -345,7 +345,7 @@ export const Dashboard = () => {
         if (quickEvent.event_type === 'financial_aid') {
           if (quickEvent.schedule_frequency === 'one_time') {
             // One-time aid: Create care event
-            await api.post('/care-events`, {
+            await api.post(`/care-events`, {
               member_id: memberId,
               campus_id: member.campus_id,
               event_type: 'financial_aid',
@@ -377,7 +377,7 @@ export const Dashboard = () => {
               startDate = new Date().toISOString().split('T')[0]; // Use today for weekly
             }
             
-            await api.post('/financial-aid-schedules`, {
+            await api.post(`/financial-aid-schedules`, {
               member_id: memberId,
               campus_id: member.campus_id,
               title: autoTitle,
@@ -394,7 +394,7 @@ export const Dashboard = () => {
           }
         } else {
           // Other events: Create normal care event with auto title
-          await api.post('/care-events`, {
+          await api.post(`/care-events`, {
             member_id: memberId,
             campus_id: member.campus_id,
             event_type: quickEvent.event_type,
@@ -1020,7 +1020,7 @@ export const Dashboard = () => {
                                 <>
                                   <Button size="default" variant="outline" onClick={async () => {
                                     try {
-                                      await api.post('/financial-aid-schedules/${task.data.id}/mark-distributed`);
+                                      await api.post(`/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success(t('toasts.payment_distributed'));
                                       await queryClient.invalidateQueries(['dashboard']);
                                     } catch (error) {
@@ -1039,7 +1039,7 @@ export const Dashboard = () => {
                                     <DropdownMenuContent align="end" className="w-40">
                                       <DropdownMenuItem onClick={async () => {
                                         try {
-                                          await api.post('/financial-aid-schedules/${task.data.id}/ignore`);
+                                          await api.post(`/financial-aid-schedules/${task.data.id}/ignore`);
                                           toast.success(t('toasts.financial_aid_ignored'));
                                           await queryClient.invalidateQueries(['dashboard']);
                                         } catch (error) {
@@ -1052,7 +1052,7 @@ export const Dashboard = () => {
                                         className="text-red-600"
                                         onClick={async () => {
                                           try {
-                                            await api.post('/financial-aid-schedules/${task.data.id}/stop`);
+                                            await api.post(`/financial-aid-schedules/${task.data.id}/stop`);
                                             toast.success(t('toasts.schedule_stopped'));
                                             await queryClient.invalidateQueries(['dashboard']);
                                           } catch (error) {
@@ -1074,7 +1074,7 @@ export const Dashboard = () => {
                                       if (task.type === 'grief_support') {
                                         await markGriefStageComplete(task.data.id, queryClient, t);
                                       } else if (task.type === 'accident_followup') {
-                                        await api.post('/accident-followup/${task.data.id}/complete`);
+                                        await api.post(`/accident-followup/${task.data.id}/complete`);
                                         toast.success(t('toasts.followup_completed'));
                                         await queryClient.invalidateQueries(['dashboard']);
                                       }
@@ -1095,10 +1095,10 @@ export const Dashboard = () => {
                                       <DropdownMenuItem onClick={async () => {
                                         try {
                                           if (task.type === 'grief_support') {
-                                            await api.post('/grief-support/${task.data.id}/ignore`);
+                                            await api.post(`/grief-support/${task.data.id}/ignore`);
                                             toast.success(t('toasts.grief_ignored'));
                                           } else if (task.type === 'accident_followup') {
-                                            await api.post('/accident-followup/${task.data.id}/ignore`);
+                                            await api.post(`/accident-followup/${task.data.id}/ignore`);
                                             toast.success(t('toasts.accident_ignored'));
                                           }
                                           await queryClient.invalidateQueries(['dashboard']);
@@ -1226,7 +1226,7 @@ export const Dashboard = () => {
                             <Button size="default" variant="outline" onClick={async () => {
                               triggerHaptic();
                               try {
-                                await api.post('/care-events/${event.id}/complete`);
+                                await api.post(`/care-events/${event.id}/complete`);
                                 toast.success(t('toasts.birthday_marked_completed'));
                                 await queryClient.invalidateQueries(['dashboard']);
                               } catch (error) {
@@ -1245,7 +1245,7 @@ export const Dashboard = () => {
                               <DropdownMenuContent align="end" className="w-32">
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    await api.post('/care-events/${event.id}/ignore`);
+                                    await api.post(`/care-events/${event.id}/ignore`);
                                     toast.success(t('toasts.birthday_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
@@ -1377,7 +1377,7 @@ export const Dashboard = () => {
                             <Button size="default" variant="outline" onClick={async () => {
                               triggerHaptic();
                               try {
-                                await api.post('/accident-followup/${followup.id}/complete`);
+                                await api.post(`/accident-followup/${followup.id}/complete`);
                                 toast.success(t('toasts.accident_completed'));
                                 await queryClient.invalidateQueries(['dashboard']);
                               } catch (error) {
@@ -1396,7 +1396,7 @@ export const Dashboard = () => {
                               <DropdownMenuContent align="end" className="w-32">
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    await api.post('/accident-followup/${followup.id}/ignore`);
+                                    await api.post(`/accident-followup/${followup.id}/ignore`);
                                     toast.success(t('toasts.accident_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
@@ -1477,7 +1477,7 @@ export const Dashboard = () => {
                               <DropdownMenuContent align="end" className="w-32">
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    await api.post('/grief-support/${stage.id}/ignore`);
+                                    await api.post(`/grief-support/${stage.id}/ignore`);
                                     toast.success(t('toasts.grief_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
@@ -1583,7 +1583,7 @@ export const Dashboard = () => {
                                   t('confirmations.mark_distributed', {name: schedule.member_name}),
                                   async () => {
                                     try {
-                                      await api.post('/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                      await api.post(`/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                       toast.success(t('toasts.payment_distributed_advanced'));
                                       await queryClient.invalidateQueries(['dashboard']);
                                       closeConfirm();
@@ -1608,7 +1608,7 @@ export const Dashboard = () => {
                               <DropdownMenuContent align="end" className="w-40">
                                 <DropdownMenuItem onClick={async () => {
                                   try {
-                                    await api.post('/financial-aid-schedules/${schedule.id}/ignore`);
+                                    await api.post(`/financial-aid-schedules/${schedule.id}/ignore`);
                                     toast.success(t('toasts.financial_aid_schedule_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
                                   } catch (error) {
@@ -1625,7 +1625,7 @@ export const Dashboard = () => {
                                       t('confirmations.stop_schedule', {name: schedule.member_name}),
                                       async () => {
                                         try {
-                                          await api.post('/financial-aid-schedules/${schedule.id}/stop`);
+                                          await api.post(`/financial-aid-schedules/${schedule.id}/stop`);
                                           toast.success(t('toasts.schedule_stopped'));
                                           await queryClient.invalidateQueries(['dashboard']);
                                           closeConfirm();
@@ -1868,7 +1868,7 @@ export const Dashboard = () => {
                             <Button size="default" variant="outline" onClick={async () => {
                               triggerHaptic();
                               try {
-                                await api.post('/financial-aid-schedules/${task.data.id}/mark-distributed`);
+                                await api.post(`/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                 toast.success(t('toasts.payment_distributed'));
                                 await queryClient.invalidateQueries(['dashboard']);
                               } catch (error) {

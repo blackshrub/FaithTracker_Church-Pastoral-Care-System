@@ -61,7 +61,7 @@ const formatPhoneForWhatsApp = (phone) => {
 
 const markBirthdayComplete = async (eventId, loadReminders) => {
   try {
-    await api.post('/care-events/${eventId}/complete`);
+    await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
     loadReminders();
   } catch (error) {
@@ -71,7 +71,7 @@ const markBirthdayComplete = async (eventId, loadReminders) => {
 
 const markGriefStageComplete = async (stageId, loadReminders) => {
   try {
-    await api.post('/grief-support/${stageId}/complete`);
+    await api.post(`/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
     loadReminders();
   } catch (error) {
@@ -81,7 +81,7 @@ const markGriefStageComplete = async (stageId, loadReminders) => {
 
 const markAccidentComplete = async (eventId, loadReminders) => {
   try {
-    await api.post('/care-events/${eventId}/complete`);
+    await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.accident_completed'));
     loadReminders();
   } catch (error) {
@@ -92,7 +92,7 @@ const markAccidentComplete = async (eventId, loadReminders) => {
 const markMemberContacted = async (memberId, memberName, user, loadReminders) => {
   try {
     // Create a regular contact event which updates last_contact_date
-    await api.post('/care-events`, {
+    await api.post(`/care-events`, {
       member_id: memberId,
       campus_id: user?.campus_id || '2b3f9094-eef4-4af4-a3ff-730ef4adeb8a', // Use user's campus or default
       event_type: 'regular_contact',
@@ -154,12 +154,12 @@ export const Reminders = () => {
       const weekAhead = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
       
       const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes] = await Promise.all([
-        api.get('/care-events`),
-        api.get('/grief-support?completed=false`),
-        api.get('/care-events/hospital/due-followup`),
-        api.get('/members/at-risk`),
-        api.get('/members`),
-        api.get('/financial-aid-schedules/due-today`)
+        api.get(`/care-events`),
+        api.get(`/grief-support?completed=false`),
+        api.get(`/care-events/hospital/due-followup`),
+        api.get(`/members/at-risk`),
+        api.get(`/members`),
+        api.get(`/financial-aid-schedules/due-today`)
       ]);
       
       // Get member names, phones, and photos for events
@@ -373,7 +373,7 @@ export const Reminders = () => {
                               `Mark financial aid as distributed to ${schedule.member_name}?`,
                               async () => {
                                 try {
-                                  await api.post('/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                  await api.post(`/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                   toast.success(t('toasts.payment_distributed_advanced'));
                                   loadReminders();
                                   closeConfirm();
@@ -396,7 +396,7 @@ export const Reminders = () => {
                               `Stop financial aid schedule for ${schedule.member_name}?`,
                               async () => {
                                 try {
-                                  await api.post('/financial-aid-schedules/${schedule.id}/stop`);
+                                  await api.post(`/financial-aid-schedules/${schedule.id}/stop`);
                                   toast.success(t('toasts.schedule_stopped'));
                                   loadReminders();
                                   closeConfirm();

@@ -73,11 +73,11 @@ export const MemberDetail = () => {
       };
       
       const [memberRes, eventsRes, griefRes, accidentRes, aidSchedulesRes] = await Promise.all([
-        api.get('/members/${id}?t=${timestamp}`, { headers: cacheHeaders }),
-        api.get('/care-events?member_id=${id}&t=${timestamp}`, { headers: cacheHeaders }),
-        api.get('/grief-support/member/${id}?t=${timestamp}`, { headers: cacheHeaders }),
-        api.get('/accident-followup/member/${id}?t=${timestamp}`, { headers: cacheHeaders }),
-        api.get('/financial-aid-schedules/member/${id}?t=${timestamp}`, { headers: cacheHeaders })
+        api.get(`/members/${id}?t=${timestamp}`, { headers: cacheHeaders }),
+        api.get(`/care-events?member_id=${id}&t=${timestamp}`, { headers: cacheHeaders }),
+        api.get(`/grief-support/member/${id}?t=${timestamp}`, { headers: cacheHeaders }),
+        api.get(`/accident-followup/member/${id}?t=${timestamp}`, { headers: cacheHeaders }),
+        api.get(`/financial-aid-schedules/member/${id}?t=${timestamp}`, { headers: cacheHeaders })
       ]);
       
       const sortedEvents = (eventsRes.data || []).sort((a, b) => {
@@ -159,7 +159,7 @@ export const MemberDetail = () => {
   
   const logAdditionalVisit = async (parentEvent) => {
     try {
-      await api.post('/care-events/${parentEvent.id}/additional-visit`, {
+      await api.post(`/care-events/${parentEvent.id}/additional-visit`, {
         visit_date: additionalVisit.visit_date,
         visit_type: additionalVisit.visit_type,
         notes: additionalVisit.notes
@@ -224,7 +224,7 @@ export const MemberDetail = () => {
             aid_type: newEvent.aid_type,
             aid_amount: parseFloat(newEvent.aid_amount)
           };
-          await api.post('/care-events`, eventData);
+          await api.post(`/care-events`, eventData);
           toast.success(t('toasts.financial_aid_recorded'));
         } else {
           // Scheduled aid: Create schedule (future payments)
@@ -265,7 +265,7 @@ export const MemberDetail = () => {
             month_of_year: newEvent.month_of_year,
             notes: newEvent.description
           };
-          await api.post('/financial-aid-schedules`, scheduleData);
+          await api.post(`/financial-aid-schedules`, scheduleData);
           toast.success(t('toasts.financial_aid_schedule_created'));
         }
       } else {
@@ -276,7 +276,7 @@ export const MemberDetail = () => {
           ...newEvent,
           aid_amount: newEvent.aid_amount ? parseFloat(newEvent.aid_amount) : null
         };
-        await api.post('/care-events`, eventData);
+        await api.post(`/care-events`, eventData);
         
         if (newEvent.event_type === 'grief_loss' && newEvent.mourning_service_date) {
           toast.success(t('success_messages.grief_timeline_generated'));
@@ -321,7 +321,7 @@ export const MemberDetail = () => {
       'Are you sure you want to delete this care event? This will also delete all related follow-up stages and activity logs.',
       async () => {
         try {
-          await api.delete('/care-events/${eventId}`);
+          await api.delete(`/care-events/${eventId}`);
           toast.success(t('toasts.event_deleted'));
           queryClient.invalidateQueries(['member', id]);
           closeConfirm();
@@ -335,7 +335,7 @@ export const MemberDetail = () => {
   
   const sendReminder = async (eventId) => {
     try {
-      const response = await api.post('/care-events/${eventId}/send-reminder`);
+      const response = await api.post(`/care-events/${eventId}/send-reminder`);
       if (response.data.success) {
         toast.success(t('success_messages.reminder_sent'));
       } else {
@@ -349,11 +349,11 @@ export const MemberDetail = () => {
   
   const handleCompleteBirthday = async (eventId) => {
     try {
-      await api.post('/care-events/${eventId}/complete`);
+      await api.post(`/care-events/${eventId}/complete`);
       toast.success(t('toasts.birthday_marked_completed'));
       queryClient.invalidateQueries(['member', id]);
       // Trigger dashboard cache refresh by making a call
-      api.get('/dashboard/reminders`).catch(() => {});
+      api.get(`/dashboard/reminders`).catch(() => {});
     } catch (error) {
       toast.error(t('toasts.failed_mark_birthday'));
       console.error('Error completing birthday:', error);
@@ -362,7 +362,7 @@ export const MemberDetail = () => {
   
   const completeGriefStage = async (stageId) => {
     try {
-      await api.post('/grief-support/${stageId}/complete`);
+      await api.post(`/grief-support/${stageId}/complete`);
       toast.success(t('success_messages.stage_completed'));
       queryClient.invalidateQueries(['member', id]);
     } catch (error) {
@@ -1001,7 +1001,7 @@ export const MemberDetail = () => {
                               {!isCompleted && !isIgnored && (
                                 <Button size="sm" variant="outline" className="min-h-[44px]" onClick={async () => {
                                   try {
-                                    await api.post('/grief-support/${stage.id}/complete`);
+                                    await api.post(`/grief-support/${stage.id}/complete`);
                                     toast.success(t('success_messages.stage_completed'));
                                     queryClient.invalidateQueries(['member', id]);
                                   } catch (error) {
@@ -1023,7 +1023,7 @@ export const MemberDetail = () => {
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={async () => {
                                       try {
-                                        await api.post('/grief-support/${stage.id}/undo`);
+                                        await api.post(`/grief-support/${stage.id}/undo`);
                                         toast.success(t('toasts.action_undone'));
                                         queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
@@ -1046,7 +1046,7 @@ export const MemberDetail = () => {
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={async () => {
                                       try {
-                                        await api.post('/grief-support/${stage.id}/ignore`);
+                                        await api.post(`/grief-support/${stage.id}/ignore`);
                                         toast.success('Grief stage ignored');
                                         queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
@@ -1104,7 +1104,7 @@ export const MemberDetail = () => {
                                     'Are you sure you want to delete this additional visit? This action cannot be undone.',
                                     async () => {
                                       try {
-                                        await api.delete('/care-events/${visit.id}`);
+                                        await api.delete(`/care-events/${visit.id}`);
                                         toast.success('Visit deleted');
                                         queryClient.invalidateQueries(['member', id]);
                                         closeConfirm();
@@ -1270,7 +1270,7 @@ export const MemberDetail = () => {
                               {!isCompleted && !isIgnored && (
                                 <Button size="sm" variant="outline" className="min-h-[44px]" onClick={async () => {
                                   try {
-                                    await api.post('/accident-followup/${stage.id}/complete`);
+                                    await api.post(`/accident-followup/${stage.id}/complete`);
                                     toast.success('Follow-up completed');
                                     queryClient.invalidateQueries(['member', id]);
                                   } catch (error) {
@@ -1292,7 +1292,7 @@ export const MemberDetail = () => {
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={async () => {
                                       try {
-                                        await api.post('/accident-followup/${stage.id}/undo`);
+                                        await api.post(`/accident-followup/${stage.id}/undo`);
                                         toast.success(t('toasts.action_undone'));
                                         queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
@@ -1315,7 +1315,7 @@ export const MemberDetail = () => {
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={async () => {
                                       try {
-                                        await api.post('/accident-followup/${stage.id}/ignore`);
+                                        await api.post(`/accident-followup/${stage.id}/ignore`);
                                         toast.success('Follow-up ignored');
                                         queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
@@ -1370,7 +1370,7 @@ export const MemberDetail = () => {
                                     'Are you sure you want to delete this additional visit? This action cannot be undone.',
                                     async () => {
                                       try {
-                                        await api.delete('/care-events/${visit.id}`);
+                                        await api.delete(`/care-events/${visit.id}`);
                                         toast.success('Visit deleted');
                                         queryClient.invalidateQueries(['member', id]);
                                         closeConfirm();
@@ -1611,7 +1611,7 @@ export const MemberDetail = () => {
                                     'Mark this scheduled payment as distributed? This will advance the schedule to the next occurrence.',
                                     async () => {
                                       try {
-                                        await api.post('/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                        await api.post(`/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                         toast.success('Payment distributed! Schedule advanced to next occurrence.');
                                         queryClient.invalidateQueries(['member', id]);
                                         queryClient.invalidateQueries(['dashboard']);
@@ -1632,7 +1632,7 @@ export const MemberDetail = () => {
                                     'Stop this aid schedule? Ignored history will be preserved. You can re-enable it later.',
                                     async () => {
                                       try {
-                                        await api.post('/financial-aid-schedules/${schedule.id}/stop`);
+                                        await api.post(`/financial-aid-schedules/${schedule.id}/stop`);
                                         toast.success('Schedule stopped');
                                         queryClient.invalidateQueries(['member', id]);
                                         queryClient.invalidateQueries(['dashboard']);
@@ -1649,7 +1649,7 @@ export const MemberDetail = () => {
                                 </DropdownMenuItem>
                                   <DropdownMenuItem onClick={async () => {
                                     try {
-                                      const response = await api.post('/financial-aid-schedules/${schedule.id}/ignore`);
+                                      const response = await api.post(`/financial-aid-schedules/${schedule.id}/ignore`);
                                       toast.success(`Payment ignored! Next payment: ${response.data.next_occurrence}`);
                                       queryClient.invalidateQueries(['member', id]);
                                       queryClient.invalidateQueries(['dashboard']);
@@ -1696,7 +1696,7 @@ export const MemberDetail = () => {
                                           `Remove this ignored occurrence (${formatDate(date, 'dd MMM yyyy')})? This payment will be marked as due again.`,
                                           async () => {
                                             try {
-                                              await api.delete('/financial-aid-schedules/${schedule.id}/ignored-occurrence/${date}`);
+                                              await api.delete(`/financial-aid-schedules/${schedule.id}/ignored-occurrence/${date}`);
                                               toast.success('Ignored occurrence removed');
                                               queryClient.invalidateQueries(['member', id]);
                                               closeConfirm();
@@ -1728,7 +1728,7 @@ export const MemberDetail = () => {
                                     async () => {
                                       try {
                                         // Use new endpoint to clear ignored occurrences
-                                        await api.post('/financial-aid-schedules/${schedule.id}/clear-ignored`);
+                                        await api.post(`/financial-aid-schedules/${schedule.id}/clear-ignored`);
                                         toast.success('All ignored payments cleared');
                                         queryClient.invalidateQueries(['member', id]);
                                         queryClient.invalidateQueries(['dashboard']);

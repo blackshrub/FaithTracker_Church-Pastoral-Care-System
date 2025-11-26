@@ -52,7 +52,7 @@ export const AdminDashboard = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [c, u] = await Promise.all([api.get('/campuses`), api.get('/users`)]);
+      const [c, u] = await Promise.all([api.get(`/campuses`), api.get(`/users`)]);
       setCampuses(c.data);
       setUsers(u.data);
     } catch (error) {
@@ -67,11 +67,11 @@ export const AdminDashboard = () => {
     try {
       if (newCampus.id) {
         // Update existing campus
-        await api.put('/campuses/${newCampus.id}`, { campus_name: newCampus.campus_name, location: newCampus.location });
+        await api.put(`/campuses/${newCampus.id}`, { campus_name: newCampus.campus_name, location: newCampus.location });
         toast.success(t('toasts.campus_updated'));
       } else {
         // Create new campus
-        await api.post('/campuses`, newCampus);
+        await api.post(`/campuses`, newCampus);
         toast.success(t('toasts.campus_created'));
       }
       setCampusModalOpen(false);
@@ -85,7 +85,7 @@ export const AdminDashboard = () => {
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/auth/register`, newUser);
+      await api.post(`/auth/register`, newUser);
       toast.success(t('admin_dashboard_page.user_created'));
       setUserModalOpen(false);
       setNewUser({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
@@ -101,7 +101,7 @@ export const AdminDashboard = () => {
       `Are you sure you want to delete ${name}? This action cannot be undone.`,
       async () => {
         try {
-          await api.delete('/users/${id}`);
+          await api.delete(`/users/${id}`);
           toast.success(t('toasts.deleted'));
           loadData();
           closeConfirm();
@@ -141,7 +141,7 @@ export const AdminDashboard = () => {
         updateData.password = newUser.password;
       }
       
-      await api.put('/users/${editingUser.id}`, updateData);
+      await api.put(`/users/${editingUser.id}`, updateData);
       toast.success(t('User updated successfully'));
       setUserModalOpen(false);
       setEditingUser(null);
@@ -228,7 +228,7 @@ export const AdminDashboard = () => {
                                 `Delete ${c.campus_name}? This will also delete all members and data for this campus.`,
                                 async () => {
                                   try {
-                                    await api.delete('/campuses/${c.id}`);
+                                    await api.delete(`/campuses/${c.id}`);
                                     toast.success(t('toasts.deleted'));
                                     loadData();
                                     closeConfirm();
@@ -291,7 +291,7 @@ export const AdminDashboard = () => {
                                     `Delete ${c.campus_name}? This will also delete all members and data for this campus.`,
                                     async () => {
                                       try {
-                                        await api.delete('/campuses/${c.id}`);
+                                        await api.delete(`/campuses/${c.id}`);
                                         toast.success(t('toasts.deleted'));
                                         loadData();
                                         closeConfirm();
@@ -477,7 +477,7 @@ export const AdminDashboard = () => {
                         async () => {
                           try {
                             // Fire the request (don't wait for response due to long processing time)
-                            api.post('/admin/recalculate-engagement`, {}, {
+                            api.post(`/admin/recalculate-engagement`, {}, {
                               timeout: 90000
                             }).catch(() => {
                               // Ignore timeout errors - backend still processing

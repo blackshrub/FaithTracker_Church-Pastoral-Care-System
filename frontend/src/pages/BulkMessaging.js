@@ -21,7 +21,7 @@ export const BulkMessaging = () => {
   
   const loadUsers = async () => {
     try {
-      const response = await api.get('/users`);
+      const response = await api.get(`/users`);
       setUsers(response.data);
     } catch (error) {
       toast.error(t('bulk_messaging_page.failed_load_users'));
@@ -59,7 +59,7 @@ export const BulkMessaging = () => {
               phone = phone + '@s.whatsapp.net';
             }
             
-            const response = await api.post('/integrations/ping/whatsapp`, {
+            const response = await api.post(`/integrations/ping/whatsapp`, {
               phone: phone,
               message
             });

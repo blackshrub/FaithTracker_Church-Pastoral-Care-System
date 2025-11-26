@@ -73,7 +73,7 @@ export const ImportExport = () => {
   
   const loadCampuses = async () => {
     try {
-      const response = await api.get('/campuses`);
+      const response = await api.get(`/campuses`);
       setCampuses(response.data);
       if (response.data.length > 0) {
         setSelectedCampusId(response.data[0].id);
@@ -159,7 +159,7 @@ export const ImportExport = () => {
       const formData = new FormData();
       formData.append('file', csvFile);
       
-      const response = await api.post('/import/members/csv`, formData);
+      const response = await api.post(`/import/members/csv`, formData);
       toast.success(t('import_export_page.imported_count', {count: response.data.imported_count}));
       if (response.data.errors.length > 0) {
         toast.warning(t('import_export_page.errors_occurred', {count: response.data.errors.length}));
@@ -179,7 +179,7 @@ export const ImportExport = () => {
     try {
       setImporting(true);
       const members = JSON.parse(jsonData);
-      const response = await api.post('/import/members/json`, members);
+      const response = await api.post(`/import/members/json`, members);
       toast.success(t('import_export_page.imported_count', {count: response.data.imported_count}));
       setJsonData('');
     } catch (error) {
@@ -264,7 +264,7 @@ export const ImportExport = () => {
       async () => {
         try {
           setImporting(true);
-          const response = await api.post('/sync/members/from-api`, null, {
+          const response = await api.post(`/sync/members/from-api`, null, {
             params: { api_url: apiUrl, api_key: apiKey || undefined }
           });
           toast.success(t('import_export_page.api_sync_created', {count: response.data.synced_count}));
@@ -288,7 +288,7 @@ export const ImportExport = () => {
   
   const handleExportMembers = async () => {
     try {
-      const response = await api.get('/export/members/csv`, { responseType: 'blob' });
+      const response = await api.get(`/export/members/csv`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -304,7 +304,7 @@ export const ImportExport = () => {
   
   const handleExportEvents = async () => {
     try {
-      const response = await api.get('/export/care-events/csv`, { responseType: 'blob' });
+      const response = await api.get(`/export/care-events/csv`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
