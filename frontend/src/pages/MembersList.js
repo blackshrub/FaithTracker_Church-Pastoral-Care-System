@@ -26,6 +26,8 @@ import { toast } from 'sonner';
 import { Plus, Search, Loader2 } from 'lucide-react';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { EngagementBadge } from '@/components/EngagementBadge';
+import { ErrorState } from '@/components/ErrorState';
+import { EmptyMembers, EmptySearch } from '@/components/EmptyState';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -61,6 +63,7 @@ export const MembersList = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchLoading, setSearchLoading] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && search.length >= 1) {
@@ -102,6 +105,7 @@ export const MembersList = () => {
   
   const loadMembers = async (page = 1, searchQuery = null) => {
     try {
+      setLoadError(null); // Clear any previous errors
       // Use tableLoading for pagination/search, loading for initial load only
       if (currentPage > 0) {
         setTableLoading(true);
@@ -146,6 +150,7 @@ export const MembersList = () => {
       setCurrentPage(page);
     } catch (error) {
       setSearchLoading(false); // Clear loading on error too
+      setLoadError(error);
       toast.error(t('error_messages.failed_to_save'));
       console.error('Error loading members:', error);
     } finally {
@@ -248,7 +253,15 @@ export const MembersList = () => {
   if (loading) {
     return <MembersListSkeleton />;
   }
-  
+
+  if (loadError) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <ErrorState error={loadError} onRetry={() => loadMembers(currentPage)} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-full">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -483,8 +496,18 @@ export const MembersList = () => {
                   </TableRow>
                 ) : filteredMembers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {search ? 'No members found matching your search.' : t('empty_states.no_members')}
+                    <TableCell colSpan={7} className="py-0">
+                      {search ? (
+                        <EmptySearch
+                          title={t('empty_states.no_search_results')}
+                          description={`No members found matching "${search}". Try a different search term.`}
+                        />
+                      ) : (
+                        <EmptyMembers
+                          actionLabel={t('add_member')}
+                          onAction={() => setAddModalOpen(true)}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (

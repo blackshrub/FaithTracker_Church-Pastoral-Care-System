@@ -65,24 +65,24 @@ export const MobileBottomNav = () => {
   
   return (
     <>
-      <nav 
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 sm:hidden"
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border sm:hidden"
         data-testid="mobile-bottom-nav"
       >
         <div className="grid grid-cols-5 h-16">
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
-            
+
             return (
               <Link
                 key={item.name}
                 to={item.href}
                 className={
                   `flex flex-col items-center justify-center gap-1 transition-colors duration-200 ${
-                    active 
-                      ? 'text-teal-600' 
-                      : 'text-gray-600 hover:text-teal-500'
+                    active
+                      ? 'text-teal-600 dark:text-teal-400'
+                      : 'text-muted-foreground hover:text-teal-500 dark:hover:text-teal-400'
                   }`
                 }
                 data-testid={item.testId}
@@ -92,12 +92,12 @@ export const MobileBottomNav = () => {
               </Link>
             );
           })}
-          
+
           {/* More Menu Trigger */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
             <SheetTrigger asChild>
               <button
-                className="flex flex-col items-center justify-center gap-1 transition-colors duration-200 text-gray-600 hover:text-teal-500"
+                className="flex flex-col items-center justify-center gap-1 transition-colors duration-200 text-muted-foreground hover:text-teal-500 dark:hover:text-teal-400"
                 data-testid="nav-more"
                 aria-label={t('more_menu')}
               >
@@ -127,8 +127,8 @@ export const MobileBottomNav = () => {
                           onClick={() => handleMoreMenuClick(item.href)}
                           className={`w-full flex items-center gap-4 p-4 rounded-lg transition-colors ${
                             active
-                              ? 'bg-teal-50 text-teal-700 font-semibold'
-                              : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                              ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
+                              : 'text-foreground hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
                           }`}
                           aria-label={`Navigate to ${item.name}`}
                         >
@@ -139,24 +139,24 @@ export const MobileBottomNav = () => {
                     })}
                   </div>
                 </div>
-                
+
                 <Separator />
-                
+
                 {/* Admin Section */}
                 <div>
                   <div className="space-y-2">
                     {moreMenuItems.filter(item => item.category === 'admin').map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
-                      
+
                       return (
                         <button
                           key={item.name}
                           onClick={() => handleMoreMenuClick(item.href)}
                           className={`w-full flex items-center gap-4 p-4 rounded-lg transition-colors ${
                             active
-                              ? 'bg-teal-50 text-teal-700 font-semibold'
-                              : 'text-gray-700 hover:bg-teal-50 hover:text-teal-700'
+                              ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
+                              : 'text-foreground hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
                           }`}
                           aria-label={`Navigate to ${item.name}`}
                         >
@@ -173,7 +173,7 @@ export const MobileBottomNav = () => {
                         navigate('/login');
                         setMoreMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-4 p-4 rounded-lg transition-colors text-red-600 hover:bg-red-50"
+                      className="w-full flex items-center gap-4 p-4 rounded-lg transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                       aria-label="Logout"
                     >
                       <LogOut className="h-6 w-6 flex-shrink-0" aria-hidden="true" />

@@ -31,6 +31,8 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Phone, Cake, CalendarIcon } from 'lucide-react';
 import { DashboardStats, BirthdaySection } from '@/components/dashboard';
 import { DashboardSkeleton } from '@/components/skeletons';
+import { ErrorState } from '@/components/ErrorState';
+import { EmptyTasks } from '@/components/EmptyState';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -242,7 +244,7 @@ export const Dashboard = () => {
   const queryClient = useQueryClient();
   
   // React Query for dashboard data
-  const { data: dashboardData, isLoading, refetch: refetchDashboard } = useQuery({
+  const { data: dashboardData, isLoading, isError, error, refetch: refetchDashboard } = useQuery({
     queryKey: ['dashboard', 'reminders', user?.campus_id],
     queryFn: async () => {
       const response = await api.get(`/dashboard/reminders`, {
@@ -470,6 +472,14 @@ export const Dashboard = () => {
   );
 
   if (isLoading) return <DashboardSkeleton />;
+
+  if (isError) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <ErrorState error={error} onRetry={refetchDashboard} />
+      </div>
+    );
+  }
 
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   

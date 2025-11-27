@@ -11,65 +11,97 @@
     --primary-light: 174 94% 50%;
     --primary-dark: 174 94% 30%;
     --primary-foreground: 0 0% 100%;
-    
+
     /* Amber Secondary - Warm, welcoming, hopeful */
     --secondary: 38 92% 50%;
     --secondary-light: 38 92% 60%;
     --secondary-dark: 38 92% 40%;
     --secondary-foreground: 0 0% 100%;
-    
+
     /* Soft Pink - Care reminders, urgent follow-ups */
     --accent-pink: 346 84% 61%;
     --accent-pink-light: 346 84% 70%;
-    
+
     /* Soft Purple - Special events, celebrations */
     --accent-purple: 271 91% 75%;
     --accent-purple-light: 271 91% 85%;
-    
+
     /* Sage Green - Growth, spiritual health */
     --accent-sage: 142 40% 55%;
     --accent-sage-light: 142 40% 65%;
-    
+
     /* Backgrounds - Clean, soft whites */
     --background: 0 0% 100%;
     --background-soft: 0 0% 98%;
     --foreground: 0 0% 10%;
-    
+
     /* Card & Surface */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 10%;
-    
+
     /* Muted & Subtle */
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
-    
+
     /* Accent - Teal */
     --accent: 174 94% 39%;
     --accent-foreground: 0 0% 100%;
-    
+
     /* Popover */
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
-    
+
     /* Destructive */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    
+
     /* Semantic Colors */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
-    
+
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    
+
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    
+
     /* Borders & Inputs */
     --border: 0 0% 90%;
     --input: 0 0% 90%;
     --ring: 174 94% 39%;
     --radius: 0.75rem;
+  }
+
+  /* Dark Mode Variables */
+  .dark {
+    --background: 222 47% 11%;
+    --background-soft: 222 47% 14%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 14%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 174 94% 45%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 25%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 20%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 174 94% 45%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 174 94% 45%;
   }
 }
 
@@ -77,14 +109,24 @@
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
-    background: linear-gradient(135deg, hsl(174, 94%, 97%) 0%, hsl(45, 93%, 97%) 50%, hsl(174, 94%, 97%) 100%);
     min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
-  
+
+  /* Light mode gradient background */
+  :root body {
+    background: linear-gradient(135deg, hsl(174, 94%, 97%) 0%, hsl(45, 93%, 97%) 50%, hsl(174, 94%, 97%) 100%);
+  }
+
+  /* Dark mode solid background */
+  .dark body {
+    background: hsl(222, 47%, 11%);
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Playfair Display', serif;
   }
@@ -141,41 +183,31 @@
   font-weight: 600;
 }
 
-/* Force light mode */
-* {
-  color-scheme: light only !important;
-}
-
-/* Dialog styling */
+/* Dialog styling - uses CSS variables for theme support */
 [role="dialog"],
 [data-radix-dialog-content] {
-  background-color: white !important;
-  color: hsl(0, 0%, 10%) !important;
+  @apply bg-card text-card-foreground;
 }
 
 label {
-  color: hsl(0, 0%, 15%) !important;
-  font-weight: 500 !important;
+  @apply text-foreground font-medium;
 }
 
 input, textarea, select {
-  background-color: white !important;
-  color: hsl(0, 0%, 10%) !important;
-  border: 1px solid hsl(0, 0%, 85%) !important;
+  @apply bg-background text-foreground border-input;
 }
 
 input::placeholder, textarea::placeholder {
-  color: hsl(0, 0%, 60%) !important;
+  @apply text-muted-foreground;
 }
 
 /* Dropdown styling */
 [data-radix-select-item][data-highlighted] {
-  background-color: hsl(174, 94%, 95%) !important;
+  @apply bg-accent/20;
 }
 
 [data-radix-select-item][data-state="checked"] {
-  background-color: hsl(174, 94%, 90%) !important;
-  font-weight: 600 !important;
+  @apply bg-accent/30 font-semibold;
 }
 
 /* Card with left border status indicators */

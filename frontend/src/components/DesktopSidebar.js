@@ -54,18 +54,18 @@ export const DesktopSidebar = () => {
   };
   
   return (
-    <aside 
-      className="hidden sm:flex flex-col w-64 bg-white border-r border-gray-200 h-screen sticky top-0"
+    <aside
+      className="hidden sm:flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0"
       data-testid="desktop-sidebar"
     >
       {/* Logo/Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-border">
         <Link to="/dashboard" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
             <Church className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-h3 text-teal-700 leading-tight">{t('components.app_name')}</h2>
+            <h2 className="text-h3 text-teal-700 dark:text-teal-400 leading-tight">{t('components.app_name')}</h2>
             <p className="text-xs text-muted-foreground">{t('pastoral_care')}</p>
           </div>
         </Link>
@@ -85,8 +85,8 @@ export const DesktopSidebar = () => {
                   className={
                     `w-full justify-start h-12 transition-all duration-200 ${
                       active
-                        ? 'bg-teal-50 text-teal-700 font-semibold'
-                        : 'text-gray-600 hover:bg-teal-50 hover:text-teal-700'
+                        ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
+                        : 'text-foreground/70 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
                     }`
                   }
                   data-testid={item.testId}
@@ -98,9 +98,9 @@ export const DesktopSidebar = () => {
             );
           })}
         </div>
-        
+
         <Separator className="my-4" />
-        
+
         {/* Admin/Settings Navigation */}
         <div className="space-y-1">
           <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -109,7 +109,7 @@ export const DesktopSidebar = () => {
           {adminNavigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
-            
+
             return (
               <Link key={item.name} to={item.href}>
                 <Button
@@ -117,8 +117,8 @@ export const DesktopSidebar = () => {
                   className={
                     `w-full justify-start h-12 transition-all duration-200 ${
                       active
-                        ? 'bg-teal-50 text-teal-700 font-semibold'
-                        : 'text-gray-600 hover:bg-teal-50 hover:text-teal-700'
+                        ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
+                        : 'text-foreground/70 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
                     }`
                   }
                   data-testid={item.testId}
@@ -133,17 +133,17 @@ export const DesktopSidebar = () => {
       </nav>
       
       {/* User Info at Bottom */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-            <span className="text-sm font-semibold text-teal-700">
+          <div className="w-10 h-10 bg-teal-100 dark:bg-teal-900 rounded-full flex items-center justify-center">
+            <span className="text-sm font-semibold text-teal-700 dark:text-teal-300">
               {user?.name?.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-700 truncate">{user?.name}</p>
+            <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
             <p className="text-xs text-muted-foreground truncate">
-              {user?.role === 'full_admin' ? t('full_admin') : 
+              {user?.role === 'full_admin' ? t('full_admin') :
                user?.role === 'campus_admin' ? t('campus_admin') : t('pastor')}
             </p>
           </div>
