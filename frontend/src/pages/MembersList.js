@@ -498,15 +498,9 @@ export const MembersList = () => {
                   <TableRow>
                     <TableCell colSpan={7} className="py-0">
                       {search ? (
-                        <EmptySearch
-                          title={t('empty_states.no_search_results')}
-                          description={`No members found matching "${search}". Try a different search term.`}
-                        />
+                        <EmptySearch searchTerm={search} />
                       ) : (
-                        <EmptyMembers
-                          actionLabel={t('add_member')}
-                          onAction={() => setAddModalOpen(true)}
-                        />
+                        <EmptyMembers onAddMember={() => setAddModalOpen(true)} />
                       )}
                     </TableCell>
                   </TableRow>
