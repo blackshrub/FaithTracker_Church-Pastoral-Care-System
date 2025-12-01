@@ -3,10 +3,10 @@
 
 services:
   # ===================
-  # Traefik - Reverse Proxy & SSL
+  # Traefik - Reverse Proxy & SSL (v3)
   # ===================
   traefik:
-    image: traefik:v2.11
+    image: traefik:v3.2
     container_name: faithtracker-traefik
     restart: unless-stopped
     command:
