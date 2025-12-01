@@ -146,6 +146,7 @@ export const Settings = () => {
   const [syncConfig, setSyncConfig] = useState({
     sync_method: 'polling',
     api_base_url: '',
+    api_path_prefix: '/api',
     api_email: '',
     api_password: '',
     polling_interval_hours: 6,
@@ -169,7 +170,11 @@ export const Settings = () => {
       // Debug: console.log('Sync config API response:', response.data);
       if (response.data) {
         // Debug: console.log('Setting sync config to:', response.data);
-        setSyncConfig(response.data);
+        // Ensure api_path_prefix has a default value for backwards compatibility
+        setSyncConfig({
+          ...response.data,
+          api_path_prefix: response.data.api_path_prefix ?? '/api'
+        });
       } else {
         // Debug: console.log('No sync config data returned');
       }
@@ -938,14 +943,24 @@ export const Settings = () => {
                 
                 <div>
                   <Label>API Base URL</Label>
-                  <Input 
+                  <Input
                     placeholder="https://faithflow.yourdomain.com"
                     value={syncConfig.api_base_url}
                     onChange={(e) => setSyncConfig({...syncConfig, api_base_url: e.target.value})}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Base URL of the core FaithFlow API (without /api suffix)</p>
+                  <p className="text-xs text-gray-500 mt-1">Base URL of the core API (e.g., https://api.flow.gkbj.org)</p>
                 </div>
-                
+
+                <div>
+                  <Label>API Path Prefix</Label>
+                  <Input
+                    placeholder="/api"
+                    value={syncConfig.api_path_prefix}
+                    onChange={(e) => setSyncConfig({...syncConfig, api_path_prefix: e.target.value})}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">API path prefix (e.g., "/api" or leave empty for no prefix). Endpoints will be: {'{base_url}{prefix}/auth/login'}</p>
+                </div>
+
                 <div>
                   <Label>API Username</Label>
                   <Input 

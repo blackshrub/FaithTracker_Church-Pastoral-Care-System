@@ -674,6 +674,7 @@ class SyncConfig(BaseModel):
     core_church_id: Optional[str] = None  # Core system's church_id (for webhook matching)
     sync_method: str = "polling"  # "polling" or "webhook"
     api_base_url: str  # e.g., https://faithflow.yourdomain.com
+    api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
     api_email: str
     api_password: str  # Encrypted in database
     webhook_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
@@ -696,6 +697,7 @@ class SyncConfig(BaseModel):
 class SyncConfigCreate(BaseModel):
     sync_method: str = "polling"
     api_base_url: str
+    api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
     api_email: str
     api_password: str
     polling_interval_hours: int = 6
@@ -5665,13 +5667,20 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
         # Check if config exists
         existing = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
         
+        # Normalize api_path_prefix (ensure it starts with / if not empty, no trailing /)
+        api_path_prefix = config.api_path_prefix.strip()
+        if api_path_prefix and not api_path_prefix.startswith('/'):
+            api_path_prefix = '/' + api_path_prefix
+        api_path_prefix = api_path_prefix.rstrip('/')
+
         # Get core church_id by logging in to core API
         core_church_id = None
         try:
             import httpx
+            base_url = config.api_base_url.rstrip('/')
             async with httpx.AsyncClient(timeout=10.0) as client:
                 login_response = await client.post(
-                    f"{config.api_base_url.rstrip('/')}/api/auth/login",
+                    f"{base_url}{api_path_prefix}/auth/login",
                     json={"email": config.api_email, "password": decrypt_password(config.api_password)}
                 )
                 if login_response.status_code == 200:
@@ -5679,12 +5688,13 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
                     core_church_id = login_data.get("user", {}).get("church_id") or login_data.get("church", {}).get("id")
         except Exception:
             pass  # If we can't get church_id, continue without it
-        
+
         sync_config_data = {
             "campus_id": campus_id,
             "core_church_id": core_church_id,
             "sync_method": config.sync_method,
             "api_base_url": config.api_base_url.rstrip('/'),
+            "api_path_prefix": api_path_prefix,
             "api_email": config.api_email,
             "api_password": encrypt_password(config.api_password),  # Encrypt password
             "polling_interval_hours": config.polling_interval_hours,
@@ -5712,6 +5722,7 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
                 campus_id=campus_id,
                 sync_method=config.sync_method,
                 api_base_url=config.api_base_url.rstrip('/'),
+                api_path_prefix=api_path_prefix,
                 api_email=config.api_email,
                 api_password=config.api_password,
                 polling_interval_hours=config.polling_interval_hours,
@@ -5782,22 +5793,29 @@ async def discover_fields_from_core(config_test: SyncConfigCreate, current_user:
     
     try:
         import httpx
-        
+
+        # Normalize api_path_prefix
+        api_path_prefix = config_test.api_path_prefix.strip()
+        if api_path_prefix and not api_path_prefix.startswith('/'):
+            api_path_prefix = '/' + api_path_prefix
+        api_path_prefix = api_path_prefix.rstrip('/')
+        base_url = config_test.api_base_url.rstrip('/')
+
         # Login to core API
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
-                f"{config_test.api_base_url.rstrip('/')}/api/auth/login",
+                f"{base_url}{api_path_prefix}/auth/login",
                 json={"email": config_test.api_email, "password": config_test.api_password}
             )
-            
+
             if login_response.status_code != 200:
                 raise HTTPException(status_code=400, detail="Failed to authenticate with core API")
-            
+
             token = login_response.json().get("access_token")
-            
+
             # Fetch members (limit to 100 for analysis)
             members_response = await client.get(
-                f"{config_test.api_base_url.rstrip('/')}/api/members/",
+                f"{base_url}{api_path_prefix}/members/",
                 headers={"Authorization": f"Bearer {token}"}
             )
             
@@ -5906,15 +5924,22 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
     
     try:
         import httpx
-        
+
+        # Normalize api_path_prefix
+        api_path_prefix = config.api_path_prefix.strip()
+        if api_path_prefix and not api_path_prefix.startswith('/'):
+            api_path_prefix = '/' + api_path_prefix
+        api_path_prefix = api_path_prefix.rstrip('/')
+        base_url = config.api_base_url.rstrip('/')
+
         # Test login - send as 'email' key even if it's not email format (core API requirement)
-        login_url = f"{config.api_base_url.rstrip('/')}/api/auth/login"
+        login_url = f"{base_url}{api_path_prefix}/auth/login"
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 login_url,
                 json={"email": config.api_email, "password": decrypt_password(config.api_password)}
             )
-            
+
             if login_response.status_code != 200:
                 error_detail = login_response.text
                 try:
@@ -5922,21 +5947,21 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
                     error_detail = error_json.get("detail", error_detail)
                 except ValueError:
                     pass
-                
+
                 return {
                     "success": False,
                     "message": f"Login failed: {error_detail}"
                 }
-            
+
             token = login_response.json().get("access_token")
             if not token:
                 return {
                     "success": False,
                     "message": "No access token received"
                 }
-            
+
             # Test members endpoint - fetch with pagination to get actual total
-            members_url = f"{config.api_base_url.rstrip('/')}/api/members/"
+            members_url = f"{base_url}{api_path_prefix}/members/"
             
             # Try to get total count by fetching with pagination
             total_members = 0
@@ -6036,26 +6061,30 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
         start_time = datetime.now(timezone.utc)
         
         try:
+            # Get api_path_prefix with fallback for existing configs
+            api_path_prefix = config.get('api_path_prefix', '/api')
+            base_url = config['api_base_url'].rstrip('/')
+
             # Login to core API
             async with httpx.AsyncClient(timeout=60.0) as client:
                 login_response = await client.post(
-                    f"{config['api_base_url']}/api/auth/login",
+                    f"{base_url}{api_path_prefix}/auth/login",
                     json={"email": config["api_email"], "password": decrypt_password(config["api_password"])}
                 )
-                
+
                 if login_response.status_code != 200:
                     raise Exception(f"Login failed: {login_response.text}")
-                
+
                 token = login_response.json().get("access_token")
-                
+
                 # Fetch ALL members using pagination
                 all_members = []
                 page_size = 100
                 offset = 0
-                
+
                 while True:
                     members_response = await client.get(
-                        f"{config['api_base_url']}/api/members/?limit={page_size}&skip={offset}",
+                        f"{base_url}{api_path_prefix}/members/?limit={page_size}&skip={offset}",
                         headers={"Authorization": f"Bearer {token}"}
                     )
                     
@@ -6569,19 +6598,23 @@ async def receive_sync_webhook(request: Request):
                 import httpx
                 from io import BytesIO
                 import base64
-                
+
+                # Get api_path_prefix with fallback for existing configs
+                api_path_prefix = config.get('api_path_prefix', '/api')
+                base_url = config['api_base_url'].rstrip('/')
+
                 # Login to core API
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     login_response = await client.post(
-                        f"{config['api_base_url']}/api/auth/login",
+                        f"{base_url}{api_path_prefix}/auth/login",
                         json={"email": config["api_email"], "password": decrypt_password(config["api_password"])}
                     )
-                    
+
                     if login_response.status_code != 200:
                         raise Exception("Login failed")
-                    
+
                     token = login_response.json().get("access_token")
-                    
+
                     if event_type == "member.deleted":
                         # Archive the member
                         await db.members.update_one(
@@ -6600,7 +6633,7 @@ async def receive_sync_webhook(request: Request):
                     else:
                         # Fetch specific member directly from core
                         member_response = await client.get(
-                            f"{config['api_base_url']}/api/members/{member_id}",
+                            f"{base_url}{api_path_prefix}/members/{member_id}",
                             headers={"Authorization": f"Bearer {token}"}
                         )
                         
