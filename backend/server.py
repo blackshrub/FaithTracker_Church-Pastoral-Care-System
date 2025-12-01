@@ -6962,8 +6962,22 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         # Permissions policy (disable unnecessary browser features)
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        # Content Security Policy - restrictive for API
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        # Content Security Policy
+        # Use permissive CSP for Swagger UI docs, strict for API endpoints
+        path = request.url.path
+        if path in ["/docs", "/redoc", "/openapi.json"] or path.startswith("/docs/") or path.startswith("/redoc/"):
+            # Swagger UI needs to load external CSS/JS from CDN
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "font-src 'self' https://cdn.jsdelivr.net; "
+                "frame-ancestors 'none'"
+            )
+        else:
+            # Strict CSP for API endpoints
+            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         # HSTS - only in production (when not localhost)
         if "localhost" not in str(request.url) and "127.0.0.1" not in str(request.url):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
