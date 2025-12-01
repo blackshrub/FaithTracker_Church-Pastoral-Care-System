@@ -154,3 +154,6 @@ backend/*.csv
 *.p12
 secrets/
 credentials/
+
+# Let's Encrypt certificates
+letsencrypt/

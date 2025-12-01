@@ -294,6 +294,13 @@ deploy_containers() {
     echo ""
     echo -e "${BOLD}Deploying FaithTracker...${NC}"
 
+    # Create Let's Encrypt certificate storage with proper permissions
+    print_step "Setting up SSL certificate storage..."
+    mkdir -p "$PWD/letsencrypt"
+    touch "$PWD/letsencrypt/acme.json"
+    chmod 600 "$PWD/letsencrypt/acme.json"
+    print_success "SSL certificate storage ready"
+
     print_step "Building containers (this may take 5-10 minutes)..."
 
     # Use docker compose (v2) or docker-compose (v1)
@@ -382,10 +389,10 @@ EOF
     echo -e "   ${DIM}docker compose down${NC}         # Stop all"
     echo -e "   ${DIM}docker compose up -d --build${NC} # Rebuild & restart"
     echo ""
-    echo -e "${CYAN}${BOLD}📁 Data Volumes:${NC}"
-    echo -e "   MongoDB:  faithtracker_mongo-data"
-    echo -e "   Uploads:  faithtracker_backend-uploads"
-    echo -e "   SSL:      faithtracker_traefik-letsencrypt"
+    echo -e "${CYAN}${BOLD}📁 Data Storage:${NC}"
+    echo -e "   MongoDB:  faithtracker_mongo-data (Docker volume)"
+    echo -e "   Uploads:  faithtracker_backend-uploads (Docker volume)"
+    echo -e "   SSL:      ./letsencrypt/acme.json (local file)"
     echo ""
     echo -e "${YELLOW}Note: SSL certificates may take 1-2 minutes to be issued.${NC}"
     echo -e "${YELLOW}If you see certificate errors, wait and refresh.${NC}"
