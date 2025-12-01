@@ -23,12 +23,12 @@ services:
       # HTTP to HTTPS redirect
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # Let's Encrypt
+      # Let's Encrypt - Using TLS-ALPN-01 challenge (works on port 443)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      # Logging
-      - "--log.level=INFO"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      # Logging - DEBUG level to troubleshoot certificate issues
+      - "--log.level=DEBUG"
       - "--accesslog=true"
     ports:
       - "80:80"

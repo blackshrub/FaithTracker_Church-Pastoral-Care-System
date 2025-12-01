@@ -297,9 +297,10 @@ deploy_containers() {
     # Create Let's Encrypt certificate storage with proper permissions
     print_step "Setting up SSL certificate storage..."
     mkdir -p "$PWD/letsencrypt"
-    touch "$PWD/letsencrypt/acme.json"
+    # Clear any stale certificate data for fresh start
+    > "$PWD/letsencrypt/acme.json"
     chmod 600 "$PWD/letsencrypt/acme.json"
-    print_success "SSL certificate storage ready"
+    print_success "SSL certificate storage ready (TLS-ALPN-01 challenge)"
 
     print_step "Building containers (this may take 5-10 minutes)..."
 
