@@ -6,7 +6,7 @@ services:
   # Traefik - Reverse Proxy & SSL
   # ===================
   traefik:
-    image: traefik:v2.11
+    image: traefik:v3.2
     container_name: faithtracker-traefik
     restart: unless-stopped
     command:
@@ -21,8 +21,8 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       # HTTP to HTTPS redirect
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # Let's Encrypt - Using TLS-ALPN-01 challenge (works on port 443)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"

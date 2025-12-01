@@ -89,6 +89,9 @@ check_docker() {
     echo ""
     echo -e "${BOLD}Checking Docker...${NC}"
 
+    # Minimum Docker version required for Traefik v3 (needs API 1.44+)
+    readonly MIN_DOCKER_VERSION="25.0.0"
+
     if ! command -v docker &>/dev/null; then
         print_warning "Docker not installed"
         echo ""
@@ -101,7 +104,30 @@ check_docker() {
             exit 1
         fi
     else
-        print_success "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
+        # Check Docker version
+        DOCKER_VERSION=$(docker --version | awk '{print $3}' | tr -d ',')
+        print_info "Docker version: ${DOCKER_VERSION}"
+
+        # Compare versions (extract major.minor)
+        DOCKER_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f1)
+        MIN_MAJOR=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f1)
+
+        if [ "$DOCKER_MAJOR" -lt "$MIN_MAJOR" ]; then
+            print_warning "Docker ${DOCKER_VERSION} is outdated (requires ${MIN_DOCKER_VERSION}+)"
+            echo ""
+            echo -e "  ${YELLOW}Traefik v3 requires Docker 25.0+ for SSL certificates to work.${NC}"
+            read -p "  Upgrade Docker to latest version? (Y/n): " -n 1 -r
+            echo ""
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                upgrade_docker
+            else
+                print_error "Docker ${MIN_DOCKER_VERSION}+ is required for SSL/HTTPS"
+                echo -e "  ${ARROW} Run manually: ${CYAN}curl -fsSL https://get.docker.com | bash${NC}"
+                exit 1
+            fi
+        else
+            print_success "Docker ${DOCKER_VERSION} (meets minimum ${MIN_DOCKER_VERSION})"
+        fi
     fi
 
     if ! command -v docker-compose &>/dev/null && ! docker compose version &>/dev/null; then
@@ -118,6 +144,26 @@ install_docker() {
     systemctl enable docker
     systemctl start docker
     print_success "Docker installed"
+}
+
+upgrade_docker() {
+    print_step "Upgrading Docker to latest version..."
+
+    # Stop running containers gracefully
+    if docker ps -q | grep -q .; then
+        print_info "Stopping running containers..."
+        docker stop $(docker ps -q) 2>/dev/null || true
+    fi
+
+    # The official Docker install script handles upgrades too
+    curl -fsSL https://get.docker.com | bash
+
+    # Restart Docker service
+    systemctl restart docker
+
+    # Verify new version
+    NEW_VERSION=$(docker --version | awk '{print $3}' | tr -d ',')
+    print_success "Docker upgraded to ${NEW_VERSION}"
 }
 
 install_docker_compose() {
