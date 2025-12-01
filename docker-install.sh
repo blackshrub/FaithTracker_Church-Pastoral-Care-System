@@ -7,7 +7,7 @@
 #
 # Features:
 #   - One-command deployment with Docker Compose
-#   - Automatic SSL via Traefik v3 + Let's Encrypt
+#   - Automatic SSL via Traefik + Let's Encrypt
 #   - Subdomain architecture (domain.com + api.domain.com)
 #   - Zero-downtime updates
 #
@@ -533,7 +533,7 @@ main() {
     echo -e "${BOLD}Welcome to FaithTracker Docker Installer${NC}"
     echo ""
     echo "This will deploy FaithTracker using Docker Compose with:"
-    echo -e "  ${BULLET} Traefik v3 reverse proxy with automatic SSL"
+    echo -e "  ${BULLET} Traefik reverse proxy with automatic SSL"
     echo -e "  ${BULLET} MongoDB database"
     echo -e "  ${BULLET} FastAPI backend"
     echo -e "  ${BULLET} React frontend"
