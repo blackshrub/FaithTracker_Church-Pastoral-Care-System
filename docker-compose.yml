@@ -81,8 +81,9 @@ services:
     container_name: faithtracker-backend
     restart: unless-stopped
     environment:
-      - MONGODB_URI=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/faithtracker?authSource=admin
-      - JWT_SECRET=${JWT_SECRET}
+      - MONGO_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/faithtracker?authSource=admin
+      - DB_NAME=faithtracker
+      - JWT_SECRET_KEY=${JWT_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - FRONTEND_URL=https://${DOMAIN}
       - ALLOWED_ORIGINS=https://${DOMAIN},https://api.${DOMAIN}
