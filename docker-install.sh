@@ -173,6 +173,77 @@ install_docker_compose() {
     print_success "Docker Compose installed"
 }
 
+check_swap() {
+    echo ""
+    echo -e "${BOLD}Checking swap space...${NC}"
+
+    # Get current swap in MB
+    CURRENT_SWAP_MB=$(free -m | awk '/^Swap:/ {print $2}')
+
+    # Minimum recommended swap for Docker builds (2GB)
+    readonly MIN_SWAP_MB=2048
+
+    if [ "$CURRENT_SWAP_MB" -ge "$MIN_SWAP_MB" ]; then
+        print_success "Swap space: ${CURRENT_SWAP_MB}MB (sufficient)"
+        return 0
+    fi
+
+    print_warning "Swap space: ${CURRENT_SWAP_MB}MB (low - Docker builds may fail with OOM)"
+    echo ""
+    read -p "  Create 2GB swap file to prevent build failures? (Y/n): " -n 1 -r
+    echo ""
+
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        print_warning "Proceeding without swap - build may fail on low-memory servers"
+        return 0
+    fi
+
+    create_swap
+}
+
+create_swap() {
+    print_step "Creating 2GB swap file..."
+
+    # Check if swap file already exists
+    if [ -f /swapfile ]; then
+        print_info "Swap file exists, checking if active..."
+        if swapon --show | grep -q "/swapfile"; then
+            print_info "Swap already active, resizing..."
+            swapoff /swapfile 2>/dev/null || true
+        fi
+        rm -f /swapfile
+    fi
+
+    # Create swap file (2GB)
+    print_step "Allocating 2GB swap file (this may take a moment)..."
+    if command -v fallocate &>/dev/null; then
+        fallocate -l 2G /swapfile
+    else
+        dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress
+    fi
+
+    # Set proper permissions
+    chmod 600 /swapfile
+
+    # Format as swap
+    print_step "Formatting swap..."
+    mkswap /swapfile >/dev/null
+
+    # Enable swap
+    print_step "Enabling swap..."
+    swapon /swapfile
+
+    # Add to fstab for persistence (if not already there)
+    if ! grep -q "/swapfile" /etc/fstab; then
+        echo "/swapfile none swap sw 0 0" >> /etc/fstab
+        print_info "Added swap to /etc/fstab for persistence"
+    fi
+
+    # Verify
+    NEW_SWAP_MB=$(free -m | awk '/^Swap:/ {print $2}')
+    print_success "Swap created and enabled: ${NEW_SWAP_MB}MB"
+}
+
 check_repository() {
     echo ""
     echo -e "${BOLD}Validating repository...${NC}"
@@ -471,6 +542,7 @@ main() {
 
     check_root
     check_docker
+    check_swap
     check_repository
     configure_environment
     create_env_file
