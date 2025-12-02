@@ -51,8 +51,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Only cache static assets - NEVER cache API calls
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // Only cache JS, CSS, HTML - NOT icons (they may be blocked by reverse proxy)
+        globPatterns: ['**/*.{js,css,html}'],
+        // Skip waiting to activate new service worker immediately
+        skipWaiting: true,
+        clientsClaim: true,
         // Explicitly exclude API routes from caching
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [

@@ -5,6 +5,9 @@
  * reducing Time-to-Interactive (TTI) significantly.
  *
  * TanStack Query is still used for caching - loaders just prime the cache.
+ *
+ * IMPORTANT: Loaders are defensive - they catch all errors and return null
+ * to prevent blocking navigation when user is not authenticated.
  */
 
 import { QueryClient } from '@tanstack/react-query';
@@ -18,28 +21,49 @@ export const setQueryClient = (client) => {
 };
 
 /**
- * Dashboard loader - prefetches all dashboard data in parallel
+ * Check if user is authenticated (has valid token)
+ */
+const isAuthenticated = () => {
+  const token = localStorage.getItem('token');
+  return !!token;
+};
+
+/**
+ * Safe prefetch wrapper - catches all errors to prevent blocking navigation
+ */
+const safePrefetch = async (queryKey, queryFn, options = {}) => {
+  if (!queryClient || !isAuthenticated()) return;
+
+  try {
+    await queryClient.prefetchQuery({
+      queryKey,
+      queryFn,
+      staleTime: options.staleTime || 1000 * 30,
+    });
+  } catch (error) {
+    // Silently fail - component will fetch data anyway
+    console.debug(`Prefetch failed for ${queryKey.join('/')}:`, error.message);
+  }
+};
+
+/**
+ * Dashboard loader - prefetches reminders and members
  */
 export const dashboardLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
-  // Prefetch all dashboard data in parallel
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['dashboard'],
-      queryFn: () => api.get('/dashboard').then(res => res.data),
-      staleTime: 1000 * 30,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['dashboard-birthdays'],
-      queryFn: () => api.get('/dashboard/birthdays').then(res => res.data),
-      staleTime: 1000 * 60,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['dashboard-grief'],
-      queryFn: () => api.get('/dashboard/grief-support').then(res => res.data),
-      staleTime: 1000 * 60,
-    }),
+  // Prefetch in parallel - these match Dashboard.jsx actual API calls
+  await Promise.allSettled([
+    safePrefetch(
+      ['dashboard-reminders'],
+      () => api.get('/dashboard/reminders').then(res => res.data),
+      { staleTime: 1000 * 30 }
+    ),
+    safePrefetch(
+      ['members-list'],
+      () => api.get('/members?limit=1000').then(res => res.data),
+      { staleTime: 1000 * 60 }
+    ),
   ]);
 
   return null;
@@ -49,13 +73,13 @@ export const dashboardLoader = async () => {
  * Members list loader - prefetches member list
  */
 export const membersLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
-  await queryClient.prefetchQuery({
-    queryKey: ['members', { page: 1, limit: 50 }],
-    queryFn: () => api.get('/members?page=1&limit=50').then(res => res.data),
-    staleTime: 1000 * 30,
-  });
+  await safePrefetch(
+    ['members', { page: 1, limit: 50 }],
+    () => api.get('/members?page=1&limit=50').then(res => res.data),
+    { staleTime: 1000 * 30 }
+  );
 
   return null;
 };
@@ -64,19 +88,19 @@ export const membersLoader = async () => {
  * Member detail loader - prefetches member and care events
  */
 export const memberDetailLoader = async ({ params }) => {
-  if (!queryClient || !params.id) return null;
+  if (!isAuthenticated() || !params.id) return null;
 
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['member', params.id],
-      queryFn: () => api.get(`/members/${params.id}`).then(res => res.data),
-      staleTime: 1000 * 30,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['member-care-events', params.id],
-      queryFn: () => api.get(`/care-events?member_id=${params.id}`).then(res => res.data),
-      staleTime: 1000 * 30,
-    }),
+  await Promise.allSettled([
+    safePrefetch(
+      ['member', params.id],
+      () => api.get(`/members/${params.id}`).then(res => res.data),
+      { staleTime: 1000 * 30 }
+    ),
+    safePrefetch(
+      ['member-care-events', params.id],
+      () => api.get(`/care-events?member_id=${params.id}`).then(res => res.data),
+      { staleTime: 1000 * 30 }
+    ),
   ]);
 
   return null;
@@ -86,19 +110,24 @@ export const memberDetailLoader = async ({ params }) => {
  * Analytics loader - prefetches analytics data
  */
 export const analyticsLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['analytics-demographics'],
-      queryFn: () => api.get('/analytics/demographic-trends').then(res => res.data),
-      staleTime: 1000 * 60 * 5,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['analytics-grief'],
-      queryFn: () => api.get('/analytics/grief-completion-rate').then(res => res.data),
-      staleTime: 1000 * 60 * 5,
-    }),
+  await Promise.allSettled([
+    safePrefetch(
+      ['analytics-demographics'],
+      () => api.get('/analytics/demographic-trends').then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
+    safePrefetch(
+      ['analytics-grief'],
+      () => api.get('/analytics/grief-completion-rate').then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
+    safePrefetch(
+      ['financial-aid-summary'],
+      () => api.get('/financial-aid/summary').then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
   ]);
 
   return null;
@@ -108,19 +137,19 @@ export const analyticsLoader = async () => {
  * Financial aid loader
  */
 export const financialAidLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['financial-aid-summary'],
-      queryFn: () => api.get('/financial-aid/summary').then(res => res.data),
-      staleTime: 1000 * 60,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['financial-aid-schedules'],
-      queryFn: () => api.get('/financial-aid-schedules').then(res => res.data),
-      staleTime: 1000 * 60,
-    }),
+  await Promise.allSettled([
+    safePrefetch(
+      ['financial-aid-summary'],
+      () => api.get('/financial-aid/summary').then(res => res.data),
+      { staleTime: 1000 * 60 }
+    ),
+    safePrefetch(
+      ['financial-aid-schedules'],
+      () => api.get('/financial-aid-schedules').then(res => res.data),
+      { staleTime: 1000 * 60 }
+    ),
   ]);
 
   return null;
@@ -130,19 +159,19 @@ export const financialAidLoader = async () => {
  * Admin loader - prefetches users and campuses
  */
 export const adminLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['admin-users'],
-      queryFn: () => api.get('/users').then(res => res.data),
-      staleTime: 1000 * 60,
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['campuses'],
-      queryFn: () => api.get('/campuses').then(res => res.data),
-      staleTime: 1000 * 60 * 5,
-    }),
+  await Promise.allSettled([
+    safePrefetch(
+      ['admin-users'],
+      () => api.get('/users').then(res => res.data),
+      { staleTime: 1000 * 60 }
+    ),
+    safePrefetch(
+      ['campuses'],
+      () => api.get('/campuses').then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
   ]);
 
   return null;
@@ -152,13 +181,20 @@ export const adminLoader = async () => {
  * Activity log loader
  */
 export const activityLogLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
-  await queryClient.prefetchQuery({
-    queryKey: ['activity-logs', { page: 1 }],
-    queryFn: () => api.get('/activity-logs?page=1&limit=50').then(res => res.data),
-    staleTime: 1000 * 30,
-  });
+  await Promise.allSettled([
+    safePrefetch(
+      ['activity-logs', { page: 1 }],
+      () => api.get('/activity-logs?page=1&limit=50').then(res => res.data),
+      { staleTime: 1000 * 30 }
+    ),
+    safePrefetch(
+      ['activity-logs-summary'],
+      () => api.get('/activity-logs/summary').then(res => res.data),
+      { staleTime: 1000 * 60 }
+    ),
+  ]);
 
   return null;
 };
@@ -167,14 +203,24 @@ export const activityLogLoader = async () => {
  * Reports loader
  */
 export const reportsLoader = async () => {
-  if (!queryClient) return null;
+  if (!isAuthenticated()) return null;
 
   const now = new Date();
-  await queryClient.prefetchQuery({
-    queryKey: ['monthly-report', now.getFullYear(), now.getMonth() + 1],
-    queryFn: () => api.get(`/reports/monthly?year=${now.getFullYear()}&month=${now.getMonth() + 1}`).then(res => res.data),
-    staleTime: 1000 * 60 * 5,
-  });
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  await Promise.allSettled([
+    safePrefetch(
+      ['monthly-report', year, month],
+      () => api.get(`/reports/monthly?year=${year}&month=${month}`).then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
+    safePrefetch(
+      ['staff-performance', year, month],
+      () => api.get(`/reports/staff-performance?year=${year}&month=${month}`).then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
+  ]);
 
   return null;
 };

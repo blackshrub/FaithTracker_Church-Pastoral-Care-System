@@ -141,6 +141,8 @@ const RootLayout = () => {
 const router = createBrowserRouter([
   {
     element: <RootLayout />,
+    // HydrateFallback for client-side only apps (prevents console warning)
+    HydrateFallback: PageLoader,
     children: [
       {
         path: '/login',
