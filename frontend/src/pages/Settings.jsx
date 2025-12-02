@@ -21,6 +21,31 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
+// Helper to parse UTC timestamps that may not have timezone indicator
+const parseUTCTimestamp = (timestamp) => {
+  if (!timestamp) return null;
+  // If timestamp doesn't end with Z or timezone offset, assume UTC and append Z
+  if (!timestamp.endsWith('Z') && !timestamp.match(/[+-]\d{2}:\d{2}$/)) {
+    timestamp = timestamp + 'Z';
+  }
+  return new Date(timestamp);
+};
+
+// Format date to Jakarta timezone
+const formatToJakarta = (timestamp) => {
+  const date = parseUTCTimestamp(timestamp);
+  if (!date || isNaN(date.getTime())) return '-';
+  return date.toLocaleString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+};
+
 export const Settings = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -1490,7 +1515,7 @@ export const Settings = () => {
               <CardContent className="space-y-4">
                 {syncConfig.last_sync_at && (
                   <div className="text-sm text-gray-600">
-                    <p><span className="font-medium">Last Sync:</span> {new Date(syncConfig.last_sync_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+                    <p><span className="font-medium">Last Sync:</span> {formatToJakarta(syncConfig.last_sync_at)}</p>
                     <p><span className="font-medium">Status:</span> <span className={syncConfig.last_sync_status === 'success' ? 'text-green-600' : 'text-red-600'}>
                       {syncConfig.last_sync_status}
                     </span></p>
@@ -1544,7 +1569,7 @@ export const Settings = () => {
                               {log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1)} Sync
                             </p>
                             <p className="text-xs text-gray-600">
-                              {new Date(log.started_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })} 
+                              {formatToJakarta(log.started_at)} 
                               {log.duration_seconds && ` • ${log.duration_seconds.toFixed(1)}s`}
                             </p>
                           </div>
