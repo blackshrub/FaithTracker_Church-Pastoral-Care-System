@@ -60,42 +60,46 @@ const formatPhoneForWhatsApp = (phone) => {
   return `https://wa.me/${formatted}`;
 };
 
-const markBirthdayComplete = async (eventId, loadReminders) => {
+const markBirthdayComplete = async (eventId, loadReminders, t) => {
   try {
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
     loadReminders();
   } catch (error) {
-    toast.error('Failed to complete');
+    toast.error(t('toasts.failed_complete') || 'Failed to complete');
   }
 };
 
-const markGriefStageComplete = async (stageId, loadReminders) => {
+const markGriefStageComplete = async (stageId, loadReminders, t) => {
   try {
     await api.post(`/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
     loadReminders();
   } catch (error) {
-    toast.error('Failed to complete');
+    toast.error(t('toasts.failed_complete') || 'Failed to complete');
   }
 };
 
-const markAccidentComplete = async (eventId, loadReminders) => {
+const markAccidentComplete = async (eventId, loadReminders, t) => {
   try {
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.accident_completed'));
     loadReminders();
   } catch (error) {
-    toast.error('Failed to complete');
+    toast.error(t('toasts.failed_complete') || 'Failed to complete');
   }
 };
 
-const markMemberContacted = async (memberId, memberName, user, loadReminders) => {
+const markMemberContacted = async (memberId, memberName, user, loadReminders, t) => {
   try {
+    if (!user?.campus_id) {
+      toast.error(t('errors.no_campus_assigned') || 'No campus assigned to your account');
+      return;
+    }
     // Create a regular contact event which updates last_contact_date
     await api.post(`/care-events`, {
       member_id: memberId,
-      campus_id: user?.campus_id || '2b3f9094-eef4-4af4-a3ff-730ef4adeb8a', // Use user's campus or default
+      campus_id: user.campus_id,
       event_type: 'regular_contact',
       event_date: new Date().toISOString().split('T')[0],
       title: `Contact with ${memberName}`,
@@ -285,7 +289,7 @@ export const Reminders = () => {
                                 Contact
                               </a>
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => markBirthdayComplete(event.id, loadReminders)}>
+                            <Button size="sm" variant="outline" onClick={() => markBirthdayComplete(event.id, loadReminders, t)}>
                               Mark Complete
                             </Button>
                           </div>
@@ -317,7 +321,7 @@ export const Reminders = () => {
                                 Contact
                               </a>
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => markGriefStageComplete(stage.id, loadReminders)}>
+                            <Button size="sm" variant="outline" onClick={() => markGriefStageComplete(stage.id, loadReminders, t)}>
                               Mark Complete
                             </Button>
                           </div>
@@ -441,7 +445,7 @@ export const Reminders = () => {
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders)}>
+                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders, t)}>
                           Mark Contacted
                         </Button>
                       </div>
@@ -475,7 +479,7 @@ export const Reminders = () => {
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders)}>
+                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders, t)}>
                           Mark Contacted
                         </Button>
                       </div>
@@ -508,7 +512,7 @@ export const Reminders = () => {
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markAccidentComplete(event.id, loadReminders)}>
+                        <Button size="sm" variant="outline" onClick={() => markAccidentComplete(event.id, loadReminders, t)}>
                           Mark Complete
                         </Button>
                       </div>
@@ -539,7 +543,7 @@ export const Reminders = () => {
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markGriefStageComplete(stage.id, loadReminders)}>
+                        <Button size="sm" variant="outline" onClick={() => markGriefStageComplete(stage.id, loadReminders, t)}>
                           Mark Complete
                         </Button>
                       </div>

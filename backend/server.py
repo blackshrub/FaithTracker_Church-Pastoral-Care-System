@@ -341,7 +341,7 @@ MAX_REQUEST_BODY_SIZE = 15 * 1024 * 1024  # 15 MB max request body
 
 # Pagination Bounds (for query parameter validation)
 MAX_PAGE_NUMBER = 10000
-MAX_LIMIT = 1000
+MAX_LIMIT = 2000
 
 # ==================== IMAGE VALIDATION ====================
 
@@ -624,6 +624,7 @@ class CareEvent(BaseModel):
     # Member information (enriched from members collection)
     member_name: Optional[str] = None
     member_phone: Optional[str] = None
+    member_photo_url: Optional[str] = None
 
 
 class SetupAdminRequest(BaseModel):
@@ -2356,7 +2357,12 @@ def get_date_in_timezone(timezone_str: str) -> str:
 async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user)):
     """Mark a care event as ignored/dismissed"""
     try:
-        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        # Get the care event with campus filter for multi-tenancy
+        query = {"id": event_id}
+        campus_filter = get_campus_filter(user)
+        if campus_filter:
+            query.update(campus_filter)
+        event = await db.care_events.find_one(query, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
         
@@ -2531,9 +2537,16 @@ async def delete_member(request: Request, member_id: str, current_user: dict = D
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        # Also delete related care events and grief support
-        await db.care_events.delete_many({"member_id": member_id})
-        await db.grief_support.delete_many({"member_id": member_id})
+        # Also delete related care events and grief support (with campus filter for defense in depth)
+        member_campus_id = member.get("campus_id")
+        cascade_filter = {"member_id": member_id}
+        if member_campus_id:
+            cascade_filter["campus_id"] = member_campus_id
+
+        await db.care_events.delete_many(cascade_filter)
+        await db.grief_support.delete_many(cascade_filter)
+        await db.accident_followup.delete_many(cascade_filter)
+        await db.activity_logs.delete_many({"member_id": member_id, "campus_id": member_campus_id} if member_campus_id else {"member_id": member_id})
 
         # Log activity
         await log_activity(
@@ -3131,13 +3144,13 @@ async def list_care_events(
             {"$sort": {"event_date": -1}},
             {"$skip": skip},
             {"$limit": limit},
-            # Join with members collection to get member names and phone in single query
+            # Join with members collection to get member names, phone, and photo in single query
             {"$lookup": {
                 "from": "members",
                 "localField": "member_id",
                 "foreignField": "id",
                 "as": "member_info",
-                "pipeline": [{"$project": {"_id": 0, "name": 1, "phone": 1}}]
+                "pipeline": [{"$project": {"_id": 0, "name": 1, "phone": 1, "photo_url": 1}}]
             }},
             # Flatten member_info array to single object
             {"$addFields": {
@@ -3159,6 +3172,13 @@ async def list_care_events(
                     "$cond": {
                         "if": {"$gt": [{"$size": "$member_info"}, 0]},
                         "then": {"$arrayElemAt": ["$member_info.phone", 0]},
+                        "else": None
+                    }
+                },
+                "member_photo_url": {
+                    "$cond": {
+                        "if": {"$gt": [{"$size": "$member_info"}, 0]},
+                        "then": {"$arrayElemAt": ["$member_info.photo_url", 0]},
                         "else": None
                     }
                 }
@@ -3229,8 +3249,12 @@ async def update_care_event(event_id: str, update: CareEventUpdate, current_user
 async def complete_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
     """Mark care event as completed and update member engagement"""
     try:
-        # Get the care event first
-        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        # Get the care event with campus filter for multi-tenancy
+        query = {"id": event_id}
+        campus_filter = get_campus_filter(current_user)
+        if campus_filter:
+            query.update(campus_filter)
+        event = await db.care_events.find_one(query, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
         
@@ -4874,11 +4898,16 @@ async def get_active_grief_support():
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/dashboard/recent-activity")
-async def get_recent_activity(limit: int = 20):
+async def get_recent_activity(limit: int = 20, current_user: dict = Depends(get_current_user)):
     """Get recent care events"""
     try:
+        # Build campus filter for multi-tenancy
+        campus_filter = get_campus_filter(current_user)
+        match_stage = {"$match": campus_filter} if campus_filter else {"$match": {}}
+
         # Optimize: Use aggregation with $lookup to join member data in single query
         pipeline = [
+            match_stage,
             {
                 "$lookup": {
                     "from": "members",
@@ -4911,15 +4940,19 @@ async def get_recent_activity(limit: int = 20):
 # ==================== ANALYTICS ENDPOINTS ====================
 
 @api_router.get("/analytics/engagement-trends")
-async def get_engagement_trends(days: int = 30):
+async def get_engagement_trends(days: int = 30, current_user: dict = Depends(get_current_user)):
     """Get engagement trends over time"""
     try:
         start_date = date.today() - timedelta(days=days)
-        
-        events = await db.care_events.find({
-            "event_date": {"$gte": start_date.isoformat()}
-        }, {"_id": 0, "event_date": 1}).to_list(1000)
-        
+
+        # Apply campus filter for multi-tenancy
+        query = {"event_date": {"$gte": start_date.isoformat()}}
+        campus_filter = get_campus_filter(current_user)
+        if campus_filter:
+            query.update(campus_filter)
+
+        events = await db.care_events.find(query, {"_id": 0, "event_date": 1}).to_list(1000)
+
         # Count by date
         date_counts = {}
         for event in events:
@@ -4927,40 +4960,49 @@ async def get_engagement_trends(days: int = 30):
             if isinstance(event_date, str):
                 event_date = event_date[:10]  # Get just the date part
             date_counts[event_date] = date_counts.get(event_date, 0) + 1
-        
+
         # Format for chart
         trends = [{"date": d, "count": c} for d, c in sorted(date_counts.items())]
-        
+
         return trends
     except Exception as e:
         logger.error(f"Error getting engagement trends: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/analytics/care-events-by-type")
-async def get_care_events_by_type():
+async def get_care_events_by_type(current_user: dict = Depends(get_current_user)):
     """Get distribution of care events by type"""
     try:
-        events = await db.care_events.find({}, {"_id": 0, "event_type": 1}).to_list(10000)
-        
+        # Apply campus filter for multi-tenancy
+        campus_filter = get_campus_filter(current_user)
+        query = campus_filter if campus_filter else {}
+
+        events = await db.care_events.find(query, {"_id": 0, "event_type": 1}).to_list(10000)
+
         type_counts = {}
         for event in events:
             event_type = event.get('event_type')
             type_counts[event_type] = type_counts.get(event_type, 0) + 1
-        
+
         return [{"type": t, "count": c} for t, c in type_counts.items()]
     except Exception as e:
         logger.error(f"Error getting events by type: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/analytics/grief-completion-rate")
-async def get_grief_completion_rate():
+async def get_grief_completion_rate(current_user: dict = Depends(get_current_user)):
     """Get grief support completion rate"""
     try:
-        total_stages = await db.grief_support.count_documents({})
-        completed_stages = await db.grief_support.count_documents({"completed": True})
-        
+        # Apply campus filter for multi-tenancy
+        campus_filter = get_campus_filter(current_user)
+        query = campus_filter if campus_filter else {}
+
+        total_stages = await db.grief_support.count_documents(query)
+        completed_query = {**query, "completed": True}
+        completed_stages = await db.grief_support.count_documents(completed_query)
+
         completion_rate = (completed_stages / total_stages * 100) if total_stages > 0 else 0
-        
+
         return {
             "total_stages": total_stages,
             "completed_stages": completed_stages,
@@ -5113,9 +5155,15 @@ async def member_sync_webhook(current_admin: dict = Depends(get_current_admin)):
 # ==================== IMPORT/EXPORT ENDPOINTS ====================
 
 @api_router.post("/import/members/csv")
-async def import_members_csv(file: UploadFile = File(...)):
+async def import_members_csv(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Import members from CSV file"""
     try:
+        # Get campus_id from current user for multi-tenancy
+        campus_id = current_user.get("campus_id")
+        church_id = current_user.get("church_id")
+        if not campus_id:
+            raise HTTPException(status_code=400, detail="No campus assigned to your account")
+
         # Read and validate file size
         contents = await file.read()
         if len(contents) > MAX_CSV_SIZE:
@@ -5123,74 +5171,98 @@ async def import_members_csv(file: UploadFile = File(...)):
 
         decoded = contents.decode('utf-8')
         reader = csv.DictReader(io.StringIO(decoded))
-        
+
         imported_count = 0
         errors = []
-        
+
         for row in reader:
             try:
-                # Create member from CSV row
+                # Create member from CSV row with campus_id for multi-tenancy
                 member = Member(
                     name=row.get('name', ''),
                     phone=row.get('phone', ''),
                     external_member_id=row.get('external_member_id'),
-                    notes=row.get('notes')
+                    notes=row.get('notes'),
+                    campus_id=campus_id,
+                    church_id=church_id
                 )
-                
+
                 await db.members.insert_one(member.model_dump())
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Row error: {str(e)}")
-        
+
+        # Log the import activity
+        await log_activity(current_user["id"], "import", None, f"Imported {imported_count} members from CSV")
+
         return {
             "success": True,
             "imported_count": imported_count,
             "errors": errors
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error importing CSV: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/import/members/json")
-async def import_members_json(members: List[Dict[str, Any]]):
+async def import_members_json(members: List[Dict[str, Any]], current_user: dict = Depends(get_current_user)):
     """Import members from JSON array"""
     try:
+        # Get campus_id from current user for multi-tenancy
+        campus_id = current_user.get("campus_id")
+        church_id = current_user.get("church_id")
+        if not campus_id:
+            raise HTTPException(status_code=400, detail="No campus assigned to your account")
+
         imported_count = 0
         errors = []
-        
+
         for member_data in members:
             try:
                 member = Member(
                     name=member_data.get('name', ''),
                     phone=member_data.get('phone', ''),
                     external_member_id=member_data.get('external_member_id'),
-                    notes=member_data.get('notes')
+                    notes=member_data.get('notes'),
+                    campus_id=campus_id,
+                    church_id=church_id
                 )
-                
+
                 await db.members.insert_one(member.model_dump())
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Member error: {str(e)}")
-        
+
+        # Log the import activity
+        await log_activity(current_user["id"], "import", None, f"Imported {imported_count} members from JSON")
+
         return {
             "success": True,
             "imported_count": imported_count,
             "errors": errors
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error importing JSON: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/export/members/csv")
-async def export_members_csv():
+async def export_members_csv(current_user: dict = Depends(get_current_user)):
     """Export members to CSV file - optimized with field projection (70% less data transfer)"""
     try:
+        # Build campus filter for multi-tenancy
+        campus_filter = get_campus_filter(current_user)
+        query = campus_filter if campus_filter else {}
+
         # Only fetch fields needed for export (reduces data transfer by ~70%)
         projection = {
             "_id": 0, "id": 1, "name": 1, "phone": 1, "external_member_id": 1,
             "last_contact_date": 1, "engagement_status": 1, "days_since_last_contact": 1, "notes": 1
         }
-        members = await db.members.find({}, projection).to_list(10000)
+        members = await db.members.find(query, projection).to_list(10000)
         
         output = io.StringIO()
         if members:
@@ -6546,10 +6618,16 @@ async def update_automation_settings(settings: dict, current_admin: dict = Depen
             upsert=True
         )
 
-        # Note: Scheduler restart may be needed to apply new digest time
-        logger.info(f"Automation settings updated by {current_admin['email']}: digestTime={digest_time}")
+        # Reschedule the daily digest job with new time
+        try:
+            from scheduler import schedule_daily_digest
+            hour, minute = map(int, digest_time.split(":"))
+            schedule_daily_digest(hour, minute)
+            logger.info(f"Automation settings updated by {current_admin['email']}: digestTime={digest_time} - scheduler updated")
+        except Exception as sched_err:
+            logger.warning(f"Could not update scheduler: {str(sched_err)} - restart may be needed")
 
-        return {"success": True, "message": "Automation settings updated"}
+        return {"success": True, "message": "Automation settings updated and applied"}
     except HTTPException:
         raise
     except Exception as e:

@@ -37,7 +37,17 @@
       "Bash(docker ps:*)",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/members?limit=2\")",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\")",
-      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/analytics/demographic-trends\")"
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/analytics/demographic-trends\")",
+      "Bash(pip3 install:*)",
+      "Bash(docker cp:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/care-events?limit=5\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDEyMDd9.u3yQVJ9Ck12dIa0BrbKUQqJVK2cKPIKDGpRTlJU_4IU\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\")",
+      "Bash(docker restart:*)",
+      "Bash(git -C /root/FaithTracker_Church-Pastoral-Care-System ls-files:*)",
+      "Bash(git -C /root/FaithTracker_Church-Pastoral-Care-System status .env)",
+      "Bash(./scripts/validate-deployment.sh:*)",
+      "Bash(docker images:*)"
     ],
     "deny": [],
     "ask": []

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { MemberAvatar } from '@/components/MemberAvatar';
 
 // Format phone for WhatsApp link
 const formatPhoneForWhatsApp = (phone) => {
@@ -144,7 +145,7 @@ export const Calendar = () => {
                   <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-teal-700' : ''}`}>{day.getDate()}</div>
                   {dayEvents.slice(0, 2).map(e => (
                     <div key={e.id} className="text-xs bg-teal-100 text-teal-700 rounded px-1 mb-1 truncate">
-                      {e.event_type === 'birthday' ? '🎂 Birthday' : e.event_type.replace('_', ' ')}
+                      {e.event_type === 'birthday' ? '🎂 Birthday' : e.event_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                     </div>
                   ))}
                   {dayEvents.length > 2 && <div className="text-xs text-muted-foreground font-semibold">+{dayEvents.length - 2} more</div>}
@@ -188,7 +189,23 @@ export const Calendar = () => {
                     <div className="space-y-3">
                       {typeEvents.map(event => (
                         <div key={event.id} className={`p-4 ${config.bgColor} rounded-lg border ${event.completed ? 'opacity-60' : ''}`}>
-                          <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            {/* Member avatar */}
+                            {event.member_id && event.member_name && (
+                              <Link
+                                to={`/members/${event.member_id}`}
+                                onClick={() => setDetailsOpen(false)}
+                                className="flex-shrink-0"
+                              >
+                                <MemberAvatar
+                                  member={{
+                                    name: event.member_name,
+                                    photo_url: event.member_photo_url
+                                  }}
+                                  size="md"
+                                />
+                              </Link>
+                            )}
                             <div className="flex-1 min-w-0">
                               {/* Member name as clickable link */}
                               {event.member_id && event.member_name ? (

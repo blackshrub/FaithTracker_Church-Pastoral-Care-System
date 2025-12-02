@@ -25,7 +25,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 export const Settings = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [atRiskDays, setAtRiskDays] = useState(60);
   const [inactiveDays, setInactiveDays] = useState(90);
   const [campusCount, setCampusCount] = useState(0);
@@ -64,8 +64,8 @@ export const Settings = () => {
       });
       toast.success(t('profile_updated_successfully'));
       setEditingProfile(false);
-      // Reload user data
-      window.location.reload();
+      // Refresh user data without full page reload
+      await refreshUser();
     } catch (error) {
       toast.error(t('failed_update_profile') + ': ' + (error.response?.data?.detail || error.message));
     } finally {
@@ -189,20 +189,20 @@ export const Settings = () => {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const response = await api.post(`/users/${user.id}/photo`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
+
       toast.success('Profile photo updated successfully');
-      
-      // Reload user data
-      window.location.reload();
+
+      // Refresh user data without full page reload
+      await refreshUser();
     } catch (error) {
       toast.error('Failed to upload photo');
       console.error('Photo upload error:', error);

@@ -535,8 +535,58 @@ async def daily_reminder_job():
         # Always release the lock when done
         await release_job_lock("daily_reminder")
 
+async def get_digest_time_from_db():
+    """Get the digest time from database settings, default to 08:00"""
+    try:
+        settings = await db.settings.find_one({"type": "automation"})
+        if settings and settings.get("data", {}).get("digestTime"):
+            return settings["data"]["digestTime"]
+        return "08:00"
+    except Exception as e:
+        logger.error(f"Error getting digest time from DB: {str(e)}")
+        return "08:00"
+
+def schedule_daily_digest(hour: int, minute: int):
+    """Schedule or reschedule the daily digest job"""
+    try:
+        # Remove existing job if present
+        try:
+            scheduler.remove_job('daily_reminders')
+        except Exception:
+            pass
+
+        # Add job with new time
+        scheduler.add_job(
+            daily_reminder_job,
+            'cron',
+            hour=hour,
+            minute=minute,
+            timezone='Asia/Jakarta',
+            id='daily_reminders',
+            name='Daily Pastoral Care Digest',
+            replace_existing=True
+        )
+        logger.info(f"✅ Daily digest scheduled for {hour:02d}:{minute:02d} Asia/Jakarta")
+    except Exception as e:
+        logger.error(f"Error scheduling daily digest: {str(e)}")
+
+async def reschedule_daily_digest():
+    """Reschedule daily digest based on current database settings"""
+    digest_time = await get_digest_time_from_db()
+    try:
+        hour, minute = map(int, digest_time.split(":"))
+        schedule_daily_digest(hour, minute)
+    except ValueError:
+        logger.error(f"Invalid digest time format: {digest_time}, using default 08:00")
+        schedule_daily_digest(8, 0)
+
+async def init_daily_digest_schedule():
+    """Initialize daily digest schedule from database on startup"""
+    await asyncio.sleep(2)  # Wait for DB connection to be ready
+    await reschedule_daily_digest()
+
 def start_scheduler():
-    """Start the scheduler with daily job at 8 AM Jakarta time"""
+    """Start the scheduler with jobs configured from database"""
     try:
         # Midnight job - Refresh dashboard cache when date changes
         scheduler.add_job(
@@ -549,18 +599,7 @@ def start_scheduler():
             name='Midnight Dashboard Cache Refresh',
             replace_existing=True
         )
-        
-        # Run daily at 8 AM Jakarta time (Asia/Jakarta = UTC+7)
-        scheduler.add_job(
-            daily_reminder_job,
-            'cron',
-            hour=8,
-            minute=0,
-            timezone='Asia/Jakarta',
-            id='daily_reminders',
-            replace_existing=True
-        )
-        
+
         # Run daily reconciliation at 3 AM Jakarta time
         scheduler.add_job(
             member_reconciliation_job,
@@ -572,11 +611,33 @@ def start_scheduler():
             name='Daily Member Reconciliation',
             replace_existing=True
         )
-        
+
+        # Default daily digest at 8 AM (will be updated from DB shortly after startup)
+        scheduler.add_job(
+            daily_reminder_job,
+            'cron',
+            hour=8,
+            minute=0,
+            timezone='Asia/Jakarta',
+            id='daily_reminders',
+            name='Daily Pastoral Care Digest',
+            replace_existing=True
+        )
+
         scheduler.start()
+
+        # Schedule async initialization of digest time from database
+        scheduler.add_job(
+            init_daily_digest_schedule,
+            'date',  # Run once
+            id='init_digest_schedule',
+            name='Initialize Digest Schedule from DB',
+            replace_existing=True
+        )
+
         logger.info("✅ Scheduler started successfully")
         logger.info("  - Midnight cache refresh: 00:00 Asia/Jakarta")
-        logger.info("  - Daily digest: 08:00 Asia/Jakarta")
+        logger.info("  - Daily digest: 08:00 Asia/Jakarta (loading from DB...)")
         logger.info("  - Member reconciliation: 03:00 Asia/Jakarta")
     except Exception as e:
         logger.error(f"Error starting scheduler: {str(e)}")

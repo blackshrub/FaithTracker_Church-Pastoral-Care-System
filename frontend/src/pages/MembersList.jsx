@@ -58,7 +58,6 @@ export const MembersList = () => {
   
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && search.length >= 1) {
-      setManualSearch(search);
       setCurrentPage(1);
       loadMembers(1, search);
     }

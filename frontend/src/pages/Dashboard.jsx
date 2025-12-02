@@ -197,10 +197,14 @@ const markAccidentComplete = async (eventId, queryClient, t) => {
 
 const markMemberContacted = async (memberId, memberName, user, queryClient, t) => {
   try {
+    if (!user?.campus_id) {
+      toast.error(t('errors.no_campus_assigned') || 'No campus assigned to your account');
+      return;
+    }
     // Create a regular contact event which updates last_contact_date
     const response = await api.post(`/care-events`, {
       member_id: memberId,
-      campus_id: user?.campus_id || '2b3f9094-eef4-4af4-a3ff-730ef4adeb8a',
+      campus_id: user.campus_id,
       event_type: 'regular_contact',
       event_date: new Date().toISOString().split('T')[0],
       title: `Contact with ${memberName}`,
