@@ -26,6 +26,7 @@ from enum import Enum
 import uuid
 from datetime import datetime, timezone, timedelta, date
 from zoneinfo import ZoneInfo
+import asyncio
 
 
 # Custom orjson response class for proper BSON/MongoDB type serialization
@@ -5094,6 +5095,228 @@ async def get_grief_completion_rate(current_user: dict = Depends(get_current_use
         }
     except Exception as e:
         logger.error(f"Error getting grief completion rate: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+@api_router.get("/analytics/dashboard")
+async def get_analytics_dashboard(
+    time_range: str = "all",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Comprehensive analytics dashboard - all data aggregated server-side.
+    Uses simple separate queries for better performance.
+    """
+    try:
+        campus_filter = get_campus_filter(current_user)
+        today = datetime.now(JAKARTA_TZ).date()
+        current_year = today.year
+        member_filter = {**campus_filter, "is_archived": {"$ne": True}}
+
+        # Build date filter for events
+        event_date_filter = {}
+        if time_range == "year":
+            event_date_filter = {"event_date": {"$gte": f"{current_year}-01-01"}}
+        elif time_range == "6months":
+            event_date_filter = {"event_date": {"$gte": (today - timedelta(days=180)).isoformat()}}
+        elif time_range == "3months":
+            event_date_filter = {"event_date": {"$gte": (today - timedelta(days=90)).isoformat()}}
+        elif time_range == "custom" and start_date and end_date:
+            event_date_filter = {"event_date": {"$gte": start_date, "$lte": end_date}}
+
+        # Execute simple queries in parallel
+        total_members, members_with_photos, grief_total, grief_completed = await asyncio.gather(
+            db.members.count_documents(member_filter),
+            db.members.count_documents({**member_filter, "photo_url": {"$exists": True, "$ne": None, "$ne": ""}}),
+            db.grief_support.count_documents(campus_filter),
+            db.grief_support.count_documents({**campus_filter, "completed": True})
+        )
+
+        # Get aggregated data with simple pipelines
+        age_agg = await db.members.aggregate([
+            {"$match": member_filter},
+            {"$group": {"_id": {
+                "$switch": {
+                    "branches": [
+                        {"case": {"$lte": [{"$ifNull": ["$age", 0]}, 12]}, "then": "Child (0-12)"},
+                        {"case": {"$lte": [{"$ifNull": ["$age", 0]}, 17]}, "then": "Teen (13-17)"},
+                        {"case": {"$lte": [{"$ifNull": ["$age", 0]}, 30]}, "then": "Youth (18-30)"},
+                        {"case": {"$lte": [{"$ifNull": ["$age", 0]}, 60]}, "then": "Adult (31-60)"}
+                    ],
+                    "default": "Senior (60+)"
+                }
+            }, "count": {"$sum": 1}, "total_age": {"$sum": {"$ifNull": ["$age", 0]}}}}
+        ]).to_list(10)
+
+        gender_agg = await db.members.aggregate([
+            {"$match": member_filter},
+            {"$group": {"_id": {"$ifNull": ["$gender", "Unknown"]}, "count": {"$sum": 1}}}
+        ]).to_list(10)
+
+        engagement_agg = await db.members.aggregate([
+            {"$match": member_filter},
+            {"$group": {"_id": {"$ifNull": ["$engagement_status", "inactive"]}, "count": {"$sum": 1}}}
+        ]).to_list(10)
+
+        membership_agg = await db.members.aggregate([
+            {"$match": member_filter},
+            {"$group": {
+                "_id": {"$ifNull": [
+                    {"$cond": [{"$in": ["$membership_status", [None, ""]]}, "$category", "$membership_status"]},
+                    "Unknown"
+                ]},
+                "count": {"$sum": 1},
+                "total_eng": {"$sum": {"$subtract": [100, {"$min": [{"$ifNull": ["$days_since_last_contact", 100]}, 100]}]}}
+            }}
+        ]).to_list(50)
+
+        category_agg = await db.members.aggregate([
+            {"$match": member_filter},
+            {"$group": {"_id": {"$ifNull": ["$category", "Unknown"]}, "count": {"$sum": 1}}}
+        ]).to_list(50)
+
+        # Events aggregations
+        events_by_type_agg = await db.care_events.aggregate([
+            {"$match": {**campus_filter, **event_date_filter, "event_type": {"$ne": "birthday"}}},
+            {"$group": {"_id": "$event_type", "count": {"$sum": 1}}}
+        ]).to_list(20)
+
+        events_by_month_agg = await db.care_events.aggregate([
+            {"$match": {**campus_filter, "event_date": {"$regex": f"^{current_year}"}}},
+            {"$group": {"_id": {"$substr": ["$event_date", 5, 2]}, "count": {"$sum": 1}}},
+            {"$sort": {"_id": 1}}
+        ]).to_list(12)
+
+        # Financial
+        financial_agg = await db.care_events.aggregate([
+            {"$match": {**campus_filter, "event_type": "financial_aid"}},
+            {"$group": {
+                "_id": {"$ifNull": ["$aid_type", "other"]},
+                "count": {"$sum": 1},
+                "total_amount": {"$sum": {"$ifNull": ["$aid_amount", 0]}}
+            }}
+        ]).to_list(20)
+
+        schedules_agg = await db.financial_aid_schedules.aggregate([
+            {"$match": campus_filter},
+            {"$group": {"_id": None, "count": {"$sum": 1}, "total_amount": {"$sum": {"$ifNull": ["$aid_amount", 0]}}}}
+        ]).to_list(1)
+
+        # Process results
+        total_age = sum(a.get("total_age", 0) for a in age_agg)
+        avg_age = round(total_age / total_members) if total_members > 0 else 0
+
+        member_stats = {"total": total_members, "with_photos": members_with_photos, "avg_age": avg_age}
+        grief_rate = round((grief_completed / grief_total * 100) if grief_total > 0 else 0, 2)
+
+        age_groups = [{"name": a["_id"], "value": a["count"]} for a in age_agg]
+
+        # Normalize gender
+        gender_normalize = {"M": "Male", "F": "Female", "male": "Male", "female": "Female",
+                          "laki-laki": "Male", "perempuan": "Female", "Laki-laki": "Male", "Perempuan": "Female"}
+        gender_data = {}
+        for g in gender_agg:
+            raw = g.get("_id", "Unknown")
+            normalized = gender_normalize.get(raw, raw)
+            gender_data[normalized] = gender_data.get(normalized, 0) + g.get("count", 0)
+
+        membership_trends = [{"name": m["_id"], "status": m["_id"], "value": m["count"], "count": m["count"],
+                            "avg_engagement": round(m["total_eng"] / m["count"]) if m["count"] > 0 else 0}
+                           for m in membership_agg]
+        membership = [{"name": m["name"], "value": m["count"]} for m in membership_trends]
+        category = [{"name": c["_id"], "value": c["count"]} for c in category_agg]
+        engagement = [{"name": e["_id"], "value": e["count"]} for e in engagement_agg]
+
+        # Events processing
+        total_non_birthday = sum(e.get("count", 0) for e in events_by_type_agg)
+        events_by_type = [{"name": (e["_id"] or "unknown").replace("_", " ").upper(), "value": e["count"],
+                         "percentage": round(e["count"] / total_non_birthday * 100) if total_non_birthday > 0 else 0}
+                        for e in events_by_type_agg]
+
+        month_names = {"01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun",
+                      "07": "Jul", "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"}
+        events_by_month = [{"month": month_names.get(m["_id"], m["_id"]), "events": m["count"]} for m in events_by_month_agg]
+
+        # Financial processing
+        total_financial = sum(f.get("total_amount", 0) for f in financial_agg)
+        financial_by_type = [{"name": (f["_id"] or "other").replace("_", " "), "value": f["total_amount"],
+                            "amount": f["total_amount"], "count": f["count"],
+                            "avg": round(f["total_amount"] / f["count"]) if f["count"] > 0 else 0}
+                           for f in financial_agg]
+        schedules_data = schedules_agg[0] if schedules_agg else {}
+        age_groups_with_events = [{"name": ag["name"], "value": ag["value"], "care_events": 0} for ag in age_groups]
+
+        # Insights
+        engagement_counts = {e["name"]: e["value"] for e in engagement}
+        inactive_count = engagement_counts.get("inactive", 0)
+        at_risk_count = engagement_counts.get("at_risk", 0)
+        senior_count = next((ag["value"] for ag in age_groups if "Senior" in ag["name"]), 0)
+        youth_count = next((ag["value"] for ag in age_groups if "Youth" in ag["name"]), 0)
+
+        care_adaptations = []
+        if inactive_count > 0:
+            care_adaptations.append(f"{inactive_count} inactive members need re-engagement outreach")
+        if at_risk_count > 0:
+            care_adaptations.append(f"{at_risk_count} at-risk members need follow-up within 2 weeks")
+        if senior_count > member_stats["total"] * 0.2:
+            care_adaptations.append(f"Focus senior care programs ({senior_count} seniors, {round(senior_count/member_stats['total']*100) if member_stats['total'] > 0 else 0}% of congregation)")
+        if youth_count > 0:
+            care_adaptations.append(f"Develop young adult ministry for {youth_count} members aged 18-30")
+        if not care_adaptations:
+            care_adaptations.append("Continue maintaining current care engagement levels")
+
+        strategic_recommendations = {
+            "high": f"{inactive_count} members with 90+ days no contact need immediate attention" if inactive_count > 0 else "All members have been contacted within 90 days",
+            "medium": f"{at_risk_count} at-risk members require follow-up before they become inactive" if at_risk_count > 0 else (f"{senior_count} seniors may need specialized care programs" if senior_count > 0 else "Engagement levels are healthy"),
+            "long": "Develop data-driven ministry approaches based on demographic analysis"
+        }
+
+        # Generate insights from demographic data
+        insights = []
+        if age_groups:
+            largest_group = max(age_groups, key=lambda x: x["value"])
+            insights.append(f"Largest demographic: {largest_group['name']} ({largest_group['value']} members)")
+        if age_groups_with_events:
+            most_care = max(age_groups_with_events, key=lambda x: x.get("care_events", 0))
+            if most_care.get("care_events", 0) > 0:
+                insights.append(f"Most care needed: {most_care['name']} ({most_care['care_events']} events)")
+        if membership_trends:
+            lowest_eng = min(membership_trends, key=lambda x: x.get("avg_engagement", 0))
+            insights.append(f"Lowest engagement: {lowest_eng['name']} (avg score: {lowest_eng['avg_engagement']})")
+
+        return {
+            "member_stats": member_stats,
+            "demographics": {
+                "age_groups": age_groups,
+                "gender": [{"name": k, "value": v} for k, v in gender_data.items()],
+                "membership": membership,
+                "category": category,
+                "engagement": engagement
+            },
+            "events_by_type": events_by_type,
+            "events_by_month": events_by_month,
+            "financial": {
+                "total_aid": total_financial,
+                "by_type": financial_by_type,
+                "schedules": schedules_data.get("count", 0),
+                "scheduled_amount": schedules_data.get("total_amount", 0)
+            },
+            "grief": {
+                "total_stages": grief_total,
+                "completed_stages": grief_completed,
+                "completion_rate": grief_rate
+            },
+            "trends": {
+                "age_groups": age_groups_with_events,
+                "membership_trends": membership_trends,
+                "insights": insights,
+                "care_adaptations": care_adaptations,
+                "strategic_recommendations": strategic_recommendations
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting analytics dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== API SYNC ENDPOINTS ====================
