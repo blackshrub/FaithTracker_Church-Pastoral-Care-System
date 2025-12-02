@@ -195,11 +195,10 @@ export const Reports = () => {
   // Shared function to fetch PDF
   const fetchPDF = async () => {
     const response = await api.get(`/reports/monthly/pdf?year=${selectedYear}&month=${selectedMonth}`, {
-      responseType: 'blob'
+      responseType: 'arraybuffer'  // Use arraybuffer for binary data
     });
-    // response.data is already a Blob when responseType is 'blob'
-    // Just ensure it has the correct MIME type
-    return response.data;
+    // Create blob from arraybuffer with explicit MIME type
+    return new Blob([response.data], { type: 'application/pdf' });
   };
 
   const handlePrint = async () => {

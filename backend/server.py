@@ -6140,15 +6140,37 @@ async def export_monthly_report_pdf(
         period = report_data.get("report_period", {})
         filename = f"Pastoral_Care_Report_{period.get('month_name', 'Monthly')}_{period.get('year', datetime.now().year)}.pdf"
 
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Length": str(len(pdf_bytes)),
-                "Cache-Control": "no-cache"
-            }
+        # Write to temp file and serve with FileResponse for reliable binary transfer
+        import tempfile
+        import os
+
+        # Create temp file
+        fd, tmp_path = tempfile.mkstemp(suffix='.pdf')
+        try:
+            os.write(fd, pdf_bytes)
+        finally:
+            os.close(fd)
+
+        # Use FileResponse with proper headers
+        response = FileResponse(
+            path=tmp_path,
+            filename=filename,
+            media_type="application/pdf"
         )
+        # Clean up temp file after response is sent
+        response.headers["Content-Length"] = str(len(pdf_bytes))
+
+        # Schedule cleanup after response
+        import asyncio
+        async def cleanup():
+            await asyncio.sleep(60)  # Wait 60 seconds
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+        asyncio.create_task(cleanup())
+
+        return response
 
     except Exception as e:
         logger.error(f"Error generating PDF report: {str(e)}")

@@ -612,6 +612,11 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     </html>
     """
 
-    # Generate PDF - write_pdf() with no target returns bytes directly
+    # Generate PDF with compatibility options
+    # pdf_version="1.7" for wide reader support
+    # pdf_variant="pdf/a-3b" for archival standard compatibility
     html = HTML(string=html_content)
-    return html.write_pdf()
+    return html.write_pdf(
+        pdf_version="1.7",
+        pdf_variant="pdf/a-3b"
+    )
