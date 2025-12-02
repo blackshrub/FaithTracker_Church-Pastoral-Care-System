@@ -50,7 +50,10 @@
       "Bash(docker images:*)",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/api/reports/monthly?year=2025&month=12\")",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/api/auth/me\")",
-      "Bash(docker inspect:*)"
+      "Bash(docker inspect:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/api/reports/monthly/pdf?year=2025&month=12\" -o /tmp/test.pdf -w \"%{http_code}\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/api/reports/monthly/pdf?year=2025&month=12\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/reports/monthly/pdf?year=2025&month=12\" -o /tmp/test.pdf -w \"%{http_code}\")"
     ],
     "deny": [],
     "ask": []

@@ -189,13 +189,60 @@ export const Reports = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const [exporting, setExporting] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  // Shared function to fetch PDF
+  const fetchPDF = async () => {
+    const response = await api.get(`/reports/monthly/pdf?year=${selectedYear}&month=${selectedMonth}`, {
+      responseType: 'blob'
+    });
+    return new Blob([response.data], { type: 'application/pdf' });
   };
 
-  const handleExportPDF = () => {
-    // For now, use browser print as PDF
-    window.print();
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      const blob = await fetchPDF();
+      const url = window.URL.createObjectURL(blob);
+
+      // Open PDF in new window and print
+      const printWindow = window.open(url, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+      }
+
+      // Clean up after a delay
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      console.error('Error printing PDF:', error);
+      alert('Failed to generate PDF for printing. Please try again.');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setExporting(true);
+    try {
+      const blob = await fetchPDF();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Pastoral_Care_Report_${MONTHS.find(m => m.value === selectedMonth)?.label}_${selectedYear}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading) {
@@ -246,13 +293,13 @@ export const Reports = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handlePrint}>
-            <Printer className="w-4 h-4 mr-2" />
-            Print
+          <Button variant="outline" onClick={handlePrint} disabled={printing}>
+            <Printer className={`w-4 h-4 mr-2 ${printing ? 'animate-pulse' : ''}`} />
+            {printing ? 'Generating...' : 'Print'}
           </Button>
-          <Button onClick={handleExportPDF} className="bg-teal-600 hover:bg-teal-700 text-white">
-            <Download className="w-4 h-4 mr-2" />
-            Export PDF
+          <Button onClick={handleExportPDF} disabled={exporting} className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
+            <Download className={`w-4 h-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
+            {exporting ? 'Generating...' : 'Export PDF'}
           </Button>
         </div>
       </div>

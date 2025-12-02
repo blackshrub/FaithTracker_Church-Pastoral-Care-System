@@ -26,6 +26,11 @@ from zoneinfo import ZoneInfo
 # Jakarta timezone (UTC+7)
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
+# PDF report generation (lazy import to avoid startup issues)
+def get_pdf_generator():
+    from pdf_report import generate_monthly_report_pdf
+    return generate_monthly_report_pdf
+
 # Configure logging - structured JSON in production, human-readable in development
 import sys
 
@@ -5673,8 +5678,10 @@ async def get_monthly_management_report(
         total_members = len(members)
         active_members = len([m for m in members if m.get("engagement_status") == "active"])
         at_risk_members = len([m for m in members if m.get("engagement_status") == "at_risk"])
-        inactive_members = len([m for m in members if m.get("engagement_status") == "inactive"])
         disconnected_members = len([m for m in members if m.get("engagement_status") == "disconnected"])
+        # Note: "inactive" status doesn't exist - we only have active, at_risk, disconnected
+        # Keep inactive_members as alias for backwards compatibility with frontend
+        inactive_members = disconnected_members
 
         # Care delivery metrics
         total_events = len(events_this_month)
@@ -5710,7 +5717,7 @@ async def get_monthly_management_report(
             week_end = min(current_week_start + timedelta(days=7), end_date)
             week_activities = [a for a in activities_this_month
                             if current_week_start.isoformat() <= a.get("created_at", "") < week_end.isoformat()]
-            week_events_completed = len([a for a in week_activities if a.get("action_type") == "COMPLETE_TASK"])
+            week_events_completed = len([a for a in week_activities if a.get("action_type", "").lower() == "complete_task"])
             engagement_trend.append({
                 "week": f"Week {week_num}",
                 "start": current_week_start.strftime("%b %d"),
@@ -5734,11 +5741,12 @@ async def get_monthly_management_report(
                     "total_actions": 0
                 }
             staff_summary[user_id]["total_actions"] += 1
-            if a.get("action_type") == "COMPLETE_TASK":
+            action_type = a.get("action_type", "").lower()
+            if action_type == "complete_task":
                 staff_summary[user_id]["tasks_completed"] += 1
                 if a.get("member_id"):
                     staff_summary[user_id]["members_contacted"].add(a.get("member_id"))
-            elif a.get("action_type") in ["CREATE_CARE_EVENT", "CREATE_MEMBER"]:
+            elif action_type in ["create_care_event", "create_member"]:
                 staff_summary[user_id]["tasks_created"] += 1
 
         # Convert sets to counts
@@ -5750,7 +5758,7 @@ async def get_monthly_management_report(
         # === MEMBER REACH ANALYSIS ===
         members_with_contact = len([m for m in members if m.get("last_contact_date")])
         members_contacted_this_month = len(set(a.get("member_id") for a in activities_this_month
-                                               if a.get("action_type") == "COMPLETE_TASK" and a.get("member_id")))
+                                               if a.get("action_type", "").lower() == "complete_task" and a.get("member_id")))
         member_reach_rate = round(members_contacted_this_month / total_members * 100, 1) if total_members > 0 else 0
 
         # === GRIEF SUPPORT ANALYSIS ===
@@ -6100,6 +6108,52 @@ async def get_monthly_management_report(
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
+@api_router.get("/reports/monthly/pdf")
+async def export_monthly_report_pdf(
+    year: int = None,
+    month: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Export monthly management report as a professionally formatted PDF.
+    Returns a downloadable PDF file.
+    """
+    try:
+        # Get the report data
+        report_data = await get_monthly_management_report(year, month, current_user)
+
+        # Get campus name for the header
+        campus_name = "GKBJ"  # Default
+        if current_user.get("campus_id"):
+            campus = await db.campuses.find_one(
+                {"id": current_user["campus_id"]},
+                {"_id": 0, "campus_name": 1}
+            )
+            if campus:
+                campus_name = campus.get("campus_name", "GKBJ")
+
+        # Generate PDF
+        generate_pdf = get_pdf_generator()
+        pdf_bytes = generate_pdf(report_data, campus_name)
+
+        # Create filename
+        period = report_data.get("report_period", {})
+        filename = f"Pastoral_Care_Report_{period.get('month_name', 'Monthly')}_{period.get('year', datetime.now().year)}.pdf"
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(pdf_bytes))
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating PDF report: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+
 @api_router.get("/reports/staff-performance")
 async def get_staff_performance_report(
     year: int = None,
@@ -6195,28 +6249,28 @@ async def get_staff_performance_report(
             staff = staff_data[user_id]
             staff["total_actions"] += 1
 
-            action = activity.get("action_type")
+            action = activity.get("action_type", "").lower()  # Normalize to lowercase
             created_at = activity.get("created_at", "")
             if created_at:
                 day = created_at[:10]
                 staff["active_days"].add(day)
                 staff["daily_activity"][day] = staff["daily_activity"].get(day, 0) + 1
 
-            if action == "COMPLETE_TASK":
+            if action == "complete_task":
                 staff["tasks_completed"] += 1
                 if activity.get("member_id"):
                     staff["members_contacted"].add(activity.get("member_id"))
                 event_type = activity.get("event_type", "other")
                 staff["events_by_type"][event_type] = staff["events_by_type"].get(event_type, 0) + 1
-            elif action == "IGNORE_TASK":
+            elif action == "ignore_task":
                 staff["tasks_ignored"] += 1
-            elif action == "CREATE_CARE_EVENT":
+            elif action == "create_care_event":
                 staff["tasks_created"] += 1
-            elif action == "CREATE_MEMBER":
+            elif action == "create_member":
                 staff["members_created"] += 1
-            elif action == "UPDATE_MEMBER":
+            elif action == "update_member":
                 staff["members_updated"] += 1
-            elif action == "SEND_REMINDER":
+            elif action == "send_reminder":
                 staff["whatsapp_sent"] += 1
 
         # Convert sets to counts and calculate metrics
