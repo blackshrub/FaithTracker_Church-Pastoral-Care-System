@@ -56,7 +56,10 @@
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3NDE3MTF9.ej79vmaNHYqF1quJfXUpou7eKBiMVsfsUGsCG34lkZE\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/reports/monthly/pdf?year=2025&month=12\" -o /tmp/test.pdf -w \"%{http_code}\")",
       "WebSearch",
       "WebFetch(domain:doc.courtbouillon.org)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "Bash(__NEW_LINE__ docker cp faithtracker-backend:/tmp/full_report.pdf /tmp/)"
     ],
     "deny": [],
     "ask": []

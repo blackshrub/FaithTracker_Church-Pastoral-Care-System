@@ -92,12 +92,21 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     comp_completion = comparison.get("completion_rate", {})
     comp_financial = comparison.get("financial_aid", {})
 
+    # Get current date for metadata
+    generated_date = datetime.now().strftime('%Y-%m-%d')
+
     html_content = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Monthly Pastoral Care Report - {period.get('month_name', '')} {period.get('year', '')}</title>
+        <meta name="author" content="{campus_name}">
+        <meta name="description" content="Monthly Pastoral Care Report for {period.get('month_name', '')} {period.get('year', '')}">
+        <meta name="keywords" content="pastoral care, church report, ministry, {campus_name}">
+        <meta name="generator" content="FaithTracker Pastoral Care System">
+        <meta name="dcterms.created" content="{generated_date}">
+        <meta name="dcterms.modified" content="{generated_date}">
+        <title>Pastoral Care Report - {campus_name} - {period.get('month_name', '')} {period.get('year', '')}</title>
         <style>
             @page {{
                 size: A4;
@@ -612,11 +621,6 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     </html>
     """
 
-    # Generate PDF with compatibility options
-    # pdf_version="1.7" for wide reader support
-    # pdf_variant="pdf/a-3b" for archival standard compatibility
+    # Generate PDF - WeasyPrint 60.2 extracts metadata from HTML meta tags automatically
     html = HTML(string=html_content)
-    return html.write_pdf(
-        pdf_version="1.7",
-        pdf_variant="pdf/a-3b"
-    )
+    return html.write_pdf()
