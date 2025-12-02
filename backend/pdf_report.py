@@ -3,10 +3,9 @@ PDF Report Generator for FaithTracker Management Reports
 Uses WeasyPrint to generate professional PDF reports from HTML templates
 """
 
-from weasyprint import HTML, CSS
+from weasyprint import HTML
 from datetime import datetime
-from typing import Dict, Any, Optional
-import io
+from typing import Dict, Any
 
 
 def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = "GKBJ") -> bytes:
@@ -166,8 +165,9 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             .stats-grid {{
                 display: flex;
                 flex-wrap: wrap;
-                gap: 10px;
                 margin-bottom: 15px;
+                margin-left: -5px;
+                margin-right: -5px;
             }}
 
             .stat-box {{
@@ -177,6 +177,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
                 border-radius: 8px;
                 padding: 12px;
                 text-align: center;
+                margin: 5px;
             }}
 
             .stat-box.highlight {{
@@ -215,7 +216,8 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             .kpi-grid {{
                 display: flex;
                 flex-wrap: wrap;
-                gap: 12px;
+                margin-left: -6px;
+                margin-right: -6px;
             }}
 
             .kpi-card {{
@@ -225,6 +227,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
                 border: 1px solid #e5e7eb;
                 border-radius: 8px;
                 padding: 12px;
+                margin: 6px;
             }}
 
             .kpi-title {{
@@ -296,7 +299,8 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             .ministry-grid {{
                 display: flex;
                 flex-wrap: wrap;
-                gap: 12px;
+                margin-left: -6px;
+                margin-right: -6px;
             }}
 
             .ministry-card {{
@@ -305,6 +309,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
                 background: #f9fafb;
                 border-radius: 8px;
                 padding: 12px;
+                margin: 6px;
             }}
 
             .ministry-card h4 {{
@@ -327,7 +332,6 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             .insight-item {{
                 display: flex;
                 align-items: flex-start;
-                gap: 10px;
                 padding: 10px;
                 background: #f9fafb;
                 border-radius: 6px;
@@ -336,6 +340,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
 
             .insight-icon {{
                 font-size: 14pt;
+                margin-right: 10px;
             }}
 
             .insight-item strong {{
@@ -352,7 +357,6 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             .recommendation-item {{
                 display: flex;
                 align-items: flex-start;
-                gap: 10px;
                 padding: 8px;
                 margin-bottom: 6px;
             }}
@@ -369,6 +373,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
                 font-size: 10pt;
                 font-weight: 600;
                 flex-shrink: 0;
+                margin-right: 10px;
             }}
 
             .recommendation-item p {{
@@ -379,7 +384,8 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             .comparison-grid {{
                 display: flex;
                 flex-wrap: wrap;
-                gap: 12px;
+                margin-left: -6px;
+                margin-right: -6px;
             }}
 
             .comparison-card {{
@@ -389,6 +395,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
                 border-radius: 8px;
                 padding: 10px;
                 text-align: center;
+                margin: 6px;
             }}
 
             .comparison-card .label {{
@@ -427,11 +434,13 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
 
             .two-column {{
                 display: flex;
-                gap: 15px;
+                margin-left: -7px;
+                margin-right: -7px;
             }}
 
             .two-column > div {{
                 flex: 1;
+                margin: 0 7px;
             }}
         </style>
     </head>
@@ -603,10 +612,6 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     </html>
     """
 
-    # Generate PDF
+    # Generate PDF - write_pdf() with no target returns bytes directly
     html = HTML(string=html_content)
-    pdf_buffer = io.BytesIO()
-    html.write_pdf(pdf_buffer)
-    pdf_buffer.seek(0)
-
-    return pdf_buffer.getvalue()
+    return html.write_pdf()
