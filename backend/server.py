@@ -6,7 +6,8 @@ Handles all API endpoints, authentication, database operations, and business log
 
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, status, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, ORJSONResponse
+import orjson
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -144,8 +145,8 @@ client = AsyncIOMotorClient(
 )
 db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
 
-# Create the main app without a prefix
-app = FastAPI()
+# Create the main app with orjson for faster JSON serialization (2-5x faster)
+app = FastAPI(default_response_class=ORJSONResponse)
 
 # GZIP compression for responses > 500 bytes (reduces bandwidth by 70-90%)
 from starlette.middleware.gzip import GZipMiddleware
@@ -1561,34 +1562,63 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/users", response_model=List[UserResponse])
 async def list_users(current_admin: dict = Depends(get_current_admin)):
-    """List all users (admin only)"""
+    """List all users (admin only) - optimized with $lookup to avoid N+1 queries"""
     try:
         query = {}
         # Campus admins only see users in their campus
         if current_admin.get("role") == UserRole.CAMPUS_ADMIN:
             query["campus_id"] = current_admin["campus_id"]
-        
-        users = await db.users.find(query, {"_id": 0}).to_list(100)
-        
-        result = []
-        for u in users:
-            campus_name = None
-            if u.get("campus_id"):
-                campus = await db.campuses.find_one({"id": u["campus_id"]}, {"_id": 0})
-                campus_name = campus["campus_name"] if campus else None
-            
-            result.append(UserResponse(
+
+        # Use aggregation pipeline with $lookup for campus name (avoids N+1 queries)
+        pipeline = [
+            {"$match": query},
+            # Only fetch required fields (exclude hashed_password for security)
+            {"$project": {
+                "_id": 0,
+                "id": 1,
+                "email": 1,
+                "name": 1,
+                "role": 1,
+                "campus_id": 1,
+                "phone": 1,
+                "is_active": 1,
+                "created_at": 1,
+                "photo_url": 1
+            }},
+            # Lookup campus name
+            {"$lookup": {
+                "from": "campuses",
+                "localField": "campus_id",
+                "foreignField": "id",
+                "as": "campus_info",
+                "pipeline": [{"$project": {"campus_name": 1, "_id": 0}}]
+            }},
+            # Flatten campus_info array
+            {"$addFields": {
+                "campus_name": {"$arrayElemAt": ["$campus_info.campus_name", 0]}
+            }},
+            {"$project": {"campus_info": 0}},
+            {"$limit": 100}
+        ]
+
+        users = await db.users.aggregate(pipeline).to_list(100)
+
+        # Convert to UserResponse (is_active defaults to True if not present)
+        result = [
+            UserResponse(
                 id=u["id"],
                 email=u["email"],
                 name=u["name"],
                 role=u["role"],
                 campus_id=u.get("campus_id"),
-                campus_name=campus_name,
+                campus_name=u.get("campus_name"),
                 phone=u["phone"],
                 is_active=u.get("is_active", True),
                 created_at=u["created_at"]
-            ))
-        
+            )
+            for u in users
+        ]
+
         return result
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}")

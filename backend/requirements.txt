@@ -75,6 +75,8 @@ tzdata==2025.2
 tzlocal==5.3.1
 urllib3==2.5.0
 uvicorn==0.25.0
+granian==1.7.6
+orjson==3.10.18
 watchfiles==1.1.1
 weasyprint==66.0
 pydyf==0.11.0

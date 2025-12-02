@@ -49,5 +49,8 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+# Run the application with Granian (Rust-based ASGI server - faster than Uvicorn)
+# --workers: Number of worker processes
+# --interface asgi: ASGI protocol for FastAPI
+# --http auto: Auto-negotiate HTTP/1.1 or HTTP/2 (H2C upgrade)
+CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8001", "--workers", "2", "--http", "auto", "server:app"]
