@@ -34,7 +34,7 @@ const SetupWizard = ({ onComplete }) => {
         return;
       }
 
-      await axios.post(`${process.env.REACT_APP_BACKEND_URL}/setup/admin`, {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/setup/admin`, {
         email: adminData.email,
         password: adminData.password,
         name: adminData.name,
@@ -50,7 +50,7 @@ const SetupWizard = ({ onComplete }) => {
 
   const createCampus = async () => {
     try {
-      await axios.post(`${process.env.REACT_APP_BACKEND_URL}/setup/campus`, campusData);
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/setup/campus`, campusData);
       toast.success('Campus created successfully');
       setStep(3);
       setTimeout(() => onComplete(), 2000);

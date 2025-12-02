@@ -124,7 +124,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_BACKEND_URL: https://api.${DOMAIN}
+        VITE_BACKEND_URL: https://api.${DOMAIN}
     container_name: faithtracker-frontend
     restart: unless-stopped
     networks:

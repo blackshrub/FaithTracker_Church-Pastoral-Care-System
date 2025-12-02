@@ -8,7 +8,7 @@
 
 import axios from 'axios';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 // Default timeout configuration
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
@@ -97,7 +97,7 @@ api.interceptors.response.use(
       await new Promise(resolve => setTimeout(resolve, delay));
 
       // Log retry attempt (in development only)
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.log(`Retrying request (attempt ${config.__retryCount}/${MAX_RETRIES}):`, config.url);
       }
 

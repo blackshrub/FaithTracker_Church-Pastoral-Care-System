@@ -1,0 +1,22 @@
+# FaithTracker Frontend Base Image
+# Pre-installs all dependencies for faster builds
+# Build with: docker build -f Dockerfile.base -t faithtracker-frontend-base .
+# Then use in main Dockerfile: FROM faithtracker-frontend-base AS deps
+
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Disable telemetry
+ENV YARN_ENABLE_TELEMETRY=0
+
+# Copy package files
+COPY package.json yarn.lock ./
+
+# Install ALL dependencies (including devDependencies for build)
+RUN yarn install --frozen-lockfile --network-timeout 600000
+
+# Label for identification
+LABEL maintainer="FaithTracker Team"
+LABEL description="Pre-built base image with all frontend dependencies"

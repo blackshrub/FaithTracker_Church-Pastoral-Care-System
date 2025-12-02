@@ -668,13 +668,15 @@ class ActivityLogResponse(BaseModel):
 
 class SyncConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     campus_id: str  # FaithTracker campus ID
     core_church_id: Optional[str] = None  # Core system's church_id (for webhook matching)
     sync_method: str = "polling"  # "polling" or "webhook"
     api_base_url: str  # e.g., https://faithflow.yourdomain.com
     api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
+    api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
+    api_members_endpoint: str = "/members/"  # Members endpoint path
     api_email: str
     api_password: str  # Encrypted in database
     webhook_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
@@ -698,6 +700,8 @@ class SyncConfigCreate(BaseModel):
     sync_method: str = "polling"
     api_base_url: str
     api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
+    api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
+    api_members_endpoint: str = "/members/"  # Members endpoint path
     api_email: str
     api_password: str
     polling_interval_hours: int = 6
@@ -5925,15 +5929,25 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
     try:
         import httpx
 
-        # Normalize api_path_prefix
+        # Normalize paths
         api_path_prefix = config.api_path_prefix.strip()
         if api_path_prefix and not api_path_prefix.startswith('/'):
             api_path_prefix = '/' + api_path_prefix
         api_path_prefix = api_path_prefix.rstrip('/')
         base_url = config.api_base_url.rstrip('/')
 
+        # Normalize login endpoint
+        login_endpoint = getattr(config, 'api_login_endpoint', '/auth/login').strip()
+        if login_endpoint and not login_endpoint.startswith('/'):
+            login_endpoint = '/' + login_endpoint
+
+        # Normalize members endpoint
+        members_endpoint = getattr(config, 'api_members_endpoint', '/members/').strip()
+        if members_endpoint and not members_endpoint.startswith('/'):
+            members_endpoint = '/' + members_endpoint
+
         # Test login - send as 'email' key even if it's not email format (core API requirement)
-        login_url = f"{base_url}{api_path_prefix}/auth/login"
+        login_url = f"{base_url}{api_path_prefix}{login_endpoint}"
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 login_url,
@@ -5961,7 +5975,7 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
                 }
 
             # Test members endpoint - fetch with pagination to get actual total
-            members_url = f"{base_url}{api_path_prefix}/members/"
+            members_url = f"{base_url}{api_path_prefix}{members_endpoint}"
             
             # Try to get total count by fetching with pagination
             total_members = 0

@@ -19,7 +19,15 @@ async def create_database_indexes():
     await db.members.create_index("last_contact_date")
     await db.members.create_index("engagement_status")
     await db.members.create_index("external_member_id")
+    await db.members.create_index("is_archived")
     await db.members.create_index([("name", "text"), ("phone", "text")])  # Text search
+    # Unique compound index for API-synced members (sparse to allow null external_member_id)
+    await db.members.create_index(
+        [("campus_id", 1), ("external_member_id", 1)],
+        unique=True,
+        sparse=True,
+        name="campus_id_1_external_member_id_1"
+    )
     print("✅ Members indexes created")
     
     # Care events collection indexes

@@ -27,7 +27,7 @@ const reportWebVitals = (onPerfEntry) => {
 export const sendToAnalytics = (metric) => {
   // Log to console in development only
   // Production analytics endpoint not implemented - metrics logged locally only
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     const { name, value, rating } = metric;
     console.log(`[Web Vitals] ${name}: ${Math.round(value)} (${rating})`);
   }
@@ -35,7 +35,7 @@ export const sendToAnalytics = (metric) => {
   // Note: To enable production analytics, implement /api/analytics/vitals endpoint
   // and uncomment the code below:
   /*
-  if (process.env.NODE_ENV === 'production') {
+  if (import.meta.env.PROD) {
     const body = JSON.stringify({
       name: metric.name,
       value: metric.value,

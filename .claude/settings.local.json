@@ -17,7 +17,14 @@
       "Bash(docker compose build:*)",
       "Bash(docker compose:*)",
       "Bash(bash:*)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(npm install:*)",
+      "Bash(docker run:*)",
+      "Bash(time docker compose build:*)",
+      "Bash(time docker build:*)",
+      "Bash(time ./scripts/build-frontend.sh:*)",
+      "Bash(./scripts/build-frontend.sh:*)",
+      "Bash(source /root/FaithTracker_Church-Pastoral-Care-System/.env)"
     ],
     "deny": [],
     "ask": []

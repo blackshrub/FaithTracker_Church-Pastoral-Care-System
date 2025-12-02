@@ -1,0 +1,28 @@
+# FaithTracker Frontend - Dependencies Image
+# Build this ONCE when dependencies change, then use Dockerfile.fast for code changes
+#
+# BUILD:
+#   cd frontend && docker build -f Dockerfile.deps -t faithtracker-frontend-deps .
+#
+# This creates a reusable image with all node_modules pre-installed
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Disable telemetry
+ENV YARN_ENABLE_TELEMETRY=0
+
+# Copy package files
+COPY package.json yarn.lock ./
+
+# Install all dependencies
+RUN yarn install --frozen-lockfile --network-timeout 600000
+
+# Remove husky postinstall warning (it looks for .git in parent)
+RUN rm -rf node_modules/.cache 2>/dev/null || true
+
+# Label for identification
+LABEL maintainer="FaithTracker"
+LABEL description="Pre-built frontend dependencies"
+LABEL version="1.0"

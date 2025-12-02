@@ -24,7 +24,7 @@ class ErrorBoundary extends React.Component {
     this.setState({ errorInfo });
 
     // In production, you could send this to an error tracking service like Sentry
-    // if (process.env.NODE_ENV === 'production') {
+    // if (import.meta.env.PROD) {
     //   sendToErrorTracking(error, errorInfo);
     // }
   }
@@ -54,7 +54,7 @@ class ErrorBoundary extends React.Component {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {process.env.NODE_ENV !== 'production' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <div className="p-3 bg-red-50 rounded-md border border-red-200">
                   <p className="text-sm font-mono text-red-700 break-all">
                     {this.state.error.toString()}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#14b8a6" />
+        <meta name="description" content="FaithTracker Pastoral Care System - Multi-campus pastoral care management with complete accountability, API sync, and performance optimization" />
+
+        <!-- Suppress ResizeObserver error globally -->
+        <script>
+            // Suppress ResizeObserver loop limit exceeded error
+            window.addEventListener('error', function(e) {
+                if (e.message === 'ResizeObserver loop limit exceeded' ||
+                    e.message === 'ResizeObserver loop completed with undelivered notifications.') {
+                    e.stopImmediatePropagation();
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            });
+
+            // Override console.error to filter ResizeObserver warnings
+            const _error = console.error;
+            console.error = function() {
+                const args = Array.from(arguments);
+                if (args.length > 0 && typeof args[0] === 'string' &&
+                    args[0].includes('ResizeObserver')) {
+                    return;
+                }
+                _error.apply(console, args);
+            };
+        </script>
+
+        <!-- Google Fonts - moved here for LightningCSS compatibility -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="GKBJ Care">
+        <title>FaithTracker Pastoral Care System</title>
+    </head>
+    <body>
+        <noscript>You need to enable JavaScript to run this app.</noscript>
+        <div id="root"></div>
+        <!-- Vite entry point -->
+        <script type="module" src="/src/main.jsx"></script>
+    </body>
+</html>
