@@ -5763,8 +5763,51 @@ async def get_monthly_management_report(
         hospital_patients = len(set(e.get("member_id") for e in hospital_events))
 
         # === BIRTHDAY MINISTRY ===
-        birthday_events = [e for e in events_this_month if e.get("event_type") == "birthday"]
-        birthdays_celebrated = len([e for e in birthday_events if e.get("completed")])
+        # Birthday events store the original birth date (e.g., "1980-05-15"), not current year's date
+        # We need to find members whose birth month matches the report month
+        # and check if their birthday events were completed during the report period
+
+        # Get all birthday events for members in this campus
+        all_birthday_events = await db.care_events.find({
+            **campus_filter,
+            "event_type": "birthday"
+        }, {"_id": 0, "member_id": 1, "event_date": 1, "completed": 1, "completed_at": 1}).to_list(5000)
+
+        # Filter to birthdays that fall in the report month (by month only, regardless of year)
+        birthday_events = []
+        for be in all_birthday_events:
+            event_date = be.get("event_date", "")
+            if event_date:
+                try:
+                    # Parse the birth date and check if month matches report month
+                    birth_month = int(event_date.split("-")[1])
+                    if birth_month == report_month:
+                        birthday_events.append(be)
+                except (ValueError, IndexError):
+                    pass
+
+        # Count birthdays celebrated - either completed with completed_at in this month,
+        # or completed during this report period
+        birthdays_celebrated = 0
+        for be in birthday_events:
+            if be.get("completed"):
+                completed_at = be.get("completed_at")
+                if completed_at:
+                    # Check if completed_at falls within the report month
+                    try:
+                        if isinstance(completed_at, str):
+                            completed_date = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
+                        else:
+                            completed_date = completed_at
+                        if start_date <= completed_date < end_date:
+                            birthdays_celebrated += 1
+                    except (ValueError, TypeError):
+                        # If we can't parse the date but it's completed, count it
+                        birthdays_celebrated += 1
+                else:
+                    # Completed but no completed_at timestamp - count it
+                    birthdays_celebrated += 1
+
         birthday_completion_rate = round(birthdays_celebrated / len(birthday_events) * 100, 1) if birthday_events else 0
 
         # === KEY PERFORMANCE INDICATORS ===
