@@ -26,17 +26,29 @@ from zoneinfo import ZoneInfo
 # Jakarta timezone (UTC+7)
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
+# Configure logging early (needed for startup warnings)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Credential encryption for security
 from cryptography.fernet import Fernet
 import base64
 
-# Get encryption key from environment or generate one
+# Get encryption key from environment (REQUIRED in production)
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
 if not ENCRYPTION_KEY:
-    # Generate a key for development (in production, set in .env)
-    ENCRYPTION_KEY = Fernet.generate_key().decode()
-    print("WARNING: ENCRYPTION_KEY not set in .env - using temporary key. Set ENCRYPTION_KEY in production!")
+    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+        raise RuntimeError(
+            "ENCRYPTION_KEY environment variable is required in production. "
+            "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        )
+    else:
+        # Generate a key for development only
+        ENCRYPTION_KEY = Fernet.generate_key().decode()
+        logger.warning("ENCRYPTION_KEY not set - using temporary key. Set ENCRYPTION_KEY for production!")
 
 cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
 
@@ -105,20 +117,75 @@ app = FastAPI()
 from starlette.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
+# Request size limit middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Limit request body size to prevent memory exhaustion attacks"""
+    async def dispatch(self, request: StarletteRequest, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            if int(content_length) > MAX_REQUEST_BODY_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body too large"}
+                )
+        return await call_next(request)
+
+app.add_middleware(RequestSizeLimitMiddleware)
+
 # Rate limiting configuration
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# ==================== SAFE ERROR HANDLING ====================
+
+# Generic error messages for production (don't expose internal details)
+GENERIC_ERROR_MESSAGES = {
+    400: "Invalid request",
+    401: "Authentication required",
+    403: "Access denied",
+    404: "Resource not found",
+    500: "An internal error occurred. Please try again later.",
+}
+
+def safe_error_detail(e: Exception, status_code: int = 500) -> str:
+    """
+    Return a safe error message for production.
+    In development, returns the full error for debugging.
+    """
+    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+        return GENERIC_ERROR_MESSAGES.get(status_code, "An error occurred")
+    else:
+        # In development, include the error message for debugging
+        return str(e)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """
+    Global exception handler that logs full errors but returns safe messages.
+    This catches any unhandled exceptions not caught by endpoint-level handlers.
+    """
+    # Log the full error for debugging
+    logger.error(f"Unhandled exception: {type(exc).__name__}: {str(exc)}")
+
+    # Return a safe error message
+    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "An internal error occurred. Please try again later."}
+        )
+    else:
+        # In development, include more details
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc), "type": type(exc).__name__}
+        )
+
 # Create a router (no prefix - using subdomain api.domain.com)
 api_router = APIRouter()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # ==================== ENUMS ====================
 
@@ -240,9 +307,56 @@ DEFAULT_UPCOMING_DAYS = 7
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB for images
 MAX_CSV_SIZE = 5 * 1024 * 1024      # 5 MB for CSV imports
 
-# ==================== UUID VALIDATION ====================
+# Request Body Size Limits
+MAX_REQUEST_BODY_SIZE = 15 * 1024 * 1024  # 15 MB max request body
+
+# Pagination Bounds (for query parameter validation)
+MAX_PAGE_NUMBER = 10000
+MAX_LIMIT = 1000
+
+# ==================== IMAGE VALIDATION ====================
+
+# Magic bytes for allowed image types (security: validate file content, not just Content-Type)
+IMAGE_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'image/jpeg',           # JPEG
+    b'\x89PNG\r\n\x1a\n': 'image/png',       # PNG
+    b'GIF87a': 'image/gif',                   # GIF87a
+    b'GIF89a': 'image/gif',                   # GIF89a
+    b'RIFF': 'image/webp',                    # WebP (partial check)
+}
+
+def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
+    """
+    Validate image file by checking magic bytes (file signature).
+    Returns (is_valid, detected_mime_type or error_message)
+    """
+    if len(content) < 8:
+        return False, "File too small to be a valid image"
+
+    for magic, mime_type in IMAGE_MAGIC_BYTES.items():
+        if content.startswith(magic):
+            return True, mime_type
+
+    # Special check for WebP (RIFF....WEBP)
+    if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+        return True, 'image/webp'
+
+    return False, "Invalid image format. Allowed: JPEG, PNG, GIF, WebP"
+
+# ==================== UUID VALIDATION & REGEX UTILITIES ====================
 
 import re
+
+def escape_regex(text: str) -> str:
+    """
+    Escape special regex characters to prevent NoSQL injection.
+    This makes the text safe to use in MongoDB $regex queries.
+    """
+    # Escape all regex special characters
+    special_chars = r'\.^$*+?{}[]|()'
+    for char in special_chars:
+        text = text.replace(char, '\\' + char)
+    return text
 
 # UUID v4 pattern for validation
 UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.IGNORECASE)
@@ -265,7 +379,19 @@ def generate_uuid() -> str:
 
 # ==================== AUTH CONFIGURATION ====================
 
-SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+# JWT Secret Key (REQUIRED - no default for security)
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
+if not SECRET_KEY:
+    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+        raise RuntimeError(
+            "JWT_SECRET_KEY environment variable is required. "
+            "Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    else:
+        # Generate a key for development only - will change on restart
+        SECRET_KEY = secrets.token_hex(32)
+        logger.warning("JWT_SECRET_KEY not set - using temporary key. Set JWT_SECRET_KEY for production!")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = JWT_TOKEN_EXPIRE_HOURS * 60
 
@@ -1178,7 +1304,7 @@ async def create_campus(campus: CampusCreate, current_admin: dict = Depends(get_
         return campus_obj
     except Exception as e:
         logger.error(f"Error creating campus: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/campuses")
 async def list_campuses():
@@ -1212,7 +1338,7 @@ async def list_campuses():
         return JSONResponse(content=serialized_campuses, headers=cache_headers)
     except Exception as e:
         logger.error(f"Error listing campuses: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/campuses/{campus_id}", response_model=Campus)
 async def get_campus(campus_id: str):
@@ -1226,7 +1352,7 @@ async def get_campus(campus_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting campus: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/campuses/{campus_id}", response_model=Campus)
 async def update_campus(campus_id: str, update: CampusCreate, current_admin: dict = Depends(get_full_admin)):
@@ -1250,7 +1376,7 @@ async def update_campus(campus_id: str, update: CampusCreate, current_admin: dic
         raise
     except Exception as e:
         logger.error(f"Error updating campus: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
@@ -1299,7 +1425,7 @@ async def register_user(request: Request, user_data: UserCreate, current_admin: 
         raise
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
@@ -1376,7 +1502,7 @@ async def login(request: Request, user_data: UserLogin):
         raise
     except Exception as e:
         logger.error(f"Error logging in: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
@@ -1431,7 +1557,7 @@ async def list_users(current_admin: dict = Depends(get_current_admin)):
         return result
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/users/{user_id}")
 
@@ -1476,7 +1602,7 @@ async def update_user(user_id: str, update: UserUpdate, current_user: dict = Dep
         raise
     except Exception as e:
         logger.error(f"Error updating user: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 class ProfileUpdate(BaseModel):
     """Model for self-profile update (excludes role and campus)"""
@@ -1531,7 +1657,7 @@ async def update_own_profile(update: ProfileUpdate, current_user: dict = Depends
         raise
     except Exception as e:
         logger.error(f"Error updating profile: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/auth/change-password")
 async def change_password(password_data: PasswordChange, current_user: dict = Depends(get_current_user)):
@@ -1567,7 +1693,7 @@ async def change_password(password_data: PasswordChange, current_user: dict = De
         raise
     except Exception as e:
         logger.error(f"Error changing password: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/users/{user_id}/photo")
 async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -1577,27 +1703,29 @@ async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_
         raise HTTPException(status_code=403, detail="Not authorized")
 
     try:
-        # Validate file type
-        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"]
-        if file.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="Invalid file type. Only images allowed.")
-
         # Validate file size
         contents = await file.read()
         if len(contents) > MAX_IMAGE_SIZE:
             raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB.")
 
+        # Security: Validate image by magic bytes (not just Content-Type which can be spoofed)
+        is_valid, result = validate_image_magic_bytes(contents)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=result)
+
         # Create uploads directory if not exists
         upload_dir = Path(ROOT_DIR) / "user_photos"
         upload_dir.mkdir(exist_ok=True)
 
-        # Generate filename
-        file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-        filename = f"USER-{user_id[:8]}.{file_ext}"
+        # Generate filename - always save as jpg since we convert to RGB
+        filename = f"USER-{user_id[:8]}.jpg"
         filepath = upload_dir / filename
-        
+
         # Resize image to 400x400 and optimize
-        img = Image.open(BytesIO(contents))
+        try:
+            img = Image.open(io.BytesIO(contents))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
         img = img.convert('RGB')
         img.thumbnail((400, 400), Image.Resampling.LANCZOS)
         img.save(filepath, 'JPEG', quality=85, optimize=True, progressive=True)
@@ -1618,7 +1746,7 @@ async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_
         raise
     except Exception as e:
         logger.error(f"Error uploading user photo: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 async def delete_user(user_id: str, current_admin: dict = Depends(get_current_admin)):
     """Delete a user (admin only)"""
@@ -1636,7 +1764,7 @@ async def delete_user(user_id: str, current_admin: dict = Depends(get_current_ad
         raise
     except Exception as e:
         logger.error(f"Error deleting user: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== MEMBER ENDPOINTS ====================
 
@@ -1673,13 +1801,13 @@ async def create_member(member: MemberCreate, current_user: dict = Depends(get_c
         return member_obj
     except Exception as e:
         logger.error(f"Error creating member: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/members", response_model=List[Member])
 async def list_members(
     response: Response,
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=1000),
+    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Query(50, ge=1, le=MAX_LIMIT),
     engagement_status: Optional[EngagementStatus] = None,
     search: Optional[str] = None,
     show_archived: bool = False,
@@ -1699,9 +1827,11 @@ async def list_members(
             query["engagement_status"] = engagement_status
 
         if search:
+            # Security: Escape regex special characters to prevent NoSQL injection
+            safe_search = escape_regex(search)
             query["$or"] = [
-                {"name": {"$regex": search, "$options": "i"}},  # Partial name match
-                {"phone": {"$regex": search, "$options": "i"}}  # Partial phone match
+                {"name": {"$regex": safe_search, "$options": "i"}},  # Partial name match
+                {"phone": {"$regex": safe_search, "$options": "i"}}  # Partial phone match
             ]
         
         # Calculate skip for pagination
@@ -1755,7 +1885,7 @@ async def list_members(
         
     except Exception as e:
         logger.error(f"Error listing members: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 async def invalidate_dashboard_cache(campus_id: str):
     """Invalidate dashboard cache for a specific campus - call after any data change"""
@@ -1837,7 +1967,7 @@ async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
         
     except Exception as e:
         logger.error(f"Error getting dashboard reminders: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: str):
     """Calculate all dashboard reminder data - optimized query"""
@@ -2237,7 +2367,7 @@ async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user
         raise
     except Exception as e:
         logger.error(f"Error ignoring care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.get("/members/at-risk", response_model=List[Member])
@@ -2282,7 +2412,7 @@ async def list_at_risk_members(current_user: dict = Depends(get_current_user)):
         return at_risk_members
     except Exception as e:
         logger.error(f"Error getting at-risk members: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/members/{member_id}", response_model=Member)
 async def get_member(member_id: str, current_user: dict = Depends(get_current_user)):
@@ -2311,7 +2441,7 @@ async def get_member(member_id: str, current_user: dict = Depends(get_current_us
         raise
     except Exception as e:
         logger.error(f"Error getting member: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/members/{member_id}", response_model=Member)
 async def update_member(member_id: str, update: MemberUpdate, current_user: dict = Depends(get_current_user)):
@@ -2348,7 +2478,7 @@ async def update_member(member_id: str, update: MemberUpdate, current_user: dict
         raise
     except Exception as e:
         logger.error(f"Error updating member: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/members/{member_id}")
 async def delete_member(member_id: str, current_user: dict = Depends(get_current_user)):
@@ -2390,7 +2520,7 @@ async def delete_member(member_id: str, current_user: dict = Depends(get_current
         raise
     except Exception as e:
         logger.error(f"Error deleting member: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/care-events/{event_id}")
 async def delete_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
@@ -2583,7 +2713,7 @@ async def delete_care_event(event_id: str, current_user: dict = Depends(get_curr
         raise
     except Exception as e:
         logger.error(f"Error deleting care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/members/{member_id}/photo")
 async def upload_member_photo(member_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -2599,18 +2729,22 @@ async def upload_member_photo(member_id: str, file: UploadFile = File(...), curr
         member = await db.members.find_one(query, {"_id": 0})
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
-        
-        # Validate file type
-        if not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="File must be an image")
 
         # Read and validate file size
         contents = await file.read()
         if len(contents) > MAX_IMAGE_SIZE:
             raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB.")
 
+        # Security: Validate image by magic bytes (not just Content-Type which can be spoofed)
+        is_valid, result = validate_image_magic_bytes(contents)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=result)
+
         # Process image
-        image = Image.open(io.BytesIO(contents))
+        try:
+            image = Image.open(io.BytesIO(contents))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
         
         # Optimize image: resize and compress
         image = image.convert('RGB')
@@ -2656,7 +2790,7 @@ async def upload_member_photo(member_id: str, file: UploadFile = File(...), curr
         raise
     except Exception as e:
         logger.error(f"Error uploading photo: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== CARE EVENT ENDPOINTS ====================
 
@@ -2792,7 +2926,7 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
         raise
     except Exception as e:
         logger.error(f"Error creating care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 
@@ -2882,7 +3016,7 @@ async def log_additional_visit(
         raise
     except Exception as e:
         logger.error(f"Error logging additional visit: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
         # Update member's last contact date for completed one-time events or non-birthday events
         if is_one_time or (event.event_type != EventType.BIRTHDAY):
@@ -2929,15 +3063,15 @@ async def log_additional_visit(
         return care_event
     except Exception as e:
         logger.error(f"Error creating care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/care-events", response_model=List[CareEvent])
 async def list_care_events(
     event_type: Optional[EventType] = None,
     member_id: Optional[str] = None,
     completed: Optional[bool] = None,
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=2000),
+    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Query(50, ge=1, le=MAX_LIMIT),
     current_user: dict = Depends(get_current_user)
 ):
     """List care events with optional filters and pagination - optimized with $lookup"""
@@ -3003,7 +3137,7 @@ async def list_care_events(
         return events
     except Exception as e:
         logger.error(f"Error listing care events: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/care-events/{event_id}", response_model=CareEvent)
 async def get_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
@@ -3023,7 +3157,7 @@ async def get_care_event(event_id: str, current_user: dict = Depends(get_current
         raise
     except Exception as e:
         logger.error(f"Error getting care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/care-events/{event_id}", response_model=CareEvent)
 async def update_care_event(event_id: str, update: CareEventUpdate, current_user: dict = Depends(get_current_user)):
@@ -3055,7 +3189,7 @@ async def update_care_event(event_id: str, update: CareEventUpdate, current_user
         raise
     except Exception as e:
         logger.error(f"Error updating care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/care-events/{event_id}/complete")
 async def complete_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
@@ -3144,7 +3278,7 @@ async def complete_care_event(event_id: str, current_user: dict = Depends(get_cu
         raise
     except Exception as e:
         logger.error(f"Error completing care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/care-events/{event_id}/send-reminder")
 async def send_care_event_reminder(event_id: str, current_user: dict = Depends(get_current_user)):
@@ -3200,7 +3334,7 @@ async def send_care_event_reminder(event_id: str, current_user: dict = Depends(g
         raise
     except Exception as e:
         logger.error(f"Error sending reminder: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/care-events/{event_id}/visitation-log")
 async def add_visitation_log(event_id: str, entry: VisitationLogEntry):
@@ -3226,7 +3360,7 @@ async def add_visitation_log(event_id: str, entry: VisitationLogEntry):
         raise
     except Exception as e:
         logger.error(f"Error adding visitation log: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/care-events/hospital/due-followup")
 async def get_hospital_followup_due():
@@ -3260,15 +3394,15 @@ async def get_hospital_followup_due():
         return followup_due
     except Exception as e:
         logger.error(f"Error getting hospital followup: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== GRIEF SUPPORT ENDPOINTS ====================
 
 @api_router.get("/grief-support", response_model=List[GriefSupport])
 async def list_grief_support(
     completed: Optional[bool] = None,
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=500),
+    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Query(50, ge=1, le=MAX_LIMIT),
     current_user: dict = Depends(get_current_user)
 ):
     """List grief support stages with pagination"""
@@ -3282,7 +3416,7 @@ async def list_grief_support(
         return stages
     except Exception as e:
         logger.error(f"Error listing grief support: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/grief-support/member/{member_id}", response_model=List[GriefSupport])
 async def get_member_grief_timeline(member_id: str, current_user: dict = Depends(get_current_user)):
@@ -3301,7 +3435,7 @@ async def get_member_grief_timeline(member_id: str, current_user: dict = Depends
         return timeline
     except Exception as e:
         logger.error(f"Error getting member grief timeline: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/grief-support/{stage_id}/complete")
 async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -3388,7 +3522,7 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
         raise
     except Exception as e:
         logger.error(f"Error completing grief stage: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/grief-support/{stage_id}/ignore")
 async def ignore_grief_stage(stage_id: str, user: dict = Depends(get_current_user)):
@@ -3457,7 +3591,7 @@ async def ignore_grief_stage(stage_id: str, user: dict = Depends(get_current_use
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/grief-support/{stage_id}/undo")
 async def undo_grief_stage(stage_id: str, user: dict = Depends(get_current_user)):
@@ -3498,7 +3632,7 @@ async def undo_grief_stage(stage_id: str, user: dict = Depends(get_current_user)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/grief-support/{stage_id}/send-reminder")
 async def send_grief_reminder(stage_id: str):
@@ -3543,13 +3677,13 @@ async def send_grief_reminder(stage_id: str):
         raise
     except Exception as e:
         logger.error(f"Error sending grief reminder: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/accident-followup")
 async def list_accident_followup(
     completed: Optional[bool] = None,
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=500),
+    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Query(50, ge=1, le=MAX_LIMIT),
     current_user: dict = Depends(get_current_user)
 ):
     """List all accident follow-up stages with pagination"""
@@ -3563,7 +3697,7 @@ async def list_accident_followup(
         return stages
     except Exception as e:
         logger.error(f"Error listing accident follow-up: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/accident-followup/member/{member_id}")
 async def get_member_accident_timeline(member_id: str, current_user: dict = Depends(get_current_user)):
@@ -3582,7 +3716,7 @@ async def get_member_accident_timeline(member_id: str, current_user: dict = Depe
         return timeline
     except Exception as e:
         logger.error(f"Error getting member accident timeline: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/accident-followup/{stage_id}/complete")
 async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -3668,7 +3802,7 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, cu
         raise
     except Exception as e:
         logger.error(f"Error completing accident stage: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/accident-followup/{stage_id}/undo")
 async def undo_accident_stage(stage_id: str, user: dict = Depends(get_current_user)):
@@ -3709,7 +3843,7 @@ async def undo_accident_stage(stage_id: str, user: dict = Depends(get_current_us
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== FINANCIAL AID SCHEDULE ENDPOINTS ====================
 
@@ -3837,14 +3971,14 @@ async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_c
         return aid_schedule
     except Exception as e:
         logger.error(f"Error creating aid schedule: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/financial-aid-schedules")
 async def list_aid_schedules(
     member_id: Optional[str] = None,
     active_only: bool = True,
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=500),
+    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Query(50, ge=1, le=MAX_LIMIT),
     current_user: dict = Depends(get_current_user)
 ):
     """List financial aid schedules with pagination"""
@@ -3862,7 +3996,7 @@ async def list_aid_schedules(
         return schedules
     except Exception as e:
         logger.error(f"Error listing aid schedules: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/financial-aid-schedules/{schedule_id}/ignored-occurrence/{date}")
 async def remove_ignored_occurrence(schedule_id: str, date: str, current_user: dict = Depends(get_current_user)):
@@ -3892,7 +4026,7 @@ async def remove_ignored_occurrence(schedule_id: str, date: str, current_user: d
         raise
     except Exception as e:
         logger.error(f"Error removing ignored occurrence: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/financial-aid-schedules/{schedule_id}/ignored-occurrence/{occurrence_date}")
 async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str):
@@ -3932,7 +4066,7 @@ async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str):
         raise
     except Exception as e:
         logger.error(f"Error removing ignored occurrence: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/financial-aid-schedules/{schedule_id}/clear-ignored")
 async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = Depends(get_current_user)):
@@ -3975,7 +4109,7 @@ async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = D
         raise
     except Exception as e:
         logger.error(f"Error clearing ignored occurrences: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/financial-aid-schedules/{schedule_id}")
 async def delete_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
@@ -4008,7 +4142,7 @@ async def delete_aid_schedule(schedule_id: str, current_user: dict = Depends(get
         raise
     except Exception as e:
         logger.error(f"Error deleting aid schedule: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/financial-aid-schedules/{schedule_id}/stop")
 async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
@@ -4058,7 +4192,7 @@ async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_c
         raise
     except Exception as e:
         logger.error(f"Error stopping aid schedule: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/financial-aid-schedules/member/{member_id}")
 async def get_member_aid_schedules(member_id: str, current_user: dict = Depends(get_current_user)):
@@ -4091,7 +4225,7 @@ async def get_member_aid_schedules(member_id: str, current_user: dict = Depends(
         return filtered
     except Exception as e:
         logger.error(f"Error getting member aid schedules: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/financial-aid-schedules/due-today")
 async def get_aid_due_today(current_user: dict = Depends(get_current_user)):
@@ -4123,7 +4257,7 @@ async def get_aid_due_today(current_user: dict = Depends(get_current_user)):
         return schedules
     except Exception as e:
         logger.error(f"Error getting aid due today: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/financial-aid-schedules/{schedule_id}/mark-distributed")
 async def mark_aid_distributed(schedule_id: str, current_user: dict = Depends(get_current_user)):
@@ -4253,7 +4387,7 @@ async def mark_aid_distributed(schedule_id: str, current_user: dict = Depends(ge
         }
     except Exception as e:
         logger.error(f"Error marking aid distributed: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/financial-aid-schedules/{schedule_id}/ignore")
 async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(get_current_user)):
@@ -4358,7 +4492,7 @@ async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(g
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # ==================== FINANCIAL AID ENDPOINTS ====================
@@ -4430,7 +4564,7 @@ async def ignore_accident_stage(stage_id: str, user: dict = Depends(get_current_
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/financial-aid/summary")
 async def get_financial_aid_summary(
@@ -4473,7 +4607,7 @@ async def get_financial_aid_summary(
         }
     except Exception as e:
         logger.error(f"Error getting financial aid summary: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/financial-aid/recipients")
 async def get_financial_aid_recipients():
@@ -4526,7 +4660,7 @@ async def get_financial_aid_recipients():
         return recipients
     except Exception as e:
         logger.error(f"Error getting financial aid recipients: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.get("/financial-aid/member/{member_id}")
@@ -4548,7 +4682,7 @@ async def get_member_financial_aid(member_id: str):
         }
     except Exception as e:
         logger.error(f"Error getting member financial aid: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== DASHBOARD ENDPOINTS ====================
 
@@ -4613,7 +4747,7 @@ async def get_dashboard_stats():
         }
     except Exception as e:
         logger.error(f"Error getting dashboard stats: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/dashboard/upcoming")
 async def get_upcoming_events(days: int = 7):
@@ -4661,7 +4795,7 @@ async def get_upcoming_events(days: int = 7):
         return events
     except Exception as e:
         logger.error(f"Error getting upcoming events: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/dashboard/grief-active")
 async def get_active_grief_support():
@@ -4710,7 +4844,7 @@ async def get_active_grief_support():
         return result
     except Exception as e:
         logger.error(f"Error getting active grief support: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/dashboard/recent-activity")
 async def get_recent_activity(limit: int = 20):
@@ -4745,7 +4879,7 @@ async def get_recent_activity(limit: int = 20):
         return events
     except Exception as e:
         logger.error(f"Error getting recent activity: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== ANALYTICS ENDPOINTS ====================
 
@@ -4773,7 +4907,7 @@ async def get_engagement_trends(days: int = 30):
         return trends
     except Exception as e:
         logger.error(f"Error getting engagement trends: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/analytics/care-events-by-type")
 async def get_care_events_by_type():
@@ -4789,7 +4923,7 @@ async def get_care_events_by_type():
         return [{"type": t, "count": c} for t, c in type_counts.items()]
     except Exception as e:
         logger.error(f"Error getting events by type: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/analytics/grief-completion-rate")
 async def get_grief_completion_rate():
@@ -4808,7 +4942,7 @@ async def get_grief_completion_rate():
         }
     except Exception as e:
         logger.error(f"Error getting grief completion rate: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== API SYNC ENDPOINTS ====================
 
@@ -4938,7 +5072,7 @@ async def sync_members_from_external_api(
         }
     except Exception as e:
         logger.error(f"API sync error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/sync/members/webhook")
 async def member_sync_webhook(current_admin: dict = Depends(get_current_admin)):
@@ -4988,7 +5122,7 @@ async def import_members_csv(file: UploadFile = File(...)):
         }
     except Exception as e:
         logger.error(f"Error importing CSV: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/import/members/json")
 async def import_members_json(members: List[Dict[str, Any]]):
@@ -5018,7 +5152,7 @@ async def import_members_json(members: List[Dict[str, Any]]):
         }
     except Exception as e:
         logger.error(f"Error importing JSON: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/export/members/csv")
 async def export_members_csv():
@@ -5062,7 +5196,7 @@ async def export_members_csv():
         )
     except Exception as e:
         logger.error(f"Error exporting members CSV: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/export/care-events/csv")
 async def export_care_events_csv():
@@ -5098,7 +5232,7 @@ async def export_care_events_csv():
         )
     except Exception as e:
         logger.error(f"Error exporting care events CSV: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== INTEGRATION TEST ENDPOINTS ====================
 
@@ -5251,7 +5385,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
         
     except Exception as e:
         logger.error(f"Error generating suggestions: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/analytics/demographic-trends")
 async def get_demographic_trends(current_user: dict = Depends(get_current_user)):
@@ -5359,7 +5493,7 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
         
     except Exception as e:
         logger.error(f"Error analyzing demographic trends: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== MANAGEMENT REPORTS ENDPOINTS ====================
 
@@ -5745,7 +5879,7 @@ async def get_monthly_management_report(
 
     except Exception as e:
         logger.error(f"Error generating monthly report: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.get("/reports/staff-performance")
@@ -5979,7 +6113,7 @@ async def get_staff_performance_report(
 
     except Exception as e:
         logger.error(f"Error generating staff performance report: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.get("/reports/yearly-summary")
@@ -6077,7 +6211,7 @@ async def get_yearly_summary_report(
 
     except Exception as e:
         logger.error(f"Error generating yearly summary: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== CONFIGURATION ENDPOINTS (For Mobile App) ====================
 # Pre-computed static configs (cached at module level - zero database/computation cost)
@@ -6234,7 +6368,7 @@ async def get_all_config():
         }
     except Exception as e:
         logger.error(f"Error getting all config: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== SETTINGS CONFIGURATION ENDPOINTS ====================
 
@@ -6294,7 +6428,7 @@ async def recalculate_all_engagement_status(user: dict = Depends(get_current_use
         raise
     except Exception as e:
         logger.error(f"Error recalculating engagement: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/settings/engagement")
 async def get_engagement_settings():
@@ -6310,7 +6444,7 @@ async def get_engagement_settings():
         return settings.get("data", {"atRiskDays": 60, "inactiveDays": 90})
     except Exception as e:
         logger.error(f"Error getting engagement settings: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/settings/engagement")
 async def update_engagement_settings(settings: dict, current_admin: dict = Depends(get_current_admin)):
@@ -6333,7 +6467,7 @@ async def update_engagement_settings(settings: dict, current_admin: dict = Depen
         return {"success": True, "message": "Engagement settings updated"}
     except Exception as e:
         logger.error(f"Error updating engagement settings: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/settings/overdue_writeoff")
 async def get_overdue_writeoff_settings(user: dict = Depends(get_current_user)):
@@ -6350,7 +6484,7 @@ async def get_overdue_writeoff_settings(user: dict = Depends(get_current_user)):
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/settings/overdue_writeoff")
 async def update_overdue_writeoff_settings(settings_data: dict, user: dict = Depends(get_current_user)):
@@ -6376,7 +6510,7 @@ async def update_overdue_writeoff_settings(settings_data: dict, user: dict = Dep
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/settings/grief-stages")
 async def get_grief_stages():
@@ -6396,7 +6530,7 @@ async def get_grief_stages():
         return settings.get("data", [])
     except Exception as e:
         logger.error(f"Error getting grief stages: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/settings/grief-stages")
 async def update_grief_stages(stages: list, current_admin: dict = Depends(get_current_admin)):
@@ -6415,7 +6549,7 @@ async def update_grief_stages(stages: list, current_admin: dict = Depends(get_cu
         return {"success": True, "message": "Grief stages configuration updated"}
     except Exception as e:
         logger.error(f"Error updating grief stages: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/settings/accident-followup")
 async def get_accident_followup():
@@ -6432,7 +6566,7 @@ async def get_accident_followup():
         return settings.get("data", [])
     except Exception as e:
         logger.error(f"Error getting accident followup settings: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/settings/accident-followup")
 async def update_accident_followup(config: list, current_admin: dict = Depends(get_current_admin)):
@@ -6451,7 +6585,7 @@ async def update_accident_followup(config: list, current_admin: dict = Depends(g
         return {"success": True, "message": "Accident follow-up configuration updated"}
     except Exception as e:
         logger.error(f"Error updating accident followup settings: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/settings/user-preferences/{user_id}")
 async def get_user_preferences(user_id: str):
@@ -6463,7 +6597,7 @@ async def get_user_preferences(user_id: str):
         return prefs.get("data", {"language": "id"})
     except Exception as e:
         logger.error(f"Error getting user preferences: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.put("/settings/user-preferences/{user_id}")
 async def update_user_preferences(user_id: str, preferences: dict):
@@ -6481,7 +6615,7 @@ async def update_user_preferences(user_id: str, preferences: dict):
         return {"success": True, "message": "User preferences updated"}
     except Exception as e:
         logger.error(f"Error updating user preferences: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== NOTIFICATION LOGS ENDPOINTS ====================
 
@@ -6506,7 +6640,7 @@ async def get_notification_logs(
         return logs
     except Exception as e:
         logger.error(f"Error getting notification logs: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== AUTOMATED REMINDERS ENDPOINTS ====================
 
@@ -6604,7 +6738,7 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
         raise
     except Exception as e:
         logger.error(f"Error saving sync config: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.post("/sync/regenerate-secret")
@@ -6643,7 +6777,7 @@ async def regenerate_webhook_secret(current_user: dict = Depends(get_current_use
         raise
     except Exception as e:
         logger.error(f"Error regenerating webhook secret: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.post("/sync/discover-fields")
@@ -6758,7 +6892,7 @@ async def discover_fields_from_core(config_test: SyncConfigCreate, current_user:
         raise
     except Exception as e:
         logger.error(f"Error discovering fields: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/sync/config")
 async def get_sync_config(current_user: dict = Depends(get_current_user)):
@@ -6778,7 +6912,7 @@ async def get_sync_config(current_user: dict = Depends(get_current_user)):
     
     except Exception as e:
         logger.error(f"Error getting sync config: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/sync/test-connection")
 async def test_sync_connection(config: SyncConfigCreate, current_user: dict = Depends(get_current_user)):
@@ -7280,7 +7414,7 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
         raise
     except Exception as e:
         logger.error(f"Error in sync members: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/sync/logs")
 async def get_sync_logs(current_user: dict = Depends(get_current_user), limit: int = 20):
@@ -7299,7 +7433,7 @@ async def get_sync_logs(current_user: dict = Depends(get_current_user), limit: i
     
     except Exception as e:
         logger.error(f"Error getting sync logs: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # ==================== SETUP WIZARD ENDPOINTS ====================
@@ -7347,7 +7481,7 @@ async def setup_first_admin(request: SetupAdminRequest):
         raise
     except Exception as e:
         logger.error(f"Error creating first admin: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/setup/campus")
 async def setup_first_campus(request: SetupCampusRequest):
@@ -7373,7 +7507,7 @@ async def setup_first_campus(request: SetupCampusRequest):
 
     except Exception as e:
         logger.error(f"Error creating first campus: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/setup/status")
 async def check_setup_status():
@@ -7397,7 +7531,7 @@ async def check_setup_status():
 
     except Exception as e:
         logger.error(f"Error checking setup status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @api_router.post("/sync/webhook")
@@ -7629,9 +7763,9 @@ async def receive_sync_webhook(request: Request):
         raise
     except Exception as e:
         logger.error(f"Error processing webhook: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
     try:
         logger.info(f"Manual reminder trigger by {current_admin['email']}")
@@ -7639,7 +7773,7 @@ async def receive_sync_webhook(request: Request):
         return {"success": True, "message": "Automated reminders executed successfully"}
     except Exception as e:
         logger.error(f"Error running reminders: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/reminders/stats")
 async def get_reminder_stats():
@@ -7678,22 +7812,42 @@ async def get_reminder_stats():
         }
     except Exception as e:
         logger.error(f"Error getting reminder stats: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== STATIC FILES ====================
 
 @api_router.get("/uploads/{filename}")
 async def get_uploaded_file(filename: str):
-    """Serve uploaded files"""
-    filepath = Path(ROOT_DIR) / "uploads" / filename
+    """Serve uploaded files with path traversal protection"""
+    # Validate filename - reject any path traversal attempts
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    uploads_dir = (Path(ROOT_DIR) / "uploads").resolve()
+    filepath = (uploads_dir / filename).resolve()
+
+    # Security: Ensure resolved path is within uploads directory
+    if not filepath.is_relative_to(uploads_dir):
+        raise HTTPException(status_code=403, detail="Access denied")
+
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(filepath)
 
 @api_router.get("/user-photos/{filename}")
 async def get_user_photo(filename: str):
-    """Serve user profile photos"""
-    filepath = Path(ROOT_DIR) / "user_photos" / filename
+    """Serve user profile photos with path traversal protection"""
+    # Validate filename - reject any path traversal attempts
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    photos_dir = (Path(ROOT_DIR) / "user_photos").resolve()
+    filepath = (photos_dir / filename).resolve()
+
+    # Security: Ensure resolved path is within user_photos directory
+    if not filepath.is_relative_to(photos_dir):
+        raise HTTPException(status_code=403, detail="Access denied")
+
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Photo not found")
     return FileResponse(filepath)
@@ -7709,21 +7863,24 @@ async def global_search(q: str, current_user: dict = Depends(get_current_user)):
     try:
         if not q or len(q) < 2:
             return {"members": [], "care_events": []}
-        
+
+        # Security: Escape regex special characters to prevent NoSQL injection
+        safe_query = escape_regex(q)
+
         # Get user's campus
         campus_id = current_user.get("campus_id")
-        
+
         # For full admin, search across all campuses they have access to
         search_filter = {}
         if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
             search_filter["campus_id"] = campus_id
-        
+
         # Search members
         member_query = {
             **search_filter,
             "$or": [
-                {"name": {"$regex": q, "$options": "i"}},
-                {"phone": {"$regex": q, "$options": "i"}}
+                {"name": {"$regex": safe_query, "$options": "i"}},
+                {"phone": {"$regex": safe_query, "$options": "i"}}
             ]
         }
         
@@ -7733,8 +7890,8 @@ async def global_search(q: str, current_user: dict = Depends(get_current_user)):
         care_event_query = {
             **search_filter,
             "$or": [
-                {"title": {"$regex": q, "$options": "i"}},
-                {"description": {"$regex": q, "$options": "i"}}
+                {"title": {"$regex": safe_query, "$options": "i"}},
+                {"description": {"$regex": safe_query, "$options": "i"}}
             ]
         }
         
@@ -7753,7 +7910,7 @@ async def global_search(q: str, current_user: dict = Depends(get_current_user)):
     
     except Exception as e:
         logger.error(f"Error in global search: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 # ==================== ACTIVITY LOG ENDPOINTS ====================
 
@@ -7810,7 +7967,7 @@ async def get_activity_logs(
     
     except Exception as e:
         logger.error(f"Error fetching activity logs: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.get("/activity-logs/summary")
 async def get_activity_summary(current_user: dict = Depends(get_current_user)):
@@ -7858,7 +8015,7 @@ async def get_activity_summary(current_user: dict = Depends(get_current_user)):
     
     except Exception as e:
         logger.error(f"Error fetching activity summary: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 # ==================== HEALTH CHECK ENDPOINTS ====================
 
 @app.get("/health")
@@ -7934,37 +8091,74 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS Configuration for subdomain architecture
 # ALLOWED_ORIGINS should be set to frontend URL (e.g., https://faithtracker.example.com)
-cors_origins = os.environ.get('ALLOWED_ORIGINS', os.environ.get('FRONTEND_URL', '*'))
+cors_origins = os.environ.get('ALLOWED_ORIGINS', os.environ.get('FRONTEND_URL', ''))
 cors_origins_list = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
+
+# Security: Don't allow wildcard with credentials - this is a security risk
+if not cors_origins_list or cors_origins_list[0] == '*':
+    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+        logger.error(
+            "ALLOWED_ORIGINS or FRONTEND_URL must be set in production. "
+            "Wildcard CORS with credentials is a security risk."
+        )
+        # Default to restrictive in production
+        cors_origins_list = []
+    else:
+        # Allow localhost in development only
+        cors_origins_list = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8001",
+            "http://127.0.0.1:8001"
+        ]
+        logger.warning("CORS: Using development origins. Set ALLOWED_ORIGINS for production.")
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=cors_origins_list if cors_origins_list and cors_origins_list[0] != '*' else ["*"],
+    allow_origins=cors_origins_list,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     expose_headers=["X-Total-Count"],
 )
 
 
 @app.on_event("startup")
 async def create_default_admin():
-    """Create default full admin user if none exists"""
+    """Create default full admin user if none exists (using environment variables)"""
     try:
         admin_count = await db.users.count_documents({"role": UserRole.FULL_ADMIN})
         if admin_count == 0:
-            default_admin = User(
-                email="admin@gkbj.church",
-                name="Full Administrator",
-                role=UserRole.FULL_ADMIN,
-                campus_id=None,  # Full admin has access to all campuses
-                phone="6281290080025",  # Admin's phone for receiving system alerts
-                hashed_password=get_password_hash("admin123"),
-                is_active=True
-            )
-            await db.users.insert_one(default_admin.model_dump())
-            logger.info("Default full admin user created: admin@gkbj.church / admin123")
-        
+            # Read admin credentials from environment variables
+            admin_email = os.environ.get('ADMIN_EMAIL')
+            admin_password = os.environ.get('ADMIN_PASSWORD')
+            admin_phone = os.environ.get('ADMIN_PHONE', '')
+
+            if not admin_email or not admin_password:
+                logger.warning(
+                    "No full admin user exists. Set ADMIN_EMAIL and ADMIN_PASSWORD "
+                    "environment variables to create initial admin, or use init_db.py script."
+                )
+            else:
+                # Validate password strength
+                if len(admin_password) < 12:
+                    logger.warning(
+                        "ADMIN_PASSWORD should be at least 12 characters for security. "
+                        "Admin user not created."
+                    )
+                else:
+                    default_admin = User(
+                        email=admin_email,
+                        name="Full Administrator",
+                        role=UserRole.FULL_ADMIN,
+                        campus_id=None,  # Full admin has access to all campuses
+                        phone=admin_phone,
+                        hashed_password=get_password_hash(admin_password),
+                        is_active=True
+                    )
+                    await db.users.insert_one(default_admin.model_dump())
+                    logger.info(f"Default full admin user created: {admin_email}")
+
         # Start automated reminder scheduler
         start_scheduler()
     except Exception as e:
