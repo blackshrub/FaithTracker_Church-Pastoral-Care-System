@@ -445,6 +445,7 @@ class CareEvent(BaseModel):
     
     # Member information (enriched from members collection)
     member_name: Optional[str] = None
+    member_phone: Optional[str] = None
 
 
 class SetupAdminRequest(BaseModel):
@@ -2923,13 +2924,13 @@ async def list_care_events(
             {"$sort": {"event_date": -1}},
             {"$skip": skip},
             {"$limit": limit},
-            # Join with members collection to get member names in single query
+            # Join with members collection to get member names and phone in single query
             {"$lookup": {
                 "from": "members",
                 "localField": "member_id",
                 "foreignField": "id",
                 "as": "member_info",
-                "pipeline": [{"$project": {"_id": 0, "name": 1}}]
+                "pipeline": [{"$project": {"_id": 0, "name": 1, "phone": 1}}]
             }},
             # Flatten member_info array to single object
             {"$addFields": {
@@ -2945,6 +2946,13 @@ async def list_care_events(
                                 "else": None
                             }
                         }
+                    }
+                },
+                "member_phone": {
+                    "$cond": {
+                        "if": {"$gt": [{"$size": "$member_info"}, 0]},
+                        "then": {"$arrayElemAt": ["$member_info.phone", 0]},
+                        "else": None
                     }
                 }
             }},
