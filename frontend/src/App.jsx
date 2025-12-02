@@ -14,6 +14,7 @@ import {
   RouterProvider,
   Navigate,
   Outlet,
+  useRouteError,
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
@@ -137,12 +138,28 @@ const RootLayout = () => {
   );
 };
 
+// Error element for route errors
+const RouteError = () => {
+  const error = useRouteError();
+  console.error('Route error:', error);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center p-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Page Error</h1>
+        <p className="text-gray-600 mb-4">{error?.message || 'Something went wrong'}</p>
+        <a href="/dashboard" className="text-teal-600 hover:underline">Go to Dashboard</a>
+      </div>
+    </div>
+  );
+};
+
 // Create router with data loaders for parallel data fetching
 const router = createBrowserRouter([
   {
     element: <RootLayout />,
     // HydrateFallback for client-side only apps (prevents console warning)
     HydrateFallback: PageLoader,
+    errorElement: <RouteError />,
     children: [
       {
         path: '/login',
@@ -150,6 +167,7 @@ const router = createBrowserRouter([
       },
       {
         element: <ProtectedRoute />,
+        errorElement: <RouteError />,
         children: [
           {
             path: '/',
