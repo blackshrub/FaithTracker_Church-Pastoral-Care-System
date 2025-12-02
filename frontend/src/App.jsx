@@ -36,6 +36,7 @@ const MembersList = lazy(() => import('@/pages/MembersList'));
 const MemberDetail = lazy(() => import('@/pages/MemberDetail'));
 const FinancialAid = lazy(() => import('@/pages/FinancialAid'));
 const Analytics = lazy(() => import('@/pages/Analytics'));
+const Reports = lazy(() => import('@/pages/Reports'));
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const ImportExport = lazy(() => import('@/pages/ImportExport'));
 const Settings = lazy(() => import('@/pages/Settings'));
@@ -99,6 +100,7 @@ function AppRoutes() {
       <Route path="/members/:id" element={<ProtectedRoute><Layout><MemberDetail /></Layout></ProtectedRoute>} />
       <Route path="/financial-aid" element={<ProtectedRoute><Layout><FinancialAid /></Layout></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
+      <Route path="/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
       <Route path="/activity-log" element={<ProtectedRoute><Layout><ActivityLog /></Layout></ProtectedRoute>} />
       <Route path="/import-export" element={<ProtectedRoute><Layout><ImportExport /></Layout></ProtectedRoute>} />

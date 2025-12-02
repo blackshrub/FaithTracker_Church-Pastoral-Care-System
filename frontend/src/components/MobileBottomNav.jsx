@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Users, Calendar, BarChart3, MoreHorizontal, DollarSign, Shield, Upload, MessageSquare, Bell, Settings as SettingsIcon, LogOut, Activity } from 'lucide-react';
+import { Home, Users, Calendar, BarChart3, MoreHorizontal, DollarSign, Shield, Upload, MessageSquare, Bell, Settings as SettingsIcon, LogOut, Activity, FileText } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -43,6 +43,7 @@ export const MobileBottomNav = () => {
   
   const moreMenuItems = [
     { name: t('calendar'), href: '/calendar', icon: Calendar, category: 'tools' },
+    { name: t('reports.title') || 'Reports', href: '/reports', icon: FileText, category: 'tools' },
     { name: t('messaging'), href: '/messaging', icon: MessageSquare, category: 'tools' },
     { name: t('whatsapp_logs'), href: '/whatsapp-logs', icon: Bell, category: 'tools' },
     { name: t('import_export'), href: '/import-export', icon: Upload, category: 'tools' },

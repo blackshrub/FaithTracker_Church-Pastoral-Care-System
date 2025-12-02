@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Home, 
-  Users, 
-  Calendar, 
-  BarChart3, 
+import {
+  Home,
+  Users,
+  Calendar,
+  BarChart3,
   DollarSign,
   Settings,
   Shield,
@@ -15,7 +15,8 @@ import {
   MessageSquare,
   Bell,
   Church,
-  Activity
+  Activity,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -30,6 +31,7 @@ export const DesktopSidebar = () => {
     { name: t('calendar'), href: '/calendar', icon: Calendar, testId: 'sidebar-calendar' },
     { name: t('financial_aid'), href: '/financial-aid', icon: DollarSign, testId: 'sidebar-financial-aid' },
     { name: t('analytics'), href: '/analytics', icon: BarChart3, testId: 'sidebar-analytics' },
+    { name: t('reports.title') || 'Reports', href: '/reports', icon: FileText, testId: 'sidebar-reports' },
   ];
   
   const adminNavigation = [

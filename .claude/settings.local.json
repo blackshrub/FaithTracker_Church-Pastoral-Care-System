@@ -29,7 +29,15 @@
       "Bash(mongosh:*)",
       "Bash(docker exec:*)",
       "Bash(docker logs:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(ssh:*)",
+      "Bash(ssh-keygen:*)",
+      "Bash(source .env)",
+      "Bash(docker ps:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/members?limit=2\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNjlmM2FhZi0yZTI1LTQ5NjktODZmNy04MTlkYTM4OWZkMjUiLCJleHAiOjE3NjQ3MzgzMTZ9.nr_8lMnKw57mMUv6zCw454JJbWqbcK4zWtnbrF440SM\" docker exec faithtracker-backend curl -s -H \"Authorization: Bearer $TOKEN\" \"http://127.0.0.1:8001/analytics/demographic-trends\")"
     ],
     "deny": [],
     "ask": []

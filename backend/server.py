@@ -5326,6 +5326,724 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
         logger.error(f"Error analyzing demographic trends: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== MANAGEMENT REPORTS ENDPOINTS ====================
+
+@api_router.get("/reports/monthly")
+async def get_monthly_management_report(
+    year: int = None,
+    month: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Comprehensive monthly management report for church leadership.
+    Provides strategic insights for pastoral care oversight and decision-making.
+    """
+    try:
+        today = datetime.now(JAKARTA_TZ)
+        report_year = year or today.year
+        report_month = month or today.month
+
+        # Calculate date range for the month
+        start_date = datetime(report_year, report_month, 1, tzinfo=JAKARTA_TZ)
+        if report_month == 12:
+            end_date = datetime(report_year + 1, 1, 1, tzinfo=JAKARTA_TZ)
+        else:
+            end_date = datetime(report_year, report_month + 1, 1, tzinfo=JAKARTA_TZ)
+
+        # Previous month for comparison
+        if report_month == 1:
+            prev_start = datetime(report_year - 1, 12, 1, tzinfo=JAKARTA_TZ)
+            prev_end = start_date
+        else:
+            prev_start = datetime(report_year, report_month - 1, 1, tzinfo=JAKARTA_TZ)
+            prev_end = start_date
+
+        campus_filter = get_campus_filter(current_user)
+
+        # Fetch all data in parallel
+        members = await db.members.find(
+            {**campus_filter, "is_archived": {"$ne": True}},
+            {"_id": 0, "id": 1, "name": 1, "engagement_status": 1, "days_since_last_contact": 1,
+             "last_contact_date": 1, "gender": 1, "age": 1, "category": 1, "membership_status": 1}
+        ).to_list(2000)
+
+        # Care events this month
+        events_this_month = await db.care_events.find({
+            **campus_filter,
+            "event_date": {
+                "$gte": start_date.strftime("%Y-%m-%d"),
+                "$lt": end_date.strftime("%Y-%m-%d")
+            }
+        }, {"_id": 0}).to_list(5000)
+
+        # Care events previous month for comparison
+        events_prev_month = await db.care_events.find({
+            **campus_filter,
+            "event_date": {
+                "$gte": prev_start.strftime("%Y-%m-%d"),
+                "$lt": prev_end.strftime("%Y-%m-%d")
+            }
+        }, {"_id": 0}).to_list(5000)
+
+        # Activity logs this month (staff actions)
+        activities_this_month = await db.activity_logs.find({
+            **campus_filter,
+            "created_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}
+        }, {"_id": 0}).to_list(10000)
+
+        activities_prev_month = await db.activity_logs.find({
+            **campus_filter,
+            "created_at": {"$gte": prev_start.isoformat(), "$lt": prev_end.isoformat()}
+        }, {"_id": 0}).to_list(10000)
+
+        # Financial aid this month
+        financial_events = [e for e in events_this_month if e.get("event_type") == "financial_aid"]
+        financial_total = sum(e.get("aid_amount", 0) or 0 for e in financial_events)
+        financial_prev = sum(e.get("aid_amount", 0) or 0 for e in events_prev_month if e.get("event_type") == "financial_aid")
+
+        # === EXECUTIVE SUMMARY ===
+        total_members = len(members)
+        active_members = len([m for m in members if m.get("engagement_status") == "active"])
+        at_risk_members = len([m for m in members if m.get("engagement_status") == "at_risk"])
+        inactive_members = len([m for m in members if m.get("engagement_status") in ["inactive", "disconnected"]])
+
+        # Care delivery metrics
+        total_events = len(events_this_month)
+        completed_events = len([e for e in events_this_month if e.get("completed")])
+        pending_events = len([e for e in events_this_month if not e.get("completed") and not e.get("ignored")])
+        ignored_events = len([e for e in events_this_month if e.get("ignored")])
+
+        completion_rate = round(completed_events / total_events * 100, 1) if total_events > 0 else 0
+        prev_completion = len([e for e in events_prev_month if e.get("completed")])
+        prev_total = len(events_prev_month)
+        prev_completion_rate = round(prev_completion / prev_total * 100, 1) if prev_total > 0 else 0
+
+        # === CARE BREAKDOWN BY TYPE ===
+        care_by_type = {}
+        for e in events_this_month:
+            etype = e.get("event_type", "unknown")
+            if etype not in care_by_type:
+                care_by_type[etype] = {"total": 0, "completed": 0, "pending": 0, "ignored": 0}
+            care_by_type[etype]["total"] += 1
+            if e.get("completed"):
+                care_by_type[etype]["completed"] += 1
+            elif e.get("ignored"):
+                care_by_type[etype]["ignored"] += 1
+            else:
+                care_by_type[etype]["pending"] += 1
+
+        # === ENGAGEMENT HEALTH ===
+        engagement_trend = []
+        # Calculate weekly engagement for the month
+        current_week_start = start_date
+        week_num = 1
+        while current_week_start < end_date:
+            week_end = min(current_week_start + timedelta(days=7), end_date)
+            week_activities = [a for a in activities_this_month
+                            if current_week_start.isoformat() <= a.get("created_at", "") < week_end.isoformat()]
+            week_events_completed = len([a for a in week_activities if a.get("action_type") == "COMPLETE_TASK"])
+            engagement_trend.append({
+                "week": f"Week {week_num}",
+                "start": current_week_start.strftime("%b %d"),
+                "contacts_made": week_events_completed,
+                "activities": len(week_activities)
+            })
+            current_week_start = week_end
+            week_num += 1
+
+        # === STAFF PERFORMANCE SUMMARY ===
+        staff_summary = {}
+        for a in activities_this_month:
+            user_id = a.get("user_id")
+            if user_id not in staff_summary:
+                staff_summary[user_id] = {
+                    "user_id": user_id,
+                    "user_name": a.get("user_name", "Unknown"),
+                    "tasks_completed": 0,
+                    "tasks_created": 0,
+                    "members_contacted": set(),
+                    "total_actions": 0
+                }
+            staff_summary[user_id]["total_actions"] += 1
+            if a.get("action_type") == "COMPLETE_TASK":
+                staff_summary[user_id]["tasks_completed"] += 1
+                if a.get("member_id"):
+                    staff_summary[user_id]["members_contacted"].add(a.get("member_id"))
+            elif a.get("action_type") in ["CREATE_CARE_EVENT", "CREATE_MEMBER"]:
+                staff_summary[user_id]["tasks_created"] += 1
+
+        # Convert sets to counts
+        for user_id in staff_summary:
+            staff_summary[user_id]["members_contacted"] = len(staff_summary[user_id]["members_contacted"])
+
+        staff_list = sorted(staff_summary.values(), key=lambda x: x["tasks_completed"], reverse=True)
+
+        # === MEMBER REACH ANALYSIS ===
+        members_with_contact = len([m for m in members if m.get("last_contact_date")])
+        members_contacted_this_month = len(set(a.get("member_id") for a in activities_this_month
+                                               if a.get("action_type") == "COMPLETE_TASK" and a.get("member_id")))
+        member_reach_rate = round(members_contacted_this_month / total_members * 100, 1) if total_members > 0 else 0
+
+        # === GRIEF SUPPORT ANALYSIS ===
+        grief_events = [e for e in events_this_month if e.get("event_type") == "grief_loss"]
+        grief_completed = len([e for e in grief_events if e.get("completed")])
+        grief_families_supported = len(set(e.get("member_id") for e in grief_events))
+
+        # === HOSPITAL/ILLNESS SUPPORT ===
+        hospital_events = [e for e in events_this_month if e.get("event_type") == "accident_illness"]
+        hospital_visits = len([e for e in hospital_events if e.get("completed")])
+        hospital_patients = len(set(e.get("member_id") for e in hospital_events))
+
+        # === BIRTHDAY MINISTRY ===
+        birthday_events = [e for e in events_this_month if e.get("event_type") == "birthday"]
+        birthdays_celebrated = len([e for e in birthday_events if e.get("completed")])
+        birthday_completion_rate = round(birthdays_celebrated / len(birthday_events) * 100, 1) if birthday_events else 0
+
+        # === KEY PERFORMANCE INDICATORS ===
+        kpis = {
+            "care_completion_rate": {
+                "current": completion_rate,
+                "previous": prev_completion_rate,
+                "change": round(completion_rate - prev_completion_rate, 1),
+                "target": 85,
+                "status": "good" if completion_rate >= 85 else "warning" if completion_rate >= 70 else "critical"
+            },
+            "member_engagement_rate": {
+                "current": round(active_members / total_members * 100, 1) if total_members > 0 else 0,
+                "at_risk_percentage": round(at_risk_members / total_members * 100, 1) if total_members > 0 else 0,
+                "inactive_percentage": round(inactive_members / total_members * 100, 1) if total_members > 0 else 0,
+                "target": 80,
+                "status": "good" if active_members / total_members >= 0.8 else "warning" if active_members / total_members >= 0.6 else "critical"
+            },
+            "member_reach_rate": {
+                "current": member_reach_rate,
+                "members_contacted": members_contacted_this_month,
+                "total_members": total_members,
+                "target": 30,
+                "status": "good" if member_reach_rate >= 30 else "warning" if member_reach_rate >= 15 else "critical"
+            },
+            "birthday_completion_rate": {
+                "current": birthday_completion_rate,
+                "celebrated": birthdays_celebrated,
+                "total": len(birthday_events),
+                "target": 95,
+                "status": "good" if birthday_completion_rate >= 95 else "warning" if birthday_completion_rate >= 80 else "critical"
+            },
+            "average_response_time_days": {
+                "value": 0,  # Would need more data to calculate
+                "target": 3,
+                "status": "good"
+            }
+        }
+
+        # === STRATEGIC INSIGHTS ===
+        insights = []
+        recommendations = []
+
+        # Engagement insights
+        if inactive_members > total_members * 0.2:
+            insights.append({
+                "type": "warning",
+                "category": "Engagement",
+                "message": f"{inactive_members} members ({round(inactive_members/total_members*100)}%) are disconnected and need re-engagement"
+            })
+            recommendations.append("Launch a re-engagement campaign targeting disconnected members with personal outreach")
+
+        if at_risk_members > total_members * 0.15:
+            insights.append({
+                "type": "warning",
+                "category": "Engagement",
+                "message": f"{at_risk_members} members are at-risk of becoming inactive"
+            })
+            recommendations.append("Prioritize at-risk members for immediate follow-up before they become inactive")
+
+        # Care delivery insights
+        if completion_rate < 70:
+            insights.append({
+                "type": "critical",
+                "category": "Care Delivery",
+                "message": f"Care completion rate ({completion_rate}%) is below target. {pending_events} tasks still pending."
+            })
+            recommendations.append("Review pending tasks and redistribute workload among staff")
+
+        if ignored_events > total_events * 0.1:
+            insights.append({
+                "type": "warning",
+                "category": "Care Delivery",
+                "message": f"{ignored_events} care events were ignored ({round(ignored_events/total_events*100)}% of total)"
+            })
+            recommendations.append("Review ignored events to understand why and improve care protocols")
+
+        # Staff workload insights
+        if staff_list:
+            max_tasks = staff_list[0]["tasks_completed"] if staff_list else 0
+            min_tasks = staff_list[-1]["tasks_completed"] if staff_list else 0
+            if max_tasks > 0 and min_tasks < max_tasks * 0.3:
+                insights.append({
+                    "type": "warning",
+                    "category": "Staff Workload",
+                    "message": f"Significant workload imbalance: top performer completed {max_tasks} tasks, lowest completed {min_tasks}"
+                })
+                recommendations.append("Review task assignment process to ensure equitable distribution")
+
+        # Birthday ministry
+        if birthday_completion_rate < 80:
+            insights.append({
+                "type": "warning",
+                "category": "Birthday Ministry",
+                "message": f"Only {birthdays_celebrated} of {len(birthday_events)} birthdays were celebrated ({birthday_completion_rate}%)"
+            })
+            recommendations.append("Improve birthday reminder system and assign dedicated birthday outreach volunteers")
+
+        # Financial aid
+        if financial_total > 0:
+            insights.append({
+                "type": "info",
+                "category": "Financial Aid",
+                "message": f"Rp {financial_total:,.0f} distributed to {len(financial_events)} recipients this month"
+            })
+
+        # Grief support
+        if grief_families_supported > 0:
+            insights.append({
+                "type": "info",
+                "category": "Grief Support",
+                "message": f"Supporting {grief_families_supported} families through grief with {len(grief_events)} follow-up touchpoints"
+            })
+
+        # Positive insights
+        if completion_rate >= 85:
+            insights.append({
+                "type": "success",
+                "category": "Care Delivery",
+                "message": f"Excellent care completion rate of {completion_rate}%! Team is performing well."
+            })
+
+        if member_reach_rate >= 30:
+            insights.append({
+                "type": "success",
+                "category": "Member Reach",
+                "message": f"Good member reach: {members_contacted_this_month} members ({member_reach_rate}%) contacted this month"
+            })
+
+        # === COMPARISON WITH PREVIOUS MONTH ===
+        comparison = {
+            "total_events": {
+                "current": total_events,
+                "previous": prev_total,
+                "change": total_events - prev_total,
+                "change_percent": round((total_events - prev_total) / prev_total * 100, 1) if prev_total > 0 else 0
+            },
+            "completion_rate": {
+                "current": completion_rate,
+                "previous": prev_completion_rate,
+                "change": round(completion_rate - prev_completion_rate, 1)
+            },
+            "total_activities": {
+                "current": len(activities_this_month),
+                "previous": len(activities_prev_month),
+                "change": len(activities_this_month) - len(activities_prev_month)
+            },
+            "financial_aid": {
+                "current": financial_total,
+                "previous": financial_prev,
+                "change": financial_total - financial_prev
+            }
+        }
+
+        return {
+            "report_period": {
+                "year": report_year,
+                "month": report_month,
+                "month_name": start_date.strftime("%B"),
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": (end_date - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "generated_at": today.isoformat()
+            },
+            "executive_summary": {
+                "total_members": total_members,
+                "active_members": active_members,
+                "at_risk_members": at_risk_members,
+                "inactive_members": inactive_members,
+                "total_care_events": total_events,
+                "completed_events": completed_events,
+                "pending_events": pending_events,
+                "ignored_events": ignored_events,
+                "completion_rate": completion_rate,
+                "financial_aid_total": financial_total,
+                "financial_aid_recipients": len(financial_events)
+            },
+            "kpis": kpis,
+            "care_breakdown": [
+                {
+                    "event_type": k,
+                    "label": k.replace("_", " ").title(),
+                    **v
+                } for k, v in care_by_type.items()
+            ],
+            "engagement_trend": engagement_trend,
+            "staff_summary": staff_list[:10],  # Top 10 staff
+            "ministry_highlights": {
+                "grief_support": {
+                    "families_supported": grief_families_supported,
+                    "total_touchpoints": len(grief_events),
+                    "completed": grief_completed
+                },
+                "hospital_visits": {
+                    "patients_visited": hospital_patients,
+                    "total_visits": hospital_visits
+                },
+                "birthday_ministry": {
+                    "total_birthdays": len(birthday_events),
+                    "celebrated": birthdays_celebrated,
+                    "completion_rate": birthday_completion_rate
+                },
+                "financial_aid": {
+                    "total_amount": financial_total,
+                    "recipients": len(financial_events)
+                }
+            },
+            "comparison": comparison,
+            "insights": insights,
+            "recommendations": recommendations
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating monthly report: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/reports/staff-performance")
+async def get_staff_performance_report(
+    year: int = None,
+    month: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Detailed staff performance report for workload balancing and recognition.
+    Helps identify overworked and underworked staff members.
+    """
+    try:
+        today = datetime.now(JAKARTA_TZ)
+        report_year = year or today.year
+        report_month = month or today.month
+
+        # Calculate date range
+        start_date = datetime(report_year, report_month, 1, tzinfo=JAKARTA_TZ)
+        if report_month == 12:
+            end_date = datetime(report_year + 1, 1, 1, tzinfo=JAKARTA_TZ)
+        else:
+            end_date = datetime(report_year, report_month + 1, 1, tzinfo=JAKARTA_TZ)
+
+        campus_filter = get_campus_filter(current_user)
+
+        # Get all staff/users for this campus
+        users = await db.users.find(
+            {**campus_filter, "is_active": True},
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1, "photo_url": 1}
+        ).to_list(100)
+
+        # Get all activity logs for the month
+        activities = await db.activity_logs.find({
+            **campus_filter,
+            "created_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}
+        }, {"_id": 0}).to_list(20000)
+
+        # Get care events completed this month
+        care_events = await db.care_events.find({
+            **campus_filter,
+            "completed": True,
+            "completed_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}
+        }, {"_id": 0, "id": 1, "completed_by_user_id": 1, "completed_by_user_name": 1,
+            "event_type": 1, "member_id": 1, "completed_at": 1}).to_list(10000)
+
+        # Build staff performance data
+        staff_data = {}
+
+        # Initialize all users
+        for user in users:
+            staff_data[user["id"]] = {
+                "user_id": user["id"],
+                "user_name": user["name"],
+                "email": user["email"],
+                "role": user["role"],
+                "photo_url": user.get("photo_url"),
+                "tasks_completed": 0,
+                "tasks_created": 0,
+                "tasks_ignored": 0,
+                "members_created": 0,
+                "members_updated": 0,
+                "members_contacted": set(),
+                "events_by_type": {},
+                "daily_activity": {},
+                "total_actions": 0,
+                "whatsapp_sent": 0,
+                "active_days": set()
+            }
+
+        # Process activity logs
+        for activity in activities:
+            user_id = activity.get("user_id")
+            if user_id not in staff_data:
+                # User might be inactive but has activities
+                staff_data[user_id] = {
+                    "user_id": user_id,
+                    "user_name": activity.get("user_name", "Unknown"),
+                    "email": "",
+                    "role": "",
+                    "photo_url": activity.get("user_photo_url"),
+                    "tasks_completed": 0,
+                    "tasks_created": 0,
+                    "tasks_ignored": 0,
+                    "members_created": 0,
+                    "members_updated": 0,
+                    "members_contacted": set(),
+                    "events_by_type": {},
+                    "daily_activity": {},
+                    "total_actions": 0,
+                    "whatsapp_sent": 0,
+                    "active_days": set()
+                }
+
+            staff = staff_data[user_id]
+            staff["total_actions"] += 1
+
+            action = activity.get("action_type")
+            created_at = activity.get("created_at", "")
+            if created_at:
+                day = created_at[:10]
+                staff["active_days"].add(day)
+                staff["daily_activity"][day] = staff["daily_activity"].get(day, 0) + 1
+
+            if action == "COMPLETE_TASK":
+                staff["tasks_completed"] += 1
+                if activity.get("member_id"):
+                    staff["members_contacted"].add(activity.get("member_id"))
+                event_type = activity.get("event_type", "other")
+                staff["events_by_type"][event_type] = staff["events_by_type"].get(event_type, 0) + 1
+            elif action == "IGNORE_TASK":
+                staff["tasks_ignored"] += 1
+            elif action == "CREATE_CARE_EVENT":
+                staff["tasks_created"] += 1
+            elif action == "CREATE_MEMBER":
+                staff["members_created"] += 1
+            elif action == "UPDATE_MEMBER":
+                staff["members_updated"] += 1
+            elif action == "SEND_REMINDER":
+                staff["whatsapp_sent"] += 1
+
+        # Convert sets to counts and calculate metrics
+        staff_list = []
+        total_tasks_completed = sum(s["tasks_completed"] for s in staff_data.values())
+
+        for user_id, staff in staff_data.items():
+            staff["members_contacted"] = len(staff["members_contacted"])
+            staff["active_days"] = len(staff["active_days"])
+
+            # Calculate percentage of total work
+            staff["work_share_percent"] = round(
+                staff["tasks_completed"] / total_tasks_completed * 100, 1
+            ) if total_tasks_completed > 0 else 0
+
+            # Calculate productivity score (tasks per active day)
+            staff["productivity_score"] = round(
+                staff["tasks_completed"] / staff["active_days"], 1
+            ) if staff["active_days"] > 0 else 0
+
+            # Calculate task completion ratio
+            total_assigned = staff["tasks_completed"] + staff["tasks_ignored"]
+            staff["completion_ratio"] = round(
+                staff["tasks_completed"] / total_assigned * 100, 1
+            ) if total_assigned > 0 else 100
+
+            # Workload status
+            avg_tasks = total_tasks_completed / len(staff_data) if len(staff_data) > 0 else 0
+            if staff["tasks_completed"] > avg_tasks * 1.5:
+                staff["workload_status"] = "overworked"
+            elif staff["tasks_completed"] < avg_tasks * 0.5 and staff["active_days"] > 5:
+                staff["workload_status"] = "underworked"
+            else:
+                staff["workload_status"] = "balanced"
+
+            staff_list.append(staff)
+
+        # Sort by tasks completed (descending)
+        staff_list.sort(key=lambda x: x["tasks_completed"], reverse=True)
+
+        # Calculate team statistics
+        tasks_completed_list = [s["tasks_completed"] for s in staff_list if s["tasks_completed"] > 0]
+
+        team_stats = {
+            "total_staff": len(staff_list),
+            "active_staff": len([s for s in staff_list if s["total_actions"] > 0]),
+            "total_tasks_completed": total_tasks_completed,
+            "total_members_contacted": len(set().union(*[set() if isinstance(s["members_contacted"], int) else s["members_contacted"] for s in staff_data.values()])),
+            "average_tasks_per_staff": round(total_tasks_completed / len(staff_list), 1) if staff_list else 0,
+            "median_tasks": sorted(tasks_completed_list)[len(tasks_completed_list)//2] if tasks_completed_list else 0,
+            "max_tasks": max(tasks_completed_list) if tasks_completed_list else 0,
+            "min_tasks": min(tasks_completed_list) if tasks_completed_list else 0,
+            "overworked_count": len([s for s in staff_list if s["workload_status"] == "overworked"]),
+            "underworked_count": len([s for s in staff_list if s["workload_status"] == "underworked"]),
+            "balanced_count": len([s for s in staff_list if s["workload_status"] == "balanced"])
+        }
+
+        # Workload distribution analysis
+        workload_distribution = {
+            "overworked": [{"name": s["user_name"], "tasks": s["tasks_completed"]}
+                         for s in staff_list if s["workload_status"] == "overworked"],
+            "underworked": [{"name": s["user_name"], "tasks": s["tasks_completed"], "active_days": s["active_days"]}
+                          for s in staff_list if s["workload_status"] == "underworked"],
+            "balanced": [{"name": s["user_name"], "tasks": s["tasks_completed"]}
+                        for s in staff_list if s["workload_status"] == "balanced"]
+        }
+
+        # Generate recommendations
+        recommendations = []
+
+        if team_stats["overworked_count"] > 0:
+            overworked_names = ", ".join([s["name"] for s in workload_distribution["overworked"]])
+            recommendations.append({
+                "type": "workload",
+                "priority": "high",
+                "message": f"Redistribute tasks from overworked staff: {overworked_names}",
+                "action": "Review task assignment and consider hiring or training more staff"
+            })
+
+        if team_stats["underworked_count"] > 0:
+            underworked_names = ", ".join([s["name"] for s in workload_distribution["underworked"]])
+            recommendations.append({
+                "type": "workload",
+                "priority": "medium",
+                "message": f"Increase task assignment for: {underworked_names}",
+                "action": "Assign more pastoral care responsibilities or provide additional training"
+            })
+
+        # Top performers
+        top_performers = staff_list[:3] if len(staff_list) >= 3 else staff_list
+        if top_performers and top_performers[0]["tasks_completed"] > 0:
+            recommendations.append({
+                "type": "recognition",
+                "priority": "info",
+                "message": f"Top performer: {top_performers[0]['user_name']} with {top_performers[0]['tasks_completed']} tasks completed",
+                "action": "Consider recognition or have them mentor other staff members"
+            })
+
+        return {
+            "report_period": {
+                "year": report_year,
+                "month": report_month,
+                "month_name": start_date.strftime("%B"),
+                "generated_at": today.isoformat()
+            },
+            "team_stats": team_stats,
+            "staff_performance": staff_list,
+            "workload_distribution": workload_distribution,
+            "top_performers": top_performers,
+            "recommendations": recommendations
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating staff performance report: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/reports/yearly-summary")
+async def get_yearly_summary_report(
+    year: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Annual summary report for year-end review and planning.
+    """
+    try:
+        today = datetime.now(JAKARTA_TZ)
+        report_year = year or today.year
+
+        start_date = datetime(report_year, 1, 1, tzinfo=JAKARTA_TZ)
+        end_date = datetime(report_year + 1, 1, 1, tzinfo=JAKARTA_TZ)
+
+        campus_filter = get_campus_filter(current_user)
+
+        # Get all members
+        members = await db.members.find(
+            {**campus_filter, "is_archived": {"$ne": True}},
+            {"_id": 0, "id": 1, "engagement_status": 1, "created_at": 1}
+        ).to_list(5000)
+
+        # Get all care events for the year
+        events = await db.care_events.find({
+            **campus_filter,
+            "event_date": {
+                "$gte": start_date.strftime("%Y-%m-%d"),
+                "$lt": end_date.strftime("%Y-%m-%d")
+            }
+        }, {"_id": 0}).to_list(50000)
+
+        # Monthly breakdown
+        monthly_data = []
+        for month in range(1, 13):
+            month_start = datetime(report_year, month, 1, tzinfo=JAKARTA_TZ)
+            if month == 12:
+                month_end = datetime(report_year + 1, 1, 1, tzinfo=JAKARTA_TZ)
+            else:
+                month_end = datetime(report_year, month + 1, 1, tzinfo=JAKARTA_TZ)
+
+            month_events = [e for e in events
+                          if month_start.strftime("%Y-%m-%d") <= e.get("event_date", "") < month_end.strftime("%Y-%m-%d")]
+
+            completed = len([e for e in month_events if e.get("completed")])
+            total = len(month_events)
+
+            monthly_data.append({
+                "month": month,
+                "month_name": month_start.strftime("%B"),
+                "total_events": total,
+                "completed_events": completed,
+                "completion_rate": round(completed / total * 100, 1) if total > 0 else 0
+            })
+
+        # Year totals
+        total_events = len(events)
+        completed_events = len([e for e in events if e.get("completed")])
+
+        # Financial aid totals
+        financial_events = [e for e in events if e.get("event_type") == "financial_aid"]
+        total_financial_aid = sum(e.get("aid_amount", 0) or 0 for e in financial_events)
+
+        # Care by type totals
+        care_totals = {}
+        for e in events:
+            etype = e.get("event_type", "unknown")
+            if etype not in care_totals:
+                care_totals[etype] = {"total": 0, "completed": 0}
+            care_totals[etype]["total"] += 1
+            if e.get("completed"):
+                care_totals[etype]["completed"] += 1
+
+        return {
+            "report_period": {
+                "year": report_year,
+                "generated_at": today.isoformat()
+            },
+            "yearly_totals": {
+                "total_members": len(members),
+                "total_care_events": total_events,
+                "completed_events": completed_events,
+                "completion_rate": round(completed_events / total_events * 100, 1) if total_events > 0 else 0,
+                "total_financial_aid": total_financial_aid,
+                "financial_aid_recipients": len(financial_events)
+            },
+            "monthly_breakdown": monthly_data,
+            "care_by_type": [
+                {"event_type": k, "label": k.replace("_", " ").title(), **v}
+                for k, v in care_totals.items()
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating yearly summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== CONFIGURATION ENDPOINTS (For Mobile App) ====================
 # Pre-computed static configs (cached at module level - zero database/computation cost)
 
