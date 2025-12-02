@@ -27,7 +27,9 @@
       "Bash(source /root/FaithTracker_Church-Pastoral-Care-System/.env)",
       "Bash(source backend/.env)",
       "Bash(mongosh:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
