@@ -3,6 +3,7 @@ import globals from 'globals';
 import reactPlugin from 'eslint-plugin-react';
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
+import reactCompiler from 'eslint-plugin-react-compiler';
 
 export default [
   js.configs.recommended,
@@ -25,7 +26,8 @@ export default [
     plugins: {
       react: reactPlugin,
       'jsx-a11y': jsxA11yPlugin,
-      import: importPlugin
+      import: importPlugin,
+      'react-compiler': reactCompiler
     },
     settings: {
       react: {
@@ -33,6 +35,9 @@ export default [
       }
     },
     rules: {
+      // React Compiler rule - ensures code is compatible with React Compiler
+      'react-compiler/react-compiler': 'error',
+
       // React rules
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',

@@ -1,26 +1,47 @@
 /**
- * App.js - Root React component and routing
+ * App.jsx - Root React component and routing
  * Sets up React Query, authentication context, and application routes
+ *
+ * Performance optimizations:
+ * - Route-level data prefetching with React Router loaders
+ * - Lazy loading for all pages
+ * - React Compiler enabled for automatic memoization
  */
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+  Outlet,
+} from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import PageLoader from '@/components/PageLoader';
+import {
+  setQueryClient,
+  dashboardLoader,
+  membersLoader,
+  memberDetailLoader,
+  analyticsLoader,
+  financialAidLoader,
+  adminLoader,
+  activityLogLoader,
+  reportsLoader,
+} from '@/lib/routeLoaders';
 import './i18n';
 import '@/App.css';
 import LoginPage from '@/pages/LoginPage';
 import api from '@/lib/api';
 
-// Create a client
+// Create query client with optimized defaults
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 30, // Data considered fresh for 30 seconds
-      cacheTime: 1000 * 60 * 5, // Keep unused data in cache for 5 minutes
+      gcTime: 1000 * 60 * 5, // Keep unused data in cache for 5 minutes
       refetchOnWindowFocus: true, // Refetch when user returns to tab
       retry: 1, // Retry failed requests once
     },
@@ -30,7 +51,10 @@ const queryClient = new QueryClient({
   },
 });
 
-// Lazy load components
+// Set query client for route loaders
+setQueryClient(queryClient);
+
+// Lazy load components for code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const MembersList = lazy(() => import('@/pages/MembersList'));
 const MemberDetail = lazy(() => import('@/pages/MemberDetail'));
@@ -49,25 +73,37 @@ const SetupWizard = lazy(() => import('@/pages/SetupWizard'));
 const IntegrationTest = lazy(() => import('@/components/IntegrationTest'));
 const Layout = lazy(() => import('@/components/Layout'));
 
-const ProtectedRoute = ({ children }) => {
+// Protected route wrapper component
+const ProtectedRoute = () => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return <PageLoader />;
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
-  return children;
+
+  return (
+    <Layout>
+      <Suspense fallback={<PageLoader />}>
+        <Outlet />
+      </Suspense>
+    </Layout>
+  );
 };
 
-function AppRoutes() {
+// Auth-aware login route
+const LoginRoute = () => {
   const { user } = useAuth();
+  return user ? <Navigate to="/dashboard" replace /> : <LoginPage />;
+};
+
+// Root component that handles setup check
+const RootLayout = () => {
   const [needsSetup, setNeedsSetup] = useState(null);
-  
-  // Check if setup is needed
+
   useEffect(() => {
     const checkSetup = async () => {
       try {
@@ -80,51 +116,126 @@ function AppRoutes() {
     };
     checkSetup();
   }, []);
-  
-  // Show loading while checking
+
   if (needsSetup === null) {
     return <PageLoader />;
   }
-  
-  // Show setup wizard if needed
+
   if (needsSetup) {
-    return <SetupWizard onComplete={() => setNeedsSetup(false)} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <SetupWizard onComplete={() => setNeedsSetup(false)} />
+      </Suspense>
+    );
   }
-  
+
   return (
-    <Routes>
-      <Route path="/login" element={!user ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-      <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-      <Route path="/members" element={<ProtectedRoute><Layout><MembersList /></Layout></ProtectedRoute>} />
-      <Route path="/members/:id" element={<ProtectedRoute><Layout><MemberDetail /></Layout></ProtectedRoute>} />
-      <Route path="/financial-aid" element={<ProtectedRoute><Layout><FinancialAid /></Layout></ProtectedRoute>} />
-      <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
-      <Route path="/reports" element={<ProtectedRoute><Layout><Reports /></Layout></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><Layout><AdminDashboard /></Layout></ProtectedRoute>} />
-      <Route path="/activity-log" element={<ProtectedRoute><Layout><ActivityLog /></Layout></ProtectedRoute>} />
-      <Route path="/import-export" element={<ProtectedRoute><Layout><ImportExport /></Layout></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
-      <Route path="/whatsapp-logs" element={<ProtectedRoute><Layout><WhatsAppLogs /></Layout></ProtectedRoute>} />
-      <Route path="/calendar" element={<ProtectedRoute><Layout><Calendar /></Layout></ProtectedRoute>} />
-      <Route path="/messaging" element={<ProtectedRoute><Layout><BulkMessaging /></Layout></ProtectedRoute>} />
-      <Route path="/reminders" element={<ProtectedRoute><Layout><Reminders /></Layout></ProtectedRoute>} />
-      <Route path="/integrations" element={<ProtectedRoute><Layout><IntegrationTest /></Layout></ProtectedRoute>} />
-    </Routes>
+    <>
+      <Outlet />
+      <Toaster />
+    </>
   );
-}
+};
+
+// Create router with data loaders for parallel data fetching
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      {
+        path: '/login',
+        element: <LoginRoute />,
+      },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          {
+            path: '/',
+            element: <Dashboard />,
+            loader: dashboardLoader,
+          },
+          {
+            path: '/dashboard',
+            element: <Dashboard />,
+            loader: dashboardLoader,
+          },
+          {
+            path: '/members',
+            element: <MembersList />,
+            loader: membersLoader,
+          },
+          {
+            path: '/members/:id',
+            element: <MemberDetail />,
+            loader: memberDetailLoader,
+          },
+          {
+            path: '/financial-aid',
+            element: <FinancialAid />,
+            loader: financialAidLoader,
+          },
+          {
+            path: '/analytics',
+            element: <Analytics />,
+            loader: analyticsLoader,
+          },
+          {
+            path: '/reports',
+            element: <Reports />,
+            loader: reportsLoader,
+          },
+          {
+            path: '/admin',
+            element: <AdminDashboard />,
+            loader: adminLoader,
+          },
+          {
+            path: '/activity-log',
+            element: <ActivityLog />,
+            loader: activityLogLoader,
+          },
+          {
+            path: '/import-export',
+            element: <ImportExport />,
+          },
+          {
+            path: '/settings',
+            element: <Settings />,
+          },
+          {
+            path: '/whatsapp-logs',
+            element: <WhatsAppLogs />,
+          },
+          {
+            path: '/calendar',
+            element: <Calendar />,
+          },
+          {
+            path: '/messaging',
+            element: <BulkMessaging />,
+          },
+          {
+            path: '/reminders',
+            element: <Reminders />,
+          },
+          {
+            path: '/integrations',
+            element: <IntegrationTest />,
+          },
+        ],
+      },
+    ],
+  },
+]);
 
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <Suspense fallback={<PageLoader />}>
-          <BrowserRouter>
-            <AuthProvider>
-              <AppRoutes />
-              <Toaster />
-            </AuthProvider>
-          </BrowserRouter>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
         </Suspense>
       </QueryClientProvider>
     </ErrorBoundary>

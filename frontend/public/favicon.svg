@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="32" height="32" rx="4" fill="#14b8a6"/>
+<g transform="translate(4, 4)">
+  <!-- Simplified heart + cross -->
+  <path d="M12 6C12 3 10 1 8 1C6.5 1 5 2 4 3.5C3 2 1.5 1 0 1C-2 1 -4 3 -4 6C-4 10 4 14 12 20C20 14 28 10 28 6C28 3 26 1 24 1C22.5 1 21 2 20 3.5C19 2 17.5 1 16 1C14 1 12 3 12 6Z"
+        fill="white" transform="translate(0, -1) scale(0.8)"/>
+  <rect x="10" y="12" width="4" height="10" fill="white" rx="1"/>
+  <rect x="7" y="15" width="10" height="4" fill="white" rx="1"/>
+</g>
+</svg>

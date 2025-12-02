@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="512" height="512" rx="64" fill="#14b8a6"/>
+<g transform="translate(128, 106)">
+  <!-- Heart icon representing care -->
+  <path d="M128 53C128 24 107 5 80 5C61 5 45 16 37 32C29 16 13 5 -6 5C-33 5 -54 24 -54 53C-54 107 37 147 128 227C219 147 310 107 310 53C310 24 289 5 262 5C243 5 227 16 219 32C211 16 195 5 176 5C149 5 128 24 128 53Z"
+        fill="white" transform="translate(0, 13) scale(0.9)"/>
+  <!-- Cross representing faith -->
+  <rect x="112" y="160" width="32" height="120" fill="white" rx="4"/>
+  <rect x="80" y="192" width="96" height="32" fill="white" rx="4"/>
+</g>
+</svg>
