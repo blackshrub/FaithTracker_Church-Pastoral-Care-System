@@ -37,12 +37,13 @@ export const Analytics = () => {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const [membersRes, eventsRes, griefRes, aidSummaryRes, scheduleRes] = await Promise.all([
+      const [membersRes, eventsRes, griefRes, aidSummaryRes, scheduleRes, demographicRes] = await Promise.all([
         api.get('/members?limit=1000'), // Get all members for analytics
         api.get('/care-events'),
         api.get('/analytics/grief-completion-rate'),
         api.get('/financial-aid/summary'),
-        api.get('/financial-aid-schedules')
+        api.get('/financial-aid-schedules'),
+        api.get('/analytics/demographic-trends')
       ]);
       
       const members = membersRes.data;
@@ -71,13 +72,13 @@ export const Analytics = () => {
         }
       }
       
-      // Member Demographics
+      // Member Demographics - dynamically collect actual values from data
       const ageGroups = { 'Child (0-12)': 0, 'Teen (13-17)': 0, 'Youth (18-30)': 0, 'Adult (31-60)': 0, 'Senior (60+)': 0 };
-      const genderData = { Male: 0, Female: 0, Unknown: 0 };
-      const membershipData = { Member: 0, 'Non Member': 0, Visitor: 0, Sympathizer: 0, 'Inactive': 0 };
-      const categoryData = { Umum: 0, Youth: 0, Teen: 0, Usinda: 0, Other: 0 };
+      const genderData = {};  // Dynamic: collect actual gender values
+      const membershipData = {};  // Dynamic: collect actual membership_status values
+      const categoryData = {};  // Dynamic: collect actual category values
       const engagementStatus = { active: 0, at_risk: 0, inactive: 0 };
-      
+
       members.forEach(m => {
         // Age groups
         const age = m.age || 0;
@@ -86,21 +87,26 @@ export const Analytics = () => {
         else if (age <= 30) ageGroups['Youth (18-30)']++;
         else if (age <= 60) ageGroups['Adult (31-60)']++;
         else ageGroups['Senior (60+)']++;
-        
-        // Gender
-        if (m.gender === 'M') genderData.Male++;
-        else if (m.gender === 'F') genderData.Female++;
-        else genderData.Unknown++;
-        
-        // Membership
-        const membership = m.membership_status || 'Unknown';
-        if (membershipData.hasOwnProperty(membership)) membershipData[membership]++;
-        
-        // Category
-        const category = m.category || 'Other';
-        if (categoryData.hasOwnProperty(category)) categoryData[category]++;
-        else categoryData.Other++;
-        
+
+        // Gender - handle various formats: 'M'/'F', 'Male'/'Female', 'Laki-laki'/'Perempuan'
+        let gender = m.gender || 'Unknown';
+        // Normalize gender values
+        if (gender === 'M' || gender.toLowerCase() === 'male' || gender.toLowerCase() === 'laki-laki') {
+          gender = 'Male';
+        } else if (gender === 'F' || gender.toLowerCase() === 'female' || gender.toLowerCase() === 'perempuan') {
+          gender = 'Female';
+        }
+        genderData[gender] = (genderData[gender] || 0) + 1;
+
+        // Membership Status - use actual values from external data
+        // If membership_status is null/empty, try using category as fallback
+        let membership = m.membership_status || m.category || 'Unknown';
+        membershipData[membership] = (membershipData[membership] || 0) + 1;
+
+        // Category - collect actual values from external data
+        const category = m.category || 'Unknown';
+        categoryData[category] = (categoryData[category] || 0) + 1;
+
         // Engagement
         const status = m.engagement_status || 'inactive';
         engagementStatus[status]++;
@@ -174,9 +180,51 @@ export const Analytics = () => {
         trends: Object.entries(eventsByMonth).map(([month, count]) => ({ month, events: count }))
       });
       
+      // Generate dynamic care adaptations based on actual data
+      const generateCareAdaptations = () => {
+        const adaptations = [];
+        const inactiveCount = engagementStatus.inactive || 0;
+        const atRiskCount = engagementStatus.at_risk || 0;
+        const seniorCount = ageGroups['Senior (60+)'] || 0;
+        const youthCount = ageGroups['Youth (18-30)'] || 0;
+
+        if (inactiveCount > 0) {
+          adaptations.push(`${inactiveCount} inactive members need re-engagement outreach`);
+        }
+        if (atRiskCount > 0) {
+          adaptations.push(`${atRiskCount} at-risk members need follow-up within 2 weeks`);
+        }
+        if (seniorCount > members.length * 0.2) {
+          adaptations.push(`Focus senior care programs (${seniorCount} seniors, ${Math.round(seniorCount/members.length*100)}% of congregation)`);
+        }
+        if (youthCount > 0) {
+          adaptations.push(`Develop young adult ministry for ${youthCount} members aged 18-30`);
+        }
+        return adaptations.length > 0 ? adaptations : ['Continue maintaining current care engagement levels'];
+      };
+
+      // Generate strategic recommendations based on actual data
+      const generateStrategicRecommendations = () => {
+        const inactiveCount = engagementStatus.inactive || 0;
+        const atRiskCount = engagementStatus.at_risk || 0;
+        const seniorCount = ageGroups['Senior (60+)'] || 0;
+
+        return {
+          high: inactiveCount > 0
+            ? `${inactiveCount} members with 90+ days no contact need immediate attention`
+            : 'All members have been contacted within 90 days',
+          medium: atRiskCount > 0
+            ? `${atRiskCount} at-risk members require follow-up before they become inactive`
+            : seniorCount > 0
+              ? `${seniorCount} seniors may need specialized care programs`
+              : 'Engagement levels are healthy',
+          long: 'Develop data-driven ministry approaches based on demographic analysis'
+        };
+      };
+
       setTrendsData({
-        age_groups: Object.entries(ageGroups).map(([name, count]) => ({ 
-          name, 
+        age_groups: Object.entries(ageGroups).map(([name, count]) => ({
+          name,
           value: count,
           count,
           care_events: events.filter(e => {
@@ -191,16 +239,24 @@ export const Analytics = () => {
             return false;
           }).length
         })),
-        membership_trends: Object.entries(membershipData).map(([status, count]) => ({ 
+        membership_trends: Object.entries(membershipData).map(([status, count]) => ({
           name: status,
-          status, 
+          status,
           value: count,
           count,
-          avg_engagement: members.filter(m => m.membership_status === status).reduce((sum, m) => {
-            const daysSinceContact = m.days_since_contact || 0;
+          avg_engagement: members.filter(m => {
+            // Match using same fallback logic as in aggregation
+            const memberStatus = m.membership_status || m.category || 'Unknown';
+            return memberStatus === status;
+          }).reduce((sum, m) => {
+            const daysSinceContact = m.days_since_last_contact || m.days_since_contact || 0;
             return sum + (100 - Math.min(daysSinceContact, 100));
           }, 0) / (count || 1)
-        }))
+        })),
+        // Use insights from backend API
+        insights: demographicRes.data?.insights || [],
+        care_adaptations: generateCareAdaptations(),
+        strategic_recommendations: generateStrategicRecommendations()
       });
       
       setGriefData(griefRes.data);
@@ -408,38 +464,46 @@ export const Analytics = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-blue-50 rounded">
-                    <p className="font-semibold text-blue-900">📊 Population Insights</p>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <p className="font-semibold text-blue-900 dark:text-blue-100">📊 {t('analytics_page.population_insights') || 'Population Insights'}</p>
                     <div className="mt-2 space-y-1">
-                      {trendsData.insights?.slice(0, 3).map((insight, i) => (
-                        <p key={i} className="text-sm text-blue-700">• {insight}</p>
-                      ))}
+                      {trendsData.insights?.length > 0 ? (
+                        trendsData.insights.slice(0, 3).map((insight, i) => (
+                          <p key={i} className="text-sm text-blue-700 dark:text-blue-300">• {insight}</p>
+                        ))
+                      ) : (
+                        <p className="text-sm text-blue-700 dark:text-blue-300">• {t('analytics_page.no_insights_available') || 'Collecting data for insights...'}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="p-4 bg-green-50 rounded">
-                    <p className="font-semibold text-green-900">💡 Care Adaptations</p>
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded">
+                    <p className="font-semibold text-green-900 dark:text-green-100">💡 {t('analytics_page.care_adaptations') || 'Care Adaptations'}</p>
                     <div className="mt-2 space-y-1">
-                      <p className="text-sm text-green-700">• Focus senior care programs for 60+ age group</p>
-                      <p className="text-sm text-green-700">• Increase visitor engagement initiatives</p>
-                      <p className="text-sm text-green-700">• Develop young adult retention strategies</p>
+                      {trendsData.care_adaptations?.length > 0 ? (
+                        trendsData.care_adaptations.map((adaptation, i) => (
+                          <p key={i} className="text-sm text-green-700 dark:text-green-300">• {adaptation}</p>
+                        ))
+                      ) : (
+                        <p className="text-sm text-green-700 dark:text-green-300">• {t('analytics_page.no_adaptations_needed') || 'Continue current care programs'}</p>
+                      )}
                     </div>
                   </div>
                 </div>
-                
-                <div className="p-4 bg-purple-50 rounded">
-                  <p className="font-semibold text-purple-900">🎯 Strategic Recommendations</p>
+
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded">
+                  <p className="font-semibold text-purple-900 dark:text-purple-100">🎯 {t('analytics_page.strategic_recommendations') || 'Strategic Recommendations'}</p>
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className="text-sm font-medium text-purple-700">High Priority</p>
-                      <p className="text-sm text-purple-600">Members with 90+ days no contact need immediate attention</p>
+                      <p className="text-sm font-medium text-purple-700 dark:text-purple-300">{t('analytics_page.high_priority')}</p>
+                      <p className="text-sm text-purple-600 dark:text-purple-400">{trendsData.strategic_recommendations?.high || t('analytics_page.no_high_priority_actions')}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-purple-700">Medium Priority</p>
-                      <p className="text-sm text-purple-600">Seniors and visitors require specialized care programs</p>
+                      <p className="text-sm font-medium text-purple-700 dark:text-purple-300">{t('analytics_page.medium_priority')}</p>
+                      <p className="text-sm text-purple-600 dark:text-purple-400">{trendsData.strategic_recommendations?.medium || t('analytics_page.engagement_levels_healthy')}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-purple-700">Long Term</p>
-                      <p className="text-sm text-purple-600">Develop demographic-specific ministry approaches</p>
+                      <p className="text-sm font-medium text-purple-700 dark:text-purple-300">{t('analytics_page.long_term') || 'Long Term'}</p>
+                      <p className="text-sm text-purple-600 dark:text-purple-400">{trendsData.strategic_recommendations?.long || t('analytics_page.develop_ministry_approaches')}</p>
                     </div>
                   </div>
                 </div>

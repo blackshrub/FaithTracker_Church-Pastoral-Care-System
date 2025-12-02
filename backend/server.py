@@ -1702,8 +1702,12 @@ async def list_members(
             "external_member_id": 1,
             "age": 1,
             "gender": 1,
-            "category": 1
-            # Exclude: notes, address, birth_date, archived_at, archived_reason, etc.
+            "category": 1,
+            "membership_status": 1,
+            "marital_status": 1,
+            "blood_type": 1,
+            "birth_date": 1
+            # Exclude: notes, address, archived_at, archived_reason, etc.
         }
 
         # Get paginated members with projection
@@ -5218,6 +5222,7 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
 async def get_demographic_trends(current_user: dict = Depends(get_current_user)):
     """Analyze demographic trends and population shifts"""
     try:
+        today = datetime.now(JAKARTA_TZ).date()
         campus_filter = get_campus_filter(current_user)
         members = await db.members.find(campus_filter, {"_id": 0}).to_list(1000)
         events = await db.care_events.find({**campus_filter}, {"_id": 0}).to_list(2000)
@@ -5231,14 +5236,9 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
             'Seniors (60+)': {'count': 0, 'care_events': 0}
         }
         
-        # Membership trends
-        membership_trends = {
-            'Member': {'count': 0, 'engagement_score': 0},
-            'Non Member': {'count': 0, 'engagement_score': 0},
-            'Visitor': {'count': 0, 'engagement_score': 0},
-            'Sympathizer': {'count': 0, 'engagement_score': 0}
-        }
-        
+        # Membership trends - dynamically collected from actual data
+        membership_trends = {}
+
         # Care needs by demographics
         care_needs = {
             'Financial aid by age': {},
@@ -5246,11 +5246,16 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
             'Medical needs by age': {},
             'Engagement by membership': {}
         }
-        
+
         for member in members:
             age = member.get('age', 0)
-            membership = member.get('membership_status', 'Unknown')
+            # Use membership_status, fallback to category if empty (external sync pattern)
+            membership = member.get('membership_status') or member.get('category') or 'Unknown'
             days_since_contact = member.get('days_since_last_contact', 999)
+
+            # Initialize membership trend entry if not exists
+            if membership not in membership_trends:
+                membership_trends[membership] = {'count': 0, 'engagement_score': 0}
             
             # Age group classification
             if age <= 12:
@@ -5268,10 +5273,10 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
             
             # Engagement scoring (inverse of days since contact)
             engagement_score = max(0, 100 - days_since_contact)
-            
-            if membership in membership_trends:
-                membership_trends[membership]['count'] += 1
-                membership_trends[membership]['engagement_score'] += engagement_score
+
+            # Membership trends - dynamically added above
+            membership_trends[membership]['count'] += 1
+            membership_trends[membership]['engagement_score'] += engagement_score
             
             # Care event analysis for this member
             member_events = [e for e in events if e['member_id'] == member['id']]

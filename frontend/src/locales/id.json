@@ -588,7 +588,15 @@
     "seniors_visitors_programs": "Lansia dan pengunjung memerlukan program perawatan khusus",
     "demographic_ministry": "Kembangkan pendekatan pelayanan spesifik demografis",
     "active_members_count": "Jemaat Aktif ({{count}} jemaat)",
-    "to": "ke"
+    "to": "ke",
+    "population_insights": "Wawasan Populasi",
+    "care_adaptations": "Adaptasi Pelayanan",
+    "strategic_recommendations": "Rekomendasi Strategis",
+    "no_insights_available": "Mengumpulkan data untuk wawasan...",
+    "no_adaptations_needed": "Lanjutkan program perawatan saat ini",
+    "no_high_priority_actions": "Tidak ada tindakan prioritas tinggi",
+    "engagement_levels_healthy": "Tingkat keterlibatan jemaat sehat",
+    "develop_ministry_approaches": "Kembangkan pendekatan pelayanan berbasis data"
   },
   
   "_comment_members_list": "Members List Page",

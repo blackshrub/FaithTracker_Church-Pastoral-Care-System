@@ -590,7 +590,15 @@
     "seniors_visitors_programs": "Seniors and visitors require specialized care programs",
     "demographic_ministry": "Develop demographic-specific ministry approaches",
     "active_members_count": "Active Members ({{count}} members)",
-    "to": "to"
+    "to": "to",
+    "population_insights": "Population Insights",
+    "care_adaptations": "Care Adaptations",
+    "strategic_recommendations": "Strategic Recommendations",
+    "no_insights_available": "Collecting data for insights...",
+    "no_adaptations_needed": "Continue current care programs",
+    "no_high_priority_actions": "No high priority actions needed",
+    "engagement_levels_healthy": "Engagement levels are healthy",
+    "develop_ministry_approaches": "Develop data-driven ministry approaches"
   },
   
   "_comment_members_list": "Members List Page",
