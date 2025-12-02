@@ -36,13 +36,19 @@ export const Calendar = () => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const days = [];
-    
+
+    // Add empty slots for days before the first day of the month
+    const startDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null); // Empty slot
+    }
+
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
     return days;
   };
-  
+
   const days = getDaysInMonth(currentDate);
   const monthName = currentDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
   
@@ -85,20 +91,41 @@ export const Calendar = () => {
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
               <div key={day} className="text-center font-semibold text-sm text-muted-foreground p-2">{day}</div>
             ))}
-            {days.map((day) => {
+            {days.map((day, index) => {
+              // Handle empty slots (days before the first of the month)
+              if (!day) {
+                return <div key={`empty-${index}`} className="border rounded-lg p-2 min-h-[80px] bg-muted/20" />;
+              }
+
               // Use local date string (YYYY-MM-DD) without UTC conversion
               const localDateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-              const dayEvents = events.filter(e => e.event_date === localDateStr);
+              // For birthdays, match by month-day pattern (birthdays recur annually)
+              const monthDay = `-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+              const dayEvents = events.filter(e => {
+                if (e.event_type === 'birthday') {
+                  // Match birthday by month-day pattern (e.g., -12-25 for Dec 25)
+                  return e.event_date && e.event_date.endsWith(monthDay);
+                }
+                // Other events match by exact date
+                return e.event_date === localDateStr;
+              });
+
+              // Check if this is today
+              const today = new Date();
+              const isToday = day.getDate() === today.getDate() &&
+                              day.getMonth() === today.getMonth() &&
+                              day.getFullYear() === today.getFullYear();
+
               return (
-                <div 
-                  key={day.toISOString()} 
-                  className={`border rounded-lg p-2 min-h-[80px] transition-all ${dayEvents.length > 0 ? 'hover:bg-teal-50 cursor-pointer hover:shadow-md' : 'hover:bg-muted/50'}`}
+                <div
+                  key={day.toISOString()}
+                  className={`border rounded-lg p-2 min-h-[80px] transition-all ${isToday ? 'ring-2 ring-teal-500 bg-teal-50' : ''} ${dayEvents.length > 0 ? 'hover:bg-teal-50 cursor-pointer hover:shadow-md' : 'hover:bg-muted/50'}`}
                   onClick={() => handleDateClick(day, dayEvents)}
                 >
-                  <div className="text-sm font-semibold mb-1">{day.getDate()}</div>
+                  <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-teal-700' : ''}`}>{day.getDate()}</div>
                   {dayEvents.slice(0, 2).map(e => (
                     <div key={e.id} className="text-xs bg-teal-100 text-teal-700 rounded px-1 mb-1 truncate">
-                      {e.event_type.replace('_', ' ')}
+                      {e.event_type === 'birthday' ? '🎂 Birthday' : e.event_type.replace('_', ' ')}
                     </div>
                   ))}
                   {dayEvents.length > 2 && <div className="text-xs text-muted-foreground font-semibold">+{dayEvents.length - 2} more</div>}
