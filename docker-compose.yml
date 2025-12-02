@@ -39,14 +39,19 @@ services:
     networks:
       - faithtracker-network
     labels:
-      # Dashboard (optional, comment out if not needed)
+      # Dashboard (optional - disable in production if not needed)
+      # Security: Protected with basic auth + IP whitelist
       - "traefik.enable=true"
       - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN}`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
+      # Apply both auth and IP whitelist (chain middlewares)
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth,dashboard-ipwhitelist"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+      # IP whitelist - only allow from these IPs (add your admin IPs)
+      # To disable whitelist, comment out the ipwhitelist middleware above
+      - "traefik.http.middlewares.dashboard-ipwhitelist.ipallowlist.sourcerange=127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
   # ===================
   # MongoDB Database
@@ -81,6 +86,7 @@ services:
     container_name: faithtracker-backend
     restart: unless-stopped
     environment:
+      - ENVIRONMENT=production
       - MONGO_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/faithtracker?authSource=admin
       - DB_NAME=faithtracker
       - JWT_SECRET_KEY=${JWT_SECRET}
@@ -88,6 +94,9 @@ services:
       - FRONTEND_URL=https://${DOMAIN}
       - ALLOWED_ORIGINS=https://${DOMAIN},https://api.${DOMAIN}
       - WHATSAPP_GATEWAY_URL=${WHATSAPP_GATEWAY_URL:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PHONE=${ADMIN_PHONE:-}
     volumes:
       - backend-uploads:/app/uploads
     networks:

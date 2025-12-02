@@ -142,14 +142,37 @@ export const Settings = () => {
 
   const [whatsappGateway, setWhatsappGateway] = useState('');
   const [digestTime, setDigestTime] = useState('08:00');
-  
+  const [automationLoading, setAutomationLoading] = useState(false);
+
+  // Load automation settings on mount
+  useEffect(() => {
+    const loadAutomationSettings = async () => {
+      try {
+        const response = await api.get('/settings/automation');
+        if (response.data) {
+          setDigestTime(response.data.digestTime || '08:00');
+          setWhatsappGateway(response.data.whatsappGateway || '');
+        }
+      } catch (error) {
+        console.error('Failed to load automation settings:', error);
+      }
+    };
+    loadAutomationSettings();
+  }, []);
+
   const saveAutomationSettings = async () => {
     try {
-      // Save WhatsApp Gateway to .env or settings collection
-      // For now, show that it's saved (backend needs endpoint)
-      toast.success('Automation settings saved');
+      setAutomationLoading(true);
+      await api.put('/settings/automation', {
+        digestTime,
+        whatsappGateway,
+        enabled: true
+      });
+      toast.success('Automation settings saved successfully');
     } catch (error) {
-      toast.error('Failed to save settings');
+      toast.error(error.response?.data?.detail || 'Failed to save settings');
+    } finally {
+      setAutomationLoading(false);
     }
   };
 
@@ -657,26 +680,8 @@ export const Settings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>{t('settings_page.schedule_time')}</Label>
-                <Input value="08:00" disabled className="h-12" />
-                <p className="text-xs text-muted-foreground mt-1">{t('settings_page.jakarta_time_fixed')}</p>
-              </div>
-              <div>
-                <Label>WhatsApp Gateway URL</Label>
-                <Input 
-                  value={whatsappGateway || import.meta.env.VITE_WHATSAPP_GATEWAY_URL || "http://dermapack.net:3001"} 
-                  onChange={(e) => setWhatsappGateway(e.target.value)}
-                  disabled={user?.role !== 'full_admin'}
-                  className="h-12" 
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {user?.role === 'full_admin' ? 'Edit and save to update' : 'Only full admin can edit'}
-                </p>
-              </div>
-              
-              <div>
-                <Label>Daily Digest Time</Label>
-                <Input 
+                <Label>Daily Digest Time (Jakarta Time)</Label>
+                <Input
                   type="time"
                   value={digestTime}
                   onChange={(e) => setDigestTime(e.target.value)}
@@ -684,13 +689,35 @@ export const Settings = () => {
                   className="h-12"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {user?.role === 'full_admin' ? 'Time to send daily pastoral care digest (Jakarta time)' : 'Only full admin can edit'}
+                  {user?.role === 'full_admin'
+                    ? 'Time when daily pastoral care digest is sent to all team members'
+                    : 'Only full admin can edit'}
                 </p>
               </div>
-              
+
+              <div>
+                <Label>WhatsApp Gateway URL</Label>
+                <Input
+                  value={whatsappGateway || import.meta.env.VITE_WHATSAPP_GATEWAY_URL || ""}
+                  onChange={(e) => setWhatsappGateway(e.target.value)}
+                  disabled={user?.role !== 'full_admin'}
+                  placeholder="http://your-whatsapp-gateway:3001"
+                  className="h-12"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {user?.role === 'full_admin'
+                    ? 'WhatsApp API gateway for sending reminders (leave empty to disable)'
+                    : 'Only full admin can edit'}
+                </p>
+              </div>
+
               {user?.role === 'full_admin' && (
-                <Button onClick={saveAutomationSettings} className="bg-teal-500 hover:bg-teal-600">
-                  Save Automation Settings
+                <Button
+                  onClick={saveAutomationSettings}
+                  disabled={automationLoading}
+                  className="bg-teal-500 hover:bg-teal-600"
+                >
+                  {automationLoading ? 'Saving...' : 'Save Automation Settings'}
                 </Button>
               )}
               <div className="p-4 bg-blue-50 rounded-lg">

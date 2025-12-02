@@ -26,11 +26,40 @@ from zoneinfo import ZoneInfo
 # Jakarta timezone (UTC+7)
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
-# Configure logging early (needed for startup warnings)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure logging - structured JSON in production, human-readable in development
+import sys
+
+class JSONFormatter(logging.Formatter):
+    """JSON log formatter for production - easier to parse and search"""
+    def format(self, record):
+        import json
+        log_obj = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno
+        }
+        if record.exc_info:
+            log_obj["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_obj)
+
+# Configure logging based on environment
+log_level = logging.INFO
+log_handler = logging.StreamHandler(sys.stdout)
+
+if os.environ.get('ENVIRONMENT', 'development') == 'production':
+    # Structured JSON logging for production (easier to parse, search, aggregate)
+    log_handler.setFormatter(JSONFormatter())
+else:
+    # Human-readable format for development
+    log_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    ))
+
+logging.basicConfig(level=log_level, handlers=[log_handler])
 logger = logging.getLogger(__name__)
 
 # Credential encryption for security
@@ -1660,8 +1689,9 @@ async def update_own_profile(update: ProfileUpdate, current_user: dict = Depends
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.post("/auth/change-password")
-async def change_password(password_data: PasswordChange, current_user: dict = Depends(get_current_user)):
-    """Change own password (all users)"""
+@limiter.limit("5/minute")
+async def change_password(request: Request, password_data: PasswordChange, current_user: dict = Depends(get_current_user)):
+    """Change own password (all users) - rate limited to prevent brute force"""
     try:
         # Get user with hashed password
         user = await db.users.find_one({"id": current_user["id"]})
@@ -1748,8 +1778,10 @@ async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_
         logger.error(f"Error uploading user photo: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-async def delete_user(user_id: str, current_admin: dict = Depends(get_current_admin)):
-    """Delete a user (admin only)"""
+@api_router.delete("/users/{user_id}")
+@limiter.limit("10/minute")
+async def delete_user(request: Request, user_id: str, current_admin: dict = Depends(get_current_admin)):
+    """Delete a user (admin only) - rate limited"""
     try:
         # Prevent deleting self
         if user_id == current_admin["id"]:
@@ -2481,8 +2513,9 @@ async def update_member(member_id: str, update: MemberUpdate, current_user: dict
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/members/{member_id}")
-async def delete_member(member_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete member"""
+@limiter.limit("20/minute")
+async def delete_member(request: Request, member_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete member - rate limited"""
     try:
         # Verify member belongs to user's campus
         query = {"id": member_id}
@@ -2523,8 +2556,9 @@ async def delete_member(member_id: str, current_user: dict = Depends(get_current
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/care-events/{event_id}")
-async def delete_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete care event and recalculate member engagement"""
+@limiter.limit("30/minute")
+async def delete_care_event(request: Request, event_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete care event and recalculate member engagement - rate limited"""
     try:
         # Build query with campus filter for multi-tenancy
         query = {"id": event_id}
@@ -4112,8 +4146,9 @@ async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = D
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @api_router.delete("/financial-aid-schedules/{schedule_id}")
-async def delete_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete a financial aid schedule and related activity logs"""
+@limiter.limit("20/minute")
+async def delete_aid_schedule(request: Request, schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a financial aid schedule and related activity logs - rate limited"""
     try:
         # Get schedule details before deleting
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4458,14 +4493,6 @@ async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(g
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
-        
-        # Log after update for debugging
-        updated_schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
-        logger.info(f"[IGNORE] After update - Schedule {schedule_id}: is_active={updated_schedule.get('is_active')}, ignored_occurrences={updated_schedule.get('ignored_occurrences')}, next_occurrence={updated_schedule.get('next_occurrence')}")
-        
-        # CRITICAL DEBUG: Check if update actually persisted
-        verify_schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
-        logger.info(f"[IGNORE] VERIFY - Schedule {schedule_id} from DB: is_active={verify_schedule.get('is_active')}, ignored={verify_schedule.get('ignored_occurrences')}")
         
         # Log activity
         await log_activity(
@@ -6469,6 +6496,66 @@ async def update_engagement_settings(settings: dict, current_admin: dict = Depen
         logger.error(f"Error updating engagement settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+@api_router.get("/settings/automation")
+async def get_automation_settings(user: dict = Depends(get_current_user)):
+    """Get automation settings (daily digest time, WhatsApp gateway)"""
+    try:
+        settings = await db.settings.find_one({"type": "automation"}, {"_id": 0})
+        if not settings:
+            # Return defaults
+            return {
+                "digestTime": "08:00",
+                "whatsappGateway": os.environ.get("WHATSAPP_GATEWAY_URL", ""),
+                "enabled": True
+            }
+        return settings.get("data", {
+            "digestTime": "08:00",
+            "whatsappGateway": "",
+            "enabled": True
+        })
+    except Exception as e:
+        logger.error(f"Error getting automation settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+@api_router.put("/settings/automation")
+async def update_automation_settings(settings: dict, current_admin: dict = Depends(get_current_admin)):
+    """Update automation settings (daily digest time, WhatsApp gateway)"""
+    try:
+        # Validate digestTime format (HH:MM)
+        digest_time = settings.get("digestTime", "08:00")
+        if digest_time:
+            try:
+                hour, minute = digest_time.split(":")
+                if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+                    raise ValueError("Invalid time")
+            except (ValueError, AttributeError):
+                raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM (e.g., 08:00)")
+
+        await db.settings.update_one(
+            {"type": "automation"},
+            {"$set": {
+                "type": "automation",
+                "data": {
+                    "digestTime": digest_time,
+                    "whatsappGateway": settings.get("whatsappGateway", ""),
+                    "enabled": settings.get("enabled", True)
+                },
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": current_admin["id"]
+            }},
+            upsert=True
+        )
+
+        # Note: Scheduler restart may be needed to apply new digest time
+        logger.info(f"Automation settings updated by {current_admin['email']}: digestTime={digest_time}")
+
+        return {"success": True, "message": "Automation settings updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating automation settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 @api_router.get("/settings/overdue_writeoff")
 async def get_overdue_writeoff_settings(user: dict = Depends(get_current_user)):
     """Get overdue write-off threshold settings"""
@@ -8020,12 +8107,30 @@ async def get_activity_summary(current_user: dict = Depends(get_current_user)):
 
 @app.get("/health")
 async def health_check():
-    """Liveness probe - is the API process running?"""
-    return {
-        "status": "healthy",
-        "service": "faithtracker-api",
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    """
+    Health check endpoint - verifies API and database are operational.
+    Used by Docker health checks and load balancers.
+    """
+    try:
+        # Verify database connectivity
+        await client.admin.command('ping')
+        return {
+            "status": "healthy",
+            "service": "faithtracker-api",
+            "database": "connected",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Health check failed - database unreachable: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "service": "faithtracker-api",
+                "database": "disconnected",
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        )
 
 @app.get("/ready")
 async def readiness_check():
@@ -8088,6 +8193,52 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# CSRF Protection Middleware - validates Origin header for state-changing requests
+class CSRFProtectionMiddleware(BaseHTTPMiddleware):
+    """
+    CSRF protection via Origin header validation.
+    For JWT-based APIs, CSRF is less critical (tokens in Authorization header),
+    but this adds defense-in-depth for state-changing requests.
+    """
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    async def dispatch(self, request, call_next):
+        # Skip CSRF check for safe methods and health endpoints
+        if request.method in self.SAFE_METHODS:
+            return await call_next(request)
+
+        if request.url.path in ["/health", "/ready"]:
+            return await call_next(request)
+
+        # In production, validate Origin header for state-changing requests
+        if os.environ.get('ENVIRONMENT', 'development') == 'production':
+            origin = request.headers.get("origin")
+            referer = request.headers.get("referer")
+
+            # Get allowed origins from environment
+            allowed = os.environ.get('ALLOWED_ORIGINS', '').split(',')
+            allowed = [o.strip() for o in allowed if o.strip()]
+
+            # Check if origin or referer matches allowed origins
+            if allowed:
+                origin_valid = origin and any(origin.startswith(ao) for ao in allowed)
+                referer_valid = referer and any(referer.startswith(ao) for ao in allowed)
+
+                # Require valid origin/referer for state-changing requests (with some exceptions)
+                # Allow requests without origin if they have valid Authorization header (API clients)
+                has_auth = request.headers.get("authorization")
+
+                if not (origin_valid or referer_valid or has_auth):
+                    logger.warning(f"CSRF check failed: origin={origin}, referer={referer}, path={request.url.path}")
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "CSRF validation failed"}
+                    )
+
+        return await call_next(request)
+
+app.add_middleware(CSRFProtectionMiddleware)
 
 # CORS Configuration for subdomain architecture
 # ALLOWED_ORIGINS should be set to frontend URL (e.g., https://faithtracker.example.com)
