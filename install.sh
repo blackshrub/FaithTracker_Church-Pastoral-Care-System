@@ -341,7 +341,7 @@ show_preflight_summary() {
     echo ""
     echo -e "${BOLD}Installation will:${NC}"
     echo -e "  ${BULLET} Install Python 3.11, Node.js ${NODE_VERSION}, MongoDB 7.0, Nginx"
-    echo -e "  ${BULLET} Install Granian (Rust ASGI server) + orjson (fast JSON)"
+    echo -e "  ${BULLET} Install Granian (Rust ASGI server) + msgspec (fast JSON)"
     echo -e "  ${BULLET} Configure firewall (UFW) and SSL certificates"
     echo -e "  ${BULLET} Create 'faithtracker' system user"
     echo -e "  ${BULLET} Set up automatic service management"

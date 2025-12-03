@@ -535,7 +535,7 @@ main() {
     echo "This will deploy FaithTracker using Docker Compose with:"
     echo -e "  ${BULLET} Traefik v3.6 reverse proxy (SSL, HTTP/3, Brotli)"
     echo -e "  ${BULLET} MongoDB 7.0 database"
-    echo -e "  ${BULLET} FastAPI backend (Granian + orjson)"
+    echo -e "  ${BULLET} FastAPI backend (Granian + msgspec)"
     echo -e "  ${BULLET} React 19 frontend (React Compiler, PWA)"
     echo ""
     read -p "Press Enter to continue..."

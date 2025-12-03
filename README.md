@@ -217,7 +217,7 @@ Both should show your server's IP.
 | Layer | Technology |
 |-------|------------|
 | **Backend** | FastAPI (Python 3.11), MongoDB 7.0, Granian (Rust ASGI server) |
-| **Performance** | orjson (fast JSON), Brotli compression, HTTP/3 (QUIC) |
+| **Performance** | msgspec (fast JSON), Brotli compression, HTTP/3 (QUIC) |
 | **Frontend** | React 19 + React Compiler, Vite, TanStack Query, Tailwind CSS, Shadcn/UI |
 | **Mobile** | React Native, Expo, NativeWind |
 | **Infrastructure** | Docker, Traefik v3.6, Let's Encrypt |
@@ -336,7 +336,7 @@ FaithTracker is optimized for speed and efficiency:
 | Optimization | Benefit |
 |-------------|---------|
 | **Granian ASGI Server** | Rust-based, 10-15% faster than Uvicorn |
-| **orjson Serialization** | 2-5x faster JSON encoding/decoding |
+| **msgspec Serialization** | Faster than orjson, 30-50% lower memory |
 | **Brotli Compression** | 15-25% smaller responses than gzip |
 | **HTTP/3 (QUIC)** | Lower latency, especially on mobile networks |
 | **React Compiler** | Automatic memoization, no manual optimization |
