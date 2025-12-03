@@ -7800,6 +7800,8 @@ async def sync_members_from_core(request: Request) -> dict:
             status="in_progress"
         )
         sync_log_dict = msgspec.to_builtins(sync_log)
+        # Preserve datetime as proper BSON Date for correct sorting
+        sync_log_dict["started_at"] = sync_log.started_at
         await db.sync_logs.insert_one(sync_log_dict)
         sync_log_id = sync_log.id
         
@@ -8116,7 +8118,7 @@ async def sync_members_from_core(request: Request) -> dict:
                         "members_updated": stats["updated"],
                         "members_archived": stats["archived"],
                         "members_unarchived": stats["unarchived"],
-                        "completed_at": end_time.isoformat(),
+                        "completed_at": end_time,
                         "duration_seconds": duration
                     }}
                 )
@@ -8147,7 +8149,7 @@ async def sync_members_from_core(request: Request) -> dict:
                 {"$set": {
                     "status": "error",
                     "error_message": str(sync_error),
-                    "completed_at": end_time.isoformat(),
+                    "completed_at": end_time,
                     "duration_seconds": duration
                 }}
             )
