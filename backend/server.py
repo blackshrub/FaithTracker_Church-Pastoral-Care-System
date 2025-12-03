@@ -6005,8 +6005,19 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         week_num = 1
         while current_week_start < end_date:
             week_end = min(current_week_start + timedelta(days=7), end_date)
+            # Handle both datetime objects and ISO strings for created_at
+            def get_activity_datetime(a):
+                created_at = a.get("created_at")
+                if isinstance(created_at, datetime):
+                    return created_at
+                if isinstance(created_at, str) and created_at:
+                    try:
+                        return datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    except ValueError:
+                        return None
+                return None
             week_activities = [a for a in activities_this_month
-                            if current_week_start.isoformat() <= a.get("created_at", "") < week_end.isoformat()]
+                            if (dt := get_activity_datetime(a)) and current_week_start <= dt < week_end]
             week_events_completed = len([a for a in week_activities if a.get("action_type", "").lower() == "complete_task"])
             engagement_trend.append({
                 "week": f"Week {week_num}",
@@ -6559,11 +6570,18 @@ async def get_staff_performance_report(
             staff["total_actions"] += 1
 
             action = activity.get("action_type", "").lower()  # Normalize to lowercase
-            created_at = activity.get("created_at", "")
+            created_at = activity.get("created_at")
             if created_at:
-                day = created_at[:10]
-                staff["active_days"].add(day)
-                staff["daily_activity"][day] = staff["daily_activity"].get(day, 0) + 1
+                # Handle both datetime objects and ISO strings
+                if isinstance(created_at, datetime):
+                    day = created_at.strftime("%Y-%m-%d")
+                elif isinstance(created_at, str):
+                    day = created_at[:10]
+                else:
+                    day = None
+                if day:
+                    staff["active_days"].add(day)
+                    staff["daily_activity"][day] = staff["daily_activity"].get(day, 0) + 1
 
             if action == "complete_task":
                 staff["tasks_completed"] += 1
