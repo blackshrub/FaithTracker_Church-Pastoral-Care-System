@@ -208,13 +208,14 @@ def encrypt_password(password: str) -> str:
     """Encrypt password for storage"""
     return cipher_suite.encrypt(password.encode()).decode()
 
-def decrypt_password(encrypted: str) -> str:
-    """Decrypt password for use"""
+def decrypt_password(encrypted: str) -> str | None:
+    """Decrypt password for use. Returns None if decryption fails."""
     try:
         return cipher_suite.decrypt(encrypted.encode()).decode()
     except Exception:
-        # If decryption fails, assume it's already plain text (backward compatibility)
-        return encrypted
+        # Return None instead of plaintext to prevent accidental exposure
+        logger.warning("Failed to decrypt password - may be corrupted or using wrong key")
+        return None
 
 def now_jakarta():
     """Get current time in Jakarta timezone"""
@@ -444,7 +445,7 @@ DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS = 14
 DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT = 14
 
 # JWT Token Settings
-JWT_TOKEN_EXPIRE_HOURS = 24
+JWT_TOKEN_EXPIRE_HOURS = 4  # Reduced from 24h for better security
 
 # Pagination Defaults
 DEFAULT_PAGE_SIZE = 50
@@ -511,6 +512,13 @@ def escape_regex(text: str) -> str:
 
 # UUID v4 pattern for validation
 UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.IGNORECASE)
+
+# Email validation pattern (RFC 5322 simplified)
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+def validate_email(email: str) -> bool:
+    """Validate email format using regex"""
+    return bool(EMAIL_PATTERN.match(email))
 
 def is_valid_uuid(value: str) -> bool:
     """Check if a string is a valid UUID format."""
@@ -965,7 +973,7 @@ class SyncConfig(Struct):
     api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
     api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
     api_members_endpoint: str = "/members/"  # Members endpoint path
-    webhook_secret: str = field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
+    webhook_secret: str = field(default_factory=lambda: secrets.token_hex(32))  # Full 256-bit entropy for HMAC-SHA256
     is_enabled: bool = False
     polling_interval_hours: int = 6  # For polling method
     reconciliation_enabled: bool = False  # Daily 3 AM reconciliation (recommended for webhook mode)
@@ -1523,6 +1531,10 @@ async def update_campus(campus_id: str, data: CampusCreate, request: Request) ->
 async def register_user(data: UserCreate, request: Request) -> dict:
     """Register a new user (admin only)"""
     try:
+        # Validate email format
+        if not validate_email(data.email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+
         # Check if email already exists
         existing = await db.users.find_one({"email": data.email}, {"_id": 0})
         if existing:
@@ -1838,15 +1850,15 @@ async def change_password(data: PasswordChange, request: Request) -> dict:
             raise HTTPException(status_code=404, detail="User not found")
 
         # Verify current password
-        if not verify_password(password_data.current_password, user["hashed_password"]):
+        if not verify_password(data.current_password, user["hashed_password"]):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
 
-        # Validate new password
-        if len(password_data.new_password) < 6:
-            raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+        # Validate new password (8 chars minimum to match registration)
+        if len(data.new_password) < 8:
+            raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
 
         # Hash and update password
-        new_hashed = get_password_hash(password_data.new_password)
+        new_hashed = get_password_hash(data.new_password)
 
         await db.users.update_one(
             {"id": current_user["id"]},
@@ -2153,24 +2165,49 @@ async def get_dashboard_reminders(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: str):
-    """Calculate all dashboard reminder data - optimized query"""
+    """Calculate all dashboard reminder data - optimized query with parallel fetching"""
     try:
         logger.info(f"Calculating dashboard reminders for campus {campus_id}, date {today_date}")
-        
+
         today = datetime.strptime(today_date, '%Y-%m-%d').date()
         tomorrow = today + timedelta(days=1)
         week_ahead = today + timedelta(days=7)
-        
-        # Get writeoff settings
-        writeoff_settings = await get_writeoff_settings()
-        
-        # Fetch only necessary data with projection (exclude archived)
-        members = await db.members.find(
+
+        # Parallel fetch: writeoff settings + all main data sources
+        # This reduces 5 sequential DB calls to 1 effective round-trip (100-200ms savings)
+        writeoff_task = get_writeoff_settings()
+        members_task = db.members.find(
             {"campus_id": campus_id, "is_archived": {"$ne": True}},
-            {"_id": 0, "id": 1, "name": 1, "phone": 1, "photo_url": 1, "birth_date": 1, 
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "photo_url": 1, "birth_date": 1,
              "engagement_status": 1, "days_since_last_contact": 1}
         ).to_list(None)
-        
+        grief_task = db.grief_support.find(
+            {"campus_id": campus_id, "completed": False, "ignored": {"$ne": True}},
+            {
+                "_id": 0, "id": 1, "member_id": 1, "campus_id": 1, "care_event_id": 1,
+                "stage": 1, "scheduled_date": 1, "completed": 1, "notes": 1
+            }
+        ).to_list(None)
+        accident_task = db.accident_followup.find(
+            {"campus_id": campus_id, "completed": False, "ignored": {"$ne": True}},
+            {
+                "_id": 0, "id": 1, "member_id": 1, "campus_id": 1, "care_event_id": 1,
+                "stage": 1, "scheduled_date": 1, "completed": 1, "notes": 1
+            }
+        ).to_list(None)
+        aid_task = db.financial_aid_schedules.find(
+            {"campus_id": campus_id, "is_active": True, "ignored": {"$ne": True}},
+            {
+                "_id": 0, "id": 1, "member_id": 1, "campus_id": 1, "aid_amount": 1,
+                "frequency": 1, "next_occurrence": 1, "is_active": 1, "notes": 1
+            }
+        ).to_list(None)
+
+        # Execute all queries in parallel
+        writeoff_settings, members, grief_stages, accident_followups, aid_schedules = await asyncio.gather(
+            writeoff_task, members_task, grief_task, accident_task, aid_task
+        )
+
         logger.info(f"Found {len(members)} members for campus {campus_id}")
         
         # Build member map for quick lookup and calculate ages
@@ -2193,41 +2230,10 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         today_tasks = []
         overdue_birthdays = []
         upcoming_tasks = []
-        
-        # Grief support due (today and overdue) - with projection
-        grief_stages = await db.grief_support.find(
-            {"campus_id": campus_id, "completed": False, "ignored": {"$ne": True}},
-            {
-                "_id": 0,
-                "id": 1,
-                "member_id": 1,
-                "campus_id": 1,
-                "care_event_id": 1,
-                "stage": 1,
-                "scheduled_date": 1,
-                "completed": 1,
-                "notes": 1
-            }
-        ).to_list(None)
-        
+
         logger.info(f"Found {len(grief_stages)} incomplete grief stages for campus")
-        
-        # Accident follow-ups due - with projection
-        accident_followups = await db.accident_followup.find(
-            {"campus_id": campus_id, "completed": False, "ignored": {"$ne": True}},
-            {
-                "_id": 0,
-                "id": 1,
-                "member_id": 1,
-                "campus_id": 1,
-                "care_event_id": 1,
-                "stage": 1,
-                "scheduled_date": 1,
-                "completed": 1,
-                "notes": 1
-            }
-        ).to_list(None)
-        
+
+        # Process accident follow-ups (already fetched in parallel above)
         accident_today = []
         accident_writeoff = writeoff_settings.get("accident_illness", 14)
         
@@ -2275,23 +2281,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         # At-risk and disconnected members
         at_risk = [m for m in members if m.get("engagement_status") == "at_risk"]
         disconnected = [m for m in members if m.get("engagement_status") == "disconnected"]
-        
-        # Financial aid - categorize by date - with projection
-        aid_schedules = await db.financial_aid_schedules.find(
-            {"campus_id": campus_id, "is_active": True, "ignored": {"$ne": True}},
-            {
-                "_id": 0,
-                "id": 1,
-                "member_id": 1,
-                "campus_id": 1,
-                "aid_amount": 1,
-                "frequency": 1,
-                "next_occurrence": 1,
-                "is_active": 1,
-                "notes": 1
-            }
-        ).to_list(None)
-        
+
+        # Process financial aid schedules (already fetched in parallel above)
         logger.info(f"Found {len(aid_schedules)} active financial aid schedules for campus")
         
         aid_due = []  # OVERDUE only (past due)
@@ -2797,7 +2788,10 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
         
         # Delete activity logs related to this care event
         await db.activity_logs.delete_many({"care_event_id": event_id})
-        
+
+        # Delete notification logs related to this care event
+        await db.notification_logs.delete_many({"care_event_id": event_id})
+
         # If deleting grief/accident parent event, also delete followup stages
         if event_type == "grief_loss":
             # Get all grief stages
@@ -2816,9 +2810,10 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 ).to_list(None)
                 timeline_entry_ids = [e["id"] for e in timeline_entries]
 
-                # Delete activity logs for these timeline entries
+                # Delete activity logs and notification logs for these timeline entries
                 if timeline_entry_ids:
                     await db.activity_logs.delete_many({"care_event_id": {"$in": timeline_entry_ids}})
+                    await db.notification_logs.delete_many({"care_event_id": {"$in": timeline_entry_ids}})
 
                 # Delete the timeline entries
                 await db.care_events.delete_many({"grief_stage_id": {"$in": stage_ids}})
@@ -2843,9 +2838,10 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 ).to_list(None)
                 timeline_entry_ids = [e["id"] for e in timeline_entries]
 
-                # Delete activity logs for these timeline entries
+                # Delete activity logs and notification logs for these timeline entries
                 if timeline_entry_ids:
                     await db.activity_logs.delete_many({"care_event_id": {"$in": timeline_entry_ids}})
+                    await db.notification_logs.delete_many({"care_event_id": {"$in": timeline_entry_ids}})
 
                 # Delete the timeline entries
                 await db.care_events.delete_many({"accident_stage_id": {"$in": stage_ids}})
@@ -7464,9 +7460,12 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
             import httpx
             base_url = config.api_base_url.rstrip('/')
             async with httpx.AsyncClient(timeout=10.0) as client:
+                decrypted_pwd = decrypt_password(config.api_password)
+                if not decrypted_pwd:
+                    raise Exception("Failed to decrypt API password")
                 login_response = await client.post(
                     f"{base_url}{api_path_prefix}/auth/login",
-                    json={"email": config.api_email, "password": decrypt_password(config.api_password)}
+                    json={"email": config.api_email, "password": decrypted_pwd}
                 )
                 if login_response.status_code == 200:
                     login_data = login_response.json()
@@ -7493,7 +7492,7 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
         
         if existing:
             # Preserve existing webhook_secret
-            sync_config_data["webhook_secret"] = existing.get("webhook_secret", secrets.token_urlsafe(32))
+            sync_config_data["webhook_secret"] = existing.get("webhook_secret", secrets.token_hex(32))
             sync_config_data["id"] = existing["id"]
             
             # Update existing
@@ -7541,7 +7540,7 @@ async def regenerate_webhook_secret(request: Request) -> dict:
             raise HTTPException(status_code=400, detail="Please select a campus first")
         
         # Generate new secret
-        new_secret = secrets.token_urlsafe(32)
+        new_secret = secrets.token_hex(32)
         
         # Update config
         result = await db.sync_configs.update_one(
@@ -7733,10 +7732,13 @@ async def test_sync_connection(config: SyncConfigCreate, request: Request) -> di
 
         # Test login - send as 'email' key even if it's not email format (core API requirement)
         login_url = f"{base_url}{api_path_prefix}{login_endpoint}"
+        decrypted_pwd = decrypt_password(config.api_password)
+        if not decrypted_pwd:
+            raise HTTPException(status_code=400, detail="Failed to decrypt API password. Please re-enter it.")
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 login_url,
-                json={"email": config.api_email, "password": decrypt_password(config.api_password)}
+                json={"email": config.api_email, "password": decrypted_pwd}
             )
 
             if login_response.status_code != 200:
@@ -7866,10 +7868,13 @@ async def sync_members_from_core(request: Request) -> dict:
             base_url = config['api_base_url'].rstrip('/')
 
             # Login to core API
+            decrypted_pwd = decrypt_password(config["api_password"])
+            if not decrypted_pwd:
+                raise Exception("Failed to decrypt API password")
             async with httpx.AsyncClient(timeout=60.0) as client:
                 login_response = await client.post(
                     f"{base_url}{api_path_prefix}/auth/login",
-                    json={"email": config["api_email"], "password": decrypt_password(config["api_password"])}
+                    json={"email": config["api_email"], "password": decrypted_pwd}
                 )
 
                 if login_response.status_code != 200:
@@ -8431,10 +8436,13 @@ async def receive_sync_webhook(request: Request) -> dict:
                 base_url = config['api_base_url'].rstrip('/')
 
                 # Login to core API
+                decrypted_pwd = decrypt_password(config["api_password"])
+                if not decrypted_pwd:
+                    raise Exception("Failed to decrypt API password")
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     login_response = await client.post(
                         f"{base_url}{api_path_prefix}/auth/login",
-                        json={"email": config["api_email"], "password": decrypt_password(config["api_password"])}
+                        json={"email": config["api_email"], "password": decrypted_pwd}
                     )
 
                     if login_response.status_code != 200:
@@ -9086,12 +9094,22 @@ route_handlers = [
     get_activity_summary,
 ]
 
+# Rate limiting configuration
+rate_limit_config = RateLimitConfig(
+    rate_limit=("minute", 100),  # 100 requests per minute for general endpoints
+    exclude=["/health", "/docs", "/schema"],  # Exclude health check and docs
+)
+
 # Create Litestar application
 app = Litestar(
     route_handlers=route_handlers,
     cors_config=cors_config,
     on_startup=[on_startup],
     on_shutdown=[on_shutdown],
+    middleware=[
+        DefineMiddleware(RequestSizeLimitMiddleware),  # Limit request body size
+        rate_limit_config.middleware,  # Rate limiting
+    ],
     openapi_config=OpenAPIConfig(
         title="FaithTracker API",
         version="1.0.0",

@@ -46,7 +46,15 @@ async def create_database_indexes():
     await db.grief_support.create_index("completed")
     await db.grief_support.create_index("care_event_id")
     print("✅ Grief support indexes created")
-    
+
+    # Accident followup collection indexes
+    await db.accident_followup.create_index("member_id")
+    await db.accident_followup.create_index("campus_id")
+    await db.accident_followup.create_index("scheduled_date")
+    await db.accident_followup.create_index("completed")
+    await db.accident_followup.create_index("care_event_id")
+    print("✅ Accident followup indexes created")
+
     # Financial aid schedules indexes
     await db.financial_aid_schedules.create_index("member_id")
     await db.financial_aid_schedules.create_index("campus_id")
