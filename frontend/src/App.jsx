@@ -31,6 +31,7 @@ import {
   adminLoader,
   activityLogLoader,
   reportsLoader,
+  calendarLoader,
 } from '@/lib/routeLoaders';
 import './i18n';
 import '@/App.css';
@@ -229,6 +230,7 @@ const router = createBrowserRouter([
           {
             path: '/calendar',
             element: <Calendar />,
+            loader: calendarLoader,
           },
           {
             path: '/messaging',

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -160,34 +161,29 @@ export const Reports = () => {
   const [activeTab, setActiveTab] = useState('monthly');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [monthlyReport, setMonthlyReport] = useState(null);
-  const [staffReport, setStaffReport] = useState(null);
-  const [yearlyReport, setYearlyReport] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
-  useEffect(() => {
-    loadReports();
-  }, [selectedYear, selectedMonth]);
+  // Use TanStack Query for data fetching - leverages prefetched cache from route loader
+  const { data: monthlyReport, isLoading: loadingMonthly } = useQuery({
+    queryKey: ['monthly-report', selectedYear, selectedMonth],
+    queryFn: () => api.get(`/reports/monthly?year=${selectedYear}&month=${selectedMonth}`).then(res => res.data),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-  const loadReports = async () => {
-    setLoading(true);
-    try {
-      const [monthlyRes, staffRes, yearlyRes] = await Promise.all([
-        api.get(`/reports/monthly?year=${selectedYear}&month=${selectedMonth}`),
-        api.get(`/reports/staff-performance?year=${selectedYear}&month=${selectedMonth}`),
-        api.get(`/reports/yearly-summary?year=${selectedYear}`)
-      ]);
-      setMonthlyReport(monthlyRes.data);
-      setStaffReport(staffRes.data);
-      setYearlyReport(yearlyRes.data);
-    } catch (error) {
-      console.error('Error loading reports:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: staffReport, isLoading: loadingStaff } = useQuery({
+    queryKey: ['staff-performance', selectedYear, selectedMonth],
+    queryFn: () => api.get(`/reports/staff-performance?year=${selectedYear}&month=${selectedMonth}`).then(res => res.data),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const { data: yearlyReport, isLoading: loadingYearly } = useQuery({
+    queryKey: ['yearly-summary', selectedYear],
+    queryFn: () => api.get(`/reports/yearly-summary?year=${selectedYear}`).then(res => res.data),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const loading = loadingMonthly || loadingStaff || loadingYearly;
 
   const [exporting, setExporting] = useState(false);
   const [printing, setPrinting] = useState(false);

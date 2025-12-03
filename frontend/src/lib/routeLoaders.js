@@ -208,7 +208,22 @@ export const activityLogLoader = async () => {
 };
 
 /**
- * Reports loader
+ * Calendar loader - prefetches care events
+ */
+export const calendarLoader = async () => {
+  if (!isAuthenticated()) return null;
+
+  await safePrefetch(
+    ['calendar-events'],
+    () => api.get('/care-events?limit=2000').then(res => res.data),
+    { staleTime: 1000 * 60 * 2 }
+  );
+
+  return null;
+};
+
+/**
+ * Reports loader - prefetches all three report endpoints in parallel
  */
 export const reportsLoader = async () => {
   if (!isAuthenticated()) return null;
@@ -226,6 +241,11 @@ export const reportsLoader = async () => {
     safePrefetch(
       ['staff-performance', year, month],
       () => api.get(`/reports/staff-performance?year=${year}&month=${month}`).then(res => res.data),
+      { staleTime: 1000 * 60 * 5 }
+    ),
+    safePrefetch(
+      ['yearly-summary', year],
+      () => api.get(`/reports/yearly-summary?year=${year}`).then(res => res.data),
       { staleTime: 1000 * 60 * 5 }
     ),
   ]);

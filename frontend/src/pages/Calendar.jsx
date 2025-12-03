@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,25 +31,19 @@ const WhatsAppIcon = () => (
 
 export const Calendar = () => {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [events, setEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  
-  useEffect(() => {
-    loadEvents();
-  }, [currentDate]);
-  
-  const loadEvents = async () => {
-    try {
-      // Fetch all events for calendar view (birthdays need all for month-day matching)
-      const response = await api.get('/care-events?limit=2000');
-      setEvents(response.data);
-    } catch (error) {
-      toast.error(t('toasts.failed_load_events'));
-    }
-  };
+
+  // Use TanStack Query for data fetching - leverages prefetched cache from route loader
+  const { data: events = [], refetch: loadEvents } = useQuery({
+    queryKey: ['calendar-events'],
+    queryFn: () => api.get('/care-events?limit=2000').then(res => res.data),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    onError: () => toast.error(t('toasts.failed_load_events')),
+  });
   
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
