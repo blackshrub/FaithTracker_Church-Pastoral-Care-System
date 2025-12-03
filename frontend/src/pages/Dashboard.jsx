@@ -70,27 +70,7 @@ const getRelativeDate = (dateStr) => {
   }
 };
 
-const getGriefStageBadge = (stage) => {
-  const badges = {
-    '1_week': 'Week 1',
-    '2_weeks': 'Week 2',
-    '1_month': 'Month 1',
-    '3_months': 'Month 3',
-    '6_months': 'Month 6',
-    '1_year': 'Year 1'
-  };
-  return badges[stage] || stage.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-};
-
-const getAccidentStageBadge = (stage) => {
-  const badges = {
-    'first_followup': 'First Follow-up',
-    'second_followup': 'Second Follow-up',
-    'third_followup': 'Third Follow-up',
-    'final_check': 'Final Check'
-  };
-  return badges[stage] || stage.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-};
+// getGriefStageBadge and getAccidentStageBadge imported from @/lib/utils/badges
 
 const triggerHaptic = () => {
   if ('vibrate' in navigator) {
@@ -133,16 +113,7 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
   );
 };
 
-const formatPhoneForWhatsApp = (phone) => {
-  if (!phone) return '#';
-  let formatted = phone;
-  if (formatted.startsWith('0')) {
-    formatted = '62' + formatted.substring(1);
-  } else if (formatted.startsWith('+')) {
-    formatted = formatted.substring(1);
-  }
-  return `https://wa.me/${formatted}`;
-};
+// formatPhoneForWhatsApp imported from @/lib/utils/formatting
 
 const markBirthdayComplete = async (eventId, queryClient, t) => {
   try {

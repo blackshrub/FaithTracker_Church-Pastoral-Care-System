@@ -10,4 +10,4 @@ export {
   useCreateEventOptimistic,
 } from './useOptimisticMutation';
 export { useConfirmDialog } from './useConfirmDialog';
-export { usePullToRefresh } from './usePullToRefresh';
+export { usePullToRefresh } from './usePullToRefresh.jsx';
