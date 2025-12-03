@@ -2032,7 +2032,7 @@ async def list_members(
     search: Optional[str] = None,
     show_archived: bool = False,
     fields: Optional[str] = None,  # Comma-separated list of fields to return
-) -> list:
+) -> Response:
     """List all members with pagination"""
     current_user = await get_current_user(request)
     try:
@@ -2105,13 +2105,17 @@ async def list_members(
             if member.get('last_contact_date'):
                 if isinstance(member['last_contact_date'], str):
                     member['last_contact_date'] = datetime.fromisoformat(member['last_contact_date'])
-            
+
             status, days = calculate_engagement_status(member.get('last_contact_date'))
             member['engagement_status'] = status
             member['days_since_last_contact'] = days
-        
-        # Return members array directly (frontend expects array)
-        return members
+
+        # Return members array with X-Total-Count header for pagination
+        return Response(
+            content=msgspec.json.encode(members, enc_hook=msgspec_enc_hook),
+            media_type="application/json",
+            headers={"X-Total-Count": str(total)}
+        )
         
     except Exception as e:
         logger.error(f"Error listing members: {str(e)}")
