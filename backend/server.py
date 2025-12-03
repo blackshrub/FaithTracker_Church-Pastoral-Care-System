@@ -3194,7 +3194,7 @@ async def list_care_events(
         # Use aggregation with $lookup to avoid N+1 queries (50x faster)
         pipeline = [
             {"$match": query},
-            {"$sort": {"event_date": -1}},
+            {"$sort": {"event_date": -1, "created_at": -1}},  # Secondary sort by created_at for same-day events
             {"$skip": skip},
             {"$limit": limit},
             # Join with members collection to get member names, phone, and photo in single query
@@ -4785,7 +4785,7 @@ async def get_member_financial_aid(member_id: str) -> dict:
         aid_events = await db.care_events.find({
             "member_id": member_id,
             "event_type": EventType.FINANCIAL_AID
-        }, {"_id": 0}).sort("event_date", -1).to_list(100)
+        }, {"_id": 0}).sort([("event_date", -1), ("created_at", -1)]).to_list(100)
         
         total_amount = sum(event.get('aid_amount', 0) or 0 for event in aid_events)
         
