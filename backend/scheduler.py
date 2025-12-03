@@ -74,38 +74,52 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         church_name = os.environ.get('CHURCH_NAME', 'Church')
         
         # 1. Birthdays today
-        birthdays_today = await db.care_events.find({
-            "campus_id": campus_id,
-            "event_type": "birthday",
-            "event_date": today.isoformat(),
-            "completed": False
-        }, {"_id": 0}).to_list(100)
-        
-        # Get member names for birthdays with wa.me links
+        # Birthday events store original birth_date (e.g., "1980-05-15"), not current year's date
+        # We need to find members whose birth month/day matches today
         birthday_members = []
-        for event in birthdays_today:
-            member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
-            if member:
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                birthday_members.append(f"  • {member['name']}\n    📱 wa.me/{phone_clean}")
-        
-        # 2. Birthdays this week (next 7 days)
-        week_end = today + timedelta(days=7)
-        birthdays_week = await db.care_events.find({
-            "campus_id": campus_id,
-            "event_type": "birthday",
-            "event_date": {"$gte": (today + timedelta(days=1)).isoformat(), "$lte": week_end.isoformat()},
-            "completed": False
-        }, {"_id": 0}).to_list(100)
-        
         birthday_week_members = []
-        for event in birthdays_week:
-            member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
-            if member:
-                event_date = datetime.fromisoformat(event['event_date']).date() if isinstance(event['event_date'], str) else event['event_date']
-                days_until = (event_date - today).days
+
+        # Get all members with birth_date in this campus
+        members_with_birthday = await db.members.find(
+            {"campus_id": campus_id, "birth_date": {"$exists": True, "$ne": None, "$ne": ""}},
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "birth_date": 1}
+        ).to_list(5000)
+
+        today_month_day = (today.month, today.day)
+        week_ahead = today + timedelta(days=7)
+
+        for member in members_with_birthday:
+            try:
+                birth_date = datetime.strptime(member["birth_date"], '%Y-%m-%d').date()
+                this_year_birthday = birth_date.replace(year=today.year)
+
+                # Handle leap year edge case (Feb 29 -> Feb 28 if not leap year)
+                if birth_date.month == 2 and birth_date.day == 29:
+                    try:
+                        this_year_birthday = birth_date.replace(year=today.year)
+                    except ValueError:
+                        this_year_birthday = birth_date.replace(year=today.year, day=28)
+
+                # Check if birthday event exists and is not completed
+                event = await db.care_events.find_one(
+                    {"member_id": member["id"], "event_type": "birthday", "completed": False, "ignored": {"$ne": True}},
+                    {"_id": 0}
+                )
+
+                if not event:
+                    continue
+
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                birthday_week_members.append(f"  • {member['name']} ({days_until} hari lagi)\n    📱 wa.me/{phone_clean}")
+
+                if this_year_birthday == today:
+                    # Birthday TODAY
+                    birthday_members.append(f"  • {member['name']}\n    📱 wa.me/{phone_clean}")
+                elif today < this_year_birthday <= week_ahead:
+                    # Birthday in next 7 days
+                    days_until = (this_year_birthday - today).days
+                    birthday_week_members.append(f"  • {member['name']} ({days_until} hari lagi)\n    📱 wa.me/{phone_clean}")
+            except (ValueError, KeyError):
+                continue
         
         # 3. Grief stages due today
         grief_due = await db.grief_support.find({
@@ -130,23 +144,28 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
                 grief_members.append(f"  • {member['name']} ({stage_name} setelah dukacita)\n    📱 wa.me/{phone_clean}")
         
-        # 4. Hospital follow-ups due
-        followup_days = [3, 7, 14]
+        # 4. Accident/illness follow-ups due today
+        # Query accident_followup collection (similar to grief_support) with scheduled_date
+        accident_followups_due = await db.accident_followup.find({
+            "campus_id": campus_id,
+            "scheduled_date": today.isoformat(),
+            "completed": False,
+            "ignored": {"$ne": True}
+        }, {"_id": 0}).to_list(100)
+
         hospital_followups = []
-        for days_after in followup_days:
-            discharge_date = today - timedelta(days=days_after)
-            events = await db.care_events.find({
-                "campus_id": campus_id,
-                "event_type": "accident_illness",
-                "discharge_date": discharge_date.isoformat(),
-                "completed": False
-            }, {"_id": 0}).to_list(100)
-            
-            for event in events:
-                member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
-                if member:
-                    phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                    hospital_followups.append(f"  • {member['name']} ({days_after} hari setelah pulang dari {event.get('hospital_name', 'RS')})\n    📱 wa.me/{phone_clean}")
+        stage_names = {
+            "first_followup": "tindak lanjut ke-1",
+            "second_followup": "tindak lanjut ke-2",
+            "final_followup": "tindak lanjut akhir"
+        }
+
+        for followup in accident_followups_due:
+            member = await db.members.find_one({"id": followup["member_id"]}, {"_id": 0})
+            if member:
+                stage_name = stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                hospital_followups.append(f"  • {member['name']} ({stage_name})\n    📱 wa.me/{phone_clean}")
         
         # 5. Members at risk (30+ days no contact) - top 10
         members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(1000)
