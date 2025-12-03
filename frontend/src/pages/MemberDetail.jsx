@@ -821,9 +821,9 @@ export const MemberDetail = () => {
                 <Heart className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Grief</span> ({griefTimeline.length})
               </TabsTrigger>
             )}
-            {careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id).length > 0 && (
+            {careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id && !e.care_event_id).length > 0 && (
               <TabsTrigger value="accident" data-testid="tab-accident" className="flex-shrink-0">
-                <Hospital className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Accident/Illness</span> ({careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id).length})
+                <Hospital className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Accident/Illness</span> ({careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id && !e.care_event_id).length})
               </TabsTrigger>
             )}
             {(careEvents.filter(e => e.event_type === 'financial_aid').length > 0 || aidSchedules.length > 0) && (
@@ -1189,10 +1189,10 @@ export const MemberDetail = () => {
         
         {/* Accident/Illness Tab */}
         <TabsContent value="accident">
-          {careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id).length === 0 ? (
+          {careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id && !e.care_event_id).length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No accident/illness visits recorded.</p>
           ) : (
-            careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id && e.followup_type !== 'additional').map(event => (
+            careEvents.filter(e => e.event_type === 'accident_illness' && !e.accident_stage_id && !e.care_event_id).map(event => (
                   <div key={event.id} className="space-y-4 mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg shadow-sm relative">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
