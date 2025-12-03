@@ -581,7 +581,7 @@ def get_campus_filter(current_user: dict):
 
 class CampusCreate(Struct):
     campus_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
-    location: Annotated[str | None, msgspec.Meta(max_length=500)] = None
+    location: str | None = None  # msgspec doesn't support max_length on union types
     timezone: str = "Asia/Jakarta"  # Default to UTC+7
 
 class Campus(Struct):
@@ -596,30 +596,30 @@ class Campus(Struct):
 class MemberCreate(Struct):
     name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
     campus_id: str
-    phone: Annotated[str | None, msgspec.Meta(max_length=20)] = None
-    external_member_id: Annotated[str | None, msgspec.Meta(max_length=100)] = None
-    notes: Annotated[str | None, msgspec.Meta(max_length=2000)] = None
+    phone: str | None = None
+    external_member_id: str | None = None
+    notes: str | None = None
     birth_date: date | None = None
-    address: Annotated[str | None, msgspec.Meta(max_length=500)] = None
-    category: Annotated[str | None, msgspec.Meta(max_length=100)] = None
-    gender: Annotated[str | None, msgspec.Meta(max_length=20)] = None
-    blood_type: Annotated[str | None, msgspec.Meta(max_length=10)] = None
-    marital_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
-    membership_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
-    age: Annotated[int | None, msgspec.Meta(ge=0, le=150)] = None
+    address: str | None = None
+    category: str | None = None
+    gender: str | None = None
+    blood_type: str | None = None
+    marital_status: str | None = None
+    membership_status: str | None = None
+    age: int | None = None
 
 class MemberUpdate(Struct):
-    name: Annotated[str | None, msgspec.Meta(min_length=1, max_length=200)] = None
-    phone: Annotated[str | None, msgspec.Meta(max_length=20)] = None
-    external_member_id: Annotated[str | None, msgspec.Meta(max_length=100)] = None
-    notes: Annotated[str | None, msgspec.Meta(max_length=2000)] = None
+    name: str | None = None
+    phone: str | None = None
+    external_member_id: str | None = None
+    notes: str | None = None
     birth_date: date | None = None
-    address: Annotated[str | None, msgspec.Meta(max_length=500)] = None
-    category: Annotated[str | None, msgspec.Meta(max_length=100)] = None
-    gender: Annotated[str | None, msgspec.Meta(max_length=20)] = None
-    blood_type: Annotated[str | None, msgspec.Meta(max_length=10)] = None
-    marital_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
-    membership_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
+    address: str | None = None
+    category: str | None = None
+    gender: str | None = None
+    blood_type: str | None = None
+    marital_status: str | None = None
+    membership_status: str | None = None
 
 class Member(Struct):
     name: str
@@ -658,22 +658,22 @@ class CareEventCreate(Struct):
     event_type: EventType
     event_date: date
     title: Annotated[str, msgspec.Meta(min_length=1, max_length=300)]
-    description: Annotated[str | None, msgspec.Meta(max_length=5000)] = None
+    description: str | None = None
     # Grief support fields
-    grief_relationship: Annotated[str | None, msgspec.Meta(max_length=200)] = None
+    grief_relationship: str | None = None
     # Accident/illness fields (merged from hospital)
-    hospital_name: Annotated[str | None, msgspec.Meta(max_length=200)] = None
+    hospital_name: str | None = None
     initial_visitation: VisitationLogEntry | None = None
     # Financial aid fields
     aid_type: AidType | None = None
-    aid_amount: Annotated[float | None, msgspec.Meta(ge=0, le=1000000000)] = None  # Max 1 billion
-    aid_notes: Annotated[str | None, msgspec.Meta(max_length=2000)] = None
+    aid_amount: float | None = None
+    aid_notes: str | None = None
 
 class CareEventUpdate(Struct):
     event_type: EventType | None = None
     event_date: date | None = None
-    title: Annotated[str | None, msgspec.Meta(min_length=1, max_length=300)] = None
-    description: Annotated[str | None, msgspec.Meta(max_length=5000)] = None
+    title: str | None = None
+    description: str | None = None
     completed: bool | None = None
     # Hospital fields
     discharge_date: date | None = None
@@ -825,9 +825,9 @@ class UserCreate(Struct):
     campus_id: str | None = None  # Required for campus_admin and pastor, null for full_admin
 
 class UserUpdate(Struct):
-    name: Annotated[str | None, msgspec.Meta(min_length=1, max_length=200)] = None
-    phone: Annotated[str | None, msgspec.Meta(max_length=20)] = None
-    password: Annotated[str | None, msgspec.Meta(min_length=8, max_length=128)] = None
+    name: str | None = None
+    phone: str | None = None
+    password: str | None = None
     role: UserRole | None = None
     campus_id: str | None = None
 
@@ -2925,6 +2925,7 @@ async def upload_member_photo(member_id: str, request: Request, data: UploadFile
 async def create_care_event(data: CareEventCreate, request: Request) -> dict:
     """Create a new care event"""
     current_user = await get_current_user(request)
+    event = data  # Alias for backward compatibility
     try:
         # For campus-specific users, enforce their campus
         campus_id = event.campus_id
@@ -5894,17 +5895,11 @@ async def get_demographic_trends(request: Request) -> dict:
 
 # ==================== MANAGEMENT REPORTS ENDPOINTS ====================
 
-@get("/reports/monthly")
-async def get_monthly_management_report(
-    request: Request,
-    year: int = None,
-    month: int = None,
-) -> dict:
+async def _compute_monthly_report_data(current_user: dict, year: int = None, month: int = None) -> dict:
     """
-    Comprehensive monthly management report for church leadership.
-    Provides strategic insights for pastoral care oversight and decision-making.
+    Helper function to compute monthly report data.
+    Can be called from both the API endpoint and PDF export.
     """
-    current_user = await get_current_user(request)
     try:
         today = datetime.now(JAKARTA_TZ)
         report_year = year or today.year
@@ -5953,14 +5948,15 @@ async def get_monthly_management_report(
         }, {"_id": 0}).to_list(5000)
 
         # Activity logs this month (staff actions)
+        # Use datetime objects for comparison since created_at is stored as ISODate
         activities_this_month = await db.activity_logs.find({
             **campus_filter,
-            "created_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}
+            "created_at": {"$gte": start_date, "$lt": end_date}
         }, {"_id": 0}).to_list(10000)
 
         activities_prev_month = await db.activity_logs.find({
             **campus_filter,
-            "created_at": {"$gte": prev_start.isoformat(), "$lt": prev_end.isoformat()}
+            "created_at": {"$gte": prev_start, "$lt": prev_end}
         }, {"_id": 0}).to_list(10000)
 
         # Financial aid this month
@@ -6402,6 +6398,20 @@ async def get_monthly_management_report(
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
+@get("/reports/monthly")
+async def get_monthly_management_report(
+    request: Request,
+    year: int = None,
+    month: int = None,
+) -> dict:
+    """
+    Comprehensive monthly management report for church leadership.
+    Provides strategic insights for pastoral care oversight and decision-making.
+    """
+    current_user = await get_current_user(request)
+    return await _compute_monthly_report_data(current_user, year, month)
+
+
 @get("/reports/monthly/pdf")
 async def export_monthly_report_pdf(
     request: Request,
@@ -6414,8 +6424,8 @@ async def export_monthly_report_pdf(
     """
     current_user = await get_current_user(request)
     try:
-        # Get the report data
-        report_data = await get_monthly_management_report(request, year, month)
+        # Get the report data using helper function (not the route handler)
+        report_data = await _compute_monthly_report_data(current_user, year, month)
 
         # Get campus name for the header
         campus_name = "GKBJ"  # Default
@@ -6435,37 +6445,15 @@ async def export_monthly_report_pdf(
         period = report_data.get("report_period", {})
         filename = f"Pastoral_Care_Report_{period.get('month_name', 'Monthly')}_{period.get('year', datetime.now().year)}.pdf"
 
-        # Write to temp file and serve with FileResponse for reliable binary transfer
-        import tempfile
-        import os
-
-        # Create temp file
-        fd, tmp_path = tempfile.mkstemp(suffix='.pdf')
-        try:
-            os.write(fd, pdf_bytes)
-        finally:
-            os.close(fd)
-
-        # Use FileResponse with proper headers
-        response = FileResponse(
-            path=tmp_path,
-            filename=filename,
-            media_type="application/pdf"
+        # Return PDF bytes directly using Litestar's Response
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes))
+            }
         )
-        # Clean up temp file after response is sent
-        response.headers["Content-Length"] = str(len(pdf_bytes))
-
-        # Schedule cleanup after response
-        import asyncio
-        async def cleanup():
-            await asyncio.sleep(60)  # Wait 60 seconds
-            try:
-                os.unlink(tmp_path)
-            except:
-                pass
-        asyncio.create_task(cleanup())
-
-        return response
 
     except Exception as e:
         logger.error(f"Error generating PDF report: {str(e)}")
@@ -6504,16 +6492,18 @@ async def get_staff_performance_report(
         ).to_list(100)
 
         # Get all activity logs for the month
+        # Use datetime objects for comparison (not ISO strings) since created_at is stored as ISODate
         activities = await db.activity_logs.find({
             **campus_filter,
-            "created_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}
+            "created_at": {"$gte": start_date, "$lt": end_date}
         }, {"_id": 0}).to_list(20000)
 
         # Get care events completed this month
+        # Use datetime objects for comparison since completed_at is stored as ISODate
         care_events = await db.care_events.find({
             **campus_filter,
             "completed": True,
-            "completed_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()}
+            "completed_at": {"$gte": start_date, "$lt": end_date}
         }, {"_id": 0, "id": 1, "completed_by_user_id": 1, "completed_by_user_name": 1,
             "event_type": 1, "member_id": 1, "completed_at": 1}).to_list(10000)
 
@@ -8532,8 +8522,9 @@ async def get_reminder_stats() -> dict:
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         
         # Count notifications sent today
+        # Use datetime object for comparison since created_at is stored as ISODate
         logs = await db.notification_logs.find({
-            "created_at": {"$gte": today_start.isoformat()}
+            "created_at": {"$gte": today_start}
         }, {"_id": 0}).to_list(1000)
         
         sent_count = sum(1 for log in logs if log.get('status') == 'sent')
