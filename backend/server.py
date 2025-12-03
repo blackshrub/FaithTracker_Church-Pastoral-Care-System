@@ -2933,7 +2933,14 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
         campus_id = event.campus_id
         if current_user.get("role") in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
             campus_id = current_user["campus_id"]
-        
+
+        # Validate required fields for financial aid events
+        if event.event_type == EventType.FINANCIAL_AID:
+            if not event.aid_type:
+                raise HTTPException(status_code=400, detail="Aid type is required for financial aid events")
+            if event.aid_amount is None or event.aid_amount < 0:
+                raise HTTPException(status_code=400, detail="Aid amount is required and must be non-negative for financial aid events")
+
         # Get member name for logging
         member = await db.members.find_one({"id": event.member_id}, {"_id": 0, "name": 1})
         member_name = member["name"] if member else "Unknown"
