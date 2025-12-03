@@ -681,6 +681,31 @@ class CareEvent(BaseModel):
     member_phone: Optional[str] = None
     member_photo_url: Optional[str] = None
 
+    # Grief support fields (only relationship, use event_date as mourning date)
+    grief_relationship: Optional[str] = None
+    grief_stage: Optional[GriefStage] = None
+    grief_stage_id: Optional[str] = None  # Link to grief_support stage (for timeline entries)
+
+    # Accident/illness fields (merged from hospital, only hospital_name, use event_date as admission)
+    hospital_name: Optional[str] = None
+    accident_stage_id: Optional[str] = None  # Link to accident_followup stage (for timeline entries)
+    visitation_log: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Follow-up type marker
+    followup_type: Optional[str] = None  # "scheduled" or "additional" (for grief/accident follow-ups)
+
+    # Financial aid fields
+    aid_type: Optional[AidType] = None
+    aid_amount: Optional[float] = None
+    aid_notes: Optional[str] = None
+
+    reminder_sent: bool = False
+    reminder_sent_at: Optional[datetime] = None
+    reminder_sent_by_user_id: Optional[str] = None
+    reminder_sent_by_user_name: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class SetupAdminRequest(BaseModel):
     email: EmailStr
@@ -692,32 +717,6 @@ class SetupCampusRequest(BaseModel):
     campus_name: str
     location: str
     timezone: str
-
-    
-    # Grief support fields (only relationship, use event_date as mourning date)
-    grief_relationship: Optional[str] = None
-    grief_stage: Optional[GriefStage] = None
-    grief_stage_id: Optional[str] = None  # Link to grief_support stage (for timeline entries)
-    
-    # Accident/illness fields (merged from hospital, only hospital_name, use event_date as admission)
-    hospital_name: Optional[str] = None
-    accident_stage_id: Optional[str] = None  # Link to accident_followup stage (for timeline entries)
-    visitation_log: List[Dict[str, Any]] = Field(default_factory=list)
-    
-    # Follow-up type marker
-    followup_type: Optional[str] = None  # "scheduled" or "additional" (for grief/accident follow-ups)
-    
-    # Financial aid fields
-    aid_type: Optional[AidType] = None
-    aid_amount: Optional[float] = None
-    aid_notes: Optional[str] = None
-    
-    reminder_sent: bool = False
-    reminder_sent_at: Optional[datetime] = None
-    reminder_sent_by_user_id: Optional[str] = None
-    reminder_sent_by_user_name: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AdditionalVisitRequest(BaseModel):
@@ -2936,9 +2935,12 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
 
         # Validate required fields for financial aid events
         if event.event_type == EventType.FINANCIAL_AID:
+            logger.info(f"[FINANCIAL AID] Creating event: aid_type={repr(event.aid_type)}, aid_amount={repr(event.aid_amount)}")
             if not event.aid_type:
+                logger.warning(f"[FINANCIAL AID] Rejecting: aid_type is missing or falsy: {repr(event.aid_type)}")
                 raise HTTPException(status_code=400, detail="Aid type is required for financial aid events")
             if event.aid_amount is None or event.aid_amount < 0:
+                logger.warning(f"[FINANCIAL AID] Rejecting: aid_amount is invalid: {repr(event.aid_amount)}")
                 raise HTTPException(status_code=400, detail="Aid amount is required and must be non-negative for financial aid events")
 
         # Get member name for logging
@@ -2986,8 +2988,13 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
         if event.initial_visitation:
             care_event.visitation_log = [event.initial_visitation.model_dump()]
         
-        # Serialize for MongoDB
-        event_dict = care_event.model_dump()
+        # Serialize for MongoDB (mode='json' ensures enums are serialized as strings)
+        event_dict = care_event.model_dump(mode='json')
+
+        # Log what we're about to save for financial aid events
+        if event.event_type == EventType.FINANCIAL_AID:
+            logger.info(f"[FINANCIAL AID] Saving to DB: aid_type={repr(event_dict.get('aid_type'))}, aid_amount={repr(event_dict.get('aid_amount'))}")
+
         event_dict['event_date'] = event_dict['event_date'].isoformat() if isinstance(event_dict['event_date'], date) else event_dict['event_date']
         if event_dict.get('mourning_service_date'):
             event_dict['mourning_service_date'] = event_dict['mourning_service_date'].isoformat() if isinstance(event_dict['mourning_service_date'], date) else event_dict['mourning_service_date']
@@ -4105,12 +4112,8 @@ async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_c
             notes=schedule.get('notes')
         )
         
-        # Serialize dates for MongoDB
-        schedule_dict = aid_schedule.model_dump()
-        schedule_dict['start_date'] = schedule_dict['start_date'].isoformat()
-        if schedule_dict.get('end_date'):
-            schedule_dict['end_date'] = schedule_dict['end_date'].isoformat()
-        schedule_dict['next_occurrence'] = schedule_dict['next_occurrence'].isoformat()
+        # Serialize for MongoDB (mode='json' ensures enums and dates are serialized properly)
+        schedule_dict = aid_schedule.model_dump(mode='json')
         
         await db.financial_aid_schedules.insert_one(schedule_dict)
         
