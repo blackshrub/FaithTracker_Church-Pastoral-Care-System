@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EventTypeBadge } from '@/components/EventTypeBadge';
 import { CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
-import { formatDate, formatDateToJakarta } from '@/lib/dateUtils';
+import { formatDate, formatDateToJakarta, formatTimeToLocalTimezone } from '@/lib/dateUtils';
 
 const getEventColors = (eventType) => {
   const celebrationTypes = ['birthday', 'childbirth', 'new_house'];
@@ -65,6 +65,12 @@ export const TimelineEventCard = memo(({
         </div>
         {/* Colored Dot Indicator */}
         <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${dotColor} border-2 border-background shadow-sm mt-1 relative z-10`}></div>
+        {/* Time indicator */}
+        {event.created_at && (
+          <div className="text-[9px] sm:text-[10px] text-muted-foreground mt-1 text-center">
+            {formatTimeToLocalTimezone(event.created_at)}
+          </div>
+        )}
       </div>
 
       {/* Event Content Card */}
@@ -186,6 +192,7 @@ TimelineEventCard.propTypes = {
     hospital_name: PropTypes.string,
     aid_type: PropTypes.string,
     aid_amount: PropTypes.number,
+    created_at: PropTypes.string,
     created_by_user_name: PropTypes.string,
     completed_by_user_name: PropTypes.string,
     completed_at: PropTypes.string,

@@ -28,7 +28,7 @@ import { MemberAvatar } from '@/components/MemberAvatar';
 import { EngagementBadge } from '@/components/EngagementBadge';
 import { EventTypeBadge } from '@/components/EventTypeBadge';
 import { MemberProfileHeader, TimelineEventCard } from '@/components/member';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDate, getTodayLocal, formatDateToLocalTimezone } from '@/lib/dateUtils';
 import { format as formatDateFns } from 'date-fns';
 
 // Aid type icon helper
@@ -116,7 +116,7 @@ export const MemberDetail = () => {
   
   const [newEvent, setNewEvent] = useState({
     event_type: 'regular_contact',
-    event_date: new Date().toISOString().split('T')[0],
+    event_date: getTodayLocal(),
     title: '',
     description: '',
     grief_relationship: '',
@@ -125,7 +125,7 @@ export const MemberDetail = () => {
     aid_amount: '',
     // Financial aid scheduling
     schedule_frequency: 'one_time',
-    schedule_start_date: new Date().toISOString().split('T')[0],
+    schedule_start_date: getTodayLocal(),
     schedule_end_date: '',
     day_of_week: 'monday',
     day_of_month: 1,
@@ -138,7 +138,7 @@ export const MemberDetail = () => {
 
   const [additionalVisitForm, setAdditionalVisitForm] = useState({});
   const [additionalVisit, setAdditionalVisit] = useState({
-    visit_date: new Date().toISOString().split('T')[0],
+    visit_date: getTodayLocal(),
     visit_type: 'Phone Call',
     notes: ''
   });
@@ -160,7 +160,7 @@ export const MemberDetail = () => {
       toast.success('Additional visit logged successfully');
       setAdditionalVisitForm({});
       setAdditionalVisit({
-        visit_date: new Date().toISOString().split('T')[0],
+        visit_date: getTodayLocal(),
         visit_type: 'Phone Call',
         notes: ''
       });
@@ -224,7 +224,7 @@ export const MemberDetail = () => {
           let startDate, endDate;
           
           if (newEvent.schedule_frequency === 'weekly') {
-            startDate = new Date().toISOString().split('T')[0];  // Use today for weekly
+            startDate = getTodayLocal();  // Use today for weekly
             endDate = newEvent.schedule_end_date || null;
           } else if (newEvent.schedule_frequency === 'monthly') {
             // Construct start_date from start_month and start_year
@@ -281,7 +281,7 @@ export const MemberDetail = () => {
       setEventModalOpen(false);
       setNewEvent({
         event_type: 'regular_contact',
-        event_date: new Date().toISOString().split('T')[0],
+        event_date: getTodayLocal(),
         title: '',
         description: '',
         grief_relationship: '',
@@ -291,8 +291,8 @@ export const MemberDetail = () => {
         aid_type: 'education',
         aid_amount: '',
         schedule_frequency: 'one_time',
-        payment_date: new Date().toISOString().split('T')[0],
-        schedule_start_date: new Date().toISOString().split('T')[0],
+        payment_date: getTodayLocal(),
+        schedule_start_date: getTodayLocal(),
         schedule_end_date: '',
         day_of_week: 'monday',
         day_of_month: 1,

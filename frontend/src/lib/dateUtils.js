@@ -13,9 +13,10 @@ const APP_TIMEZONE = import.meta.env.VITE_TIMEZONE || Intl.DateTimeFormat().reso
  * Parse a timestamp that may or may not have timezone indicator
  * Backend stores timestamps in UTC but may not include 'Z' suffix
  * @param {string|Date} timestamp - Timestamp to parse
+ * @param {boolean} isDateOnly - If true, parse as local date (no timezone conversion)
  * @returns {Date|null} Parsed Date object or null if invalid
  */
-export const parseUTCTimestamp = (timestamp) => {
+export const parseUTCTimestamp = (timestamp, isDateOnly = false) => {
   if (!timestamp) return null;
 
   // If already a Date object, return it
@@ -24,7 +25,18 @@ export const parseUTCTimestamp = (timestamp) => {
   // Convert to string if needed
   let ts = String(timestamp);
 
-  // If timestamp doesn't end with Z or timezone offset, assume UTC and append Z
+  // Check if this is a date-only string (YYYY-MM-DD format, no time component)
+  const isDateOnlyString = /^\d{4}-\d{2}-\d{2}$/.test(ts);
+
+  if (isDateOnly || isDateOnlyString) {
+    // For date-only values, parse as local date to avoid timezone shift
+    // This ensures "2024-12-03" displays as "Dec 03" regardless of timezone
+    const [year, month, day] = ts.split('T')[0].split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // For full timestamps, assume UTC if no timezone indicator
   if (!ts.endsWith('Z') && !ts.match(/[+-]\d{2}:\d{2}$/)) {
     ts = ts + 'Z';
   }
