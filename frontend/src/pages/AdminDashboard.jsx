@@ -26,23 +26,19 @@ export const AdminDashboard = () => {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
 
-  // Use TanStack Query for data fetching
-  const { data: adminData, isLoading: loading } = useQuery({
+  // Use TanStack Query for data fetching with prefetched cache from route loader
+  const { data: adminData, isLoading: loading, refetch: loadData } = useQuery({
     queryKey: ['admin-data'],
     queryFn: async () => {
       const [c, u] = await Promise.all([api.get('/campuses'), api.get('/users')]);
-      return { campuses: c.data, users: u.data };
+      return { campuses: c.data || [], users: u.data || [] };
     },
-    staleTime: 1000 * 60,
-    enabled: user?.role === 'full_admin',
+    staleTime: 1000 * 60 * 5, // 5 minutes - data is fresh for longer
+    gcTime: 1000 * 60 * 10, // 10 minutes - keep in cache longer
   });
 
   const campuses = adminData?.campuses || [];
   const users = adminData?.users || [];
-
-  const loadData = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin-data'] });
-  };
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,

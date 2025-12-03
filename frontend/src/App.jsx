@@ -3,9 +3,9 @@
  * Sets up React Query, authentication context, and application routes
  *
  * Performance optimizations:
- * - Route-level data prefetching with React Router loaders
  * - Lazy loading for all pages
  * - React Compiler enabled for automatic memoization
+ * - TanStack Query handles caching (staleTime/gcTime for fast navigation)
  */
 
 import React, { Suspense, lazy, useState, useEffect } from 'react';
@@ -21,18 +21,6 @@ import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import PageLoader from '@/components/PageLoader';
-import {
-  setQueryClient,
-  dashboardLoader,
-  membersLoader,
-  memberDetailLoader,
-  analyticsLoader,
-  financialAidLoader,
-  adminLoader,
-  activityLogLoader,
-  reportsLoader,
-  calendarLoader,
-} from '@/lib/routeLoaders';
 import './i18n';
 import '@/App.css';
 import LoginPage from '@/pages/LoginPage';
@@ -53,8 +41,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// Set query client for route loaders
-setQueryClient(queryClient);
 
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -173,47 +159,38 @@ const router = createBrowserRouter([
           {
             path: '/',
             element: <Dashboard />,
-            loader: dashboardLoader,
           },
           {
             path: '/dashboard',
             element: <Dashboard />,
-            loader: dashboardLoader,
           },
           {
             path: '/members',
             element: <MembersList />,
-            loader: membersLoader,
           },
           {
             path: '/members/:id',
             element: <MemberDetail />,
-            loader: memberDetailLoader,
           },
           {
             path: '/financial-aid',
             element: <FinancialAid />,
-            loader: financialAidLoader,
           },
           {
             path: '/analytics',
             element: <Analytics />,
-            loader: analyticsLoader,
           },
           {
             path: '/reports',
             element: <Reports />,
-            loader: reportsLoader,
           },
           {
             path: '/admin',
             element: <AdminDashboard />,
-            loader: adminLoader,
           },
           {
             path: '/activity-log',
             element: <ActivityLog />,
-            loader: activityLogLoader,
           },
           {
             path: '/import-export',
@@ -230,7 +207,6 @@ const router = createBrowserRouter([
           {
             path: '/calendar',
             element: <Calendar />,
-            loader: calendarLoader,
           },
           {
             path: '/messaging',

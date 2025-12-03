@@ -879,11 +879,11 @@ git diff <commit1> <commit2>
 - Configured via `babel-plugin-react-compiler` in Vite
 - Target: React 19
 
-**Route Loaders (React Router v7):**
-- Data prefetching during navigation (parallel with component loading)
-- Located in `frontend/src/lib/routeLoaders.js`
-- Primes TanStack Query cache before component renders
-- Uses unique query keys to avoid cache conflicts
+**Data Fetching (TanStack Query only):**
+- All data fetching happens in components via `useQuery`
+- No React Router loaders (removed - auth context not available in loaders)
+- Cache settings: `staleTime: 30s-5min`, `gcTime: 5-10min` for fast navigation
+- Automatic refetch on window focus ensures data freshness
 
 **PWA Service Worker:**
 - Caches static assets (JS, CSS, HTML) for offline use

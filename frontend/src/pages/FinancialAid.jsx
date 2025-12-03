@@ -65,8 +65,8 @@ export const FinancialAid = () => {
   const [recipients, setRecipients] = useState([]);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
 
-  // Use TanStack Query for data fetching - leverages prefetched cache from route loader
-  const { data: financialData, isLoading: loading } = useQuery({
+  // Use TanStack Query for data fetching with long cache time
+  const { data: financialData, isLoading: loading, isFetching } = useQuery({
     queryKey: ['financial-aid-data'],
     queryFn: async () => {
       const [summaryRes, eventsRes, membersRes] = await Promise.all([
@@ -77,25 +77,27 @@ export const FinancialAid = () => {
 
       // Add member photos to events
       const memberMap = {};
-      membersRes.data.forEach(m => memberMap[m.id] = {
+      (membersRes.data || []).forEach(m => memberMap[m.id] = {
         name: m.name,
         photo_url: m.photo_url
       });
 
-      const eventsWithPhotos = eventsRes.data.map(event => ({
+      const eventsWithPhotos = (eventsRes.data || []).map(event => ({
         ...event,
         member_photo_url: memberMap[event.member_id]?.photo_url
       }));
 
       return {
-        summary: summaryRes.data,
+        summary: summaryRes.data || {},
         aidEvents: eventsWithPhotos
       };
     },
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh longer
+    gcTime: 1000 * 60 * 10, // 10 minutes - keep in cache longer
+    retry: 2,
   });
 
-  const summary = financialData?.summary;
+  const summary = financialData?.summary || null;
   const aidEvents = financialData?.aidEvents || [];
 
   const loadRecipients = async () => {

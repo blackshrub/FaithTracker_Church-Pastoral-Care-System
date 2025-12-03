@@ -24,7 +24,7 @@ export const Analytics = () => {
   const [activeTab, setActiveTab] = useState('demographics');
 
   // Use TanStack Query for data fetching - leverages prefetched cache from route loader
-  const { data, isLoading: loading } = useQuery({
+  const { data, isLoading: loading, refetch } = useQuery({
     queryKey: ['analytics-dashboard', timeRange, customStartDate, customEndDate],
     queryFn: async () => {
       const params = new URLSearchParams({ time_range: timeRange });
@@ -86,7 +86,7 @@ export const Analytics = () => {
               <Button
                 size="sm"
                 className="bg-teal-500 hover:bg-teal-600 text-white"
-                onClick={() => loadAnalytics()}
+                onClick={() => refetch()}
                 disabled={!customStartDate || !customEndDate}
               >
                 {t('misc.apply')}
