@@ -7767,9 +7767,16 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
                         f"{base_url}{api_path_prefix}/members/?limit={page_size}&skip={offset}",
                         headers={"Authorization": f"Bearer {token}"}
                     )
-                    
+
                     if members_response.status_code != 200:
-                        raise Exception(f"Failed to fetch members: {members_response.text}")
+                        if members_response.status_code == 500:
+                            raise Exception(f"External API server error (500). The FaithFlow server ({base_url}) is experiencing issues. Please try again later or contact FaithFlow support.")
+                        elif members_response.status_code == 401:
+                            raise Exception("Authentication expired. Please check your API credentials.")
+                        elif members_response.status_code == 403:
+                            raise Exception("Access denied. Your API account may not have permission to access member data.")
+                        else:
+                            raise Exception(f"Failed to fetch members (HTTP {members_response.status_code}): {members_response.text}")
                     
                     batch = members_response.json()
                     
