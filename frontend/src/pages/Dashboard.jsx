@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import LazyImage from '@/components/LazyImage';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { Link } from 'react-router-dom';
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDateToJakarta, formatRelativeTime } from '@/lib/dateUtils';
 import { toast } from 'sonner';
@@ -109,11 +110,11 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
     : null;
 
   return (
-    <Link to={`/members/${memberId}`} className="flex items-center gap-3 hover:text-teal-700">
+    <MemberLink memberId={memberId} className="flex items-center gap-3 hover:text-teal-700">
       <div className="w-10 h-10 rounded-full overflow-hidden bg-teal-100 flex items-center justify-center">
         {photoUrl ? (
-          <LazyImage 
-            src={photoUrl} 
+          <LazyImage
+            src={photoUrl}
             alt={member.name}
             className="w-full h-full object-cover"
             placeholderClassName="w-full h-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-semibold"
@@ -124,7 +125,7 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
           </span>
         )}
       </div>
-    </Link>
+    </MemberLink>
   );
 };
 
@@ -252,29 +253,23 @@ export const Dashboard = () => {
   const { data: dashboardData, isLoading, isError, error, refetch: refetchDashboard } = useQuery({
     queryKey: ['dashboard', 'reminders', user?.campus_id],
     queryFn: async () => {
-      const response = await api.get(`/dashboard/reminders`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        },
-        params: {
-          t: Date.now()
-        }
-      });
+      const response = await api.get(`/dashboard/reminders`);
       return response.data;
     },
     enabled: !!user?.campus_id,
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 60 * 2, // 2 minutes - dashboard data is relatively stable
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
   });
-  
-  // React Query for all members (for quick event form)
+
+  // React Query for all members (for quick event form) - only fetch basic fields
   const { data: allMembers = [] } = useQuery({
-    queryKey: ['members', 'all'],
+    queryKey: ['members', 'all', 'basic'],
     queryFn: async () => {
-      const response = await api.get(`/members?limit=1000`);
+      const response = await api.get(`/members?limit=500&fields=id,name,phone,photo_url`);
       return response.data;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes (member list changes infrequently)
+    staleTime: 1000 * 60 * 10, // 10 minutes - member list changes infrequently
+    gcTime: 1000 * 60 * 15, // Keep in cache for 15 minutes
   });
   
   // Extract data with defaults
@@ -999,9 +994,9 @@ export const Dashboard = () => {
                               </div>
                               
                               <div className="flex-1 min-w-0">
-                                <Link to={`/members/${task.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                                <MemberLink memberId={task.member_id} className="font-semibold text-base hover:text-teal-600">
                                   {task.member_name}
-                                </Link>
+                                </MemberLink>
                                 {task.member_phone && (
                                   <a href={`tel:${task.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                     📞 {task.member_phone}
@@ -1216,9 +1211,9 @@ export const Dashboard = () => {
                               <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${event.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={event.member_id} className="font-semibold text-base hover:text-teal-600">
                                 {event.member_name}
-                              </Link>
+                              </MemberLink>
                               {event.member_phone && event.member_phone !== 'null' && event.member_phone !== 'NULL' && (
                                 <a href={`tel:${event.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {event.member_phone}
@@ -1306,9 +1301,9 @@ export const Dashboard = () => {
                               <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${event.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={event.member_id} className="font-semibold text-base hover:text-teal-600">
                                 {event.member_name}
-                              </Link>
+                              </MemberLink>
                               {event.member_phone && event.member_phone !== 'null' && event.member_phone !== 'NULL' && (
                                 <a href={`tel:${event.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {event.member_phone}
@@ -1364,9 +1359,9 @@ export const Dashboard = () => {
                               <MemberAvatar member={{name: followup.member_name, photo_url: followup.member_photo_url}} size="md" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${followup.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={followup.member_id} className="font-semibold text-base hover:text-teal-600">
                                 {followup.member_name}
-                              </Link>
+                              </MemberLink>
                               {followup.member_phone && (
                                 <a href={`tel:${followup.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {followup.member_phone}
@@ -1454,9 +1449,9 @@ export const Dashboard = () => {
                               <MemberAvatar member={{name: stage.member_name, photo_url: stage.member_photo_url}} size="md" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${stage.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={stage.member_id} className="font-semibold text-base hover:text-teal-600">
                                 {stage.member_name}
-                              </Link>
+                              </MemberLink>
                               {stage.member_phone && (
                                 <a href={`tel:${stage.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {stage.member_phone}
@@ -1549,9 +1544,9 @@ export const Dashboard = () => {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${schedule.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={schedule.member_id} className="font-semibold text-base hover:text-teal-600">
                                 {schedule.member_name}
-                              </Link>
+                              </MemberLink>
                               {schedule.member_phone && (
                                 <a href={`tel:${schedule.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {schedule.member_phone}
@@ -1688,9 +1683,9 @@ export const Dashboard = () => {
                               <MemberAvatar member={member} size="md" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${member.id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={member.id} className="font-semibold text-base hover:text-teal-600">
                                 {member.name}
-                              </Link>
+                              </MemberLink>
                               {member.phone && member.phone !== 'null' && member.phone !== 'NULL' && (
                                 <a href={`tel:${member.phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {member.phone}
@@ -1746,9 +1741,9 @@ export const Dashboard = () => {
                               <MemberAvatar member={member} size="md" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Link to={`/members/${member.id}`} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={member.id} className="font-semibold text-base hover:text-teal-600">
                                 {member.name}
-                              </Link>
+                              </MemberLink>
                               {member.phone && member.phone !== 'null' && member.phone !== 'NULL' && (
                                 <a href={`tel:${member.phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                   📞 {member.phone}
@@ -1827,9 +1822,9 @@ export const Dashboard = () => {
                           </div>
                           
                           <div className="flex-1 min-w-0">
-                            <Link to={`/members/${task.member_id}`} className="font-semibold text-base hover:text-teal-600">
+                            <MemberLink memberId={task.member_id} className="font-semibold text-base hover:text-teal-600">
                               {task.member_name}
-                            </Link>
+                            </MemberLink>
                             {task.member_phone && task.member_phone !== 'null' && task.member_phone !== 'NULL' && (
                               <a href={`tel:${task.member_phone}`} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-1">
                                 📞 {task.member_phone}

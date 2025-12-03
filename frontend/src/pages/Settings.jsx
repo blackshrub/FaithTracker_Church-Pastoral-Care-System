@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Settings as SettingsIcon, Bell, Heart, Zap, Users, Clock, UserCircle, Upload, RefreshCw, Search } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, Heart, Zap, Users, Clock, UserCircle, Upload, RefreshCw, Search, Eye, EyeOff } from 'lucide-react';
 import FilterRuleBuilder from '@/components/FilterRuleBuilder';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
@@ -113,7 +113,7 @@ export const Settings = () => {
   }, [user]);
 
   const [writeoffGrief, setWriteoffGrief] = useState(14);
-  const [activeTab, setActiveTab] = useState('automation');
+  const [activeTab, setActiveTab] = useState('profile');
   const [griefStages, setGriefStages] = useState([
     { stage: '1_week', days: 7, name: 'First Follow-up' },
     { stage: '2_weeks', days: 14, name: 'Second Follow-up' },
@@ -228,6 +228,7 @@ export const Settings = () => {
     webhook_secret: '',
     is_enabled: false
   });
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [syncLogs, setSyncLogs] = useState([]);
   const [syncLogsTotal, setSyncLogsTotal] = useState(0);
   const [syncLogsPage, setSyncLogsPage] = useState(0);
@@ -1147,13 +1148,22 @@ export const Settings = () => {
                 
                 <div>
                   <Label>API Secret Key</Label>
-                  <Input 
+                  <Input
                     type="password"
-                    placeholder="Enter API password"
-                    value={syncConfig.api_password === '********' ? '' : syncConfig.api_password}
+                    placeholder={syncConfig.api_password === '********' ? '(stored securely)' : 'Enter API password'}
+                    value={syncConfig.api_password === '********' ? '••••••••••••••••' : syncConfig.api_password}
                     onChange={(e) => setSyncConfig({...syncConfig, api_password: e.target.value})}
+                    onFocus={(e) => {
+                      if (syncConfig.api_password === '********') {
+                        setSyncConfig({...syncConfig, api_password: ''});
+                      }
+                    }}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Password for API authentication</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {syncConfig.api_password === '********'
+                      ? 'Password is stored. Click field to enter a new one.'
+                      : 'Password for API authentication'}
+                  </p>
                 </div>
                 
                 {/* Polling-specific settings */}
@@ -1578,7 +1588,12 @@ export const Settings = () => {
                         <p className="text-gray-600 text-xs uppercase mb-1">Webhook Secret</p>
                         {syncConfig.webhook_secret ? (
                           <div className="flex gap-2">
-                            <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">{syncConfig.webhook_secret}</code>
+                            <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">
+                              {showWebhookSecret ? syncConfig.webhook_secret : '••••••••••••••••••••••••••••••••'}
+                            </code>
+                            <Button size="sm" variant="outline" onClick={() => setShowWebhookSecret(!showWebhookSecret)} title={showWebhookSecret ? 'Hide secret' : 'Show secret'}>
+                              {showWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
                             <Button size="sm" variant="outline" onClick={() => {
                               navigator.clipboard.writeText(syncConfig.webhook_secret);
                               toast.success('Copied!');
@@ -1591,6 +1606,7 @@ export const Settings = () => {
                                   try {
                                     const response = await api.post(`/sync/regenerate-secret`);
                                     toast.success('Secret regenerated. Update core system!');
+                                    setShowWebhookSecret(false);
                                     await loadSyncConfig();
                                     closeConfirm();
                                   } catch (error) {

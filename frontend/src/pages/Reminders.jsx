@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router-dom';
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDateToJakarta } from '@/lib/dateUtils';
 import { toast } from 'sonner';
@@ -35,7 +36,7 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
     : null;
 
   return (
-    <Link to={`/members/${memberId}`} className="flex items-center gap-3 hover:text-teal-700">
+    <MemberLink memberId={memberId} className="flex items-center gap-3 hover:text-teal-700">
       <Avatar className="w-10 h-10">
         {photoUrl && <AvatarImage src={photoUrl} alt={member.name} className="object-cover" />}
         <AvatarFallback className="bg-teal-100 text-teal-700 font-semibold text-xs">
@@ -45,7 +46,7 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
       <div>
         <p className="font-semibold hover:underline">{member.name}</p>
       </div>
-    </Link>
+    </MemberLink>
   );
 };
 

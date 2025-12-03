@@ -30,9 +30,19 @@
             };
         </script>
 
-        <!-- Google Fonts - moved here for LightningCSS compatibility -->
+        <!-- Resource Hints for Faster Initial Load -->
+        <!-- DNS prefetch for API backend (helps in production) -->
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="dns-prefetch" href="//fonts.gstatic.com">
+
+        <!-- Google Fonts - preconnect for parallel font loading -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+        <!-- Preload critical Inter font (main body font) for faster text rendering -->
+        <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+
+        <!-- Load all fonts -->
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
         <link rel="manifest" href="/manifest.json" />

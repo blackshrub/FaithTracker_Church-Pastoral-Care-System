@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
@@ -40,11 +41,11 @@ const MemberNameWithPhoto = ({ member, memberId }) => {
     : null;
 
   return (
-    <Link to={`/members/${memberId}`} className="flex items-center gap-3 hover:text-teal-700">
+    <MemberLink memberId={memberId} className="flex items-center gap-3 hover:text-teal-700">
       <div className="w-8 h-8 rounded-full overflow-hidden bg-teal-100 flex items-center justify-center">
         {photoUrl ? (
-          <LazyImage 
-            src={photoUrl} 
+          <LazyImage
+            src={photoUrl}
             alt={member.name}
             className="w-full h-full object-cover"
             placeholderClassName="w-full h-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-semibold"
@@ -56,7 +57,7 @@ const MemberNameWithPhoto = ({ member, memberId }) => {
         )}
       </div>
       <span className="font-medium hover:underline">{member.name}</span>
-    </Link>
+    </MemberLink>
   );
 };
 

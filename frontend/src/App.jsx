@@ -30,9 +30,9 @@ import api from '@/lib/api';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 30, // Data considered fresh for 30 seconds
-      gcTime: 1000 * 60 * 5, // Keep unused data in cache for 5 minutes
-      refetchOnWindowFocus: true, // Refetch when user returns to tab
+      staleTime: 1000 * 60 * 2, // Data considered fresh for 2 minutes (was 30s - too aggressive)
+      gcTime: 1000 * 60 * 10, // Keep unused data in cache for 10 minutes (fast navigation)
+      refetchOnWindowFocus: false, // Don't refetch on tab focus (reduces network churn)
       retry: 1, // Retry failed requests once
     },
     mutations: {

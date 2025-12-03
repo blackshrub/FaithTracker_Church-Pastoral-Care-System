@@ -82,8 +82,8 @@ export const MemberDetail = () => {
       };
     },
     enabled: !!id,
-    staleTime: 1000 * 30, // Data fresh for 30 seconds
-    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    staleTime: 1000 * 60 * 2, // Data fresh for 2 minutes (matches global default)
+    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes (faster back navigation)
   });
   
   // Extract data with defaults

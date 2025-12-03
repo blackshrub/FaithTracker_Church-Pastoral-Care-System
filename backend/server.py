@@ -55,6 +55,7 @@ def msgspec_enc_hook(obj):
     - Binary: base64-encoded string
     - Regex: pattern string
     - UUID: string representation
+    - Enum: value (msgspec handles str Enums, but this catches others)
     """
     if isinstance(obj, datetime):
         return obj.isoformat()
@@ -73,11 +74,63 @@ def msgspec_enc_hook(obj):
         return str(obj)
     if isinstance(obj, bytes):
         return base64.b64encode(obj).decode('utf-8')
+    if isinstance(obj, Enum):
+        return obj.value
     raise NotImplementedError(f"Object of type {type(obj)} is not JSON serializable")
 
 
 # Create a reusable encoder instance (more efficient than creating per-request)
 _msgspec_encoder = msgspec.json.Encoder(enc_hook=msgspec_enc_hook)
+
+
+def to_mongo_doc(obj, _original_obj=None) -> dict:
+    """Convert msgspec Struct to MongoDB-ready dict preserving datetime as native types.
+
+    This helper ensures datetime fields are stored as native MongoDB Date types (ISODate)
+    for proper sorting and querying. Use this instead of raw msgspec.to_builtins().
+
+    Args:
+        obj: A msgspec Struct instance or dict
+        _original_obj: Internal use - original Struct for datetime field extraction
+
+    Returns:
+        Dict with datetime preserved as native types, UNSET values excluded,
+        and Enum values converted to their underlying values.
+    """
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            if v is UNSET:
+                continue  # Skip UNSET values
+            elif isinstance(v, datetime):
+                result[k] = v  # Keep as datetime for MongoDB ISODate storage
+            elif isinstance(v, date) and not isinstance(v, datetime):
+                result[k] = v.isoformat()  # date (not datetime) -> string YYYY-MM-DD
+            elif isinstance(v, str) and _original_obj is not None:
+                # Check if this was originally a datetime that msgspec converted to string
+                orig_val = getattr(_original_obj, k, None)
+                if isinstance(orig_val, datetime):
+                    result[k] = orig_val  # Restore original datetime
+                else:
+                    result[k] = v
+            elif isinstance(v, Enum):
+                result[k] = v.value
+            elif isinstance(v, dict):
+                result[k] = to_mongo_doc(v)
+            elif isinstance(v, list):
+                result[k] = [to_mongo_doc(item) if isinstance(item, (dict, Struct)) else
+                            item if isinstance(item, datetime) else
+                            item.isoformat() if isinstance(item, date) else
+                            item.value if isinstance(item, Enum) else item
+                            for item in v]
+            else:
+                result[k] = v
+        return result
+
+    # Convert Struct to dict first using msgspec.to_builtins with str_keys for MongoDB compatibility
+    # Pass original object to restore datetime fields that msgspec converts to strings
+    raw = msgspec.to_builtins(obj, str_keys=True)
+    return to_mongo_doc(raw, _original_obj=obj)
 
 
 class CustomMsgspecResponse(Response):
@@ -104,7 +157,7 @@ class JSONFormatter(logging.Formatter):
     def format(self, record):
         import json
         log_obj = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -569,12 +622,15 @@ async def get_full_admin(request: Request) -> dict:
 
 def get_campus_filter(current_user: dict):
     """Get campus filter for queries based on user role"""
-    if current_user.get("role") == UserRole.FULL_ADMIN:
+    role = current_user.get("role")
+    # Handle both enum and string values for role comparison
+    if role == UserRole.FULL_ADMIN.value or role == "full_admin":
         return {}  # Full admin sees all campuses
     elif current_user.get("campus_id"):
         return {"campus_id": current_user["campus_id"]}  # Campus-specific user
     else:
-        return {"campus_id": None}  # Fallback
+        # User has no campus - return impossible filter to prevent data leaks
+        return {"campus_id": {"$exists": False, "$eq": "IMPOSSIBLE_VALUE"}}
 
 # ==================== MODELS ====================
 # Using msgspec.Struct instead of Pydantic BaseModel for faster serialization
@@ -1171,7 +1227,7 @@ async def log_activity(
             event_type=event_type,
             notes=notes
         )
-        await db.activity_logs.insert_one(msgspec.to_builtins(activity))
+        await db.activity_logs.insert_one(to_mongo_doc(activity))
         logger.info(f"Activity logged: {user_name} - {action_type} - {member_name}")
     except Exception as e:
         logger.error(f"Error logging activity: {str(e)}")
@@ -1261,8 +1317,8 @@ def generate_accident_followup_timeline(event_date: date, care_event_id: str, me
             "completed_at": None,
             "notes": None,
             "reminder_sent": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         }
         timeline.append(followup_stage)
     
@@ -1292,8 +1348,8 @@ def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: 
             "completed_at": None,
             "notes": None,
             "reminder_sent": False,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         }
         timeline.append(grief_support)
     
@@ -1334,7 +1390,7 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
                 response_data=response_data
             )
             
-            await db.notification_logs.insert_one(msgspec.to_builtins(log_entry))
+            await db.notification_logs.insert_one(to_mongo_doc(log_entry))
             
             return {
                 "success": status == NotificationStatus.SENT,
@@ -1355,7 +1411,7 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
                 status=NotificationStatus.FAILED,
                 response_data={"error": str(e)}
             )
-            await db.notification_logs.insert_one(msgspec.to_builtins(log_entry))
+            await db.notification_logs.insert_one(to_mongo_doc(log_entry))
         
         return {
             "success": False,
@@ -1367,17 +1423,21 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
 @post("/campuses")
 async def create_campus(data: CampusCreate, request: Request) -> dict:
     """Create a new campus (full admin only)"""
+    current_user = await get_current_user(request)
+    if current_user.get("role") != UserRole.FULL_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only full administrators can create campuses")
     try:
         campus_obj = Campus(
-            campus_name=campus.campus_name,
-            location=campus.location
+            campus_name=data.campus_name,
+            location=data.location,
+            timezone=data.timezone
         )
-        await db.campuses.insert_one(msgspec.to_builtins(campus_obj))
+        await db.campuses.insert_one(to_mongo_doc(campus_obj))
 
         # Invalidate campus cache
         invalidate_cache("campuses:")
 
-        return campus_obj
+        return {"id": campus_obj.id, "campus_name": campus_obj.campus_name, "location": campus_obj.location}
     except Exception as e:
         logger.error(f"Error creating campus: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -1433,12 +1493,15 @@ async def get_campus(campus_id: str) -> dict:
 @put("/campuses/{campus_id:str}")
 async def update_campus(campus_id: str, data: CampusCreate, request: Request) -> dict:
     """Update campus (full admin only)"""
+    current_user = await get_current_user(request)
+    if current_user.get("role") != UserRole.FULL_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only full administrators can update campuses")
     try:
         result = await db.campuses.update_one(
             {"id": campus_id},
             {"$set": {
-                **msgspec.to_builtins(update),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                **to_mongo_doc(data),
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         if result.matched_count == 0:
@@ -1478,7 +1541,7 @@ async def register_user(data: UserCreate, request: Request) -> dict:
             hashed_password=get_password_hash(data.password)
         )
         
-        await db.users.insert_one(msgspec.to_builtins(user))
+        await db.users.insert_one(to_mongo_doc(user))
         
         campus_name = None
         if user.campus_id:
@@ -1526,7 +1589,7 @@ async def login(data: UserLogin, request: Request) -> dict:
             )
         
         # For campus-specific users, validate campus_id
-        if user.get("role") in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+        if user.get("role") in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             if data.campus_id and user["campus_id"] != data.campus_id:
                 raise HTTPException(
                     status_code=HTTP_403_FORBIDDEN,
@@ -1535,14 +1598,14 @@ async def login(data: UserLogin, request: Request) -> dict:
         
         # For full admins, use the selected campus_id from login
         active_campus_id = user.get("campus_id")
-        if user.get("role") == UserRole.FULL_ADMIN:
+        if user.get("role") == UserRole.FULL_ADMIN.value:
             if data.campus_id:
                 # Full admin selected a specific campus
                 active_campus_id = data.campus_id
                 # Update user's active campus
                 await db.users.update_one(
                     {"id": user["id"]},
-                    {"$set": {"campus_id": data.campus_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                    {"$set": {"campus_id": data.campus_id, "updated_at": datetime.now(timezone.utc)}}
                 )
             else:
                 raise HTTPException(
@@ -1606,7 +1669,7 @@ async def list_users(request: Request) -> list:
     try:
         query = {}
         # Campus admins only see users in their campus
-        if current_admin.get("role") == UserRole.CAMPUS_ADMIN:
+        if current_admin.get("role") == UserRole.CAMPUS_ADMIN.value:
             query["campus_id"] = current_admin["campus_id"]
 
         # Use aggregation pipeline with $lookup for campus name (avoids N+1 queries)
@@ -1672,29 +1735,29 @@ async def update_user(user_id: str, data: UserUpdate, request: Request) -> dict:
         raise HTTPException(status_code=403, detail="Only full administrators can update users")
     
     try:
-        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
-        
+        update_data = {k: v for k, v in to_mongo_doc(data).items() if v is not None}
+
         # Normalize phone number if provided
         if 'phone' in update_data and update_data['phone']:
             update_data['phone'] = normalize_phone_number(update_data['phone'])
-        
+
         # Hash password if provided
         if 'password' in update_data:
             update_data['hashed_password'] = get_password_hash(update_data['password'])
             del update_data['password']
-        
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        
+
+        update_data["updated_at"] = datetime.now(timezone.utc)
+
         result = await db.users.update_one(
             {"id": user_id},
             {"$set": update_data}
         )
-        
+
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         updated_user = await db.users.find_one({"id": user_id}, {"_id": 0})
-        
+
         # Get campus name if campus_id exists
         if updated_user.get("campus_id"):
             campus = await db.campuses.find_one({"id": updated_user["campus_id"]}, {"_id": 0})
@@ -1724,7 +1787,7 @@ async def update_own_profile(update: ProfileUpdate, request: Request) -> dict:
     """Update own profile (all users can update their own name, email, phone)"""
     current_user = await get_current_user(request)
     try:
-        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
+        update_data = {k: v for k, v in to_mongo_doc(update).items() if v is not None}
 
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields to update")
@@ -1739,7 +1802,7 @@ async def update_own_profile(update: ProfileUpdate, request: Request) -> dict:
             if existing:
                 raise HTTPException(status_code=400, detail="Email already in use")
 
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         result = await db.users.update_one(
             {"id": current_user["id"]},
@@ -1789,7 +1852,7 @@ async def change_password(data: PasswordChange, request: Request) -> dict:
             {"id": current_user["id"]},
             {"$set": {
                 "hashed_password": new_hashed,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
 
@@ -1844,7 +1907,7 @@ async def upload_user_photo(user_id: str, request: Request, data: UploadFile) ->
             {"id": user_id},
             {"$set": {
                 "photo_url": photo_url,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -1884,32 +1947,29 @@ async def create_member(data: MemberCreate, request: Request) -> dict:
     current_user = await get_current_user(request)
     try:
         # For campus-specific users, enforce their campus
-        campus_id = member.campus_id
-        if current_user.get("role") in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+        campus_id = data.campus_id
+        if current_user.get("role") in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             campus_id = current_user["campus_id"]
 
         member_obj = Member(
-            name=member.name,
-            phone=normalize_phone_number(member.phone),
+            name=data.name,
+            phone=normalize_phone_number(data.phone) if data.phone else None,
             campus_id=campus_id,
-            external_member_id=member.external_member_id,
-            notes=member.notes,
-            birth_date=member.birth_date,
-            address=member.address,
-            category=member.category,
-            gender=member.gender,
-            blood_type=member.blood_type,
-            marital_status=member.marital_status,
-            membership_status=member.membership_status,
-            age=member.age
+            external_member_id=data.external_member_id,
+            notes=data.notes,
+            birth_date=data.birth_date,
+            address=data.address,
+            category=data.category,
+            gender=data.gender,
+            blood_type=data.blood_type,
+            marital_status=data.marital_status,
+            membership_status=data.membership_status,
+            age=data.age
         )
 
-        member_dict = msgspec.to_builtins(member_obj)
-        if member_dict.get('birth_date'):
-            member_dict['birth_date'] = member_dict['birth_date'].isoformat() if isinstance(member_dict['birth_date'], date) else member_dict['birth_date']
-
+        member_dict = to_mongo_doc(member_obj)
         await db.members.insert_one(member_dict)
-        return member_obj
+        return {"id": member_obj.id, "name": member_obj.name, "campus_id": member_obj.campus_id}
     except Exception as e:
         logger.error(f"Error creating member: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -1922,6 +1982,7 @@ async def list_members(
     engagement_status: Optional[EngagementStatus] = None,
     search: Optional[str] = None,
     show_archived: bool = False,
+    fields: Optional[str] = None,  # Comma-separated list of fields to return
 ) -> list:
     """List all members with pagination"""
     current_user = await get_current_user(request)
@@ -1944,35 +2005,48 @@ async def list_members(
                 {"name": {"$regex": safe_search, "$options": "i"}},  # Partial name match
                 {"phone": {"$regex": safe_search, "$options": "i"}}  # Partial phone match
             ]
-        
+
         # Calculate skip for pagination
         skip = (page - 1) * limit
-        
+
         # Get total count for pagination metadata
         total = await db.members.count_documents(query)
 
-        # Define projection for list view (exclude heavy fields like notes, address)
-        projection = {
-            "_id": 0,
-            "id": 1,
-            "name": 1,
-            "phone": 1,
-            "campus_id": 1,
-            "photo_url": 1,
-            "last_contact_date": 1,
-            "engagement_status": 1,
-            "days_since_last_contact": 1,
-            "is_archived": 1,
-            "external_member_id": 1,
-            "age": 1,
-            "gender": 1,
-            "category": 1,
-            "membership_status": 1,
-            "marital_status": 1,
-            "blood_type": 1,
-            "birth_date": 1
-            # Exclude: notes, address, archived_at, archived_reason, etc.
-        }
+        # Build projection based on fields parameter or use default
+        if fields:
+            # Parse comma-separated fields and build projection
+            allowed_fields = {"id", "name", "phone", "campus_id", "photo_url", "last_contact_date",
+                            "engagement_status", "days_since_last_contact", "is_archived",
+                            "external_member_id", "age", "gender", "category", "membership_status",
+                            "marital_status", "blood_type", "birth_date"}
+            requested_fields = [f.strip() for f in fields.split(",")]
+            projection = {"_id": 0}
+            for field in requested_fields:
+                if field in allowed_fields:
+                    projection[field] = 1
+        else:
+            # Default projection for list view (exclude heavy fields like notes, address)
+            projection = {
+                "_id": 0,
+                "id": 1,
+                "name": 1,
+                "phone": 1,
+                "campus_id": 1,
+                "photo_url": 1,
+                "last_contact_date": 1,
+                "engagement_status": 1,
+                "days_since_last_contact": 1,
+                "is_archived": 1,
+                "external_member_id": 1,
+                "age": 1,
+                "gender": 1,
+                "category": 1,
+                "membership_status": 1,
+                "marital_status": 1,
+                "blood_type": 1,
+                "birth_date": 1
+                # Exclude: notes, address, archived_at, archived_reason, etc.
+            }
 
         # Get paginated members with projection
         members = await db.members.find(query, projection).skip(skip).limit(limit).to_list(limit)
@@ -2043,9 +2117,10 @@ async def get_dashboard_reminders(request: Request) -> dict:
         
         campus_tz = await get_campus_timezone(campus_id)
         today_date = get_date_in_timezone(campus_tz)
-        
+
         # Check if we have cached data for today
-        cache_key = f"dashboard_reminders_{current_user.get('campus_id')}_{today_date}"
+        # Use resolved campus_id (not None) for cache key
+        cache_key = f"dashboard_reminders_{campus_id}_{today_date}"
         cached = await db.dashboard_cache.find_one({"cache_key": cache_key})
 
         if cached and cached.get("data"):
@@ -2275,24 +2350,30 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                 continue
         
         # AI suggestions (top 10 at-risk)
-        suggestions_list = sorted(at_risk + disconnected, 
-                                 key=lambda x: x.get("days_since_last_contact", 0), 
+        suggestions_list = sorted(at_risk + disconnected,
+                                 key=lambda x: x.get("days_since_last_contact", 0),
                                  reverse=True)[:10]
-        
+
+        # Batch fetch ALL birthday events for this campus in ONE query (N+1 fix)
+        member_ids = [m["id"] for m in members if m.get("birth_date")]
+        birthday_events = await db.care_events.find(
+            {"campus_id": campus_id, "event_type": "birthday", "member_id": {"$in": member_ids}},
+            {"_id": 0}
+        ).to_list(None)
+        # Build lookup map: member_id -> birthday event
+        birthday_events_map = {e["member_id"]: e for e in birthday_events}
+
         # Process all birthdays
         for member in members:
             if not member.get("birth_date"):
                 continue
-                
+
             birth_date = datetime.strptime(member["birth_date"], '%Y-%m-%d').date()
             this_year_birthday = birth_date.replace(year=today.year)
-            
-            # Find birthday event if exists
-            event = await db.care_events.find_one(
-                {"member_id": member["id"], "event_type": "birthday"},
-                {"_id": 0}
-            )
-            
+
+            # Lookup birthday event from pre-fetched map (O(1) instead of DB call)
+            event = birthday_events_map.get(member["id"])
+
             if not event:
                 continue
             
@@ -2431,44 +2512,45 @@ def get_date_in_timezone(timezone_str: str) -> str:
 @post("/care-events/{event_id:str}/ignore")
 async def ignore_care_event(event_id: str, request: Request) -> dict:
     """Mark a care event as ignored/dismissed"""
+    current_user = await get_current_user(request)
     try:
         # Get the care event with campus filter for multi-tenancy
         query = {"id": event_id}
-        campus_filter = get_campus_filter(user)
+        campus_filter = get_campus_filter(current_user)
         if campus_filter:
             query.update(campus_filter)
         event = await db.care_events.find_one(query, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
-        
+
         # Get member name for logging
         member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
         member_name = member["name"] if member else "Unknown"
-        
+
         # Update event to mark as ignored
         await db.care_events.update_one(
             {"id": event_id},
             {"$set": {
                 "ignored": True,
-                "ignored_at": datetime.now(timezone.utc).isoformat(),
-                "ignored_by": user.get("id"),
-                "ignored_by_name": user.get("name"),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "ignored_at": datetime.now(timezone.utc),
+                "ignored_by": current_user.get("id"),
+                "ignored_by_name": current_user.get("name"),
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
-        
+
         # Log activity
         await log_activity(
             campus_id=event["campus_id"],
-            user_id=user["id"],
-            user_name=user["name"],
+            user_id=current_user["id"],
+            user_name=current_user["name"],
             action_type=ActivityActionType.IGNORE_TASK,
             member_id=event["member_id"],
             member_name=member_name,
             care_event_id=event_id,
             event_type=EventType(event["event_type"]),
             notes=f"Ignored {event['event_type']} task",
-            user_photo_url=user.get("photo_url")
+            user_photo_url=current_user.get("photo_url")
         )
         
         # Invalidate dashboard cache
@@ -2573,13 +2655,13 @@ async def update_member(member_id: str, data: MemberUpdate, request: Request) ->
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
+        update_data = {k: v for k, v in to_mongo_doc(data).items() if v is not None}
 
         # Normalize phone number if provided
         if 'phone' in update_data and update_data['phone']:
             update_data['phone'] = normalize_phone_number(update_data['phone'])
 
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         result = await db.members.update_one(
             {"id": member_id},
@@ -2589,7 +2671,10 @@ async def update_member(member_id: str, data: MemberUpdate, request: Request) ->
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        return await get_member(member_id, current_user)
+        # Invalidate dashboard cache since member data changed
+        await invalidate_dashboard_cache(member.get("campus_id"))
+
+        return await get_member(member_id, request)
     except HTTPException:
         raise
     except Exception as e:
@@ -2628,15 +2713,14 @@ async def delete_member(member_id: str, request: Request) -> dict:
 
         # Log activity
         await log_activity(
-            db=db,
+            campus_id=member.get("campus_id") or current_user.get("campus_id"),
             user_id=current_user["id"],
             user_name=current_user["name"],
-            campus_id=current_user.get("campus_id"),
-            action="delete_member",
-            target_type="member",
-            target_id=member_id,
-            target_name=member.get("name", "Unknown"),
-            description=f"Deleted member {member.get('name', 'Unknown')}"
+            action_type=ActivityActionType.DELETE_MEMBER,
+            member_id=member_id,
+            member_name=member.get("name", "Unknown"),
+            notes=f"Deleted member {member.get('name', 'Unknown')}",
+            user_photo_url=current_user.get("photo_url")
         )
 
         return {"success": True, "message": "Member deleted successfully"}
@@ -2701,7 +2785,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
             if birthday_event:
                 await db.care_events.update_one(
                     {"id": birthday_event["id"]},
-                    {"$set": {"completed": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                    {"$set": {"completed": False, "updated_at": datetime.now(timezone.utc)}}
                 )
                 # Also delete the activity log associated with the original birthday event completion
                 await db.activity_logs.delete_many({"care_event_id": birthday_event["id"]})
@@ -2811,7 +2895,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                     "last_contact_date": new_last_contact,
                     "days_since_last_contact": days_since,
                     "engagement_status": engagement_status,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
+                    "updated_at": datetime.now(timezone.utc)
                 }}
             )
         else:
@@ -2822,7 +2906,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                     "last_contact_date": None,
                     "days_since_last_contact": 999,
                     "engagement_status": "disconnected",
-                    "updated_at": datetime.now(timezone.utc).isoformat()
+                    "updated_at": datetime.now(timezone.utc)
                 }}
             )
         
@@ -2904,7 +2988,7 @@ async def upload_member_photo(member_id: str, request: Request, data: UploadFile
             {"$set": {
                 "photo_url": photo_urls['medium'],  # Default medium size
                 "photo_urls": photo_urls,  # All sizes available
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -2929,7 +3013,7 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
     try:
         # For campus-specific users, enforce their campus
         campus_id = event.campus_id
-        if current_user.get("role") in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+        if current_user.get("role") in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             campus_id = current_user["campus_id"]
 
         # Validate required fields for financial aid events
@@ -2985,23 +3069,15 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
         
         # Add initial visitation log if hospital visit
         if event.initial_visitation:
-            care_event.visitation_log = [msgspec.to_builtins(event.initial_visitation)]
+            care_event.visitation_log = [to_mongo_doc(event.initial_visitation)]
 
-        # Serialize for MongoDB using msgspec
-        event_dict = msgspec.to_builtins(care_event)
+        # Serialize for MongoDB using to_mongo_doc (handles all dates automatically)
+        event_dict = to_mongo_doc(care_event)
 
         # Log what we're about to save for financial aid events
         if event.event_type == EventType.FINANCIAL_AID:
             logger.info(f"[FINANCIAL AID] Saving to DB: aid_type={repr(event_dict.get('aid_type'))}, aid_amount={repr(event_dict.get('aid_amount'))}")
 
-        event_dict['event_date'] = event_dict['event_date'].isoformat() if isinstance(event_dict['event_date'], date) else event_dict['event_date']
-        if event_dict.get('mourning_service_date'):
-            event_dict['mourning_service_date'] = event_dict['mourning_service_date'].isoformat() if isinstance(event_dict['mourning_service_date'], date) else event_dict['mourning_service_date']
-        if event_dict.get('admission_date'):
-            event_dict['admission_date'] = event_dict['admission_date'].isoformat() if isinstance(event_dict['admission_date'], date) else event_dict['admission_date']
-        if event_dict.get('discharge_date'):
-            event_dict['discharge_date'] = event_dict['discharge_date'].isoformat() if isinstance(event_dict['discharge_date'], date) else event_dict['discharge_date']
-        
         await db.care_events.insert_one(event_dict)
         
         # Log activity for creating the care event
@@ -3054,10 +3130,10 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
             await db.members.update_one(
                 {"id": event.member_id},
                 {"$set": {
-                    "last_contact_date": now.isoformat(),
+                    "last_contact_date": now,
                     "days_since_last_contact": 0,
                     "engagement_status": "active",
-                    "updated_at": now.isoformat()
+                    "updated_at": now
                 }}
             )
         
@@ -3072,13 +3148,6 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
         logger.error(f"Error creating care event: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-
-
-class AdditionalVisitRequest2(Struct):
-    """Second definition for additional visit (duplicate of line 714)"""
-    visit_date: str
-    visit_type: str
-    notes: str
 
 @post("/care-events/{parent_event_id:str}/additional-visit")
 async def log_additional_visit(
@@ -3117,13 +3186,13 @@ async def log_additional_visit(
             "title": f"Additional Visit - {data.visit_type}",
             "description": data.notes,
             "completed": True,  # Always completed (already happened)
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc),
             "completed_by_user_id": current_user["id"],
             "completed_by_user_name": current_user["name"],
             "created_by_user_id": current_user["id"],
             "created_by_user_name": current_user["name"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         }
         
         await db.care_events.insert_one(additional_visit)
@@ -3146,7 +3215,7 @@ async def log_additional_visit(
         await db.members.update_one(
             {"id": parent["member_id"]},
             {"$set": {
-                "last_contact_date": datetime.now(timezone.utc).isoformat(),
+                "last_contact_date": datetime.now(timezone.utc),
                 "engagement_status": "active",
                 "days_since_last_contact": 0
             }}
@@ -3283,8 +3352,8 @@ async def update_care_event(event_id: str, data: CareEventUpdate, request: Reque
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
 
-        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        update_data = {k: v for k, v in to_mongo_doc(data).items() if v is not None}
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         result = await db.care_events.update_one(
             {"id": event_id},
@@ -3324,10 +3393,10 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
             {"id": event_id},
             {"$set": {
                 "completed": True,
-                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "completed_at": datetime.now(timezone.utc),
                 "completed_by_user_id": current_user["id"],
                 "completed_by_user_name": current_user["name"],
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -3353,10 +3422,10 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
         await db.members.update_one(
             {"id": event["member_id"]},
             {"$set": {
-                "last_contact_date": now.isoformat(),
+                "last_contact_date": now,
                 "days_since_last_contact": 0,
                 "engagement_status": "active",
-                "updated_at": now.isoformat()
+                "updated_at": now
             }}
         )
         
@@ -3375,12 +3444,12 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
                 "title": "Birthday Contact",
                 "description": f"Contacted {member_name} for their birthday celebration",
                 "completed": True,
-                "completed_at": now.isoformat(),
+                "completed_at": now,
                 "completed_by_user_id": current_user["id"],
                 "completed_by_user_name": current_user["name"],
                 "reminder_sent": False,
-                "created_at": now.isoformat(),
-                "updated_at": now.isoformat()
+                "created_at": now,
+                "updated_at": now
             }
             
             await db.care_events.insert_one(contact_event)
@@ -3425,7 +3494,7 @@ async def send_care_event_reminder(event_id: str, request: Request) -> dict:
                 {"id": event_id},
                 {"$set": {
                     "reminder_sent": True,
-                    "reminder_sent_at": datetime.now(timezone.utc).isoformat(),
+                    "reminder_sent_at": datetime.now(timezone.utc),
                     "reminder_sent_by_user_id": current_user["id"],
                     "reminder_sent_by_user_name": current_user["name"]
                 }}
@@ -3460,14 +3529,13 @@ async def add_visitation_log(event_id: str, entry: VisitationLogEntry) -> dict:
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
         
-        log_entry = msgspec.to_builtins(entry)
-        log_entry['visit_date'] = log_entry['visit_date'].isoformat() if isinstance(log_entry['visit_date'], date) else log_entry['visit_date']
+        log_entry = to_mongo_doc(entry)
         
         await db.care_events.update_one(
             {"id": event_id},
             {
                 "$push": {"visitation_log": log_entry},
-                "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+                "$set": {"updated_at": datetime.now(timezone.utc)}
             }
         )
         
@@ -3571,10 +3639,10 @@ async def complete_grief_stage(stage_id: str, request: Request, notes: Optional[
         
         update_data = {
             "completed": True,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc),
             "completed_by_user_id": current_user["id"],
             "completed_by_user_name": current_user["name"],
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at": datetime.now(timezone.utc)
         }
         
         if notes:
@@ -3604,13 +3672,13 @@ async def complete_grief_stage(stage_id: str, request: Request, notes: Optional[
             "description": "Completed grief follow-up stage" + (f"\n\nNotes: {notes}" if notes else ""),
             "grief_stage_id": stage_id,  # Link for undo (but NOT care_event_id)
             "completed": True,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc),
             "completed_by_user_id": current_user["id"],
             "completed_by_user_name": current_user["name"],
             "created_by_user_id": current_user["id"],
             "created_by_user_name": current_user["name"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         })
         
         # Log activity
@@ -3630,7 +3698,7 @@ async def complete_grief_stage(stage_id: str, request: Request, notes: Optional[
         # Update member's last contact date
         await db.members.update_one(
             {"id": stage["member_id"]},
-            {"$set": {"last_contact_date": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {"last_contact_date": datetime.now(timezone.utc)}}
         )
         
         # Invalidate dashboard cache
@@ -3659,7 +3727,7 @@ async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
             {"id": stage_id},
             {"$set": {
                 "ignored": True,
-                "ignored_at": datetime.now(timezone.utc).isoformat(),
+                "ignored_at": datetime.now(timezone.utc),
                 "ignored_by": user.get("id"),
                 "ignored_by_name": user.get("name")
             }}
@@ -3680,13 +3748,13 @@ async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
             "description": "Stage was marked as ignored/not applicable",
             "grief_stage_id": stage_id,  # Link for undo (but NOT care_event_id)
             "ignored": True,
-            "ignored_at": datetime.now(timezone.utc).isoformat(),
+            "ignored_at": datetime.now(timezone.utc),
             "ignored_by": user.get("id"),
             "ignored_by_name": user.get("name"),
             "created_by_user_id": user.get("id"),
             "created_by_user_name": user.get("name"),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         })
         
         # Log activity
@@ -3788,7 +3856,7 @@ async def send_grief_reminder(stage_id: str) -> dict:
         if result['success']:
             await db.grief_support.update_one(
                 {"id": stage_id},
-                {"$set": {"reminder_sent": True, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                {"$set": {"reminder_sent": True, "updated_at": datetime.now(timezone.utc)}}
             )
         
         return result
@@ -3855,10 +3923,10 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: Option
         
         update_data = {
             "completed": True,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc),
             "completed_by_user_id": current_user["id"],
             "completed_by_user_name": current_user["name"],
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at": datetime.now(timezone.utc)
         }
         
         if notes:
@@ -3887,13 +3955,13 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: Option
             "description": "Completed accident/illness follow-up" + (f"\n\nNotes: {notes}" if notes else ""),
             "accident_stage_id": stage_id,  # Link for undo
             "completed": True,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc),
             "completed_by_user_id": current_user["id"],
             "completed_by_user_name": current_user["name"],
             "created_by_user_id": current_user["id"],
             "created_by_user_name": current_user["name"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         })
         
         # Log activity
@@ -3913,7 +3981,7 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: Option
         # Update member's last contact date
         await db.members.update_one(
             {"id": stage["member_id"]},
-            {"$set": {"last_contact_date": datetime.now(timezone.utc).isoformat()}}
+            {"$set": {"last_contact_date": datetime.now(timezone.utc)}}
         )
         
         # Invalidate dashboard cache
@@ -4079,9 +4147,9 @@ async def create_aid_schedule(schedule: dict, request: Request) -> dict:
             notes=schedule.get('notes')
         )
         
-        # Serialize for MongoDB using msgspec
-        schedule_dict = msgspec.to_builtins(aid_schedule)
-        
+        # Serialize for MongoDB using to_mongo_doc for consistent date handling
+        schedule_dict = to_mongo_doc(aid_schedule)
+
         await db.financial_aid_schedules.insert_one(schedule_dict)
         
         # Invalidate dashboard cache
@@ -4118,69 +4186,45 @@ async def list_aid_schedules(
         logger.error(f"Error listing aid schedules: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@delete("/financial-aid-schedules/{schedule_id:str}/ignored-occurrence/{date:str}", status_code=200)
-async def remove_ignored_occurrence(schedule_id: str, date: str, request: Request) -> dict:
-    """Remove a specific ignored occurrence from a schedule"""
-    try:
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
-        if not schedule:
-            raise HTTPException(status_code=404, detail="Schedule not found")
-        
-        ignored_list = schedule.get("ignored_occurrences", [])
-        if date in ignored_list:
-            ignored_list.remove(date)
-        
-        await db.financial_aid_schedules.update_one(
-            {"id": schedule_id},
-            {"$set": {
-                "ignored_occurrences": ignored_list,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-        
-        # Invalidate dashboard cache
-        await invalidate_dashboard_cache(schedule["campus_id"])
-        
-        return {"success": True, "message": "Ignored occurrence removed"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error removing ignored occurrence: {str(e)}")
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
-
 @delete("/financial-aid-schedules/{schedule_id:str}/ignored-occurrence/{occurrence_date:str}", status_code=200)
-async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str) -> dict:
+async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str, request: Request) -> dict:
     """Remove a specific ignored occurrence from the schedule and its activity log"""
+    current_user = await get_current_user(request)
     try:
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        # Build query with campus filter
+        query = {"id": schedule_id}
+        campus_filter = get_campus_filter(current_user)
+        if campus_filter:
+            query.update(campus_filter)
+
+        schedule = await db.financial_aid_schedules.find_one(query, {"_id": 0})
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
-        
+
         # Remove the occurrence from ignored list
         ignored_list = schedule.get("ignored_occurrences", [])
         if occurrence_date in ignored_list:
             ignored_list.remove(occurrence_date)
-        
+
         await db.financial_aid_schedules.update_one(
             {"id": schedule_id},
             {"$set": {
                 "ignored_occurrences": ignored_list,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
-        
+
         # Delete activity log for this ignore action
-        # Match activity log that has this date in the notes
         await db.activity_logs.delete_many({
             "member_id": schedule["member_id"],
             "event_type": "financial_aid",
             "action_type": "ignore_task",
             "notes": {"$regex": occurrence_date, "$options": "i"}
         })
-        
+
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(schedule["campus_id"])
-        
+
         return {"success": True, "message": "Ignored occurrence removed"}
     except HTTPException:
         raise
@@ -4205,7 +4249,7 @@ async def clear_all_ignored_occurrences(schedule_id: str, request: Request) -> d
             {"id": schedule_id},
             {"$set": {
                 "ignored_occurrences": [],
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -4285,8 +4329,8 @@ async def stop_aid_schedule(schedule_id: str, request: Request) -> dict:
                 "is_active": False,
                 "stopped_by_user_id": current_user["id"],
                 "stopped_by_user_name": current_user["name"],
-                "stopped_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "stopped_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -4409,13 +4453,13 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
             "aid_amount": schedule["aid_amount"],
             "aid_notes": f"From {schedule['frequency']} schedule",
             "completed": True,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc),
             "completed_by_user_id": current_user["id"],
             "completed_by_user_name": current_user["name"],
             "created_by_user_id": current_user["id"],
             "created_by_user_name": current_user["name"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         })
         
         # Log activity
@@ -4439,10 +4483,10 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
         await db.members.update_one(
             {"id": schedule["member_id"]},
             {"$set": {
-                "last_contact_date": datetime.now(timezone.utc).isoformat(),
+                "last_contact_date": datetime.now(timezone.utc),
                 "engagement_status": status,
                 "days_since_last_contact": days,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -4493,7 +4537,7 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
             {"$set": {
                 "next_occurrence": next_date.isoformat(),
                 "occurrences_completed": (schedule.get("occurrences_completed", 0) + 1),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -4579,7 +4623,7 @@ async def ignore_financial_aid_schedule(schedule_id: str, request: Request) -> d
             {"$set": {
                 "ignored_occurrences": ignored_list,
                 "next_occurrence": next_date.isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -4629,7 +4673,7 @@ async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
             {"id": stage_id},
             {"$set": {
                 "ignored": True,
-                "ignored_at": datetime.now(timezone.utc).isoformat(),
+                "ignored_at": datetime.now(timezone.utc),
                 "ignored_by": user.get("id"),
                 "ignored_by_name": user.get("name")
             }}
@@ -4650,13 +4694,13 @@ async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
             "description": "Stage was marked as ignored/not applicable",
             "accident_stage_id": stage_id,  # Link for undo
             "ignored": True,
-            "ignored_at": datetime.now(timezone.utc).isoformat(),
+            "ignored_at": datetime.now(timezone.utc),
             "ignored_by": user.get("id"),
             "ignored_by_name": user.get("name"),
             "created_by_user_id": user.get("id"),
             "created_by_user_name": user.get("name"),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
         })
         
         # Log activity
@@ -5349,7 +5393,7 @@ async def sync_members_from_external_api(
                         "name": ext_member.get('name'),
                         "phone": ext_member.get('phone'),
                         "email": ext_member.get('email'),
-                        "updated_at": datetime.now(timezone.utc).isoformat()
+                        "updated_at": datetime.now(timezone.utc)
                     }
                     
                     # If member was archived, un-archive them
@@ -5382,17 +5426,13 @@ async def sync_members_from_external_api(
                         phone=ext_member.get('phone'),
                         campus_id=sync_campus_id,
                         external_member_id=ext_id,
-                        email=ext_member.get('email'),
                         birth_date=ext_member.get('birth_date'),
                         address=ext_member.get('address'),
                         membership_status=ext_member.get('membership_status'),
                         category=ext_member.get('category'),
                         gender=ext_member.get('gender')
                     )
-                    member_dict = msgspec.to_builtins(member)
-                    if member_dict.get('birth_date'):
-                        member_dict['birth_date'] = member_dict['birth_date'].isoformat()
-                    await db.members.insert_one(member_dict)
+                    await db.members.insert_one(to_mongo_doc(member))
                 
                 synced_count += 1
             except Exception as e:
@@ -5416,9 +5456,9 @@ async def sync_members_from_external_api(
                     {"id": member["id"]},
                     {"$set": {
                         "is_archived": True,
-                        "archived_at": datetime.now(timezone.utc).isoformat(),
+                        "archived_at": datetime.now(timezone.utc),
                         "archived_reason": "Removed from external API source",
-                        "updated_at": datetime.now(timezone.utc).isoformat()
+                        "updated_at": datetime.now(timezone.utc)
                     }}
                 )
                 archived_count += 1
@@ -5455,7 +5495,6 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
     try:
         # Get campus_id from current user for multi-tenancy
         campus_id = current_user.get("campus_id")
-        church_id = current_user.get("church_id")
         if not campus_id:
             raise HTTPException(status_code=400, detail="No campus assigned to your account")
 
@@ -5478,11 +5517,10 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
                     phone=row.get('phone', ''),
                     external_member_id=row.get('external_member_id'),
                     notes=row.get('notes'),
-                    campus_id=campus_id,
-                    church_id=church_id
+                    campus_id=campus_id
                 )
 
-                await db.members.insert_one(msgspec.to_builtins(member))
+                await db.members.insert_one(to_mongo_doc(member))
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Row error: {str(e)}")
@@ -5508,7 +5546,6 @@ async def import_members_json(members: List[Dict[str, Any]], request: Request) -
     try:
         # Get campus_id from current user for multi-tenancy
         campus_id = current_user.get("campus_id")
-        church_id = current_user.get("church_id")
         if not campus_id:
             raise HTTPException(status_code=400, detail="No campus assigned to your account")
 
@@ -5522,11 +5559,10 @@ async def import_members_json(members: List[Dict[str, Any]], request: Request) -
                     phone=member_data.get('phone', ''),
                     external_member_id=member_data.get('external_member_id'),
                     notes=member_data.get('notes'),
-                    campus_id=campus_id,
-                    church_id=church_id
+                    campus_id=campus_id
                 )
 
-                await db.members.insert_one(msgspec.to_builtins(member))
+                await db.members.insert_one(to_mongo_doc(member))
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Member error: {str(e)}")
@@ -5685,35 +5721,45 @@ async def get_intelligent_suggestions(request: Request) -> dict:
     try:
         campus_filter = get_campus_filter(current_user)
         today = date.today()
-        
+
         # Get members and their recent activities
         members = await db.members.find(campus_filter, {"_id": 0}).to_list(1000)
         recent_events = await db.care_events.find({**campus_filter}, {"_id": 0}).to_list(2000)
-        
+
+        # Build event lookup maps ONCE (O(n) instead of O(n*m) nested loops)
+        events_by_member = {}  # member_id -> list of events
+        financial_aid_members = set()  # members with financial aid events
+        for event in recent_events:
+            mid = event.get('member_id')
+            if mid:
+                if mid not in events_by_member:
+                    events_by_member[mid] = []
+                events_by_member[mid].append(event)
+                if event.get('event_type') == 'financial_aid':
+                    financial_aid_members.add(mid)
+
         suggestions = []
-        
+        now_utc = datetime.now(timezone.utc)
+
         for member in members:
-            member_events = [e for e in recent_events if e['member_id'] == member['id']]
             last_contact = member.get('last_contact_date')
             days_since = member.get('days_since_last_contact', 999)
-            
+
             # Skip members contacted in last 48 hours (recently contacted)
             if last_contact:
                 if isinstance(last_contact, str):
                     last_contact_date = datetime.fromisoformat(last_contact)
                 else:
                     last_contact_date = last_contact
-                
+
                 # Ensure both dates are timezone-aware for comparison
                 if last_contact_date.tzinfo is None:
                     last_contact_date = last_contact_date.replace(tzinfo=timezone.utc)
-                
-                now_utc = datetime.now(timezone.utc)
-                
+
                 # If contacted in last 2 days, don't suggest
                 if (now_utc - last_contact_date).days <= 2:
                     continue
-            
+
             # AI-powered suggestions based on patterns
             if days_since > 90:
                 suggestions.append({
@@ -5751,7 +5797,8 @@ async def get_intelligent_suggestions(request: Request) -> dict:
                     "recommended_action": "Welcome visit or invitation to activities",
                     "urgency_score": days_since + 10
                 })
-            elif len([e for e in member_events if e.get('event_type') == 'financial_aid']) > 0 and days_since > 60:
+            elif member['id'] in financial_aid_members and days_since > 60:
+                # O(1) lookup instead of O(n) array scan
                 suggestions.append({
                     "member_id": member['id'],
                     "member_name": member['name'],
@@ -5775,7 +5822,7 @@ async def get_intelligent_suggestions(request: Request) -> dict:
                     "recommended_action": "Invite to small groups or social activities",
                     "urgency_score": days_since
                 })
-        
+
         # Sort by urgency score and return top suggestions
         suggestions.sort(key=lambda x: x['urgency_score'], reverse=True)
         return suggestions[:20]  # Top 20 suggestions
@@ -6515,14 +6562,8 @@ async def get_staff_performance_report(
             "created_at": {"$gte": start_date, "$lt": end_date}
         }, {"_id": 0}).to_list(20000)
 
-        # Get care events completed this month
-        # Use datetime objects for comparison since completed_at is stored as ISODate
-        care_events = await db.care_events.find({
-            **campus_filter,
-            "completed": True,
-            "completed_at": {"$gte": start_date, "$lt": end_date}
-        }, {"_id": 0, "id": 1, "completed_by_user_id": 1, "completed_by_user_name": 1,
-            "event_type": 1, "member_id": 1, "completed_at": 1}).to_list(10000)
+        # Note: Staff performance is derived from activity_logs (which use ISODate),
+        # not care_events (which store completed_at as strings). This ensures accurate data.
 
         # Build staff performance data
         staff_data = {}
@@ -7042,7 +7083,7 @@ async def get_all_config() -> dict:
 async def recalculate_all_engagement_status(request: Request) -> dict:
     """Recalculate engagement status for all members (admin only)"""
     try:
-        if user.get("role") not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+        if user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
             raise HTTPException(status_code=403, detail="Only admins can recalculate engagement")
         
         # Get engagement settings
@@ -7068,7 +7109,7 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
                 {"$set": {
                     "engagement_status": status,
                     "days_since_last_contact": days,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
+                    "updated_at": datetime.now(timezone.utc)
                 }}
             )
             
@@ -7122,7 +7163,7 @@ async def update_engagement_settings(settings: dict, request: Request) -> dict:
             {"$set": {
                 "type": "engagement",
                 "data": settings,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc),
                 "updated_by": current_admin["id"]
             }},
             upsert=True
@@ -7181,7 +7222,7 @@ async def update_automation_settings(settings: dict, request: Request) -> dict:
                     "whatsappGateway": settings.get("whatsappGateway", ""),
                     "enabled": settings.get("enabled", True)
                 },
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc),
                 "updated_by": current_admin["id"]
             }},
             upsert=True
@@ -7224,7 +7265,7 @@ async def get_overdue_writeoff_settings(request: Request) -> dict:
 async def update_overdue_writeoff_settings(settings_data: dict, request: Request) -> dict:
     """Update overdue write-off threshold settings"""
     try:
-        if user.get("role") not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+        if user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
             raise HTTPException(status_code=403, detail="Only admins can update settings")
 
         await db.settings.update_one(
@@ -7232,7 +7273,7 @@ async def update_overdue_writeoff_settings(settings_data: dict, request: Request
             {"$set": {
                 "key": "overdue_writeoff",
                 "data": settings_data.get("data", {}),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }},
             upsert=True
         )
@@ -7276,7 +7317,7 @@ async def update_grief_stages(stages: list, request: Request) -> dict:
             {"$set": {
                 "type": "grief_stages",
                 "data": stages,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc),
                 "updated_by": current_admin["id"]
             }},
             upsert=True
@@ -7313,7 +7354,7 @@ async def update_accident_followup(config: list, request: Request) -> dict:
             {"$set": {
                 "type": "accident_followup",
                 "data": config,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc),
                 "updated_by": current_admin["id"]
             }},
             upsert=True
@@ -7344,7 +7385,7 @@ async def update_user_preferences(user_id: str, preferences: dict) -> dict:
             {"$set": {
                 "user_id": user_id,
                 "data": preferences,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }},
             upsert=True
         )
@@ -7400,12 +7441,12 @@ async def run_reminders_now(request: Request) -> dict:
 async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
     """Save sync configuration for campus"""
     current_user = await get_current_user(request)
-    if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can configure sync")
     
     try:
         campus_id = current_user.get("campus_id")
-        if not campus_id and current_user["role"] == UserRole.FULL_ADMIN:
+        if not campus_id and current_user["role"] == UserRole.FULL_ADMIN.value:
             raise HTTPException(status_code=400, detail="Please select a campus first")
         
         # Check if config exists
@@ -7447,7 +7488,7 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
             "filter_mode": config.filter_mode,
             "filter_rules": config.filter_rules or [],
             "is_enabled": config.is_enabled,
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at": datetime.now(timezone.utc)
         }
         
         if existing:
@@ -7476,8 +7517,8 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
                 filter_rules=config.filter_rules or [],
                 is_enabled=config.is_enabled
             )
-            await db.sync_configs.insert_one(msgspec.to_builtins(sync_config))
-        
+            await db.sync_configs.insert_one(to_mongo_doc(sync_config))
+
         return {"success": True, "message": "Sync configuration saved"}
     
     except HTTPException:
@@ -7491,7 +7532,7 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
 async def regenerate_webhook_secret(request: Request) -> dict:
     """Regenerate webhook secret for security rotation"""
     current_user = await get_current_user(request)
-    if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can regenerate webhook secret")
     
     try:
@@ -7507,7 +7548,7 @@ async def regenerate_webhook_secret(request: Request) -> dict:
             {"campus_id": campus_id},
             {"$set": {
                 "webhook_secret": new_secret,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
         
@@ -7534,7 +7575,7 @@ async def discover_fields_from_core(config_test: SyncConfigCreate, request: Requ
     Returns field metadata for building dynamic filters
     """
     current_user = await get_current_user(request)
-    if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can discover fields")
     
     try:
@@ -7667,7 +7708,7 @@ async def get_sync_config(request: Request) -> dict:
 async def test_sync_connection(config: SyncConfigCreate, request: Request) -> dict:
     """Test connection to core API"""
     current_user = await get_current_user(request)
-    if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can test sync")
     
     try:
@@ -7790,7 +7831,7 @@ async def test_sync_connection(config: SyncConfigCreate, request: Request) -> di
 async def sync_members_from_core(request: Request) -> dict:
     """Pull members from core API and sync"""
     current_user = await get_current_user(request)
-    if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can sync members")
     
     try:
@@ -7813,10 +7854,8 @@ async def sync_members_from_core(request: Request) -> dict:
             sync_type="manual",
             status="in_progress"
         )
-        sync_log_dict = msgspec.to_builtins(sync_log)
-        # Preserve datetime as proper BSON Date for correct sorting
-        sync_log_dict["started_at"] = sync_log.started_at
-        await db.sync_logs.insert_one(sync_log_dict)
+        # Use to_mongo_doc for consistent date serialization (ISO strings)
+        await db.sync_logs.insert_one(to_mongo_doc(sync_log))
         sync_log_id = sync_log.id
         
         start_time = datetime.now(timezone.utc)
@@ -8003,7 +8042,7 @@ async def sync_members_from_core(request: Request) -> dict:
                         "birth_date": core_member.get("date_of_birth"),
                         "gender": core_member.get("gender"),
                         "category": core_member.get("member_status"),
-                        "updated_at": datetime.now(timezone.utc).isoformat()
+                        "updated_at": datetime.now(timezone.utc)
                     }
                     
                     # Calculate age if birth_date exists
@@ -8039,7 +8078,7 @@ async def sync_members_from_core(request: Request) -> dict:
                         if not is_active and not existing.get("is_archived"):
                             # Archive member
                             member_data["is_archived"] = True
-                            member_data["archived_at"] = datetime.now(timezone.utc).isoformat()
+                            member_data["archived_at"] = datetime.now(timezone.utc)
                             member_data["archived_reason"] = "Deactivated in core system"
                             stats["archived"] += 1
                         elif is_active and existing.get("is_archived"):
@@ -8064,7 +8103,7 @@ async def sync_members_from_core(request: Request) -> dict:
                             "is_archived": not is_active,
                             "engagement_status": "active",
                             "days_since_last_contact": 999,
-                            "created_at": datetime.now(timezone.utc).isoformat()
+                            "created_at": datetime.now(timezone.utc)
                         }
                         
                         await db.members.insert_one(new_member)
@@ -8083,8 +8122,8 @@ async def sync_members_from_core(request: Request) -> dict:
                                 "description": "Annual birthday reminder",
                                 "completed": False,
                                 "ignored": False,
-                                "created_at": datetime.now(timezone.utc).isoformat(),
-                                "updated_at": datetime.now(timezone.utc).isoformat()
+                                "created_at": datetime.now(timezone.utc),
+                                "updated_at": datetime.now(timezone.utc)
                             }
                             await db.care_events.insert_one(birthday_event)
 
@@ -8101,9 +8140,9 @@ async def sync_members_from_core(request: Request) -> dict:
                             {"id": existing_member["id"]},
                             {"$set": {
                                 "is_archived": True,
-                                "archived_at": datetime.now(timezone.utc).isoformat(),
+                                "archived_at": datetime.now(timezone.utc),
                                 "archived_reason": "No longer matches sync filter rules",
-                                "updated_at": datetime.now(timezone.utc).isoformat()
+                                "updated_at": datetime.now(timezone.utc)
                             }}
                         )
                         stats["archived"] += 1
@@ -8116,7 +8155,7 @@ async def sync_members_from_core(request: Request) -> dict:
                 await db.sync_configs.update_one(
                     {"campus_id": campus_id},
                     {"$set": {
-                        "last_sync_at": end_time.isoformat(),
+                        "last_sync_at": end_time,
                         "last_sync_status": "success",
                         "last_sync_message": f"Synced {stats['fetched']} members successfully"
                     }}
@@ -8152,7 +8191,7 @@ async def sync_members_from_core(request: Request) -> dict:
             await db.sync_configs.update_one(
                 {"campus_id": campus_id},
                 {"$set": {
-                    "last_sync_at": end_time.isoformat(),
+                    "last_sync_at": end_time,
                     "last_sync_status": "error",
                     "last_sync_message": str(sync_error)
                 }}
@@ -8241,12 +8280,7 @@ async def setup_first_admin(request: SetupAdminRequest) -> dict:
             hashed_password=get_password_hash(request.password)
         )
         
-        # Convert to dict and ensure proper serialization
-        user_dict = msgspec.to_builtins(admin_user)
-        user_dict['created_at'] = user_dict['created_at'].isoformat() if isinstance(user_dict['created_at'], datetime) else user_dict['created_at']
-        user_dict['updated_at'] = user_dict['updated_at'].isoformat() if isinstance(user_dict['updated_at'], datetime) else user_dict['updated_at']
-        
-        await db.users.insert_one(user_dict)
+        await db.users.insert_one(to_mongo_doc(admin_user))
         
         return {"success": True, "message": "Admin account created"}
     
@@ -8266,12 +8300,7 @@ async def setup_first_campus(request: SetupCampusRequest) -> dict:
             timezone=request.timezone
         )
 
-        # Convert to dict and ensure proper datetime serialization
-        campus_dict = msgspec.to_builtins(campus)
-        campus_dict['created_at'] = campus_dict['created_at'].isoformat() if isinstance(campus_dict['created_at'], datetime) else campus_dict['created_at']
-        campus_dict['updated_at'] = campus_dict['updated_at'].isoformat() if isinstance(campus_dict['updated_at'], datetime) else campus_dict['updated_at']
-
-        await db.campuses.insert_one(campus_dict)
+        await db.campuses.insert_one(to_mongo_doc(campus))
 
         # Invalidate campuses cache so new campus appears immediately
         invalidate_cache("campuses")
@@ -8368,7 +8397,7 @@ async def receive_sync_webhook(request: Request) -> dict:
             "member_id": payload.get("member_id"),
             "payload": payload,
             "signature_valid": True,
-            "received_at": datetime.now(timezone.utc).isoformat()
+            "received_at": datetime.now(timezone.utc)
         })
         
         # Process webhook based on event type
@@ -8380,7 +8409,7 @@ async def receive_sync_webhook(request: Request) -> dict:
             return {
                 "success": True,
                 "message": "Webhook test successful! FaithTracker is ready to receive member updates.",
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc)
             }
         elif event_type in ["member.created", "member.updated", "member.deleted"]:
             # Sync this specific member immediately
@@ -8419,7 +8448,7 @@ async def receive_sync_webhook(request: Request) -> dict:
                             {"external_member_id": member_id},
                             {"$set": {
                                 "is_archived": True,
-                                "archived_at": datetime.now(timezone.utc).isoformat(),
+                                "archived_at": datetime.now(timezone.utc),
                                 "archived_reason": "Deleted in core system"
                             }}
                         )
@@ -8451,7 +8480,7 @@ async def receive_sync_webhook(request: Request) -> dict:
                             "birth_date": core_member.get("date_of_birth"),
                             "gender": core_member.get("gender"),
                             "category": core_member.get("member_status"),
-                            "updated_at": datetime.now(timezone.utc).isoformat()
+                            "updated_at": datetime.now(timezone.utc)
                         }
                         
                         # Calculate age
@@ -8508,7 +8537,7 @@ async def receive_sync_webhook(request: Request) -> dict:
                                 "is_archived": not core_member.get("is_active", True),
                                 "engagement_status": "active",
                                 "days_since_last_contact": 999,
-                                "created_at": datetime.now(timezone.utc).isoformat()
+                                "created_at": datetime.now(timezone.utc)
                             }
                             await db.members.insert_one(new_member)
                             logger.info(f"Created member {core_member.get('full_name')} via webhook")
@@ -8638,7 +8667,7 @@ async def global_search(q: str, request: Request) -> dict:
 
         # For full admin, search across all campuses they have access to
         search_filter = {}
-        if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+        if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             search_filter["campus_id"] = campus_id
 
         # Search members
@@ -8700,7 +8729,7 @@ async def get_activity_logs(
         
         # Build query
         query = {}
-        if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+        if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             query["campus_id"] = campus_id
         
         # Filter by user
@@ -8746,7 +8775,7 @@ async def get_activity_summary(request: Request) -> dict:
         campus_id = current_user.get("campus_id")
         
         query = {}
-        if current_user["role"] in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
+        if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             query["campus_id"] = campus_id
         
         # Last 30 days
@@ -8799,7 +8828,7 @@ async def health_check() -> dict:
             "status": "healthy",
             "service": "faithtracker-api",
             "database": "connected",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc)
         }
     except Exception as e:
         logger.error(f"Health check failed - database unreachable: {str(e)}")
@@ -8809,7 +8838,7 @@ async def health_check() -> dict:
                 "status": "unhealthy",
                 "service": "faithtracker-api",
                 "database": "disconnected",
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc)
             }
         )
 
@@ -8822,7 +8851,7 @@ async def readiness_check() -> dict:
         return {
             "status": "ready",
             "database": "connected",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc)
         }
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
@@ -8885,7 +8914,6 @@ async def on_startup() -> None:
                         "Admin user not created."
                     )
                 else:
-                    # Convert msgspec Struct to dict for MongoDB
                     default_admin = User(
                         email=admin_email,
                         name="Full Administrator",
@@ -8895,9 +8923,7 @@ async def on_startup() -> None:
                         hashed_password=get_password_hash(admin_password),
                         is_active=True
                     )
-                    # msgspec Struct to dict conversion
-                    admin_dict = msgspec.to_builtins(default_admin)
-                    await db.users.insert_one(admin_dict)
+                    await db.users.insert_one(to_mongo_doc(default_admin))
                     logger.info(f"Default full admin user created: {admin_email}")
 
         start_scheduler()

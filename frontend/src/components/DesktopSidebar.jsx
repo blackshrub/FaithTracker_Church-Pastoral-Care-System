@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
+import { LinkWithPrefetch } from '@/components/LinkWithPrefetch';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -63,7 +64,7 @@ export const DesktopSidebar = () => {
     >
       {/* Logo/Header */}
       <div className="p-6 border-b border-border">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <LinkWithPrefetch to="/dashboard" prefetchType="dashboard" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
             <Church className="w-6 h-6 text-white" />
           </div>
@@ -71,7 +72,7 @@ export const DesktopSidebar = () => {
             <h2 className="text-h3 text-teal-700 dark:text-teal-400 leading-tight">{t('components.app_name')}</h2>
             <p className="text-xs text-muted-foreground">{t('pastoral_care')}</p>
           </div>
-        </Link>
+        </LinkWithPrefetch>
       </div>
       
       {/* Main Navigation */}
@@ -80,9 +81,16 @@ export const DesktopSidebar = () => {
           {mainNavigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
-            
+            // Use LinkWithPrefetch for dashboard and members for instant navigation
+            const usePrefetch = item.href === '/dashboard' || item.href === '/members';
+            const prefetchType = item.href === '/dashboard' ? 'dashboard'
+              : item.href === '/members' ? 'membersList'
+              : undefined;
+            const LinkComponent = usePrefetch ? LinkWithPrefetch : Link;
+            const linkProps = usePrefetch ? { prefetchType } : {};
+
             return (
-              <Link key={item.name} to={item.href}>
+              <LinkComponent key={item.name} to={item.href} {...linkProps}>
                 <Button
                   variant="ghost"
                   className={
@@ -97,7 +105,7 @@ export const DesktopSidebar = () => {
                   <Icon className="mr-3 h-5 w-5" />
                   {item.name}
                 </Button>
-              </Link>
+              </LinkComponent>
             );
           })}
         </div>

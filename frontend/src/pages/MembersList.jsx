@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import { useDebounce } from 'use-debounce';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
@@ -560,9 +561,9 @@ export const MembersList = () => {
                       })}
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
-                          <Link to={`/members/${member.id}`}>
+                          <MemberLink memberId={member.id}>
                             <Button size="sm" variant="outline">{t('view')}</Button>
-                          </Link>
+                          </MemberLink>
                           <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => { setEditingMember(member); setEditModalOpen(true); }}>{t('edit')}</Button>
                           <Button size="sm" variant="ghost" className="text-red-600 hidden sm:inline-flex" onClick={() => handleDeleteMember(member.id, member.name)}>{t('delete')}</Button>
                         </div>

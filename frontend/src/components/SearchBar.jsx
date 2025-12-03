@@ -145,13 +145,16 @@ const SearchBar = () => {
                   </div>
                   <div className="flex-shrink-0">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      member.engagement_status === 'active' 
+                      member.engagement_status === 'active'
                         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                         : member.engagement_status === 'at_risk'
                         ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     }`}>
-                      {member.engagement_status}
+                      {member.engagement_status === 'at_risk' ? 'At Risk'
+                        : member.engagement_status === 'active' ? 'Active'
+                        : member.engagement_status === 'disconnected' ? 'Disconnected'
+                        : member.engagement_status}
                     </span>
                   </div>
                 </button>

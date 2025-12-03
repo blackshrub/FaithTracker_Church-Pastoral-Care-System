@@ -32,6 +32,17 @@ const MONTHS = [
   { value: 12, label: 'December' }
 ];
 
+// Format role names for display
+const formatRole = (role) => {
+  const roleMap = {
+    'full_admin': 'Full Admin',
+    'campus_admin': 'Campus Admin',
+    'pastor': 'Pastor',
+    'staff': 'Staff'
+  };
+  return roleMap[role] || role || 'Staff';
+};
+
 const KPICard = ({ title, current, target, previous, status, icon: Icon, format = 'percent', subtitle }) => {
   const change = previous !== undefined ? current - previous : null;
   const isPositive = change > 0;
@@ -139,7 +150,7 @@ const StaffPerformanceRow = ({ staff, rank, avgTasks }) => {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium truncate">{staff.user_name}</p>
-            <p className="text-xs text-muted-foreground">{staff.role || 'Staff'}</p>
+            <p className="text-xs text-muted-foreground">{formatRole(staff.role)}</p>
           </div>
           <Badge className={`${workloadColor[staff.workload_status]} text-xs`}>{staff.workload_status}</Badge>
         </div>
@@ -173,7 +184,7 @@ const StaffPerformanceRow = ({ staff, rank, avgTasks }) => {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{staff.user_name}</p>
-          <p className="text-xs text-muted-foreground">{staff.role || 'Staff'}</p>
+          <p className="text-xs text-muted-foreground">{formatRole(staff.role)}</p>
         </div>
         <div className="text-center">
           <p className="text-lg font-bold">{staff.tasks_completed}</p>

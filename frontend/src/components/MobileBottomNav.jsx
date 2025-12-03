@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { LinkWithPrefetch } from '@/components/LinkWithPrefetch';
 import { Home, Users, Calendar, BarChart3, MoreHorizontal, DollarSign, Shield, Upload, MessageSquare, Bell, Settings as SettingsIcon, LogOut, Activity, FileText } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -75,11 +76,18 @@ export const MobileBottomNav = () => {
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            // Use LinkWithPrefetch for dashboard and members for instant navigation
+            const usePrefetch = item.href === '/dashboard' || item.href === '/members';
+            const prefetchType = item.href === '/dashboard' ? 'dashboard'
+              : item.href === '/members' ? 'membersList'
+              : undefined;
+            const LinkComponent = usePrefetch ? LinkWithPrefetch : Link;
 
             return (
-              <Link
+              <LinkComponent
                 key={item.name}
                 to={item.href}
+                {...(usePrefetch ? { prefetchType } : {})}
                 className={
                   `flex flex-col items-center justify-center gap-1 transition-colors duration-200 ${
                     active
@@ -91,7 +99,7 @@ export const MobileBottomNav = () => {
               >
                 <Icon className="h-5 w-5" />
                 <span className="text-xs font-medium">{item.name}</span>
-              </Link>
+              </LinkComponent>
             );
           })}
 
