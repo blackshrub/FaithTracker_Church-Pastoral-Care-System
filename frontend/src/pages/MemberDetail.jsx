@@ -254,10 +254,22 @@ export const MemberDetail = () => {
         }
       } else {
         // Other event types: Create normal care event
+        // Auto-generate title if not provided (title field only shown for financial_aid)
+        const eventTypeTitles = {
+          'regular_contact': 'Regular Contact',
+          'birthday': 'Birthday',
+          'grief_loss': 'Grief Support',
+          'accident_illness': newEvent.hospital_name || 'Accident/Illness',
+          'childbirth': 'Childbirth',
+          'new_house': 'New House'
+        };
+        const autoTitle = newEvent.title || newEvent.description || eventTypeTitles[newEvent.event_type] || 'Care Event';
+
         const eventData = {
           member_id: id,
           campus_id: member.campus_id,
           ...newEvent,
+          title: autoTitle,
           aid_amount: newEvent.aid_amount ? parseFloat(newEvent.aid_amount) : null
         };
         await api.post(`/care-events`, eventData);

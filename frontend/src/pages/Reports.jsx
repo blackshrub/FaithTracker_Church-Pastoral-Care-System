@@ -52,38 +52,38 @@ const KPICard = ({ title, current, target, previous, status, icon: Icon, format 
 
   return (
     <Card className="relative overflow-hidden">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">{title}</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">{formatValue(current)}</span>
+      <CardContent className="p-4 sm:p-6">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1 sm:space-y-2 min-w-0 flex-1">
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{title}</p>
+            <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+              <span className="text-2xl sm:text-3xl font-bold">{formatValue(current)}</span>
               {target && (
-                <span className="text-sm text-muted-foreground">/ {formatValue(target)} target</span>
+                <span className="text-xs sm:text-sm text-muted-foreground">/ {formatValue(target)}</span>
               )}
             </div>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-muted-foreground line-clamp-2">{subtitle}</p>}
             {change !== null && (
-              <div className="flex items-center gap-1 text-sm">
+              <div className="flex items-center gap-1 text-xs sm:text-sm">
                 {isPositive ? (
-                  <ChevronUp className="w-4 h-4 text-green-600" />
+                  <ChevronUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
                 ) : isNeutral ? (
-                  <Minus className="w-4 h-4 text-gray-400" />
+                  <Minus className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-red-600" />
+                  <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-red-600 flex-shrink-0" />
                 )}
-                <span className={isPositive ? 'text-green-600' : isNeutral ? 'text-gray-500' : 'text-red-600'}>
-                  {isPositive ? '+' : ''}{change.toFixed(1)}{format === 'percent' ? '%' : ''} vs last month
+                <span className={`truncate ${isPositive ? 'text-green-600' : isNeutral ? 'text-gray-500' : 'text-red-600'}`}>
+                  {isPositive ? '+' : ''}{change.toFixed(1)}{format === 'percent' ? '%' : ''} <span className="hidden xs:inline">vs last month</span>
                 </span>
               </div>
             )}
           </div>
-          <div className={`p-3 rounded-full ${statusColors[status] || 'bg-gray-100'}`}>
-            <Icon className="w-6 h-6" />
+          <div className={`p-2 sm:p-3 rounded-full flex-shrink-0 ${statusColors[status] || 'bg-gray-100'}`}>
+            <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
         </div>
         {target && (
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             <Progress value={Math.min((current / target) * 100, 100)} className="h-2" />
           </div>
         )}
@@ -103,12 +103,12 @@ const InsightCard = ({ type, category, message }) => {
   const { icon: Icon, bg, border, text } = config[type] || config.info;
 
   return (
-    <div className={`p-4 rounded-lg ${bg} border ${border}`}>
-      <div className="flex items-start gap-3">
-        <Icon className={`w-5 h-5 ${text} flex-shrink-0 mt-0.5`} />
-        <div>
-          <Badge variant="outline" className={`mb-1 ${text} border-current`}>{category}</Badge>
-          <p className={`text-sm ${text}`}>{message}</p>
+    <div className={`p-3 sm:p-4 rounded-lg ${bg} border ${border}`}>
+      <div className="flex items-start gap-2 sm:gap-3">
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${text} flex-shrink-0 mt-0.5`} />
+        <div className="min-w-0 flex-1">
+          <Badge variant="outline" className={`mb-1 text-xs ${text} border-current`}>{category}</Badge>
+          <p className={`text-xs sm:text-sm ${text}`}>{message}</p>
         </div>
       </div>
     </div>
@@ -123,34 +123,72 @@ const StaffPerformanceRow = ({ staff, rank, avgTasks }) => {
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-        {rank}
+    <div className="p-4 bg-muted/30 rounded-lg">
+      {/* Mobile layout */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm">
+            {rank}
+          </div>
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+            {staff.photo_url ? (
+              <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" />
+            ) : (
+              <Users className="w-5 h-5 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{staff.user_name}</p>
+            <p className="text-xs text-muted-foreground">{staff.role || 'Staff'}</p>
+          </div>
+          <Badge className={`${workloadColor[staff.workload_status]} text-xs`}>{staff.workload_status}</Badge>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="p-2 bg-background/50 rounded">
+            <p className="text-lg font-bold">{staff.tasks_completed}</p>
+            <p className="text-xs text-muted-foreground">tasks</p>
+          </div>
+          <div className="p-2 bg-background/50 rounded">
+            <p className="text-lg font-bold">{staff.members_contacted}</p>
+            <p className="text-xs text-muted-foreground">members</p>
+          </div>
+          <div className="p-2 bg-background/50 rounded">
+            <p className="text-lg font-bold">{staff.active_days}</p>
+            <p className="text-xs text-muted-foreground">days</p>
+          </div>
+        </div>
       </div>
-      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-        {staff.photo_url ? (
-          <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" />
-        ) : (
-          <Users className="w-5 h-5 text-muted-foreground" />
-        )}
+
+      {/* Desktop layout */}
+      <div className="hidden sm:flex items-center gap-4">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+          {rank}
+        </div>
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+          {staff.photo_url ? (
+            <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" />
+          ) : (
+            <Users className="w-5 h-5 text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium truncate">{staff.user_name}</p>
+          <p className="text-xs text-muted-foreground">{staff.role || 'Staff'}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold">{staff.tasks_completed}</p>
+          <p className="text-xs text-muted-foreground">tasks</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold">{staff.members_contacted}</p>
+          <p className="text-xs text-muted-foreground">members</p>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold">{staff.active_days}</p>
+          <p className="text-xs text-muted-foreground">active days</p>
+        </div>
+        <Badge className={workloadColor[staff.workload_status]}>{staff.workload_status}</Badge>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{staff.user_name}</p>
-        <p className="text-xs text-muted-foreground">{staff.role || 'Staff'}</p>
-      </div>
-      <div className="text-center">
-        <p className="text-lg font-bold">{staff.tasks_completed}</p>
-        <p className="text-xs text-muted-foreground">tasks</p>
-      </div>
-      <div className="text-center">
-        <p className="text-lg font-bold">{staff.members_contacted}</p>
-        <p className="text-xs text-muted-foreground">members</p>
-      </div>
-      <div className="text-center">
-        <p className="text-lg font-bold">{staff.active_days}</p>
-        <p className="text-xs text-muted-foreground">active days</p>
-      </div>
-      <Badge className={workloadColor[staff.workload_status]}>{staff.workload_status}</Badge>
     </div>
   );
 };
@@ -260,45 +298,51 @@ export const Reports = () => {
   const ministry = monthlyReport?.ministry_highlights || {};
 
   return (
-    <div className="space-y-6 print:space-y-4" ref={reportRef}>
+    <div className="space-y-4 sm:space-y-6 print:space-y-4 overflow-hidden" ref={reportRef}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
+      <div className="flex flex-col gap-4 print:hidden">
         <div>
-          <h1 className="text-3xl font-playfair font-bold text-foreground flex items-center gap-2">
-            <FileText className="w-8 h-8 text-teal-600" />
+          <h1 className="text-2xl sm:text-3xl font-playfair font-bold text-foreground flex items-center gap-2">
+            <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-teal-600 flex-shrink-0" />
             {t('reports.title') || 'Reports'}
           </h1>
-          <p className="text-muted-foreground mt-1">{t('reports.subtitle') || 'Management reports and staff performance analytics'}</p>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">{t('reports.subtitle') || 'Management reports and staff performance analytics'}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map(m => (
-                <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(y => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={handlePrint} disabled={printing}>
-            <Printer className={`w-4 h-4 mr-2 ${printing ? 'animate-pulse' : ''}`} />
-            {printing ? 'Generating...' : 'Print'}
-          </Button>
-          <Button onClick={handleExportPDF} disabled={exporting} className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
-            <Download className={`w-4 h-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
-            {exporting ? 'Generating...' : 'Export PDF'}
-          </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex gap-2">
+            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+              <SelectTrigger className="flex-1 sm:w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map(m => (
+                  <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map(y => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handlePrint} disabled={printing} className="flex-1 sm:flex-none">
+              <Printer className={`w-4 h-4 mr-2 ${printing ? 'animate-pulse' : ''}`} />
+              <span className="hidden xs:inline">{printing ? 'Generating...' : 'Print'}</span>
+              <span className="xs:hidden">{printing ? '...' : 'Print'}</span>
+            </Button>
+            <Button onClick={handleExportPDF} disabled={exporting} className="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
+              <Download className={`w-4 h-4 mr-2 ${exporting ? 'animate-pulse' : ''}`} />
+              <span className="hidden xs:inline">{exporting ? 'Generating...' : 'Export PDF'}</span>
+              <span className="xs:hidden">{exporting ? '...' : 'PDF'}</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -342,43 +386,43 @@ export const Reports = () => {
                 Key metrics and performance overview for church leadership
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-teal-700 dark:text-teal-400">{exec.total_members || 0}</p>
-                  <p className="text-sm text-muted-foreground">Total Members</p>
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                <div className="text-center p-3 sm:p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-teal-700 dark:text-teal-400">{exec.total_members || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Total Members</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-green-700 dark:text-green-400">{exec.active_members || 0}</p>
-                  <p className="text-sm text-muted-foreground">Active</p>
+                <div className="text-center p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400">{exec.active_members || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Active</p>
                 </div>
-                <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{exec.at_risk_members || 0}</p>
-                  <p className="text-sm text-muted-foreground">At Risk</p>
+                <div className="text-center p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-400">{exec.at_risk_members || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">At Risk</p>
                 </div>
-                <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-red-700 dark:text-red-400">{exec.inactive_members || 0}</p>
-                  <p className="text-sm text-muted-foreground">Inactive</p>
+                <div className="text-center p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-400">{exec.inactive_members || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Inactive</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Care Events This Month</p>
-                  <p className="text-2xl font-bold">{exec.total_care_events || 0}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 border rounded-lg">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Care Events This Month</p>
+                  <p className="text-xl sm:text-2xl font-bold">{exec.total_care_events || 0}</p>
                   <div className="flex gap-2 mt-1 text-xs">
                     <span className="text-green-600">{exec.completed_events || 0} completed</span>
                     <span className="text-amber-600">{exec.pending_events || 0} pending</span>
                   </div>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Completion Rate</p>
-                  <p className="text-2xl font-bold">{exec.completion_rate || 0}%</p>
+                <div className="p-3 sm:p-4 border rounded-lg">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Completion Rate</p>
+                  <p className="text-xl sm:text-2xl font-bold">{exec.completion_rate || 0}%</p>
                   <Progress value={exec.completion_rate || 0} className="h-2 mt-2" />
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Financial Aid Distributed</p>
-                  <p className="text-2xl font-bold">Rp {(exec.financial_aid_total || 0).toLocaleString('id-ID')}</p>
+                <div className="p-3 sm:p-4 border rounded-lg">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Financial Aid Distributed</p>
+                  <p className="text-xl sm:text-2xl font-bold truncate">Rp {(exec.financial_aid_total || 0).toLocaleString('id-ID')}</p>
                   <p className="text-xs text-muted-foreground">{exec.financial_aid_recipients || 0} recipients</p>
                 </div>
               </div>
@@ -485,23 +529,23 @@ export const Reports = () => {
           </div>
 
           {/* Care Breakdown & Weekly Trend */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Care Events by Type</CardTitle>
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">Care Events by Type</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="p-4 sm:p-6">
+                <div className="space-y-2 sm:space-y-3">
                   {monthlyReport?.care_breakdown?.map((care, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                      <div>
-                        <p className="font-medium">{care.label}</p>
+                    <div key={i} className="flex items-center justify-between gap-3 p-2 sm:p-3 bg-muted/30 rounded-lg">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm sm:text-base truncate">{care.label}</p>
                         <p className="text-xs text-muted-foreground">
-                          {care.completed} completed, {care.pending} pending, {care.ignored} ignored
+                          {care.completed} done, {care.pending} pending
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold">{care.total}</p>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-base sm:text-lg font-bold">{care.total}</p>
                         <p className="text-xs text-muted-foreground">total</p>
                       </div>
                     </div>
@@ -511,63 +555,67 @@ export const Reports = () => {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Weekly Activity Trend</CardTitle>
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">Weekly Activity Trend</CardTitle>
               </CardHeader>
-              <CardContent>
-                <AreaChart
-                  data={monthlyReport?.engagement_trend || []}
-                  dataKey="contacts_made"
-                  xAxisKey="week"
-                  color="#14b8a6"
-                  height={250}
-                />
+              <CardContent className="p-4 sm:p-6">
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[280px]">
+                    <AreaChart
+                      data={monthlyReport?.engagement_trend || []}
+                      dataKey="contacts_made"
+                      xAxisKey="week"
+                      color="#14b8a6"
+                      height={220}
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Insights & Recommendations */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="w-5 h-5 text-amber-500" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 flex-shrink-0" />
                   Strategic Insights
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="p-4 sm:p-6">
+                <div className="space-y-2 sm:space-y-3">
                   {monthlyReport?.insights?.length > 0 ? (
                     monthlyReport.insights.map((insight, i) => (
                       <InsightCard key={i} {...insight} />
                     ))
                   ) : (
-                    <p className="text-muted-foreground text-center py-8">No specific insights for this period</p>
+                    <p className="text-muted-foreground text-center py-6 sm:py-8 text-sm">No specific insights for this period</p>
                   )}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5 text-teal-600" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Target className="w-4 h-4 sm:w-5 sm:h-5 text-teal-600 flex-shrink-0" />
                   Action Recommendations
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="p-4 sm:p-6">
+                <div className="space-y-2 sm:space-y-3">
                   {monthlyReport?.recommendations?.length > 0 ? (
                     monthlyReport.recommendations.map((rec, i) => (
-                      <div key={i} className="flex items-start gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                        <div className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                      <div key={i} className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0">
                           {i + 1}
                         </div>
-                        <p className="text-sm text-teal-800 dark:text-teal-300">{rec}</p>
+                        <p className="text-xs sm:text-sm text-teal-800 dark:text-teal-300">{rec}</p>
                       </div>
                     ))
                   ) : (
-                    <p className="text-muted-foreground text-center py-8">No specific recommendations for this period</p>
+                    <p className="text-muted-foreground text-center py-6 sm:py-8 text-sm">No specific recommendations for this period</p>
                   )}
                 </div>
               </CardContent>
@@ -576,18 +624,18 @@ export const Reports = () => {
 
           {/* Month Comparison */}
           <Card>
-            <CardHeader>
-              <CardTitle>Comparison with Previous Month</CardTitle>
+            <CardHeader className="pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Comparison with Previous Month</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
                 {Object.entries(monthlyReport?.comparison || {}).map(([key, data]) => (
-                  <div key={key} className="p-4 border rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
-                    <p className="text-2xl font-bold">{typeof data.current === 'number' && data.current > 1000 ? data.current.toLocaleString('id-ID') : data.current}</p>
-                    <div className={`flex items-center justify-center gap-1 text-sm ${data.change > 0 ? 'text-green-600' : data.change < 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                      {data.change > 0 ? <TrendingUp className="w-4 h-4" /> : data.change < 0 ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                      {data.change > 0 ? '+' : ''}{typeof data.change === 'number' && Math.abs(data.change) > 1000 ? data.change.toLocaleString('id-ID') : data.change}
+                  <div key={key} className="p-2 sm:p-4 border rounded-lg text-center">
+                    <p className="text-xs sm:text-sm text-muted-foreground capitalize truncate">{key.replace(/_/g, ' ')}</p>
+                    <p className="text-lg sm:text-2xl font-bold truncate">{typeof data.current === 'number' && data.current > 1000 ? data.current.toLocaleString('id-ID') : data.current}</p>
+                    <div className={`flex items-center justify-center gap-1 text-xs sm:text-sm ${data.change > 0 ? 'text-green-600' : data.change < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                      {data.change > 0 ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" /> : data.change < 0 ? <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" /> : <Minus className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />}
+                      <span className="truncate">{data.change > 0 ? '+' : ''}{typeof data.change === 'number' && Math.abs(data.change) > 1000 ? data.change.toLocaleString('id-ID') : data.change}</span>
                     </div>
                   </div>
                 ))}
@@ -609,38 +657,38 @@ export const Reports = () => {
                 Monitor workload distribution to prevent burnout and ensure equitable task assignment
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-3xl font-bold">{staffReport?.team_stats?.total_staff || 0}</p>
-                  <p className="text-sm text-muted-foreground">Total Staff</p>
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                <div className="text-center p-3 sm:p-4 bg-muted/50 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold">{staffReport?.team_stats?.total_staff || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Total Staff</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-green-700 dark:text-green-400">{staffReport?.team_stats?.balanced_count || 0}</p>
-                  <p className="text-sm text-muted-foreground">Balanced Workload</p>
+                <div className="text-center p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400">{staffReport?.team_stats?.balanced_count || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Balanced</p>
                 </div>
-                <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-red-700 dark:text-red-400">{staffReport?.team_stats?.overworked_count || 0}</p>
-                  <p className="text-sm text-muted-foreground">Overworked</p>
+                <div className="text-center p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-400">{staffReport?.team_stats?.overworked_count || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Overworked</p>
                 </div>
-                <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{staffReport?.team_stats?.underworked_count || 0}</p>
-                  <p className="text-sm text-muted-foreground">Underworked</p>
+                <div className="text-center p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-amber-700 dark:text-amber-400">{staffReport?.team_stats?.underworked_count || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Underworked</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg text-center">
-                  <p className="text-sm text-muted-foreground">Total Tasks Completed</p>
-                  <p className="text-2xl font-bold">{staffReport?.team_stats?.total_tasks_completed || 0}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 border rounded-lg text-center">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Total Tasks Completed</p>
+                  <p className="text-xl sm:text-2xl font-bold">{staffReport?.team_stats?.total_tasks_completed || 0}</p>
                 </div>
-                <div className="p-4 border rounded-lg text-center">
-                  <p className="text-sm text-muted-foreground">Avg Tasks/Staff</p>
-                  <p className="text-2xl font-bold">{staffReport?.team_stats?.average_tasks_per_staff || 0}</p>
+                <div className="p-3 sm:p-4 border rounded-lg text-center">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Avg Tasks/Staff</p>
+                  <p className="text-xl sm:text-2xl font-bold">{staffReport?.team_stats?.average_tasks_per_staff || 0}</p>
                 </div>
-                <div className="p-4 border rounded-lg text-center">
-                  <p className="text-sm text-muted-foreground">Max - Min Difference</p>
-                  <p className="text-2xl font-bold">{(staffReport?.team_stats?.max_tasks || 0) - (staffReport?.team_stats?.min_tasks || 0)}</p>
+                <div className="p-3 sm:p-4 border rounded-lg text-center">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Max - Min Difference</p>
+                  <p className="text-xl sm:text-2xl font-bold">{(staffReport?.team_stats?.max_tasks || 0) - (staffReport?.team_stats?.min_tasks || 0)}</p>
                 </div>
               </div>
             </CardContent>
@@ -730,63 +778,67 @@ export const Reports = () => {
         </TabsContent>
 
         {/* Yearly Summary Tab */}
-        <TabsContent value="yearly" className="space-y-6 mt-6">
+        <TabsContent value="yearly" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Yearly Summary - {yearlyReport?.report_period?.year}</CardTitle>
+            <CardHeader className="pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Yearly Summary - {yearlyReport?.report_period?.year}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-teal-700 dark:text-teal-400">{yearlyReport?.yearly_totals?.total_members || 0}</p>
-                  <p className="text-sm text-muted-foreground">Total Members</p>
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+                <div className="text-center p-3 sm:p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-teal-700 dark:text-teal-400">{yearlyReport?.yearly_totals?.total_members || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Members</p>
                 </div>
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">{yearlyReport?.yearly_totals?.total_care_events || 0}</p>
-                  <p className="text-sm text-muted-foreground">Care Events</p>
+                <div className="text-center p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-400">{yearlyReport?.yearly_totals?.total_care_events || 0}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Care Events</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-green-700 dark:text-green-400">{yearlyReport?.yearly_totals?.completion_rate || 0}%</p>
-                  <p className="text-sm text-muted-foreground">Completion Rate</p>
+                <div className="text-center p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400">{yearlyReport?.yearly_totals?.completion_rate || 0}%</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Completion</p>
                 </div>
-                <div className="text-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">Rp {(yearlyReport?.yearly_totals?.total_financial_aid || 0).toLocaleString('id-ID')}</p>
-                  <p className="text-sm text-muted-foreground">Financial Aid</p>
+                <div className="text-center p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <p className="text-lg sm:text-2xl font-bold text-amber-700 dark:text-amber-400 truncate">Rp {(yearlyReport?.yearly_totals?.total_financial_aid || 0).toLocaleString('id-ID')}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Financial Aid</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Monthly Trend</CardTitle>
+            <CardHeader className="pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Monthly Trend</CardTitle>
             </CardHeader>
-            <CardContent>
-              <AreaChart
-                data={yearlyReport?.monthly_breakdown || []}
-                dataKey="total_events"
-                xAxisKey="month_name"
-                color="#14b8a6"
-                height={300}
-              />
+            <CardContent className="p-4 sm:p-6">
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-[300px]">
+                  <AreaChart
+                    data={yearlyReport?.monthly_breakdown || []}
+                    dataKey="total_events"
+                    xAxisKey="month_name"
+                    color="#14b8a6"
+                    height={250}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Care Events by Type (Year Total)</CardTitle>
+            <CardHeader className="pb-2 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">Care Events by Type (Year Total)</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {yearlyReport?.care_by_type?.map((care, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                    <div>
-                      <p className="font-medium">{care.label}</p>
+                  <div key={i} className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-muted/30 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm sm:text-base truncate">{care.label}</p>
                       <p className="text-xs text-muted-foreground">{care.completed} of {care.total} completed</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold">{care.total}</p>
-                      <Progress value={(care.completed / care.total) * 100 || 0} className="h-2 w-24" />
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl sm:text-2xl font-bold">{care.total}</p>
+                      <Progress value={(care.completed / care.total) * 100 || 0} className="h-2 w-16 sm:w-24" />
                     </div>
                   </div>
                 ))}
