@@ -67,6 +67,7 @@ export const MembersList = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [selectedMembers, setSelectedMembers] = useState([]);
+  const [saving, setSaving] = useState(false);
   // Available columns config - will be filtered based on actual member data
   const allPossibleColumns = {
     phone: { label: 'Phone', field: 'phone' },
@@ -187,6 +188,7 @@ export const MembersList = () => {
   
   const handleAddMember = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       await api.post(`/members`, {...newMember, campus_id: 'auto'});
       toast.success(t('success_messages.member_created'));
@@ -195,11 +197,14 @@ export const MembersList = () => {
       loadMembers();
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
+    } finally {
+      setSaving(false);
     }
   };
-  
+
   const handleEditMember = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       await api.put(`/members/${editingMember.id}`, editingMember);
       toast.success('Member updated!');
@@ -208,6 +213,8 @@ export const MembersList = () => {
       loadMembers();
     } catch (error) {
       toast.error('Failed to update');
+    } finally {
+      setSaving(false);
     }
   };
   
@@ -333,17 +340,17 @@ export const MembersList = () => {
                 />
               </div>
               <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)} disabled={saving}>
                   {t('cancel')}
                 </Button>
-                <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white" data-testid="save-member-button">
+                <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white" loading={saving} data-testid="save-member-button">
                   {t('save')}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
-        
+
         {/* Edit Member Modal */}
         <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
           <DialogContent data-testid="edit-member-modal">
@@ -379,10 +386,10 @@ export const MembersList = () => {
                   />
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)} disabled={saving}>
                     {t('cancel')}
                   </Button>
-                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600">
+                  <Button type="submit" className="bg-teal-500 hover:bg-teal-600" loading={saving}>
                     {t('save')}
                   </Button>
                 </div>

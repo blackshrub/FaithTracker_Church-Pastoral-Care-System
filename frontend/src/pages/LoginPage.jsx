@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Heart, LogIn, Loader2 } from 'lucide-react';
+import { Heart, LogIn } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -133,17 +133,13 @@ export const LoginPage = () => {
               />
             </div>
             
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-teal-500 hover:bg-teal-600 text-white"
-              disabled={loading}
+              loading={loading}
               data-testid="login-button"
             >
-              {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing in...</>
-              ) : (
-                <><LogIn className="w-4 h-4 mr-2" /> Sign In</>
-              )}
+              <LogIn className="w-4 h-4 mr-2" /> Sign In
             </Button>
             
             <div className="text-center text-sm text-muted-foreground mt-4">

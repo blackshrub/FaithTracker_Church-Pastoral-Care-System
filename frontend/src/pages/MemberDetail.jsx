@@ -100,6 +100,7 @@ export const MemberDetail = () => {
   
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editEventModalOpen, setEditEventModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [eventDateOpen, setEventDateOpen] = useState(false);
   const [paymentDateOpen, setPaymentDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
@@ -194,6 +195,7 @@ export const MemberDetail = () => {
   
   const handleAddCareEvent = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (newEvent.event_type === 'financial_aid') {
         if (newEvent.schedule_frequency === 'one_time') {
@@ -308,9 +310,11 @@ export const MemberDetail = () => {
       queryClient.invalidateQueries(['member', id]);
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
+    } finally {
+      setSaving(false);
     }
   };
-  
+
   const handleDeleteEvent = async (eventId) => {
     showConfirm(
       'Delete Care Event',
@@ -757,7 +761,7 @@ export const MemberDetail = () => {
                   <Button type="button" variant="outline" onClick={() => setEventModalOpen(false)} className="flex-1 h-12">
                     {t('cancel')}
                   </Button>
-                  <Button type="submit" className="flex-1 h-12 bg-teal-500 hover:bg-teal-600 text-white font-semibold" data-testid="save-care-event-button">
+                  <Button type="submit" loading={saving} className="flex-1 h-12 bg-teal-500 hover:bg-teal-600 text-white font-semibold" data-testid="save-care-event-button">
                     Save Care Event
                   </Button>
                 </div>
