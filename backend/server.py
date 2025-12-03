@@ -2,17 +2,32 @@
 FaithTracker Pastoral Care System - Main Backend API
 Multi-tenant pastoral care management with complete accountability
 Handles all API endpoints, authentication, database operations, and business logic
+
+Framework: Litestar + msgspec (migrated from FastAPI + Pydantic)
 """
 
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, status, Request, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from litestar import Litestar, Router, get, post, put, patch, delete, Request, Response
+from litestar.di import Provide
+from litestar.exceptions import HTTPException, NotAuthorizedException, PermissionDeniedException
+from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_413_REQUEST_ENTITY_TOO_LARGE, HTTP_500_INTERNAL_SERVER_ERROR
+from litestar.datastructures import UploadFile, State
+from litestar.params import Parameter
+from litestar.response import Response as LitestarResponse, File as LitestarFile, Stream
+from litestar.middleware.base import AbstractMiddleware, DefineMiddleware
+from litestar.middleware.compression import CompressionMiddleware
+from litestar.middleware.rate_limit import RateLimitConfig
+from litestar.config.cors import CORSConfig
+from litestar.openapi import OpenAPIConfig
+from litestar.connection import ASGIConnection
+from litestar.handlers.base import BaseRouteHandler
+import msgspec
 import msgspec.json
+from msgspec import Struct, field, UNSET, UnsetType
+from typing import Annotated
 from bson import ObjectId, Decimal128, Binary, Regex
 from bson.errors import InvalidId
 import base64
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -20,13 +35,13 @@ import secrets
 import hmac
 import hashlib
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from enum import Enum
 import uuid
 from datetime import datetime, timezone, timedelta, date
 from zoneinfo import ZoneInfo
 import asyncio
+import re
 
 
 # Custom msgspec response class for proper BSON/MongoDB type serialization
@@ -170,9 +185,6 @@ import json as json_lib
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from scheduler import start_scheduler, stop_scheduler, daily_reminder_job
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -194,35 +206,26 @@ client = AsyncIOMotorClient(
 )
 db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
 
-# Create the main app with msgspec for faster JSON serialization (faster than orjson, lower memory)
-app = FastAPI(default_response_class=CustomMsgspecResponse)
+# NOTE: Litestar app will be created at the end of the file after all routes are defined
+# Middleware and app configuration will be done there
 
-# GZIP compression for responses > 500 bytes (reduces bandwidth by 70-90%)
-from starlette.middleware.gzip import GZipMiddleware
-app.add_middleware(GZipMiddleware, minimum_size=500)
-
-# Request size limit middleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request as StarletteRequest
-
-class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+# Request size limit middleware for Litestar
+class RequestSizeLimitMiddleware(AbstractMiddleware):
     """Limit request body size to prevent memory exhaustion attacks"""
-    async def dispatch(self, request: StarletteRequest, call_next):
-        content_length = request.headers.get("content-length")
-        if content_length:
-            if int(content_length) > MAX_REQUEST_BODY_SIZE:
-                return JSONResponse(
-                    status_code=413,
-                    content={"detail": "Request body too large"}
-                )
-        return await call_next(request)
-
-app.add_middleware(RequestSizeLimitMiddleware)
-
-# Rate limiting configuration
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            content_length = headers.get(b"content-length")
+            if content_length:
+                if int(content_length) > MAX_REQUEST_BODY_SIZE:
+                    response = LitestarResponse(
+                        content={"detail": "Request body too large"},
+                        status_code=HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        media_type="application/json"
+                    )
+                    await response(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
 
 # ==================== SAFE ERROR HANDLING ====================
 
@@ -246,30 +249,41 @@ def safe_error_detail(e: Exception, status_code: int = 500) -> str:
         # In development, include the error message for debugging
         return str(e)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+# Global exception handler for Litestar (will be registered with app)
+def global_exception_handler(request: Request, exc: Exception) -> LitestarResponse:
     """
     Global exception handler that logs full errors but returns safe messages.
     This catches any unhandled exceptions not caught by endpoint-level handlers.
     """
+    import json
+
+    # Handle HTTP exceptions properly - return their status code and message
+    if isinstance(exc, HTTPException):
+        content = json.dumps({"detail": exc.detail})
+        return LitestarResponse(
+            content=content,
+            status_code=exc.status_code,
+            media_type="application/json"
+        )
+
     # Log the full error for debugging
     logger.error(f"Unhandled exception: {type(exc).__name__}: {str(exc)}")
 
     # Return a safe error message
     if os.environ.get('ENVIRONMENT', 'development') == 'production':
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "An internal error occurred. Please try again later."}
-        )
+        content = json.dumps({"detail": "An internal error occurred. Please try again later."})
     else:
         # In development, include more details
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc), "type": type(exc).__name__}
-        )
+        content = json.dumps({"detail": str(exc), "type": type(exc).__name__})
 
-# Create a router (no prefix - using subdomain api.domain.com)
-api_router = APIRouter()
+    return LitestarResponse(
+        content=content,
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+        media_type="application/json"
+    )
+
+# Route handlers list (will be collected and passed to Litestar app)
+route_handlers: List[Any] = []
 
 # ==================== ENUMS ====================
 
@@ -480,7 +494,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = JWT_TOKEN_EXPIRE_HOURS * 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -498,38 +511,58 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def get_current_user(request: Request) -> dict:
+    """Extract and validate JWT token from Authorization header.
+
+    This is a Litestar dependency that will be provided via Provide().
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            extra={"headers": {"WWW-Authenticate": "Bearer"}},
+        )
+
+    token = auth_header[7:]  # Remove "Bearer " prefix
     try:
-        token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
-            raise credentials_exception
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+            )
     except JWTError:
-        raise credentials_exception
-    
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if user is None:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
     return user
 
-async def get_current_admin(current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
+async def get_current_admin(request: Request) -> dict:
+    """Get current user and verify admin role."""
+    current_user = await get_current_user(request)
+    if current_user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value, "full_admin", "campus_admin"]:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=HTTP_403_FORBIDDEN,
             detail="Admin privileges required"
         )
     return current_user
 
-async def get_full_admin(current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != UserRole.FULL_ADMIN:
+async def get_full_admin(request: Request) -> dict:
+    """Get current user and verify full admin role."""
+    current_user = await get_current_user(request)
+    if current_user.get("role") not in [UserRole.FULL_ADMIN.value, "full_admin"]:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=HTTP_403_FORBIDDEN,
             detail="Full admin privileges required"
         )
     return current_user
@@ -544,423 +577,382 @@ def get_campus_filter(current_user: dict):
         return {"campus_id": None}  # Fallback
 
 # ==================== MODELS ====================
+# Using msgspec.Struct instead of Pydantic BaseModel for faster serialization
 
-class CampusCreate(BaseModel):
-    campus_name: str = Field(..., min_length=1, max_length=200)
-    location: Optional[str] = Field(None, max_length=500)
+class CampusCreate(Struct):
+    campus_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
+    location: Annotated[str | None, msgspec.Meta(max_length=500)] = None
     timezone: str = "Asia/Jakarta"  # Default to UTC+7
 
-class Campus(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class Campus(Struct):
     campus_name: str
-    location: Optional[str] = None
+    id: str = field(default_factory=generate_uuid)
+    location: str | None = None
     timezone: str = "Asia/Jakarta"  # Campus timezone (default UTC+7)
     is_active: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class MemberCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=200)
-    phone: Optional[str] = Field(None, max_length=20)
+class MemberCreate(Struct):
+    name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
     campus_id: str
-    external_member_id: Optional[str] = Field(None, max_length=100)
-    notes: Optional[str] = Field(None, max_length=2000)
-    birth_date: Optional[date] = None
-    address: Optional[str] = Field(None, max_length=500)
-    category: Optional[str] = Field(None, max_length=100)
-    gender: Optional[str] = Field(None, max_length=20)
-    blood_type: Optional[str] = Field(None, max_length=10)
-    marital_status: Optional[str] = Field(None, max_length=50)
-    membership_status: Optional[str] = Field(None, max_length=50)
-    age: Optional[int] = Field(None, ge=0, le=150)
+    phone: Annotated[str | None, msgspec.Meta(max_length=20)] = None
+    external_member_id: Annotated[str | None, msgspec.Meta(max_length=100)] = None
+    notes: Annotated[str | None, msgspec.Meta(max_length=2000)] = None
+    birth_date: date | None = None
+    address: Annotated[str | None, msgspec.Meta(max_length=500)] = None
+    category: Annotated[str | None, msgspec.Meta(max_length=100)] = None
+    gender: Annotated[str | None, msgspec.Meta(max_length=20)] = None
+    blood_type: Annotated[str | None, msgspec.Meta(max_length=10)] = None
+    marital_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
+    membership_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
+    age: Annotated[int | None, msgspec.Meta(ge=0, le=150)] = None
 
-class MemberUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    phone: Optional[str] = Field(None, max_length=20)
-    external_member_id: Optional[str] = Field(None, max_length=100)
-    notes: Optional[str] = Field(None, max_length=2000)
-    birth_date: Optional[date] = None
-    address: Optional[str] = Field(None, max_length=500)
-    category: Optional[str] = Field(None, max_length=100)
-    gender: Optional[str] = Field(None, max_length=20)
-    blood_type: Optional[str] = Field(None, max_length=10)
-    marital_status: Optional[str] = Field(None, max_length=50)
-    membership_status: Optional[str] = Field(None, max_length=50)
+class MemberUpdate(Struct):
+    name: Annotated[str | None, msgspec.Meta(min_length=1, max_length=200)] = None
+    phone: Annotated[str | None, msgspec.Meta(max_length=20)] = None
+    external_member_id: Annotated[str | None, msgspec.Meta(max_length=100)] = None
+    notes: Annotated[str | None, msgspec.Meta(max_length=2000)] = None
+    birth_date: date | None = None
+    address: Annotated[str | None, msgspec.Meta(max_length=500)] = None
+    category: Annotated[str | None, msgspec.Meta(max_length=100)] = None
+    gender: Annotated[str | None, msgspec.Meta(max_length=20)] = None
+    blood_type: Annotated[str | None, msgspec.Meta(max_length=10)] = None
+    marital_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
+    membership_status: Annotated[str | None, msgspec.Meta(max_length=50)] = None
 
-class Member(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class Member(Struct):
     name: str
-    phone: Optional[str] = None  # Some members may not have phone numbers
     campus_id: str
-    photo_url: Optional[str] = None
-    last_contact_date: Optional[datetime] = None
+    id: str = field(default_factory=generate_uuid)
+    phone: str | None = None  # Some members may not have phone numbers
+    photo_url: str | None = None
+    last_contact_date: datetime | None = None
     engagement_status: EngagementStatus = EngagementStatus.ACTIVE
     days_since_last_contact: int = 0
     is_archived: bool = False
-    archived_at: Optional[datetime] = None
-    archived_reason: Optional[str] = None
-    external_member_id: Optional[str] = None
-    notes: Optional[str] = None
-    birth_date: Optional[date] = None
-    address: Optional[str] = None
-    category: Optional[str] = None
-    gender: Optional[str] = None
-    blood_type: Optional[str] = None
-    marital_status: Optional[str] = None
-    membership_status: Optional[str] = None
-    age: Optional[int] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    archived_at: datetime | None = None
+    archived_reason: str | None = None
+    external_member_id: str | None = None
+    notes: str | None = None
+    birth_date: date | None = None
+    address: str | None = None
+    category: str | None = None
+    gender: str | None = None
+    blood_type: str | None = None
+    marital_status: str | None = None
+    membership_status: str | None = None
+    age: int | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class VisitationLogEntry(BaseModel):
-    visitor_name: str = Field(..., min_length=1, max_length=200)
+class VisitationLogEntry(Struct):
+    visitor_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
     visit_date: date
-    notes: str = Field(..., max_length=2000)
+    notes: Annotated[str, msgspec.Meta(max_length=2000)]
     prayer_offered: bool = False
 
-class CareEventCreate(BaseModel):
+class CareEventCreate(Struct):
     member_id: str
     campus_id: str
     event_type: EventType
     event_date: date
-    title: str = Field(..., min_length=1, max_length=300)
-    description: Optional[str] = Field(None, max_length=5000)
-
+    title: Annotated[str, msgspec.Meta(min_length=1, max_length=300)]
+    description: Annotated[str | None, msgspec.Meta(max_length=5000)] = None
     # Grief support fields
-    grief_relationship: Optional[str] = Field(None, max_length=200)
-
+    grief_relationship: Annotated[str | None, msgspec.Meta(max_length=200)] = None
     # Accident/illness fields (merged from hospital)
-    hospital_name: Optional[str] = Field(None, max_length=200)
-    initial_visitation: Optional[VisitationLogEntry] = None
-
+    hospital_name: Annotated[str | None, msgspec.Meta(max_length=200)] = None
+    initial_visitation: VisitationLogEntry | None = None
     # Financial aid fields
-    aid_type: Optional[AidType] = None
-    aid_amount: Optional[float] = Field(None, ge=0, le=1000000000)  # Max 1 billion
-    aid_notes: Optional[str] = Field(None, max_length=2000)
+    aid_type: AidType | None = None
+    aid_amount: Annotated[float | None, msgspec.Meta(ge=0, le=1000000000)] = None  # Max 1 billion
+    aid_notes: Annotated[str | None, msgspec.Meta(max_length=2000)] = None
 
-class CareEventUpdate(BaseModel):
-    event_type: Optional[EventType] = None
-    event_date: Optional[date] = None
-    title: Optional[str] = Field(None, min_length=1, max_length=300)
-    description: Optional[str] = Field(None, max_length=5000)
-    completed: Optional[bool] = None
-
+class CareEventUpdate(Struct):
+    event_type: EventType | None = None
+    event_date: date | None = None
+    title: Annotated[str | None, msgspec.Meta(min_length=1, max_length=300)] = None
+    description: Annotated[str | None, msgspec.Meta(max_length=5000)] = None
+    completed: bool | None = None
     # Hospital fields
-    discharge_date: Optional[date] = None
+    discharge_date: date | None = None
 
-class CareEvent(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class CareEvent(Struct):
     member_id: str
     campus_id: str
-    care_event_id: Optional[str] = None  # Parent event ID (for linking child events)
     event_type: EventType
     event_date: date
     title: str
-    description: Optional[str] = None
+    id: str = field(default_factory=generate_uuid)
+    care_event_id: str | None = None  # Parent event ID (for linking child events)
+    description: str | None = None
     completed: bool = False
-    completed_at: Optional[datetime] = None
-    completed_by_user_id: Optional[str] = None
-    completed_by_user_name: Optional[str] = None
-    
+    completed_at: datetime | None = None
+    completed_by_user_id: str | None = None
+    completed_by_user_name: str | None = None
     ignored: bool = False
-    ignored_at: Optional[datetime] = None
-    ignored_by: Optional[str] = None
-    ignored_by_name: Optional[str] = None
-    
-    created_by_user_id: Optional[str] = None
-    created_by_user_name: Optional[str] = None
-    
+    ignored_at: datetime | None = None
+    ignored_by: str | None = None
+    ignored_by_name: str | None = None
+    created_by_user_id: str | None = None
+    created_by_user_name: str | None = None
     # Member information (enriched from members collection)
-    member_name: Optional[str] = None
-    member_phone: Optional[str] = None
-    member_photo_url: Optional[str] = None
-
+    member_name: str | None = None
+    member_phone: str | None = None
+    member_photo_url: str | None = None
     # Grief support fields (only relationship, use event_date as mourning date)
-    grief_relationship: Optional[str] = None
-    grief_stage: Optional[GriefStage] = None
-    grief_stage_id: Optional[str] = None  # Link to grief_support stage (for timeline entries)
-
+    grief_relationship: str | None = None
+    grief_stage: GriefStage | None = None
+    grief_stage_id: str | None = None  # Link to grief_support stage (for timeline entries)
     # Accident/illness fields (merged from hospital, only hospital_name, use event_date as admission)
-    hospital_name: Optional[str] = None
-    accident_stage_id: Optional[str] = None  # Link to accident_followup stage (for timeline entries)
-    visitation_log: List[Dict[str, Any]] = Field(default_factory=list)
-
+    hospital_name: str | None = None
+    accident_stage_id: str | None = None  # Link to accident_followup stage (for timeline entries)
+    visitation_log: List[Dict[str, Any]] = field(default_factory=list)
     # Follow-up type marker
-    followup_type: Optional[str] = None  # "scheduled" or "additional" (for grief/accident follow-ups)
-
+    followup_type: str | None = None  # "scheduled" or "additional" (for grief/accident follow-ups)
     # Financial aid fields
-    aid_type: Optional[AidType] = None
-    aid_amount: Optional[float] = None
-    aid_notes: Optional[str] = None
-
+    aid_type: AidType | None = None
+    aid_amount: float | None = None
+    aid_notes: str | None = None
     reminder_sent: bool = False
-    reminder_sent_at: Optional[datetime] = None
-    reminder_sent_by_user_id: Optional[str] = None
-    reminder_sent_by_user_name: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reminder_sent_at: datetime | None = None
+    reminder_sent_by_user_id: str | None = None
+    reminder_sent_by_user_name: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class SetupAdminRequest(BaseModel):
-    email: EmailStr
+class SetupAdminRequest(Struct):
+    email: str  # Email validation handled at route level
     password: str
     name: str
     phone: str  # Required for WhatsApp notifications
 
-class SetupCampusRequest(BaseModel):
+class SetupCampusRequest(Struct):
     campus_name: str
     location: str
     timezone: str
 
 
-class AdditionalVisitRequest(BaseModel):
+class AdditionalVisitRequest(Struct):
     visit_date: str
     visit_type: str
     notes: str
 
 
-class GriefSupport(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class GriefSupport(Struct):
     care_event_id: str
     member_id: str
     campus_id: str
     stage: GriefStage
     scheduled_date: date
+    id: str = field(default_factory=generate_uuid)
     completed: bool = False
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     ignored: bool = False
-    ignored_at: Optional[datetime] = None
-    ignored_by: Optional[str] = None
-    notes: Optional[str] = None
+    ignored_at: datetime | None = None
+    ignored_by: str | None = None
+    notes: str | None = None
     reminder_sent: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class AccidentFollowup(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class AccidentFollowup(Struct):
     care_event_id: str
     member_id: str
     campus_id: str
     stage: str  # "first_followup", "second_followup", "final_followup"
     scheduled_date: date
+    id: str = field(default_factory=generate_uuid)
     completed: bool = False
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     ignored: bool = False
-    ignored_at: Optional[datetime] = None
-    ignored_by: Optional[str] = None
-    notes: Optional[str] = None
+    ignored_at: datetime | None = None
+    ignored_by: str | None = None
+    notes: str | None = None
     reminder_sent: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class NotificationLog(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
-    care_event_id: Optional[str] = None
-    grief_support_id: Optional[str] = None
-    member_id: Optional[str] = None
-    campus_id: Optional[str] = None
-    pastoral_team_user_id: Optional[str] = None  # If sent to pastoral team
+class NotificationLog(Struct):
     channel: NotificationChannel
     recipient: str
     message: str
     status: NotificationStatus
-    response_data: Optional[Dict[str, Any]] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    id: str = field(default_factory=generate_uuid)
+    care_event_id: str | None = None
+    grief_support_id: str | None = None
+    member_id: str | None = None
+    campus_id: str | None = None
+    pastoral_team_user_id: str | None = None  # If sent to pastoral team
+    response_data: Dict[str, Any] | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class FinancialAidSchedule(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class FinancialAidSchedule(Struct):
     member_id: str
     campus_id: str
     title: str
     aid_type: AidType
     aid_amount: float
     frequency: ScheduleFrequency
-    
-    # Date fields
     start_date: date
-    end_date: Optional[date] = None  # None means no end
-    
+    next_occurrence: date
+    created_by: str  # User ID who created the schedule
+    id: str = field(default_factory=generate_uuid)
+    end_date: date | None = None  # None means no end
     # Weekly specific
-    day_of_week: Optional[WeekDay] = None
-    
+    day_of_week: WeekDay | None = None
     # Monthly specific
-    day_of_month: Optional[int] = None  # 1-31
-    
+    day_of_month: int | None = None  # 1-31
     # Annual specific
-    month_of_year: Optional[int] = None  # 1-12
-    
+    month_of_year: int | None = None  # 1-12
     # Tracking
     is_active: bool = True
-    ignored_occurrences: List[str] = []  # List of dates (YYYY-MM-DD) that were ignored
-    next_occurrence: date
+    ignored_occurrences: List[str] = field(default_factory=list)  # List of dates (YYYY-MM-DD) that were ignored
     occurrences_completed: int = 0
-    created_by: str  # User ID who created the schedule
-    notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    notes: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 # User Authentication Models
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
-    name: str = Field(..., min_length=1, max_length=200)
+class UserCreate(Struct):
+    email: str  # Email validation handled at route level
+    password: Annotated[str, msgspec.Meta(min_length=8, max_length=128)]
+    name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
+    phone: Annotated[str, msgspec.Meta(max_length=20)]  # Pastoral team member's phone for receiving reminders
     role: UserRole = UserRole.PASTOR
-    campus_id: Optional[str] = None  # Required for campus_admin and pastor, null for full_admin
-    phone: str = Field(..., max_length=20)  # Pastoral team member's phone for receiving reminders
+    campus_id: str | None = None  # Required for campus_admin and pastor, null for full_admin
 
-class UserUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    phone: Optional[str] = Field(None, max_length=20)
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
-    role: Optional[UserRole] = None
-    campus_id: Optional[str] = None
+class UserUpdate(Struct):
+    name: Annotated[str | None, msgspec.Meta(min_length=1, max_length=200)] = None
+    phone: Annotated[str | None, msgspec.Meta(max_length=20)] = None
+    password: Annotated[str | None, msgspec.Meta(min_length=8, max_length=128)] = None
+    role: UserRole | None = None
+    campus_id: str | None = None
 
-class UserLogin(BaseModel):
-    email: EmailStr
+class UserLogin(Struct):
+    email: str  # Email validation handled at route level
     password: str
-    campus_id: Optional[str] = None  # Campus selection at login
+    campus_id: str | None = None  # Campus selection at login
 
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
-    email: EmailStr
+class User(Struct):
+    email: str  # Email validation handled at route level
     name: str
     role: UserRole
-    campus_id: Optional[str] = None
-    phone: Optional[str] = None  # For receiving pastoral care task reminders
-    photo_url: Optional[str] = None
     hashed_password: str
+    id: str = field(default_factory=generate_uuid)
+    campus_id: str | None = None
+    phone: str | None = None  # For receiving pastoral care task reminders
+    photo_url: str | None = None
     is_active: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class UserResponse(BaseModel):
+class UserResponse(Struct):
     id: str
-    email: EmailStr
+    email: str  # Email validation handled at route level
     name: str
     role: UserRole
-    campus_id: Optional[str] = None
-    campus_name: Optional[str] = None
-    phone: Optional[str] = None
-    photo_url: Optional[str] = None
     is_active: bool
     created_at: datetime
+    campus_id: str | None = None
+    campus_name: str | None = None
+    phone: str | None = None
+    photo_url: str | None = None
 
-class TokenResponse(BaseModel):
+class TokenResponse(Struct):
     access_token: str
     token_type: str
     user: UserResponse
 
 
-class ActivityLog(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class ActivityLog(Struct):
     campus_id: str
     user_id: str
     user_name: str
-    user_photo_url: Optional[str] = None
     action_type: ActivityActionType
-    member_id: Optional[str] = None
-    member_name: Optional[str] = None
-    care_event_id: Optional[str] = None
-    event_type: Optional[EventType] = None
-    notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    id: str = field(default_factory=generate_uuid)
+    user_photo_url: str | None = None
+    member_id: str | None = None
+    member_name: str | None = None
+    care_event_id: str | None = None
+    event_type: EventType | None = None
+    notes: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class ActivityLogResponse(BaseModel):
+class ActivityLogResponse(Struct):
     id: str
     campus_id: str
     user_id: str
     user_name: str
-    user_photo_url: Optional[str] = None
     action_type: str
-    member_id: Optional[str] = None
-    member_name: Optional[str] = None
-    care_event_id: Optional[str] = None
-    event_type: Optional[str] = None
-    notes: Optional[str] = None
     created_at: datetime
+    user_photo_url: str | None = None
+    member_id: str | None = None
+    member_name: str | None = None
+    care_event_id: str | None = None
+    event_type: str | None = None
+    notes: str | None = None
 
 
 # ==================== SYNC MODELS ====================
 
-class SyncConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class SyncConfig(Struct):
     campus_id: str  # FaithTracker campus ID
-    core_church_id: Optional[str] = None  # Core system's church_id (for webhook matching)
-    sync_method: str = "polling"  # "polling" or "webhook"
     api_base_url: str  # e.g., https://faithflow.yourdomain.com
+    api_email: str
+    api_password: str  # Encrypted in database
+    id: str = field(default_factory=generate_uuid)
+    core_church_id: str | None = None  # Core system's church_id (for webhook matching)
+    sync_method: str = "polling"  # "polling" or "webhook"
     api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
     api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
     api_members_endpoint: str = "/members/"  # Members endpoint path
-    api_email: str
-    api_password: str  # Encrypted in database
-    webhook_secret: str = Field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
+    webhook_secret: str = field(default_factory=lambda: secrets.token_urlsafe(32))  # For signature verification
     is_enabled: bool = False
     polling_interval_hours: int = 6  # For polling method
     reconciliation_enabled: bool = False  # Daily 3 AM reconciliation (recommended for webhook mode)
     reconciliation_time: str = "03:00"  # Time for daily reconciliation (HH:MM format)
-    
     # Sync filters (optional - empty means sync all)
     filter_mode: str = "include"  # "include" or "exclude"
-    filter_rules: Optional[List[Dict[str, Any]]] = None  # Dynamic filter rules
+    filter_rules: List[Dict[str, Any]] | None = None  # Dynamic filter rules
     # Example: [{"field": "gender", "operator": "equals", "value": "Female"}, {"field": "age", "operator": "between", "value": [18, 35]}]
-    
-    last_sync_at: Optional[datetime] = None
-    last_sync_status: Optional[str] = None  # success, error
-    last_sync_message: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_sync_at: datetime | None = None
+    last_sync_status: str | None = None  # success, error
+    last_sync_message: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-class SyncConfigCreate(BaseModel):
-    sync_method: str = "polling"
+class SyncConfigCreate(Struct):
     api_base_url: str
+    api_email: str
+    api_password: str
+    sync_method: str = "polling"
     api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
     api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
     api_members_endpoint: str = "/members/"  # Members endpoint path
-    api_email: str
-    api_password: str
     polling_interval_hours: int = 6
     reconciliation_enabled: bool = False
     reconciliation_time: str = "03:00"
     filter_mode: str = "include"
-    filter_rules: Optional[List[Dict[str, Any]]] = None
+    filter_rules: List[Dict[str, Any]] | None = None
     is_enabled: bool = False
 
-class SyncLog(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str = Field(default_factory=generate_uuid)
+class SyncLog(Struct):
     campus_id: str
     sync_type: str  # manual, scheduled, webhook
     status: str  # success, error, partial
+    id: str = field(default_factory=generate_uuid)
     members_fetched: int = 0
     members_created: int = 0
     members_updated: int = 0
     members_archived: int = 0
     members_unarchived: int = 0
-    error_message: Optional[str] = None
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
+    error_message: str | None = None
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: datetime | None = None
+    duration_seconds: float | None = None
 
 
 # ==================== UTILITY FUNCTIONS ====================
@@ -1179,7 +1171,7 @@ async def log_activity(
             event_type=event_type,
             notes=notes
         )
-        await db.activity_logs.insert_one(activity.model_dump())
+        await db.activity_logs.insert_one(msgspec.to_builtins(activity))
         logger.info(f"Activity logged: {user_name} - {action_type} - {member_name}")
     except Exception as e:
         logger.error(f"Error logging activity: {str(e)}")
@@ -1342,7 +1334,7 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
                 response_data=response_data
             )
             
-            await db.notification_logs.insert_one(log_entry.model_dump())
+            await db.notification_logs.insert_one(msgspec.to_builtins(log_entry))
             
             return {
                 "success": status == NotificationStatus.SENT,
@@ -1363,7 +1355,7 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
                 status=NotificationStatus.FAILED,
                 response_data={"error": str(e)}
             )
-            await db.notification_logs.insert_one(log_entry.model_dump())
+            await db.notification_logs.insert_one(msgspec.to_builtins(log_entry))
         
         return {
             "success": False,
@@ -1372,15 +1364,15 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
 
 # ==================== CAMPUS ENDPOINTS ====================
 
-@api_router.post("/campuses", response_model=Campus)
-async def create_campus(campus: CampusCreate, current_admin: dict = Depends(get_full_admin)):
+@post("/campuses")
+async def create_campus(data: CampusCreate, request: Request) -> dict:
     """Create a new campus (full admin only)"""
     try:
         campus_obj = Campus(
             campus_name=campus.campus_name,
             location=campus.location
         )
-        await db.campuses.insert_one(campus_obj.model_dump())
+        await db.campuses.insert_one(msgspec.to_builtins(campus_obj))
 
         # Invalidate campus cache
         invalidate_cache("campuses:")
@@ -1390,8 +1382,8 @@ async def create_campus(campus: CampusCreate, current_admin: dict = Depends(get_
         logger.error(f"Error creating campus: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/campuses")
-async def list_campuses():
+@get("/campuses")
+async def list_campuses() -> list:
     """List all campuses (public for login selection) - cached for 10 minutes"""
     cache_key = "campuses:all"
     cached = get_from_cache(cache_key, ttl_seconds=600)
@@ -1403,7 +1395,7 @@ async def list_campuses():
     }
 
     if cached is not None:
-        return JSONResponse(content=cached, headers=cache_headers)
+        return LitestarResponse(content=cached, headers=cache_headers)
 
     try:
         campuses = await db.campuses.find({"is_active": True}, {"_id": 0}).to_list(100)
@@ -1419,13 +1411,13 @@ async def list_campuses():
             serialized_campuses.append(campus_copy)
 
         set_in_cache(cache_key, serialized_campuses)
-        return JSONResponse(content=serialized_campuses, headers=cache_headers)
+        return LitestarResponse(content=serialized_campuses, headers=cache_headers)
     except Exception as e:
         logger.error(f"Error listing campuses: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/campuses/{campus_id}", response_model=Campus)
-async def get_campus(campus_id: str):
+@get("/campuses/{campus_id:str}")
+async def get_campus(campus_id: str) -> dict:
     """Get campus by ID"""
     try:
         campus = await db.campuses.find_one({"id": campus_id}, {"_id": 0})
@@ -1438,14 +1430,14 @@ async def get_campus(campus_id: str):
         logger.error(f"Error getting campus: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/campuses/{campus_id}", response_model=Campus)
-async def update_campus(campus_id: str, update: CampusCreate, current_admin: dict = Depends(get_full_admin)):
+@put("/campuses/{campus_id:str}")
+async def update_campus(campus_id: str, data: CampusCreate, request: Request) -> dict:
     """Update campus (full admin only)"""
     try:
         result = await db.campuses.update_one(
             {"id": campus_id},
             {"$set": {
-                **update.model_dump(),
+                **msgspec.to_builtins(update),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
@@ -1464,30 +1456,29 @@ async def update_campus(campus_id: str, update: CampusCreate, current_admin: dic
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
-@api_router.post("/auth/register", response_model=UserResponse)
-@limiter.limit("10/minute")
-async def register_user(request: Request, user_data: UserCreate, current_admin: dict = Depends(get_current_admin)):
+@post("/auth/register")
+async def register_user(data: UserCreate, request: Request) -> dict:
     """Register a new user (admin only)"""
     try:
         # Check if email already exists
-        existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+        existing = await db.users.find_one({"email": data.email}, {"_id": 0})
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
         
         # Validate campus_id for non-full-admin users
-        if user_data.role != UserRole.FULL_ADMIN and not user_data.campus_id:
+        if data.role != UserRole.FULL_ADMIN and not data.campus_id:
             raise HTTPException(status_code=400, detail="campus_id required for campus admin and pastor roles")
         
         user = User(
-            email=user_data.email,
-            name=user_data.name,
-            role=user_data.role,
-            campus_id=user_data.campus_id,
-            phone=normalize_phone_number(user_data.phone),
-            hashed_password=get_password_hash(user_data.password)
+            email=data.email,
+            name=data.name,
+            role=data.role,
+            campus_id=data.campus_id,
+            phone=normalize_phone_number(data.phone),
+            hashed_password=get_password_hash(data.password)
         )
         
-        await db.users.insert_one(user.model_dump())
+        await db.users.insert_one(msgspec.to_builtins(user))
         
         campus_name = None
         if user.campus_id:
@@ -1511,52 +1502,51 @@ async def register_user(request: Request, user_data: UserCreate, current_admin: 
         logger.error(f"Error registering user: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/auth/login", response_model=TokenResponse)
-@limiter.limit("5/minute")
-async def login(request: Request, user_data: UserLogin):
+@post("/auth/login")
+async def login(data: UserLogin, request: Request) -> dict:
     """Login and get access token (rate limited: 5 attempts per minute)"""
     try:
-        user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+        user = await db.users.find_one({"email": data.email}, {"_id": 0})
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
             )
         
-        if not verify_password(user_data.password, user["hashed_password"]):
+        if not verify_password(data.password, user["hashed_password"]):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
             )
         
         if not user.get("is_active", True):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=HTTP_403_FORBIDDEN,
                 detail="User account is disabled"
             )
         
         # For campus-specific users, validate campus_id
         if user.get("role") in [UserRole.CAMPUS_ADMIN, UserRole.PASTOR]:
-            if user_data.campus_id and user["campus_id"] != user_data.campus_id:
+            if data.campus_id and user["campus_id"] != data.campus_id:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                    status_code=HTTP_403_FORBIDDEN,
                     detail="You don't have access to this campus"
                 )
         
         # For full admins, use the selected campus_id from login
         active_campus_id = user.get("campus_id")
         if user.get("role") == UserRole.FULL_ADMIN:
-            if user_data.campus_id:
+            if data.campus_id:
                 # Full admin selected a specific campus
-                active_campus_id = user_data.campus_id
+                active_campus_id = data.campus_id
                 # Update user's active campus
                 await db.users.update_one(
                     {"id": user["id"]},
-                    {"$set": {"campus_id": user_data.campus_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                    {"$set": {"campus_id": data.campus_id, "updated_at": datetime.now(timezone.utc).isoformat()}}
                 )
             else:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=HTTP_400_BAD_REQUEST,
                     detail="Please select a campus to continue"
                 )
         
@@ -1588,9 +1578,10 @@ async def login(request: Request, user_data: UserLogin):
         logger.error(f"Error logging in: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+@get("/auth/me")
+async def get_current_user_info(request: Request) -> dict:
     """Get current logged-in user info"""
+    current_user = await get_current_user(request)
     campus_name = None
     if current_user.get("campus_id"):
         campus = await db.campuses.find_one({"id": current_user["campus_id"]}, {"_id": 0})
@@ -1608,9 +1599,10 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"]
     )
 
-@api_router.get("/users", response_model=List[UserResponse])
-async def list_users(current_admin: dict = Depends(get_current_admin)):
+@get("/users")
+async def list_users(request: Request) -> list:
     """List all users (admin only) - optimized with $lookup to avoid N+1 queries"""
+    current_admin = await get_current_admin(request)
     try:
         query = {}
         # Campus admins only see users in their campus
@@ -1672,16 +1664,15 @@ async def list_users(current_admin: dict = Depends(get_current_admin)):
         logger.error(f"Error listing users: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/users/{user_id}")
-
-@api_router.put("/users/{user_id}", response_model=UserResponse)
-async def update_user(user_id: str, update: UserUpdate, current_user: dict = Depends(get_current_user)):
+@put("/users/{user_id:str}")
+async def update_user(user_id: str, data: UserUpdate, request: Request) -> dict:
     """Update a user (full admin only)"""
+    current_user = await get_current_user(request)
     if current_user["role"] != "full_admin":
         raise HTTPException(status_code=403, detail="Only full administrators can update users")
     
     try:
-        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
         
         # Normalize phone number if provided
         if 'phone' in update_data and update_data['phone']:
@@ -1717,22 +1708,23 @@ async def update_user(user_id: str, update: UserUpdate, current_user: dict = Dep
         logger.error(f"Error updating user: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-class ProfileUpdate(BaseModel):
+class ProfileUpdate(Struct):
     """Model for self-profile update (excludes role and campus)"""
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
 
-class PasswordChange(BaseModel):
+class PasswordChange(Struct):
     """Model for password change"""
     current_password: str
     new_password: str
 
-@api_router.put("/auth/profile")
-async def update_own_profile(update: ProfileUpdate, current_user: dict = Depends(get_current_user)):
+@put("/auth/profile")
+async def update_own_profile(update: ProfileUpdate, request: Request) -> dict:
     """Update own profile (all users can update their own name, email, phone)"""
+    current_user = await get_current_user(request)
     try:
-        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
 
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields to update")
@@ -1772,10 +1764,10 @@ async def update_own_profile(update: ProfileUpdate, current_user: dict = Depends
         logger.error(f"Error updating profile: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/auth/change-password")
-@limiter.limit("5/minute")
-async def change_password(request: Request, password_data: PasswordChange, current_user: dict = Depends(get_current_user)):
-    """Change own password (all users) - rate limited to prevent brute force"""
+@post("/auth/change-password")
+async def change_password(data: PasswordChange, request: Request) -> dict:
+    """Change own password (all users)"""
+    current_user = await get_current_user(request)
     try:
         # Get user with hashed password
         user = await db.users.find_one({"id": current_user["id"]})
@@ -1809,9 +1801,11 @@ async def change_password(request: Request, password_data: PasswordChange, curre
         logger.error(f"Error changing password: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/users/{user_id}/photo")
-async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+@post("/users/{user_id:str}/photo")
+async def upload_user_photo(user_id: str, request: Request, data: UploadFile) -> dict:
     """Upload user profile photo"""
+    current_user = await get_current_user(request)
+    file = data  # Alias for compatibility
     # Users can upload their own photo or full admin can upload for others
     if current_user["id"] != user_id and current_user["role"] != "full_admin":
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -1862,10 +1856,10 @@ async def upload_user_photo(user_id: str, file: UploadFile = File(...), current_
         logger.error(f"Error uploading user photo: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/users/{user_id}")
-@limiter.limit("10/minute")
-async def delete_user(request: Request, user_id: str, current_admin: dict = Depends(get_current_admin)):
-    """Delete a user (admin only) - rate limited"""
+@delete("/users/{user_id:str}", status_code=200)
+async def delete_user(user_id: str, request: Request) -> dict:
+    """Delete a user (admin only)"""
+    current_admin = await get_current_admin(request)
     try:
         # Prevent deleting self
         if user_id == current_admin["id"]:
@@ -1884,9 +1878,10 @@ async def delete_user(request: Request, user_id: str, current_admin: dict = Depe
 
 # ==================== MEMBER ENDPOINTS ====================
 
-@api_router.post("/members", response_model=Member)
-async def create_member(member: MemberCreate, current_user: dict = Depends(get_current_user)):
+@post("/members")
+async def create_member(data: MemberCreate, request: Request) -> dict:
     """Create a new member"""
+    current_user = await get_current_user(request)
     try:
         # For campus-specific users, enforce their campus
         campus_id = member.campus_id
@@ -1909,7 +1904,7 @@ async def create_member(member: MemberCreate, current_user: dict = Depends(get_c
             age=member.age
         )
 
-        member_dict = member_obj.model_dump()
+        member_dict = msgspec.to_builtins(member_obj)
         if member_dict.get('birth_date'):
             member_dict['birth_date'] = member_dict['birth_date'].isoformat() if isinstance(member_dict['birth_date'], date) else member_dict['birth_date']
 
@@ -1919,17 +1914,17 @@ async def create_member(member: MemberCreate, current_user: dict = Depends(get_c
         logger.error(f"Error creating member: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/members", response_model=List[Member])
+@get("/members")
 async def list_members(
-    response: Response,
-    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
-    limit: int = Query(50, ge=1, le=MAX_LIMIT),
+    request: Request,
+    page: int = Parameter(default=1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Parameter(default=50, ge=1, le=MAX_LIMIT),
     engagement_status: Optional[EngagementStatus] = None,
     search: Optional[str] = None,
     show_archived: bool = False,
-    current_user: dict = Depends(get_current_user)
-):
+) -> list:
     """List all members with pagination"""
+    current_user = await get_current_user(request)
     try:
         query = get_campus_filter(current_user)
 
@@ -1992,11 +1987,7 @@ async def list_members(
             member['engagement_status'] = status
             member['days_since_last_contact'] = days
         
-        # Add pagination metadata as headers (keep response as array)
-        # This maintains compatibility while providing pagination info
-        response.headers["X-Total-Count"] = str(total)
-        response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
-
+        # Return members array directly (frontend expects array)
         return members
         
     except Exception as e:
@@ -2019,14 +2010,15 @@ async def invalidate_dashboard_cache(campus_id: str):
         logger.error(f"Error invalidating dashboard cache: {str(e)}")
 
 
-@api_router.get("/dashboard/reminders")
-async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
+@get("/dashboard/reminders")
+async def get_dashboard_reminders(request: Request) -> dict:
     """
     Get pre-calculated dashboard reminders
     Optimized for fast loading - data refreshed daily
     """
+    current_user = await get_current_user(request)
     try:
-        campus_id = user.get("campus_id")
+        campus_id = current_user.get("campus_id")
         
         # For full admins without campus, use default campus or all campuses
         if not campus_id:
@@ -2053,14 +2045,14 @@ async def get_dashboard_reminders(user: dict = Depends(get_current_user)):
         today_date = get_date_in_timezone(campus_tz)
         
         # Check if we have cached data for today
-        cache_key = f"dashboard_reminders_{user.get('campus_id')}_{today_date}"
+        cache_key = f"dashboard_reminders_{current_user.get('campus_id')}_{today_date}"
         cached = await db.dashboard_cache.find_one({"cache_key": cache_key})
-        
+
         if cached and cached.get("data"):
             return cached["data"]
-        
+
         # If no cache, calculate now (fallback)
-        data = await calculate_dashboard_reminders(user.get("campus_id"), campus_tz, today_date)
+        data = await calculate_dashboard_reminders(current_user.get("campus_id"), campus_tz, today_date)
         
         # Cache for 1 hour
         cache_data = {
@@ -2436,8 +2428,8 @@ def get_date_in_timezone(timezone_str: str) -> str:
         return datetime.now(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d')
 
 
-@api_router.post("/care-events/{event_id}/ignore")
-async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user)):
+@post("/care-events/{event_id:str}/ignore")
+async def ignore_care_event(event_id: str, request: Request) -> dict:
     """Mark a care event as ignored/dismissed"""
     try:
         # Get the care event with campus filter for multi-tenancy
@@ -2491,9 +2483,10 @@ async def ignore_care_event(event_id: str, user: dict = Depends(get_current_user
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.get("/members/at-risk", response_model=List[Member])
-async def list_at_risk_members(current_user: dict = Depends(get_current_user)):
+@get("/members/at-risk")
+async def list_at_risk_members(request: Request) -> list:
     """Get members with no contact in 30+ days"""
+    current_user = await get_current_user(request)
     try:
         # Apply campus filter for multi-tenancy
         query = get_campus_filter(current_user)
@@ -2535,9 +2528,10 @@ async def list_at_risk_members(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error getting at-risk members: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/members/{member_id}", response_model=Member)
-async def get_member(member_id: str, current_user: dict = Depends(get_current_user)):
+@get("/members/{member_id:str}")
+async def get_member(member_id: str, request: Request) -> dict:
     """Get member by ID"""
+    current_user = await get_current_user(request)
     try:
         # Build query with campus filter for multi-tenancy
         query = {"id": member_id}
@@ -2564,9 +2558,10 @@ async def get_member(member_id: str, current_user: dict = Depends(get_current_us
         logger.error(f"Error getting member: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/members/{member_id}", response_model=Member)
-async def update_member(member_id: str, update: MemberUpdate, current_user: dict = Depends(get_current_user)):
+@put("/members/{member_id:str}")
+async def update_member(member_id: str, data: MemberUpdate, request: Request) -> dict:
     """Update member"""
+    current_user = await get_current_user(request)
     try:
         # Verify member belongs to user's campus
         query = {"id": member_id}
@@ -2578,7 +2573,7 @@ async def update_member(member_id: str, update: MemberUpdate, current_user: dict
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
 
         # Normalize phone number if provided
         if 'phone' in update_data and update_data['phone']:
@@ -2601,10 +2596,10 @@ async def update_member(member_id: str, update: MemberUpdate, current_user: dict
         logger.error(f"Error updating member: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/members/{member_id}")
-@limiter.limit("20/minute")
-async def delete_member(request: Request, member_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete member - rate limited"""
+@delete("/members/{member_id:str}", status_code=200)
+async def delete_member(member_id: str, request: Request) -> dict:
+    """Delete member"""
+    current_user = await get_current_user(request)
     try:
         # Verify member belongs to user's campus
         query = {"id": member_id}
@@ -2651,10 +2646,10 @@ async def delete_member(request: Request, member_id: str, current_user: dict = D
         logger.error(f"Error deleting member: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/care-events/{event_id}")
-@limiter.limit("30/minute")
-async def delete_care_event(request: Request, event_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete care event and recalculate member engagement - rate limited"""
+@delete("/care-events/{event_id:str}", status_code=200)
+async def delete_care_event(event_id: str, request: Request) -> dict:
+    """Delete care event and recalculate member engagement"""
+    current_user = await get_current_user(request)
     try:
         # Build query with campus filter for multi-tenancy
         query = {"id": event_id}
@@ -2845,9 +2840,11 @@ async def delete_care_event(request: Request, event_id: str, current_user: dict 
         logger.error(f"Error deleting care event: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/members/{member_id}/photo")
-async def upload_member_photo(member_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+@post("/members/{member_id:str}/photo")
+async def upload_member_photo(member_id: str, request: Request, data: UploadFile) -> dict:
     """Upload member profile photo with optimization"""
+    current_user = await get_current_user(request)
+    file = data  # Alias for compatibility
     try:
         # Build query with campus filter for multi-tenancy
         query = {"id": member_id}
@@ -2924,9 +2921,10 @@ async def upload_member_photo(member_id: str, file: UploadFile = File(...), curr
 
 # ==================== CARE EVENT ENDPOINTS ====================
 
-@api_router.post("/care-events", response_model=CareEvent)
-async def create_care_event(event: CareEventCreate, current_user: dict = Depends(get_current_user)):
+@post("/care-events")
+async def create_care_event(data: CareEventCreate, request: Request) -> dict:
     """Create a new care event"""
+    current_user = await get_current_user(request)
     try:
         # For campus-specific users, enforce their campus
         campus_id = event.campus_id
@@ -2986,7 +2984,7 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
         
         # Add initial visitation log if hospital visit
         if event.initial_visitation:
-            care_event.visitation_log = [event.initial_visitation.model_dump()]
+            care_event.visitation_log = [event.msgspec.to_builtins(initial_visitation)]
         
         # Serialize for MongoDB (mode='json' ensures enums are serialized as strings)
         event_dict = care_event.model_dump(mode='json')
@@ -3075,21 +3073,23 @@ async def create_care_event(event: CareEventCreate, current_user: dict = Depends
 
 
 
-class AdditionalVisitRequest(BaseModel):
+class AdditionalVisitRequest2(Struct):
+    """Second definition for additional visit (duplicate of line 714)"""
     visit_date: str
     visit_type: str
     notes: str
 
-@api_router.post("/care-events/{parent_event_id}/additional-visit")
+@post("/care-events/{parent_event_id:str}/additional-visit")
 async def log_additional_visit(
     parent_event_id: str,
-    request: AdditionalVisitRequest,
-    current_user: dict = Depends(get_current_user)
-):
+    data: AdditionalVisitRequest,
+    request: Request,
+) -> dict:
     """
     Log an additional unscheduled visit for grief or accident/illness event
     Creates a child care_event linked to parent
     """
+    current_user = await get_current_user(request)
     try:
         # Get parent event
         parent = await db.care_events.find_one({"id": parent_event_id}, {"_id": 0})
@@ -3112,9 +3112,9 @@ async def log_additional_visit(
             "event_type": parent["event_type"],  # Same type as parent (grief_loss or accident_illness)
             "care_event_id": parent_event_id,  # Link to parent
             "followup_type": "additional",  # Marker for additional visit
-            "event_date": request.visit_date,
-            "title": f"Additional Visit - {request.visit_type}",
-            "description": request.notes,
+            "event_date": data.visit_date,
+            "title": f"Additional Visit - {data.visit_type}",
+            "description": data.notes,
             "completed": True,  # Always completed (already happened)
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "completed_by_user_id": current_user["id"],
@@ -3137,7 +3137,7 @@ async def log_additional_visit(
             member_name=member_name,
             care_event_id=additional_visit["id"],
             event_type=EventType(parent["event_type"]),
-            notes=f"Logged additional visit: {request.visit_type}",
+            notes=f"Logged additional visit: {data.visit_type}",
             user_photo_url=current_user.get("photo_url")
         )
         
@@ -3153,7 +3153,7 @@ async def log_additional_visit(
         
         return {
             "success": True,
-            "message": f"Additional visit logged: {request.visit_type}",
+            "message": f"Additional visit logged: {data.visit_type}",
             "visit_id": additional_visit["id"]
         }
     
@@ -3163,63 +3163,18 @@ async def log_additional_visit(
         logger.error(f"Error logging additional visit: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-        # Update member's last contact date for completed one-time events or non-birthday events
-        if is_one_time or (event.event_type != EventType.BIRTHDAY):
-            now = datetime.now(timezone.utc)
-            await db.members.update_one(
-                {"id": event.member_id},
-                {"$set": {
-                    "last_contact_date": now.isoformat(),
-                    "days_since_last_contact": 0,  # Reset to 0 for fresh contact
-                    "engagement_status": "active",  # Set to active after contact
-                    "updated_at": now.isoformat()
-                }}
-            )
-        
-        # Auto-generate grief support timeline if grief/loss event (use event_date as mourning date)
-        if event.event_type == EventType.GRIEF_LOSS:
-            timeline = generate_grief_timeline(
-                event.event_date,  # Use event_date as mourning date
-                care_event.id,
-                event.member_id
-            )
-            if timeline:
-                # Add campus_id to all timeline stages
-                for stage in timeline:
-                    stage['campus_id'] = campus_id
-                await db.grief_support.insert_many(timeline)
-                logger.info(f"Generated {len(timeline)} grief support stages for member {event.member_id}")
-        
-        # Auto-generate accident/illness follow-up timeline
-        if event.event_type == EventType.ACCIDENT_ILLNESS:
-            timeline = generate_accident_followup_timeline(
-                event.event_date,
-                care_event.id,
-                event.member_id,
-                campus_id
-            )
-            if timeline:
-                await db.accident_followup.insert_many(timeline)
-                logger.info(f"Generated {len(timeline)} accident follow-up stages for member {event.member_id}")
-        
-        # Invalidate dashboard cache after creating care event
-        await invalidate_dashboard_cache(campus_id)
-        
-        return care_event
-    except Exception as e:
-        logger.error(f"Error creating care event: {str(e)}")
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/care-events", response_model=List[CareEvent])
+@get("/care-events")
 async def list_care_events(
+    request: Request,
     event_type: Optional[EventType] = None,
     member_id: Optional[str] = None,
     completed: Optional[bool] = None,
-    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
-    limit: int = Query(50, ge=1, le=MAX_LIMIT),
-    current_user: dict = Depends(get_current_user)
-):
+    page: int = Parameter(default=1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Parameter(default=50, ge=1, le=MAX_LIMIT),
+) -> dict:
     """List care events with optional filters and pagination - optimized with $lookup"""
+    current_user = await get_current_user(request)
     try:
         # Apply campus filter for multi-tenancy
         query = get_campus_filter(current_user)
@@ -3291,9 +3246,10 @@ async def list_care_events(
         logger.error(f"Error listing care events: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/care-events/{event_id}", response_model=CareEvent)
-async def get_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
+@get("/care-events/{event_id:str}")
+async def get_care_event(event_id: str, request: Request) -> dict:
     """Get care event by ID"""
+    current_user = await get_current_user(request)
     try:
         # Build query with campus filter for multi-tenancy
         query = {"id": event_id}
@@ -3311,9 +3267,10 @@ async def get_care_event(event_id: str, current_user: dict = Depends(get_current
         logger.error(f"Error getting care event: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/care-events/{event_id}", response_model=CareEvent)
-async def update_care_event(event_id: str, update: CareEventUpdate, current_user: dict = Depends(get_current_user)):
+@put("/care-events/{event_id:str}")
+async def update_care_event(event_id: str, data: CareEventUpdate, request: Request) -> dict:
     """Update care event"""
+    current_user = await get_current_user(request)
     try:
         # Build query with campus filter for multi-tenancy
         query = {"id": event_id}
@@ -3325,7 +3282,7 @@ async def update_care_event(event_id: str, update: CareEventUpdate, current_user
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
 
-        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+        update_data = {k: v for k, v in msgspec.to_builtins(update).items() if v is not None}
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
         result = await db.care_events.update_one(
@@ -3343,9 +3300,10 @@ async def update_care_event(event_id: str, update: CareEventUpdate, current_user
         logger.error(f"Error updating care event: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/care-events/{event_id}/complete")
-async def complete_care_event(event_id: str, current_user: dict = Depends(get_current_user)):
+@post("/care-events/{event_id:str}/complete")
+async def complete_care_event(event_id: str, request: Request) -> dict:
     """Mark care event as completed and update member engagement"""
+    current_user = await get_current_user(request)
     try:
         # Get the care event with campus filter for multi-tenancy
         query = {"id": event_id}
@@ -3436,9 +3394,10 @@ async def complete_care_event(event_id: str, current_user: dict = Depends(get_cu
         logger.error(f"Error completing care event: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/care-events/{event_id}/send-reminder")
-async def send_care_event_reminder(event_id: str, current_user: dict = Depends(get_current_user)):
+@post("/care-events/{event_id:str}/send-reminder")
+async def send_care_event_reminder(event_id: str, request: Request) -> dict:
     """Send WhatsApp reminder for care event"""
+    current_user = await get_current_user(request)
     try:
         event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
         if not event:
@@ -3492,15 +3451,15 @@ async def send_care_event_reminder(event_id: str, current_user: dict = Depends(g
         logger.error(f"Error sending reminder: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/care-events/{event_id}/visitation-log")
-async def add_visitation_log(event_id: str, entry: VisitationLogEntry):
+@post("/care-events/{event_id:str}/visitation-log")
+async def add_visitation_log(event_id: str, entry: VisitationLogEntry) -> dict:
     """Add visitation log entry to hospital visit"""
     try:
         event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
         
-        log_entry = entry.model_dump()
+        log_entry = msgspec.to_builtins(entry)
         log_entry['visit_date'] = log_entry['visit_date'].isoformat() if isinstance(log_entry['visit_date'], date) else log_entry['visit_date']
         
         await db.care_events.update_one(
@@ -3518,8 +3477,8 @@ async def add_visitation_log(event_id: str, entry: VisitationLogEntry):
         logger.error(f"Error adding visitation log: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/care-events/hospital/due-followup")
-async def get_hospital_followup_due():
+@get("/care-events/hospital/due-followup")
+async def get_hospital_followup_due() -> dict:
     """Get accident/illness events needing follow-up"""
     try:
         # Find accident/illness events (merged from hospital) with discharge date but no completion
@@ -3554,14 +3513,15 @@ async def get_hospital_followup_due():
 
 # ==================== GRIEF SUPPORT ENDPOINTS ====================
 
-@api_router.get("/grief-support", response_model=List[GriefSupport])
+@get("/grief-support")
 async def list_grief_support(
+    request: Request,
     completed: Optional[bool] = None,
-    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
-    limit: int = Query(50, ge=1, le=MAX_LIMIT),
-    current_user: dict = Depends(get_current_user)
-):
+    page: int = Parameter(default=1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Parameter(default=50, ge=1, le=MAX_LIMIT),
+) -> dict:
     """List grief support stages with pagination"""
+    current_user = await get_current_user(request)
     try:
         query = get_campus_filter(current_user)
         if completed is not None:
@@ -3574,9 +3534,10 @@ async def list_grief_support(
         logger.error(f"Error listing grief support: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/grief-support/member/{member_id}", response_model=List[GriefSupport])
-async def get_member_grief_timeline(member_id: str, current_user: dict = Depends(get_current_user)):
+@get("/grief-support/member/{member_id:str}")
+async def get_member_grief_timeline(member_id: str, request: Request) -> dict:
     """Get grief timeline for specific member"""
+    current_user = await get_current_user(request)
     try:
         # Build query with campus filter
         query = {"member_id": member_id}
@@ -3593,9 +3554,10 @@ async def get_member_grief_timeline(member_id: str, current_user: dict = Depends
         logger.error(f"Error getting member grief timeline: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/grief-support/{stage_id}/complete")
-async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+@post("/grief-support/{stage_id:str}/complete")
+async def complete_grief_stage(stage_id: str, request: Request, notes: Optional[str] = None) -> dict:
     """Mark grief stage as completed with notes"""
+    current_user = await get_current_user(request)
     try:
         # Get stage first
         stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
@@ -3680,8 +3642,8 @@ async def complete_grief_stage(stage_id: str, notes: Optional[str] = None, curre
         logger.error(f"Error completing grief stage: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/grief-support/{stage_id}/ignore")
-async def ignore_grief_stage(stage_id: str, user: dict = Depends(get_current_user)):
+@post("/grief-support/{stage_id:str}/ignore")
+async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
     """Mark a grief support stage as ignored/dismissed"""
     try:
         stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
@@ -3749,8 +3711,8 @@ async def ignore_grief_stage(stage_id: str, user: dict = Depends(get_current_use
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/grief-support/{stage_id}/undo")
-async def undo_grief_stage(stage_id: str, user: dict = Depends(get_current_user)):
+@post("/grief-support/{stage_id:str}/undo")
+async def undo_grief_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of grief support stage"""
     try:
         stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
@@ -3790,8 +3752,8 @@ async def undo_grief_stage(stage_id: str, user: dict = Depends(get_current_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/grief-support/{stage_id}/send-reminder")
-async def send_grief_reminder(stage_id: str):
+@post("/grief-support/{stage_id:str}/send-reminder")
+async def send_grief_reminder(stage_id: str) -> dict:
     """Send WhatsApp reminder for grief stage"""
     try:
         stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
@@ -3835,14 +3797,15 @@ async def send_grief_reminder(stage_id: str):
         logger.error(f"Error sending grief reminder: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/accident-followup")
+@get("/accident-followup")
 async def list_accident_followup(
+    request: Request,
     completed: Optional[bool] = None,
-    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
-    limit: int = Query(50, ge=1, le=MAX_LIMIT),
-    current_user: dict = Depends(get_current_user)
-):
+    page: int = Parameter(default=1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Parameter(default=50, ge=1, le=MAX_LIMIT),
+) -> dict:
     """List all accident follow-up stages with pagination"""
+    current_user = await get_current_user(request)
     try:
         query = get_campus_filter(current_user)
         if completed is not None:
@@ -3855,9 +3818,10 @@ async def list_accident_followup(
         logger.error(f"Error listing accident follow-up: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/accident-followup/member/{member_id}")
-async def get_member_accident_timeline(member_id: str, current_user: dict = Depends(get_current_user)):
+@get("/accident-followup/member/{member_id:str}")
+async def get_member_accident_timeline(member_id: str, request: Request) -> dict:
     """Get accident follow-up timeline for specific member"""
+    current_user = await get_current_user(request)
     try:
         # Build query with campus filter
         query = {"member_id": member_id}
@@ -3874,9 +3838,10 @@ async def get_member_accident_timeline(member_id: str, current_user: dict = Depe
         logger.error(f"Error getting member accident timeline: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/accident-followup/{stage_id}/complete")
-async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+@post("/accident-followup/{stage_id:str}/complete")
+async def complete_accident_stage(stage_id: str, request: Request, notes: Optional[str] = None) -> dict:
     """Mark accident follow-up stage as completed"""
+    current_user = await get_current_user(request)
     try:
         # Get stage first
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
@@ -3960,8 +3925,8 @@ async def complete_accident_stage(stage_id: str, notes: Optional[str] = None, cu
         logger.error(f"Error completing accident stage: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/accident-followup/{stage_id}/undo")
-async def undo_accident_stage(stage_id: str, user: dict = Depends(get_current_user)):
+@post("/accident-followup/{stage_id:str}/undo")
+async def undo_accident_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of accident followup stage"""
     try:
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
@@ -4003,9 +3968,10 @@ async def undo_accident_stage(stage_id: str, user: dict = Depends(get_current_us
 
 # ==================== FINANCIAL AID SCHEDULE ENDPOINTS ====================
 
-@api_router.post("/financial-aid-schedules", response_model=FinancialAidSchedule)
-async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_current_user)):
+@post("/financial-aid-schedules")
+async def create_aid_schedule(schedule: dict, request: Request) -> dict:
     """Create a financial aid schedule"""
+    current_user = await get_current_user(request)
     try:
         # Calculate next occurrence based on frequency
         today = date.today()
@@ -4125,15 +4091,16 @@ async def create_aid_schedule(schedule: dict, current_user: dict = Depends(get_c
         logger.error(f"Error creating aid schedule: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/financial-aid-schedules")
+@get("/financial-aid-schedules")
 async def list_aid_schedules(
+    request: Request,
     member_id: Optional[str] = None,
     active_only: bool = True,
-    page: int = Query(1, ge=1, le=MAX_PAGE_NUMBER),
-    limit: int = Query(50, ge=1, le=MAX_LIMIT),
-    current_user: dict = Depends(get_current_user)
-):
+    page: int = Parameter(default=1, ge=1, le=MAX_PAGE_NUMBER),
+    limit: int = Parameter(default=50, ge=1, le=MAX_LIMIT),
+) -> dict:
     """List financial aid schedules with pagination"""
+    current_user = await get_current_user(request)
     try:
         query = get_campus_filter(current_user)
 
@@ -4150,8 +4117,8 @@ async def list_aid_schedules(
         logger.error(f"Error listing aid schedules: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/financial-aid-schedules/{schedule_id}/ignored-occurrence/{date}")
-async def remove_ignored_occurrence(schedule_id: str, date: str, current_user: dict = Depends(get_current_user)):
+@delete("/financial-aid-schedules/{schedule_id:str}/ignored-occurrence/{date:str}", status_code=200)
+async def remove_ignored_occurrence(schedule_id: str, date: str, request: Request) -> dict:
     """Remove a specific ignored occurrence from a schedule"""
     try:
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4180,8 +4147,8 @@ async def remove_ignored_occurrence(schedule_id: str, date: str, current_user: d
         logger.error(f"Error removing ignored occurrence: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/financial-aid-schedules/{schedule_id}/ignored-occurrence/{occurrence_date}")
-async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str):
+@delete("/financial-aid-schedules/{schedule_id:str}/ignored-occurrence/{occurrence_date:str}", status_code=200)
+async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str) -> dict:
     """Remove a specific ignored occurrence from the schedule and its activity log"""
     try:
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4220,9 +4187,10 @@ async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str):
         logger.error(f"Error removing ignored occurrence: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/financial-aid-schedules/{schedule_id}/clear-ignored")
-async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = Depends(get_current_user)):
+@post("/financial-aid-schedules/{schedule_id:str}/clear-ignored")
+async def clear_all_ignored_occurrences(schedule_id: str, request: Request) -> dict:
     """Clear all ignored occurrences for a schedule"""
+    current_user = await get_current_user(request)
     try:
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
         if not schedule:
@@ -4263,10 +4231,9 @@ async def clear_all_ignored_occurrences(schedule_id: str, current_user: dict = D
         logger.error(f"Error clearing ignored occurrences: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.delete("/financial-aid-schedules/{schedule_id}")
-@limiter.limit("20/minute")
-async def delete_aid_schedule(request: Request, schedule_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete a financial aid schedule and related activity logs - rate limited"""
+@delete("/financial-aid-schedules/{schedule_id:str}", status_code=200)
+async def delete_aid_schedule(schedule_id: str, request: Request) -> dict:
+    """Delete a financial aid schedule and related activity logs"""
     try:
         # Get schedule details before deleting
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4297,9 +4264,10 @@ async def delete_aid_schedule(request: Request, schedule_id: str, current_user: 
         logger.error(f"Error deleting aid schedule: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/financial-aid-schedules/{schedule_id}/stop")
-async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+@post("/financial-aid-schedules/{schedule_id:str}/stop")
+async def stop_aid_schedule(schedule_id: str, request: Request) -> dict:
     """Manually stop a financial aid schedule"""
+    current_user = await get_current_user(request)
     try:
         # Get schedule first
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4347,8 +4315,8 @@ async def stop_aid_schedule(schedule_id: str, current_user: dict = Depends(get_c
         logger.error(f"Error stopping aid schedule: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/financial-aid-schedules/member/{member_id}")
-async def get_member_aid_schedules(member_id: str, current_user: dict = Depends(get_current_user)):
+@get("/financial-aid-schedules/member/{member_id:str}")
+async def get_member_aid_schedules(member_id: str, request: Request) -> dict:
     """Get financial aid schedules for specific member (active + stopped with history)"""
     try:
         logger.info(f"[GET AID SCHEDULES] Querying for member_id={member_id}")
@@ -4380,9 +4348,10 @@ async def get_member_aid_schedules(member_id: str, current_user: dict = Depends(
         logger.error(f"Error getting member aid schedules: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/financial-aid-schedules/due-today")
-async def get_aid_due_today(current_user: dict = Depends(get_current_user)):
+@get("/financial-aid-schedules/due-today")
+async def get_aid_due_today(request: Request) -> dict:
     """Get financial aid schedules due today and overdue"""
+    current_user = await get_current_user(request)
     try:
         today = date.today().isoformat()
         query = get_campus_filter(current_user)
@@ -4412,9 +4381,10 @@ async def get_aid_due_today(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error getting aid due today: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/financial-aid-schedules/{schedule_id}/mark-distributed")
-async def mark_aid_distributed(schedule_id: str, current_user: dict = Depends(get_current_user)):
+@post("/financial-aid-schedules/{schedule_id:str}/mark-distributed")
+async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
     """Mark scheduled aid as distributed and advance to next occurrence"""
+    current_user = await get_current_user(request)
     try:
         # Get the schedule
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4542,8 +4512,8 @@ async def mark_aid_distributed(schedule_id: str, current_user: dict = Depends(ge
         logger.error(f"Error marking aid distributed: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/financial-aid-schedules/{schedule_id}/ignore")
-async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(get_current_user)):
+@post("/financial-aid-schedules/{schedule_id:str}/ignore")
+async def ignore_financial_aid_schedule(schedule_id: str, request: Request) -> dict:
     """Mark a specific financial aid occurrence as ignored (not the entire schedule)"""
     try:
         schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
@@ -4642,8 +4612,8 @@ async def ignore_financial_aid_schedule(schedule_id: str, user: dict = Depends(g
 
 # ==================== FINANCIAL AID ENDPOINTS ====================
 
-@api_router.post("/accident-followup/{stage_id}/ignore")
-async def ignore_accident_stage(stage_id: str, user: dict = Depends(get_current_user)):
+@post("/accident-followup/{stage_id:str}/ignore")
+async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
     """Mark an accident followup stage as ignored/dismissed"""
     try:
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
@@ -4711,11 +4681,11 @@ async def ignore_accident_stage(stage_id: str, user: dict = Depends(get_current_
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/financial-aid/summary")
+@get("/financial-aid/summary")
 async def get_financial_aid_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
-):
+) -> dict:
     """Get financial aid summary by type and date range"""
     try:
         query = {"event_type": EventType.FINANCIAL_AID}
@@ -4754,8 +4724,8 @@ async def get_financial_aid_summary(
         logger.error(f"Error getting financial aid summary: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/financial-aid/recipients")
-async def get_financial_aid_recipients():
+@get("/financial-aid/recipients")
+async def get_financial_aid_recipients() -> dict:
     """Get list of all financial aid recipients with totals"""
     try:
         # Aggregate financial aid by member
@@ -4808,8 +4778,8 @@ async def get_financial_aid_recipients():
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.get("/financial-aid/member/{member_id}")
-async def get_member_financial_aid(member_id: str):
+@get("/financial-aid/member/{member_id:str}")
+async def get_member_financial_aid(member_id: str) -> dict:
     """Get all financial aid given to a member"""
     try:
         aid_events = await db.care_events.find({
@@ -4831,8 +4801,8 @@ async def get_member_financial_aid(member_id: str):
 
 # ==================== DASHBOARD ENDPOINTS ====================
 
-@api_router.get("/dashboard/stats")
-async def get_dashboard_stats():
+@get("/dashboard/stats")
+async def get_dashboard_stats() -> dict:
     """Get overall dashboard statistics"""
     try:
         # Optimize: Use aggregation pipeline to get member stats in single query
@@ -4894,8 +4864,8 @@ async def get_dashboard_stats():
         logger.error(f"Error getting dashboard stats: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/dashboard/upcoming")
-async def get_upcoming_events(days: int = 7):
+@get("/dashboard/upcoming")
+async def get_upcoming_events(days: int = 7) -> dict:
     """Get upcoming events for next N days"""
     try:
         today = date.today()
@@ -4942,8 +4912,8 @@ async def get_upcoming_events(days: int = 7):
         logger.error(f"Error getting upcoming events: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/dashboard/grief-active")
-async def get_active_grief_support():
+@get("/dashboard/grief-active")
+async def get_active_grief_support() -> dict:
     """Get members currently in grief support timeline"""
     try:
         # Optimize: Use aggregation with $lookup and $group to join and group in single query
@@ -4991,9 +4961,10 @@ async def get_active_grief_support():
         logger.error(f"Error getting active grief support: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/dashboard/recent-activity")
-async def get_recent_activity(limit: int = 20, current_user: dict = Depends(get_current_user)):
+@get("/dashboard/recent-activity")
+async def get_recent_activity(request: Request, limit: int = 20) -> dict:
     """Get recent care events"""
+    current_user = await get_current_user(request)
     try:
         # Build campus filter for multi-tenancy
         campus_filter = get_campus_filter(current_user)
@@ -5033,9 +5004,10 @@ async def get_recent_activity(limit: int = 20, current_user: dict = Depends(get_
 
 # ==================== ANALYTICS ENDPOINTS ====================
 
-@api_router.get("/analytics/engagement-trends")
-async def get_engagement_trends(days: int = 30, current_user: dict = Depends(get_current_user)):
+@get("/analytics/engagement-trends")
+async def get_engagement_trends(request: Request, days: int = 30) -> dict:
     """Get engagement trends over time"""
+    current_user = await get_current_user(request)
     try:
         start_date = date.today() - timedelta(days=days)
 
@@ -5063,9 +5035,10 @@ async def get_engagement_trends(days: int = 30, current_user: dict = Depends(get
         logger.error(f"Error getting engagement trends: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/analytics/care-events-by-type")
-async def get_care_events_by_type(current_user: dict = Depends(get_current_user)):
+@get("/analytics/care-events-by-type")
+async def get_care_events_by_type(request: Request) -> dict:
     """Get distribution of care events by type"""
+    current_user = await get_current_user(request)
     try:
         # Apply campus filter for multi-tenancy
         campus_filter = get_campus_filter(current_user)
@@ -5083,9 +5056,10 @@ async def get_care_events_by_type(current_user: dict = Depends(get_current_user)
         logger.error(f"Error getting events by type: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/analytics/grief-completion-rate")
-async def get_grief_completion_rate(current_user: dict = Depends(get_current_user)):
+@get("/analytics/grief-completion-rate")
+async def get_grief_completion_rate(request: Request) -> dict:
     """Get grief support completion rate"""
+    current_user = await get_current_user(request)
     try:
         # Apply campus filter for multi-tenancy
         campus_filter = get_campus_filter(current_user)
@@ -5107,17 +5081,18 @@ async def get_grief_completion_rate(current_user: dict = Depends(get_current_use
         logger.error(f"Error getting grief completion rate: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/analytics/dashboard")
+@get("/analytics/dashboard")
 async def get_analytics_dashboard(
+    request: Request,
     time_range: str = "all",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
+) -> dict:
     """
     Comprehensive analytics dashboard - all data aggregated server-side.
     Uses simple separate queries for better performance.
     """
+    current_user = await get_current_user(request)
     try:
         campus_filter = get_campus_filter(current_user)
         today = datetime.now(JAKARTA_TZ).date()
@@ -5331,21 +5306,22 @@ async def get_analytics_dashboard(
 
 # ==================== API SYNC ENDPOINTS ====================
 
-@api_router.post("/sync/members/from-api")
+@post("/sync/members/from-api")
 async def sync_members_from_external_api(
     api_url: str,
     api_key: Optional[str] = None,
     campus_id: Optional[str] = None,
-    current_admin: dict = Depends(get_current_admin)
-):
+    request: Request = None
+) -> dict:
     """Continuously sync members from external API with archiving"""
+    current_admin = await get_current_admin(request)
     try:
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-        
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(api_url, headers=headers)
             external_members = response.json()
-        
+
         sync_campus_id = campus_id or current_admin.get('campus_id')
         synced_count = 0
         updated_count = 0
@@ -5412,7 +5388,7 @@ async def sync_members_from_external_api(
                         category=ext_member.get('category'),
                         gender=ext_member.get('gender')
                     )
-                    member_dict = member.model_dump()
+                    member_dict = msgspec.to_builtins(member)
                     if member_dict.get('birth_date'):
                         member_dict['birth_date'] = member_dict['birth_date'].isoformat()
                     await db.members.insert_one(member_dict)
@@ -5459,8 +5435,8 @@ async def sync_members_from_external_api(
         logger.error(f"API sync error: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/sync/members/webhook")
-async def member_sync_webhook(current_admin: dict = Depends(get_current_admin)):
+@get("/sync/members/webhook")
+async def member_sync_webhook(request: Request) -> dict:
     """Webhook URL for external system to push member updates"""
     return {
         "webhook_url": f"{os.environ.get('BACKEND_URL', 'http://localhost:8001')}/api/sync/members/from-api",
@@ -5470,9 +5446,11 @@ async def member_sync_webhook(current_admin: dict = Depends(get_current_admin)):
 
 # ==================== IMPORT/EXPORT ENDPOINTS ====================
 
-@api_router.post("/import/members/csv")
-async def import_members_csv(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+@post("/import/members/csv")
+async def import_members_csv(request: Request, data: UploadFile) -> Response:
     """Import members from CSV file"""
+    current_user = await get_current_user(request)
+    file = data  # Alias for compatibility
     try:
         # Get campus_id from current user for multi-tenancy
         campus_id = current_user.get("campus_id")
@@ -5503,7 +5481,7 @@ async def import_members_csv(file: UploadFile = File(...), current_user: dict = 
                     church_id=church_id
                 )
 
-                await db.members.insert_one(member.model_dump())
+                await db.members.insert_one(msgspec.to_builtins(member))
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Row error: {str(e)}")
@@ -5522,9 +5500,10 @@ async def import_members_csv(file: UploadFile = File(...), current_user: dict = 
         logger.error(f"Error importing CSV: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/import/members/json")
-async def import_members_json(members: List[Dict[str, Any]], current_user: dict = Depends(get_current_user)):
+@post("/import/members/json")
+async def import_members_json(members: List[Dict[str, Any]], request: Request) -> dict:
     """Import members from JSON array"""
+    current_user = await get_current_user(request)
     try:
         # Get campus_id from current user for multi-tenancy
         campus_id = current_user.get("campus_id")
@@ -5546,7 +5525,7 @@ async def import_members_json(members: List[Dict[str, Any]], current_user: dict 
                     church_id=church_id
                 )
 
-                await db.members.insert_one(member.model_dump())
+                await db.members.insert_one(msgspec.to_builtins(member))
                 imported_count += 1
             except Exception as e:
                 errors.append(f"Member error: {str(e)}")
@@ -5565,9 +5544,10 @@ async def import_members_json(members: List[Dict[str, Any]], current_user: dict 
         logger.error(f"Error importing JSON: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/export/members/csv")
-async def export_members_csv(current_user: dict = Depends(get_current_user)):
+@get("/export/members/csv")
+async def export_members_csv(request: Request) -> Response:
     """Export members to CSV file - optimized with field projection (70% less data transfer)"""
+    current_user = await get_current_user(request)
     try:
         # Build campus filter for multi-tenancy
         campus_filter = get_campus_filter(current_user)
@@ -5613,8 +5593,8 @@ async def export_members_csv(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error exporting members CSV: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/export/care-events/csv")
-async def export_care_events_csv():
+@get("/export/care-events/csv")
+async def export_care_events_csv() -> Response:
     """Export care events to CSV file - optimized with field projection (75% less data transfer)"""
     try:
         # Only fetch fields needed for export (reduces data transfer by ~75%)
@@ -5651,17 +5631,17 @@ async def export_care_events_csv():
 
 # ==================== INTEGRATION TEST ENDPOINTS ====================
 
-class WhatsAppTestRequest(BaseModel):
+class WhatsAppTestRequest(Struct):
     phone: str
     message: str
 
-class WhatsAppTestResponse(BaseModel):
+class WhatsAppTestResponse(Struct):
     success: bool
     message: str
-    details: Optional[dict] = None
+    details: dict | None = None
 
-@api_router.post("/integrations/ping/whatsapp", response_model=WhatsAppTestResponse)
-async def test_whatsapp_integration(request: WhatsAppTestRequest):
+@post("/integrations/ping/whatsapp")
+async def test_whatsapp_integration(request: WhatsAppTestRequest) -> dict:
     """Test WhatsApp gateway integration by sending a test message"""
     try:
         result = await send_whatsapp_message(request.phone, request.message, member_id="test")
@@ -5686,8 +5666,8 @@ async def test_whatsapp_integration(request: WhatsAppTestRequest):
             details={"error": str(e)}
         )
 
-@api_router.get("/integrations/ping/email")
-async def test_email_integration():
+@get("/integrations/ping/email")
+async def test_email_integration() -> dict:
     """Email integration test - currently pending provider configuration"""
     return {
         "success": False,
@@ -5697,9 +5677,10 @@ async def test_email_integration():
 
 # ==================== AUTO-SUGGESTIONS ENDPOINTS ====================
 
-@api_router.get("/suggestions/follow-up")
-async def get_intelligent_suggestions(current_user: dict = Depends(get_current_user)):
+@get("/suggestions/follow-up")
+async def get_intelligent_suggestions(request: Request) -> dict:
     """Generate intelligent follow-up recommendations"""
+    current_user = await get_current_user(request)
     try:
         campus_filter = get_campus_filter(current_user)
         today = date.today()
@@ -5802,9 +5783,10 @@ async def get_intelligent_suggestions(current_user: dict = Depends(get_current_u
         logger.error(f"Error generating suggestions: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/analytics/demographic-trends")
-async def get_demographic_trends(current_user: dict = Depends(get_current_user)):
+@get("/analytics/demographic-trends")
+async def get_demographic_trends(request: Request) -> dict:
     """Analyze demographic trends and population shifts"""
+    current_user = await get_current_user(request)
     try:
         today = datetime.now(JAKARTA_TZ).date()
         campus_filter = get_campus_filter(current_user)
@@ -5912,16 +5894,17 @@ async def get_demographic_trends(current_user: dict = Depends(get_current_user))
 
 # ==================== MANAGEMENT REPORTS ENDPOINTS ====================
 
-@api_router.get("/reports/monthly")
+@get("/reports/monthly")
 async def get_monthly_management_report(
+    request: Request,
     year: int = None,
     month: int = None,
-    current_user: dict = Depends(get_current_user)
-):
+) -> dict:
     """
     Comprehensive monthly management report for church leadership.
     Provides strategic insights for pastoral care oversight and decision-making.
     """
+    current_user = await get_current_user(request)
     try:
         today = datetime.now(JAKARTA_TZ)
         report_year = year or today.year
@@ -6419,19 +6402,20 @@ async def get_monthly_management_report(
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.get("/reports/monthly/pdf")
+@get("/reports/monthly/pdf")
 async def export_monthly_report_pdf(
+    request: Request,
     year: int = None,
     month: int = None,
-    current_user: dict = Depends(get_current_user)
-):
+) -> Response:
     """
     Export monthly management report as a professionally formatted PDF.
     Returns a downloadable PDF file.
     """
+    current_user = await get_current_user(request)
     try:
         # Get the report data
-        report_data = await get_monthly_management_report(year, month, current_user)
+        report_data = await get_monthly_management_report(request, year, month)
 
         # Get campus name for the header
         campus_name = "GKBJ"  # Default
@@ -6488,16 +6472,17 @@ async def export_monthly_report_pdf(
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.get("/reports/staff-performance")
+@get("/reports/staff-performance")
 async def get_staff_performance_report(
+    request: Request,
     year: int = None,
     month: int = None,
-    current_user: dict = Depends(get_current_user)
-):
+) -> dict:
     """
     Detailed staff performance report for workload balancing and recognition.
     Helps identify overworked and underworked staff members.
     """
+    current_user = await get_current_user(request)
     try:
         today = datetime.now(JAKARTA_TZ)
         report_year = year or today.year
@@ -6722,14 +6707,15 @@ async def get_staff_performance_report(
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.get("/reports/yearly-summary")
+@get("/reports/yearly-summary")
 async def get_yearly_summary_report(
+    request: Request,
     year: int = None,
-    current_user: dict = Depends(get_current_user)
-):
+) -> dict:
     """
     Annual summary report for year-end review and planning.
     """
+    current_user = await get_current_user(request)
     try:
         today = datetime.now(JAKARTA_TZ)
         report_year = year or today.year
@@ -6864,9 +6850,9 @@ _CACHED_ENGAGEMENT_STATUSES = [
 ]
 
 
-def static_config_response(data: list) -> JSONResponse:
+def static_config_response(data: list) -> LitestarResponse:
     """Return static config data with aggressive HTTP cache headers (1 hour)"""
-    return JSONResponse(
+    return LitestarResponse(
         content=data,
         headers={
             "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
@@ -6875,33 +6861,33 @@ def static_config_response(data: list) -> JSONResponse:
     )
 
 
-@api_router.get("/config/aid-types")
-async def get_aid_types():
+@get("/config/aid-types")
+async def get_aid_types() -> dict:
     """Get all financial aid types (cached - instant response with HTTP cache headers)"""
     return static_config_response(_CACHED_AID_TYPES)
 
-@api_router.get("/config/event-types")
-async def get_event_types():
+@get("/config/event-types")
+async def get_event_types() -> dict:
     """Get all care event types (cached - instant response with HTTP cache headers)"""
     return static_config_response(_CACHED_EVENT_TYPES)
 
-@api_router.get("/config/relationship-types")
-async def get_relationship_types():
+@get("/config/relationship-types")
+async def get_relationship_types() -> dict:
     """Get grief relationship types (cached - instant response with HTTP cache headers)"""
     return static_config_response(_CACHED_RELATIONSHIP_TYPES)
 
-@api_router.get("/config/user-roles")
-async def get_user_roles():
+@get("/config/user-roles")
+async def get_user_roles() -> dict:
     """Get user role types (cached - instant response with HTTP cache headers)"""
     return static_config_response(_CACHED_USER_ROLES)
 
-@api_router.get("/config/engagement-statuses")
-async def get_engagement_statuses():
+@get("/config/engagement-statuses")
+async def get_engagement_statuses() -> dict:
     """Get engagement status types (cached - instant response with HTTP cache headers)"""
     return static_config_response(_CACHED_ENGAGEMENT_STATUSES)
 
-@api_router.get("/config/weekdays")
-async def get_weekdays():
+@get("/config/weekdays")
+async def get_weekdays() -> dict:
     """Get weekday options (cached with HTTP cache headers)"""
     return static_config_response([
         {"value": "monday", "label": "Monday", "short": "Mon"},
@@ -6913,8 +6899,8 @@ async def get_weekdays():
         {"value": "sunday", "label": "Sunday", "short": "Sun"}
     ])
 
-@api_router.get("/config/months")
-async def get_months():
+@get("/config/months")
+async def get_months() -> dict:
     """Get month options (cached with HTTP cache headers)"""
     return static_config_response([
         {"value": 1, "label": "January", "short": "Jan"},
@@ -6931,8 +6917,8 @@ async def get_months():
         {"value": 12, "label": "December", "short": "Dec"}
     ])
 
-@api_router.get("/config/frequency-types")
-async def get_frequency_types():
+@get("/config/frequency-types")
+async def get_frequency_types() -> dict:
     """Get financial aid frequency types (cached with HTTP cache headers)"""
     return static_config_response([
         {"value": "one_time", "label": "One-time Payment", "description": "Single payment (already given)"},
@@ -6941,8 +6927,8 @@ async def get_frequency_types():
         {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"}
     ])
 
-@api_router.get("/config/membership-statuses")
-async def get_membership_statuses():
+@get("/config/membership-statuses")
+async def get_membership_statuses() -> dict:
     """Get membership status types (cached with HTTP cache headers)"""
     return static_config_response([
         {"value": "Member", "label": "Member", "active": True},
@@ -6952,24 +6938,84 @@ async def get_membership_statuses():
         {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False}
     ])
 
-@api_router.get("/config/all")
-async def get_all_config():
+@get("/config/all")
+async def get_all_config() -> dict:
     """Get all configuration data for mobile app"""
     try:
+        # Use cached data directly instead of calling route handlers
+        # Get settings from database for dynamic config
+        engagement_settings = await db.settings.find_one({"type": "engagement"}, {"_id": 0})
+        grief_settings = await db.settings.find_one({"type": "grief_stages"}, {"_id": 0})
+        accident_settings = await db.settings.find_one({"type": "accident_followup"}, {"_id": 0})
+
         return {
-            "aid_types": await get_aid_types(),
-            "event_types": await get_event_types(),
-            "relationship_types": await get_relationship_types(),
-            "user_roles": await get_user_roles(),
-            "engagement_statuses": await get_engagement_statuses(),
-            "weekdays": await get_weekdays(),
-            "months": await get_months(),
-            "frequency_types": await get_frequency_types(),
-            "membership_statuses": await get_membership_statuses(),
+            "aid_types": _CACHED_AID_TYPES,
+            "event_types": _CACHED_EVENT_TYPES,
+            "relationship_types": _CACHED_RELATIONSHIP_TYPES,
+            "user_roles": _CACHED_USER_ROLES,
+            "engagement_statuses": _CACHED_ENGAGEMENT_STATUSES,
+            "weekdays": [
+                {"value": "monday", "label": "Monday", "short": "Mon"},
+                {"value": "tuesday", "label": "Tuesday", "short": "Tue"},
+                {"value": "wednesday", "label": "Wednesday", "short": "Wed"},
+                {"value": "thursday", "label": "Thursday", "short": "Thu"},
+                {"value": "friday", "label": "Friday", "short": "Fri"},
+                {"value": "saturday", "label": "Saturday", "short": "Sat"},
+                {"value": "sunday", "label": "Sunday", "short": "Sun"}
+            ],
+            "months": [
+                {"value": 1, "label": "January", "short": "Jan"},
+                {"value": 2, "label": "February", "short": "Feb"},
+                {"value": 3, "label": "March", "short": "Mar"},
+                {"value": 4, "label": "April", "short": "Apr"},
+                {"value": 5, "label": "May", "short": "May"},
+                {"value": 6, "label": "June", "short": "Jun"},
+                {"value": 7, "label": "July", "short": "Jul"},
+                {"value": 8, "label": "August", "short": "Aug"},
+                {"value": 9, "label": "September", "short": "Sep"},
+                {"value": 10, "label": "October", "short": "Oct"},
+                {"value": 11, "label": "November", "short": "Nov"},
+                {"value": 12, "label": "December", "short": "Dec"}
+            ],
+            "frequency_types": [
+                {"value": "one_time", "label": "One-time Payment", "description": "Single payment (already given)"},
+                {"value": "weekly", "label": "Weekly Schedule", "description": "Future weekly payments"},
+                {"value": "monthly", "label": "Monthly Schedule", "description": "Future monthly payments"},
+                {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"}
+            ],
+            "membership_statuses": [
+                {"value": "Member", "label": "Member", "active": True},
+                {"value": "Non Member", "label": "Non Member", "active": False},
+                {"value": "Visitor", "label": "Visitor", "active": False},
+                {"value": "Sympathizer", "label": "Sympathizer", "active": False},
+                {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False}
+            ],
             "settings": {
-                "engagement": await get_engagement_settings(),
-                "grief_stages": await get_grief_stages(),
-                "accident_followup": await get_accident_followup()
+                "engagement": engagement_settings.get("data", {"atRiskDays": 60, "inactiveDays": 90}) if engagement_settings else {"atRiskDays": 60, "inactiveDays": 90},
+                "grief_stages": grief_settings.get("data", [
+                    {"stage": "1_week", "days": 7, "name": "1 Week After"},
+                    {"stage": "2_weeks", "days": 14, "name": "2 Weeks After"},
+                    {"stage": "1_month", "days": 30, "name": "1 Month After"},
+                    {"stage": "3_months", "days": 90, "name": "3 Months After"},
+                    {"stage": "6_months", "days": 180, "name": "6 Months After"},
+                    {"stage": "1_year", "days": 365, "name": "1 Year After"}
+                ]) if grief_settings else [
+                    {"stage": "1_week", "days": 7, "name": "1 Week After"},
+                    {"stage": "2_weeks", "days": 14, "name": "2 Weeks After"},
+                    {"stage": "1_month", "days": 30, "name": "1 Month After"},
+                    {"stage": "3_months", "days": 90, "name": "3 Months After"},
+                    {"stage": "6_months", "days": 180, "name": "6 Months After"},
+                    {"stage": "1_year", "days": 365, "name": "1 Year After"}
+                ],
+                "accident_followup": accident_settings.get("data", [
+                    {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
+                    {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
+                    {"stage": "final_followup", "days": 14, "name": "Final Follow-up"}
+                ]) if accident_settings else [
+                    {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
+                    {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
+                    {"stage": "final_followup", "days": 14, "name": "Final Follow-up"}
+                ]
             }
         }
     except Exception as e:
@@ -6978,8 +7024,8 @@ async def get_all_config():
 
 # ==================== SETTINGS CONFIGURATION ENDPOINTS ====================
 
-@api_router.post("/admin/recalculate-engagement")
-async def recalculate_all_engagement_status(user: dict = Depends(get_current_user)):
+@post("/admin/recalculate-engagement")
+async def recalculate_all_engagement_status(request: Request) -> dict:
     """Recalculate engagement status for all members (admin only)"""
     try:
         if user.get("role") not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
@@ -7036,8 +7082,8 @@ async def recalculate_all_engagement_status(user: dict = Depends(get_current_use
         logger.error(f"Error recalculating engagement: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/settings/engagement")
-async def get_engagement_settings():
+@get("/settings/engagement")
+async def get_engagement_settings() -> dict:
     """Get engagement threshold settings"""
     try:
         settings = await db.settings.find_one({"type": "engagement"}, {"_id": 0})
@@ -7052,9 +7098,10 @@ async def get_engagement_settings():
         logger.error(f"Error getting engagement settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/settings/engagement")
-async def update_engagement_settings(settings: dict, current_admin: dict = Depends(get_current_admin)):
+@put("/settings/engagement")
+async def update_engagement_settings(settings: dict, request: Request) -> dict:
     """Update engagement threshold settings"""
+    current_admin = await get_current_admin(request)
     try:
         await db.settings.update_one(
             {"type": "engagement"},
@@ -7075,8 +7122,8 @@ async def update_engagement_settings(settings: dict, current_admin: dict = Depen
         logger.error(f"Error updating engagement settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/settings/automation")
-async def get_automation_settings(user: dict = Depends(get_current_user)):
+@get("/settings/automation")
+async def get_automation_settings(request: Request) -> dict:
     """Get automation settings (daily digest time, WhatsApp gateway)"""
     try:
         settings = await db.settings.find_one({"type": "automation"}, {"_id": 0})
@@ -7096,9 +7143,10 @@ async def get_automation_settings(user: dict = Depends(get_current_user)):
         logger.error(f"Error getting automation settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/settings/automation")
-async def update_automation_settings(settings: dict, current_admin: dict = Depends(get_current_admin)):
+@put("/settings/automation")
+async def update_automation_settings(settings: dict, request: Request) -> dict:
     """Update automation settings (daily digest time, WhatsApp gateway)"""
+    current_admin = await get_current_admin(request)
     try:
         # Validate digestTime format (HH:MM)
         digest_time = settings.get("digestTime", "08:00")
@@ -7141,8 +7189,8 @@ async def update_automation_settings(settings: dict, current_admin: dict = Depen
         logger.error(f"Error updating automation settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/settings/overdue_writeoff")
-async def get_overdue_writeoff_settings(user: dict = Depends(get_current_user)):
+@get("/settings/overdue_writeoff")
+async def get_overdue_writeoff_settings(request: Request) -> dict:
     """Get overdue write-off threshold settings"""
     try:
         settings = await db.settings.find_one({"key": "overdue_writeoff"}, {"_id": 0})
@@ -7158,8 +7206,8 @@ async def get_overdue_writeoff_settings(user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/settings/overdue_writeoff")
-async def update_overdue_writeoff_settings(settings_data: dict, user: dict = Depends(get_current_user)):
+@put("/settings/overdue_writeoff")
+async def update_overdue_writeoff_settings(settings_data: dict, request: Request) -> dict:
     """Update overdue write-off threshold settings"""
     try:
         if user.get("role") not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
@@ -7184,8 +7232,8 @@ async def update_overdue_writeoff_settings(settings_data: dict, user: dict = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/settings/grief-stages")
-async def get_grief_stages():
+@get("/settings/grief-stages")
+async def get_grief_stages() -> dict:
     """Get grief support stage configuration"""
     try:
         settings = await db.settings.find_one({"type": "grief_stages"}, {"_id": 0})
@@ -7204,9 +7252,10 @@ async def get_grief_stages():
         logger.error(f"Error getting grief stages: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/settings/grief-stages")
-async def update_grief_stages(stages: list, current_admin: dict = Depends(get_current_admin)):
+@put("/settings/grief-stages")
+async def update_grief_stages(stages: list, request: Request) -> dict:
     """Update grief support stage configuration"""
+    current_admin = await get_current_admin(request)
     try:
         await db.settings.update_one(
             {"type": "grief_stages"},
@@ -7223,8 +7272,8 @@ async def update_grief_stages(stages: list, current_admin: dict = Depends(get_cu
         logger.error(f"Error updating grief stages: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/settings/accident-followup")
-async def get_accident_followup():
+@get("/settings/accident-followup")
+async def get_accident_followup() -> dict:
     """Get accident follow-up configuration"""
     try:
         settings = await db.settings.find_one({"type": "accident_followup"}, {"_id": 0})
@@ -7240,9 +7289,10 @@ async def get_accident_followup():
         logger.error(f"Error getting accident followup settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/settings/accident-followup")
-async def update_accident_followup(config: list, current_admin: dict = Depends(get_current_admin)):
+@put("/settings/accident-followup")
+async def update_accident_followup(config: list, request: Request) -> dict:
     """Update accident follow-up configuration"""
+    current_admin = await get_current_admin(request)
     try:
         await db.settings.update_one(
             {"type": "accident_followup"},
@@ -7259,8 +7309,8 @@ async def update_accident_followup(config: list, current_admin: dict = Depends(g
         logger.error(f"Error updating accident followup settings: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/settings/user-preferences/{user_id}")
-async def get_user_preferences(user_id: str):
+@get("/settings/user-preferences/{user_id:str}")
+async def get_user_preferences(user_id: str) -> dict:
     """Get user preferences (language, etc.)"""
     try:
         prefs = await db.user_preferences.find_one({"user_id": user_id}, {"_id": 0})
@@ -7271,8 +7321,8 @@ async def get_user_preferences(user_id: str):
         logger.error(f"Error getting user preferences: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.put("/settings/user-preferences/{user_id}")
-async def update_user_preferences(user_id: str, preferences: dict):
+@put("/settings/user-preferences/{user_id:str}")
+async def update_user_preferences(user_id: str, preferences: dict) -> dict:
     """Update user preferences"""
     try:
         await db.user_preferences.update_one(
@@ -7291,13 +7341,14 @@ async def update_user_preferences(user_id: str, preferences: dict):
 
 # ==================== NOTIFICATION LOGS ENDPOINTS ====================
 
-@api_router.get("/notification-logs")
+@get("/notification-logs")
 async def get_notification_logs(
-    limit: int = Query(100, le=500),
+    request: Request,
+    limit: int = Parameter(default=100, le=500),
     status: Optional[NotificationStatus] = None,
-    current_user: dict = Depends(get_current_user)
-):
+) -> dict:
     """Get notification logs with filtering"""
+    current_user = await get_current_user(request)
     try:
         query = get_campus_filter(current_user)
         
@@ -7316,16 +7367,25 @@ async def get_notification_logs(
 
 # ==================== AUTOMATED REMINDERS ENDPOINTS ====================
 
-@api_router.post("/reminders/run-now")
-async def run_reminders_now(current_admin: dict = Depends(get_current_admin)):
+@post("/reminders/run-now")
+async def run_reminders_now(request: Request) -> dict:
     """Manually trigger daily reminder job (admin only)"""
+    current_admin = await get_current_admin(request)
+    try:
+        logger.info(f"Manual reminder trigger by {current_admin['email']}")
+        await daily_reminder_job()
+        return {"success": True, "message": "Automated reminders executed successfully"}
+    except Exception as e:
+        logger.error(f"Error running reminders: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # ==================== SYNC ENDPOINTS ====================
 
-@api_router.post("/sync/config")
-async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depends(get_current_user)):
+@post("/sync/config")
+async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
     """Save sync configuration for campus"""
+    current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
         raise HTTPException(status_code=403, detail="Only administrators can configure sync")
     
@@ -7402,7 +7462,7 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
                 filter_rules=config.filter_rules or [],
                 is_enabled=config.is_enabled
             )
-            await db.sync_configs.insert_one(sync_config.model_dump())
+            await db.sync_configs.insert_one(msgspec.to_builtins(sync_config))
         
         return {"success": True, "message": "Sync configuration saved"}
     
@@ -7413,9 +7473,10 @@ async def save_sync_config(config: SyncConfigCreate, current_user: dict = Depend
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.post("/sync/regenerate-secret")
-async def regenerate_webhook_secret(current_user: dict = Depends(get_current_user)):
+@post("/sync/regenerate-secret")
+async def regenerate_webhook_secret(request: Request) -> dict:
     """Regenerate webhook secret for security rotation"""
+    current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
         raise HTTPException(status_code=403, detail="Only administrators can regenerate webhook secret")
     
@@ -7452,12 +7513,13 @@ async def regenerate_webhook_secret(current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.post("/sync/discover-fields")
-async def discover_fields_from_core(config_test: SyncConfigCreate, current_user: dict = Depends(get_current_user)):
+@post("/sync/discover-fields")
+async def discover_fields_from_core(config_test: SyncConfigCreate, request: Request) -> dict:
     """
     Analyze sample members from core API to discover available fields and their values
     Returns field metadata for building dynamic filters
     """
+    current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
         raise HTTPException(status_code=403, detail="Only administrators can discover fields")
     
@@ -7566,10 +7628,11 @@ async def discover_fields_from_core(config_test: SyncConfigCreate, current_user:
         logger.error(f"Error discovering fields: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/sync/config")
-async def get_sync_config(current_user: dict = Depends(get_current_user)):
+@get("/sync/config")
+async def get_sync_config(request: Request) -> dict:
     """Get sync configuration for campus"""
     try:
+        current_user = await get_current_user(request)
         campus_id = current_user.get("campus_id")
         if not campus_id:
             return None
@@ -7586,9 +7649,10 @@ async def get_sync_config(current_user: dict = Depends(get_current_user)):
         logger.error(f"Error getting sync config: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/sync/test-connection")
-async def test_sync_connection(config: SyncConfigCreate, current_user: dict = Depends(get_current_user)):
+@post("/sync/test-connection")
+async def test_sync_connection(config: SyncConfigCreate, request: Request) -> dict:
     """Test connection to core API"""
+    current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
         raise HTTPException(status_code=403, detail="Only administrators can test sync")
     
@@ -7708,9 +7772,10 @@ async def test_sync_connection(config: SyncConfigCreate, current_user: dict = De
             "message": f"Connection error: {str(e)}"
         }
 
-@api_router.post("/sync/members/pull")
-async def sync_members_from_core(current_user: dict = Depends(get_current_user)):
+@post("/sync/members/pull")
+async def sync_members_from_core(request: Request) -> dict:
     """Pull members from core API and sync"""
+    current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN, UserRole.CAMPUS_ADMIN]:
         raise HTTPException(status_code=403, detail="Only administrators can sync members")
     
@@ -7734,7 +7799,7 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
             sync_type="manual",
             status="in_progress"
         )
-        sync_log_dict = sync_log.model_dump()
+        sync_log_dict = msgspec.to_builtins(sync_log)
         await db.sync_logs.insert_one(sync_log_dict)
         sync_log_id = sync_log.id
         
@@ -8095,14 +8160,15 @@ async def sync_members_from_core(current_user: dict = Depends(get_current_user))
         logger.error(f"Error in sync members: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/sync/logs")
+@get("/sync/logs")
 async def get_sync_logs(
-    current_user: dict = Depends(get_current_user),
+    request: Request,
     limit: int = 5,
     skip: int = 0
-):
+) -> dict:
     """Get sync history logs with pagination"""
     try:
+        current_user = await get_current_user(request)
         campus_id = current_user.get("campus_id")
         if not campus_id:
             return {"logs": [], "total": 0, "has_more": False}
@@ -8129,8 +8195,8 @@ async def get_sync_logs(
 
 # ==================== SETUP WIZARD ENDPOINTS ====================
 
-@api_router.post("/setup/admin")
-async def setup_first_admin(request: SetupAdminRequest):
+@post("/setup/admin")
+async def setup_first_admin(request: SetupAdminRequest) -> dict:
     """Create church admin account (allows one church admin even if default system admin exists)"""
     try:
         # Default system admin email (auto-created at startup for system provider)
@@ -8160,7 +8226,7 @@ async def setup_first_admin(request: SetupAdminRequest):
         )
         
         # Convert to dict and ensure proper serialization
-        user_dict = admin_user.model_dump()
+        user_dict = msgspec.to_builtins(admin_user)
         user_dict['created_at'] = user_dict['created_at'].isoformat() if isinstance(user_dict['created_at'], datetime) else user_dict['created_at']
         user_dict['updated_at'] = user_dict['updated_at'].isoformat() if isinstance(user_dict['updated_at'], datetime) else user_dict['updated_at']
         
@@ -8174,8 +8240,8 @@ async def setup_first_admin(request: SetupAdminRequest):
         logger.error(f"Error creating first admin: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.post("/setup/campus")
-async def setup_first_campus(request: SetupCampusRequest):
+@post("/setup/campus")
+async def setup_first_campus(request: SetupCampusRequest) -> dict:
     """Create first campus (setup wizard)"""
     try:
         campus = Campus(
@@ -8185,7 +8251,7 @@ async def setup_first_campus(request: SetupCampusRequest):
         )
 
         # Convert to dict and ensure proper datetime serialization
-        campus_dict = campus.model_dump()
+        campus_dict = msgspec.to_builtins(campus)
         campus_dict['created_at'] = campus_dict['created_at'].isoformat() if isinstance(campus_dict['created_at'], datetime) else campus_dict['created_at']
         campus_dict['updated_at'] = campus_dict['updated_at'].isoformat() if isinstance(campus_dict['updated_at'], datetime) else campus_dict['updated_at']
 
@@ -8200,8 +8266,8 @@ async def setup_first_campus(request: SetupCampusRequest):
         logger.error(f"Error creating first campus: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/setup/status")
-async def check_setup_status():
+@get("/setup/status")
+async def check_setup_status() -> dict:
     """Check if initial setup is needed"""
     try:
         # Default system admin email (auto-created at startup for system provider)
@@ -8225,8 +8291,8 @@ async def check_setup_status():
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
-@api_router.post("/sync/webhook")
-async def receive_sync_webhook(request: Request):
+@post("/sync/webhook")
+async def receive_sync_webhook(request: Request) -> dict:
     """
     Webhook receiver for real-time member sync from core system
     Validates HMAC signature for security
@@ -8456,18 +8522,9 @@ async def receive_sync_webhook(request: Request):
         logger.error(f"Error processing webhook: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-    try:
-        logger.info(f"Manual reminder trigger by {current_admin['email']}")
-        await daily_reminder_job()
-        return {"success": True, "message": "Automated reminders executed successfully"}
-    except Exception as e:
-        logger.error(f"Error running reminders: {str(e)}")
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
-
-@api_router.get("/reminders/stats")
-async def get_reminder_stats():
+@get("/reminders/stats")
+async def get_reminder_stats() -> dict:
     """Get reminder statistics for today"""
     try:
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -8507,8 +8564,8 @@ async def get_reminder_stats():
 
 # ==================== STATIC FILES ====================
 
-@api_router.get("/uploads/{filename}")
-async def get_uploaded_file(filename: str):
+@get("/uploads/{filename:str}")
+async def get_uploaded_file(filename: str) -> dict:
     """Serve uploaded files with path traversal protection"""
     # Validate filename - reject any path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:
@@ -8525,8 +8582,8 @@ async def get_uploaded_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(filepath)
 
-@api_router.get("/user-photos/{filename}")
-async def get_user_photo(filename: str):
+@get("/user-photos/{filename:str}")
+async def get_user_photo(filename: str) -> dict:
     """Serve user profile photos with path traversal protection"""
     # Validate filename - reject any path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:
@@ -8545,8 +8602,8 @@ async def get_user_photo(filename: str):
 
 # ==================== SEARCH ENDPOINT ====================
 
-@api_router.get("/search")
-async def global_search(q: str, current_user: dict = Depends(get_current_user)):
+@get("/search")
+async def global_search(q: str, request: Request) -> list:
     """
     Global search across members and care events
     Returns members matching name, phone, email and care events matching title, description
@@ -8605,20 +8662,21 @@ async def global_search(q: str, current_user: dict = Depends(get_current_user)):
 
 # ==================== ACTIVITY LOG ENDPOINTS ====================
 
-@api_router.get("/activity-logs", response_model=List[ActivityLogResponse])
+@get("/activity-logs")
 async def get_activity_logs(
-    current_user: dict = Depends(get_current_user),
+    request: Request,
     user_id: Optional[str] = None,
     action_type: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = 100
-):
+) -> dict:
     """
     Get activity logs with optional filters
     Default: last 30 days
     """
     try:
+        current_user = await get_current_user(request)
         # Get user's campus
         campus_id = current_user.get("campus_id")
         
@@ -8660,12 +8718,13 @@ async def get_activity_logs(
         logger.error(f"Error fetching activity logs: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
-@api_router.get("/activity-logs/summary")
-async def get_activity_summary(current_user: dict = Depends(get_current_user)):
+@get("/activity-logs/summary")
+async def get_activity_summary(request: Request) -> dict:
     """
     Get summary statistics for activity logs
     """
     try:
+        current_user = await get_current_user(request)
         campus_id = current_user.get("campus_id")
         
         query = {}
@@ -8709,8 +8768,8 @@ async def get_activity_summary(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 # ==================== HEALTH CHECK ENDPOINTS ====================
 
-@app.get("/health")
-async def health_check():
+@get("/health")
+async def health_check() -> dict:
     """
     Health check endpoint - verifies API and database are operational.
     Used by Docker health checks and load balancers.
@@ -8726,9 +8785,9 @@ async def health_check():
         }
     except Exception as e:
         logger.error(f"Health check failed - database unreachable: {str(e)}")
-        return JSONResponse(
+        raise HTTPException(
             status_code=503,
-            content={
+            detail={
                 "status": "unhealthy",
                 "service": "faithtracker-api",
                 "database": "disconnected",
@@ -8736,8 +8795,8 @@ async def health_check():
             }
         )
 
-@app.get("/ready")
-async def readiness_check():
+@get("/ready")
+async def readiness_check() -> dict:
     """Readiness probe - can the API handle requests? Checks database connectivity."""
     try:
         # Verify database connectivity with ping
@@ -8754,98 +8813,9 @@ async def readiness_check():
             detail={"status": "not_ready", "database": "disconnected", "error": str(e)}
         )
 
-# Include the router in the main app
-app.include_router(api_router)
-
-# Security Headers Middleware (OWASP recommended)
-from starlette.middleware.base import BaseHTTPMiddleware
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add security headers to all responses (HSTS, X-Frame-Options, etc.)"""
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        # Prevent clickjacking
-        response.headers["X-Frame-Options"] = "DENY"
-        # Prevent MIME-sniffing
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        # XSS protection (legacy browsers)
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        # Referrer policy
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # Permissions policy (disable unnecessary browser features)
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        # Content Security Policy
-        # Use permissive CSP for Swagger UI docs, strict for API endpoints
-        path = request.url.path
-        if path in ["/docs", "/redoc", "/openapi.json"] or path.startswith("/docs/") or path.startswith("/redoc/"):
-            # Swagger UI needs to load external CSS/JS from CDN
-            response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "img-src 'self' data: https://fastapi.tiangolo.com; "
-                "font-src 'self' https://cdn.jsdelivr.net; "
-                "connect-src 'self' https://cdn.jsdelivr.net; "
-                "frame-ancestors 'none'"
-            )
-        else:
-            # Strict CSP for API endpoints
-            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
-        # HSTS - only in production (when not localhost)
-        if "localhost" not in str(request.url) and "127.0.0.1" not in str(request.url):
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        return response
-
-app.add_middleware(SecurityHeadersMiddleware)
-
-# CSRF Protection Middleware - validates Origin header for state-changing requests
-class CSRFProtectionMiddleware(BaseHTTPMiddleware):
-    """
-    CSRF protection via Origin header validation.
-    For JWT-based APIs, CSRF is less critical (tokens in Authorization header),
-    but this adds defense-in-depth for state-changing requests.
-    """
-    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
-
-    async def dispatch(self, request, call_next):
-        # Skip CSRF check for safe methods and health endpoints
-        if request.method in self.SAFE_METHODS:
-            return await call_next(request)
-
-        if request.url.path in ["/health", "/ready"]:
-            return await call_next(request)
-
-        # In production, validate Origin header for state-changing requests
-        if os.environ.get('ENVIRONMENT', 'development') == 'production':
-            origin = request.headers.get("origin")
-            referer = request.headers.get("referer")
-
-            # Get allowed origins from environment
-            allowed = os.environ.get('ALLOWED_ORIGINS', '').split(',')
-            allowed = [o.strip() for o in allowed if o.strip()]
-
-            # Check if origin or referer matches allowed origins
-            if allowed:
-                origin_valid = origin and any(origin.startswith(ao) for ao in allowed)
-                referer_valid = referer and any(referer.startswith(ao) for ao in allowed)
-
-                # Require valid origin/referer for state-changing requests (with some exceptions)
-                # Allow requests without origin if they have valid Authorization header (API clients)
-                has_auth = request.headers.get("authorization")
-
-                if not (origin_valid or referer_valid or has_auth):
-                    logger.warning(f"CSRF check failed: origin={origin}, referer={referer}, path={request.url.path}")
-                    return JSONResponse(
-                        status_code=403,
-                        content={"detail": "CSRF validation failed"}
-                    )
-
-        return await call_next(request)
-
-app.add_middleware(CSRFProtectionMiddleware)
+# ==================== LITESTAR APP CONFIGURATION ====================
 
 # CORS Configuration for subdomain architecture
-# ALLOWED_ORIGINS should be set to frontend URL (e.g., https://faithtracker.example.com)
 cors_origins = os.environ.get('ALLOWED_ORIGINS', os.environ.get('FRONTEND_URL', ''))
 cors_origins_list = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
 
@@ -8856,10 +8826,8 @@ if not cors_origins_list or cors_origins_list[0] == '*':
             "ALLOWED_ORIGINS or FRONTEND_URL must be set in production. "
             "Wildcard CORS with credentials is a security risk."
         )
-        # Default to restrictive in production
         cors_origins_list = []
     else:
-        # Allow localhost in development only
         cors_origins_list = [
             "http://localhost:3000",
             "http://127.0.0.1:3000",
@@ -8868,8 +8836,7 @@ if not cors_origins_list or cors_origins_list[0] == '*':
         ]
         logger.warning("CORS: Using development origins. Set ALLOWED_ORIGINS for production.")
 
-app.add_middleware(
-    CORSMiddleware,
+cors_config = CORSConfig(
     allow_credentials=True,
     allow_origins=cors_origins_list,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -8878,13 +8845,12 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def create_default_admin():
+# Lifecycle functions
+async def on_startup() -> None:
     """Create default full admin user if none exists (using environment variables)"""
     try:
-        admin_count = await db.users.count_documents({"role": UserRole.FULL_ADMIN})
+        admin_count = await db.users.count_documents({"role": UserRole.FULL_ADMIN.value})
         if admin_count == 0:
-            # Read admin credentials from environment variables
             admin_email = os.environ.get('ADMIN_EMAIL')
             admin_password = os.environ.get('ADMIN_PASSWORD')
             admin_phone = os.environ.get('ADMIN_PHONE', '')
@@ -8895,31 +8861,203 @@ async def create_default_admin():
                     "environment variables to create initial admin, or use init_db.py script."
                 )
             else:
-                # Validate password strength
                 if len(admin_password) < 12:
                     logger.warning(
                         "ADMIN_PASSWORD should be at least 12 characters for security. "
                         "Admin user not created."
                     )
                 else:
+                    # Convert msgspec Struct to dict for MongoDB
                     default_admin = User(
                         email=admin_email,
                         name="Full Administrator",
                         role=UserRole.FULL_ADMIN,
-                        campus_id=None,  # Full admin has access to all campuses
+                        campus_id=None,
                         phone=admin_phone,
                         hashed_password=get_password_hash(admin_password),
                         is_active=True
                     )
-                    await db.users.insert_one(default_admin.model_dump())
+                    # msgspec Struct to dict conversion
+                    admin_dict = msgspec.to_builtins(default_admin)
+                    await db.users.insert_one(admin_dict)
                     logger.info(f"Default full admin user created: {admin_email}")
 
-        # Start automated reminder scheduler
         start_scheduler()
     except Exception as e:
         logger.error(f"Error in startup: {str(e)}")
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
+
+async def on_shutdown() -> None:
+    """Cleanup on shutdown"""
     stop_scheduler()
     client.close()
+
+
+# All route handlers - must be explicitly listed for Litestar
+route_handlers = [
+    # Health checks
+    health_check,
+    readiness_check,
+    # Campus endpoints
+    create_campus,
+    list_campuses,
+    get_campus,
+    update_campus,
+    # Auth endpoints
+    register_user,
+    login,
+    get_current_user_info,
+    list_users,
+    update_user,
+    update_own_profile,
+    change_password,
+    upload_user_photo,
+    delete_user,
+    # Member endpoints
+    create_member,
+    list_members,
+    get_member,
+    update_member,
+    delete_member,
+    upload_member_photo,
+    list_at_risk_members,
+    # Dashboard endpoints
+    get_dashboard_reminders,
+    get_dashboard_stats,
+    get_upcoming_events,
+    get_active_grief_support,
+    get_recent_activity,
+    # Care event endpoints
+    create_care_event,
+    list_care_events,
+    get_care_event,
+    update_care_event,
+    complete_care_event,
+    ignore_care_event,
+    delete_care_event,
+    send_care_event_reminder,
+    add_visitation_log,
+    log_additional_visit,
+    get_hospital_followup_due,
+    # Grief support endpoints
+    list_grief_support,
+    get_member_grief_timeline,
+    complete_grief_stage,
+    ignore_grief_stage,
+    undo_grief_stage,
+    send_grief_reminder,
+    # Accident followup endpoints
+    list_accident_followup,
+    get_member_accident_timeline,
+    complete_accident_stage,
+    undo_accident_stage,
+    ignore_accident_stage,
+    # Financial aid endpoints
+    create_aid_schedule,
+    list_aid_schedules,
+    remove_ignored_occurrence,
+    clear_all_ignored_occurrences,
+    delete_aid_schedule,
+    stop_aid_schedule,
+    get_member_aid_schedules,
+    get_aid_due_today,
+    mark_aid_distributed,
+    ignore_financial_aid_schedule,
+    get_financial_aid_summary,
+    get_financial_aid_recipients,
+    get_member_financial_aid,
+    # Analytics endpoints
+    get_engagement_trends,
+    get_care_events_by_type,
+    get_grief_completion_rate,
+    get_analytics_dashboard,
+    get_demographic_trends,
+    # Sync endpoints
+    sync_members_from_external_api,
+    member_sync_webhook,
+    save_sync_config,
+    regenerate_webhook_secret,
+    discover_fields_from_core,
+    get_sync_config,
+    test_sync_connection,
+    sync_members_from_core,
+    get_sync_logs,
+    receive_sync_webhook,
+    # Import/Export endpoints
+    import_members_csv,
+    import_members_json,
+    export_members_csv,
+    export_care_events_csv,
+    # Integration endpoints
+    test_whatsapp_integration,
+    test_email_integration,
+    # Suggestions endpoint
+    get_intelligent_suggestions,
+    # Reports endpoints
+    get_monthly_management_report,
+    export_monthly_report_pdf,
+    get_staff_performance_report,
+    get_yearly_summary_report,
+    # Config endpoints
+    get_aid_types,
+    get_event_types,
+    get_relationship_types,
+    get_user_roles,
+    get_engagement_statuses,
+    get_weekdays,
+    get_months,
+    get_frequency_types,
+    get_membership_statuses,
+    get_all_config,
+    # Admin endpoints
+    recalculate_all_engagement_status,
+    # Settings endpoints
+    get_engagement_settings,
+    update_engagement_settings,
+    get_automation_settings,
+    update_automation_settings,
+    get_overdue_writeoff_settings,
+    update_overdue_writeoff_settings,
+    get_grief_stages,
+    update_grief_stages,
+    get_accident_followup,
+    update_accident_followup,
+    get_user_preferences,
+    update_user_preferences,
+    # Notification endpoints
+    get_notification_logs,
+    run_reminders_now,
+    get_reminder_stats,
+    # Setup endpoints
+    setup_first_admin,
+    setup_first_campus,
+    check_setup_status,
+    # File serving endpoints
+    get_uploaded_file,
+    get_user_photo,
+    # Search endpoint
+    global_search,
+    # Activity log endpoints
+    get_activity_logs,
+    get_activity_summary,
+]
+
+# Create Litestar application
+app = Litestar(
+    route_handlers=route_handlers,
+    cors_config=cors_config,
+    on_startup=[on_startup],
+    on_shutdown=[on_shutdown],
+    openapi_config=OpenAPIConfig(
+        title="FaithTracker API",
+        version="1.0.0",
+        description="Pastoral Care Management System API",
+    ),
+    type_encoders={
+        datetime: lambda dt: dt.isoformat(),
+        date: lambda d: d.isoformat(),
+        ObjectId: str,
+        Decimal128: lambda d: float(d.to_decimal()),
+    },
+    exception_handlers={Exception: global_exception_handler},
+)
