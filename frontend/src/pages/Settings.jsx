@@ -523,6 +523,7 @@ export const Settings = () => {
                       src={user.photo_url.startsWith('http') ? user.photo_url : `${BACKEND_URL}${user.photo_url}`}
                       alt={user.name}
                       className="w-24 h-24 rounded-full object-cover border-4 border-teal-100"
+                      loading="lazy"
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center border-4 border-teal-200">

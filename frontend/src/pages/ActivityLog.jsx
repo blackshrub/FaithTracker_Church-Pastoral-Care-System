@@ -432,6 +432,7 @@ const ActivityLog = () => {
                                 src={log.user_photo_url.startsWith('http') ? log.user_photo_url : `${import.meta.env.VITE_BACKEND_URL}${log.user_photo_url}`}
                                 alt={log.user_name}
                                 className="h-8 w-8 rounded-full object-cover"
+                                loading="lazy"
                               />
                             ) : (
                               <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">

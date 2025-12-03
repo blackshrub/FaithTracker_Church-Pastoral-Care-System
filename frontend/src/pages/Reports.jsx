@@ -143,7 +143,7 @@ const StaffPerformanceRow = ({ staff, rank, avgTasks }) => {
           </div>
           <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
             {staff.photo_url ? (
-              <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" />
+              <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" loading="lazy" />
             ) : (
               <Users className="w-5 h-5 text-muted-foreground" />
             )}
@@ -177,7 +177,7 @@ const StaffPerformanceRow = ({ staff, rank, avgTasks }) => {
         </div>
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
           {staff.photo_url ? (
-            <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" />
+            <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <Users className="w-5 h-5 text-muted-foreground" />
           )}
@@ -749,7 +749,7 @@ export const Reports = () => {
                     <div key={staff.user_id} className={`p-4 rounded-lg text-center ${i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-400' : 'bg-muted/30'}`}>
                       <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3 ${i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-gray-300 text-gray-700' : 'bg-orange-300 text-orange-800'}`}>
                         {staff.photo_url ? (
-                          <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full rounded-full object-cover" />
+                          <img src={staff.photo_url} alt={staff.user_name} className="w-full h-full rounded-full object-cover" loading="lazy" />
                         ) : (
                           <span className="text-2xl font-bold">#{i + 1}</span>
                         )}
