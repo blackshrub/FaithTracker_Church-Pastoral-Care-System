@@ -96,8 +96,9 @@ export const MobileBottomNav = () => {
                   }`
                 }
                 data-testid={item.testId}
+                aria-label={item.name}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5" aria-hidden="true" />
                 <span className="text-xs font-medium">{item.name}</span>
               </LinkComponent>
             );
@@ -111,7 +112,7 @@ export const MobileBottomNav = () => {
                 data-testid="nav-more"
                 aria-label={t('more_menu')}
               >
-                <MoreHorizontal className="h-5 w-5" />
+                <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
                 <span className="text-xs font-medium">{t('more')}</span>
               </button>
             </SheetTrigger>

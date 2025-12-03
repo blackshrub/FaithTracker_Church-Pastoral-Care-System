@@ -2,9 +2,10 @@
  * SearchBar Component - Global search across members and care events
  * Provides live search with 300ms debounce and dropdown results
  * Displays member photos and engagement status
+ * Supports keyboard navigation (ArrowUp/Down, Enter, Escape)
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, User, Calendar, X } from 'lucide-react';
 import api from '@/lib/api';
@@ -15,15 +16,23 @@ const SearchBar = () => {
   const [results, setResults] = useState({ members: [], care_events: [] });
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1); // For keyboard navigation
   const navigate = useNavigate();
   const searchRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Get all results as flat array for keyboard navigation
+  const allResults = [
+    ...results.members.map(m => ({ type: 'member', id: m.id, data: m })),
+    ...results.care_events.map(e => ({ type: 'event', id: e.id, memberId: e.member_id, data: e }))
+  ];
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setIsOpen(false);
+        setActiveIndex(-1);
       }
     };
 
@@ -39,11 +48,17 @@ const SearchBar = () => {
       } else {
         setResults({ members: [], care_events: [] });
         setIsOpen(false);
+        setActiveIndex(-1);
       }
     }, 300); // 300ms debounce
 
     return () => clearTimeout(delayDebounce);
   }, [query]);
+
+  // Reset active index when results change
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [results]);
 
   const performSearch = async (searchQuery) => {
     setIsLoading(true);
@@ -52,53 +67,100 @@ const SearchBar = () => {
       setResults(response.data);
       setIsOpen(true);
     } catch (error) {
-      console.error('Search error:', error);
+      // Silent error handling - don't log to console in production
       setResults({ members: [], care_events: [] });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleMemberClick = (memberId) => {
+  const handleMemberClick = useCallback((memberId) => {
     navigate(`/members/${memberId}`);
     setQuery('');
     setIsOpen(false);
-  };
+    setActiveIndex(-1);
+  }, [navigate]);
 
   const handleClearSearch = () => {
     setQuery('');
     setResults({ members: [], care_events: [] });
     setIsOpen(false);
+    setActiveIndex(-1);
     inputRef.current?.focus();
+  };
+
+  // Keyboard navigation handler
+  const handleKeyDown = (e) => {
+    if (!isOpen || allResults.length === 0) {
+      if (e.key === 'Escape') {
+        setQuery('');
+        setIsOpen(false);
+        inputRef.current?.blur();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex(prev => (prev < allResults.length - 1 ? prev + 1 : 0));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex(prev => (prev > 0 ? prev - 1 : allResults.length - 1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < allResults.length) {
+          const selected = allResults[activeIndex];
+          handleMemberClick(selected.type === 'member' ? selected.id : selected.memberId);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setActiveIndex(-1);
+        inputRef.current?.blur();
+        break;
+      default:
+        break;
+    }
   };
 
   const totalResults = results.members.length + results.care_events.length;
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-md">
+    <div ref={searchRef} className="relative w-full max-w-md" role="combobox" aria-expanded={isOpen} aria-haspopup="listbox">
       {/* Search Input */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Search members, events..."
           className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500"
           data-testid="global-search-input"
+          aria-label="Search members and events"
+          aria-autocomplete="list"
+          aria-controls="search-results-listbox"
+          aria-activedescendant={activeIndex >= 0 ? `search-result-${activeIndex}` : undefined}
         />
-        {query && (
+        {query && !isLoading && (
           <button
             onClick={handleClearSearch}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             data-testid="clear-search-btn"
+            aria-label="Clear search"
+            type="button"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         )}
         {isLoading && (
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2" aria-label="Searching..." role="status">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
           </div>
         )}
@@ -106,104 +168,131 @@ const SearchBar = () => {
 
       {/* Search Results Dropdown */}
       {isOpen && totalResults > 0 && (
-        <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto"
-             data-testid="search-results-dropdown">
-          
+        <ul
+          id="search-results-listbox"
+          role="listbox"
+          className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+          data-testid="search-results-dropdown"
+          aria-label="Search results"
+        >
           {/* Members Section */}
           {results.members.length > 0 && (
-            <div className="p-2">
-              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <li className="p-2" role="presentation">
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider" role="presentation">
                 Members ({results.members.length})
               </div>
-              {results.members.map((member) => (
-                <button
-                  key={member.id}
-                  onClick={() => handleMemberClick(member.id)}
-                  className="w-full px-3 py-2 flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-left"
-                  data-testid={`search-member-${member.id}`}
-                >
-                  <div className="flex-shrink-0">
-                    {member.photo_url ? (
-                      <img
-                        src={member.photo_url.startsWith('http') ? member.photo_url : `${import.meta.env.VITE_BACKEND_URL}${member.photo_url}`}
-                        alt={member.name}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                        <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {member.name}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {member.phone}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      member.engagement_status === 'active'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : member.engagement_status === 'at_risk'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
-                      {member.engagement_status === 'at_risk' ? 'At Risk'
-                        : member.engagement_status === 'active' ? 'Active'
-                        : member.engagement_status === 'disconnected' ? 'Disconnected'
-                        : member.engagement_status}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+              {results.members.map((member, idx) => {
+                const globalIdx = idx;
+                const isActive = activeIndex === globalIdx;
+                return (
+                  <button
+                    key={member.id}
+                    id={`search-result-${globalIdx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onClick={() => handleMemberClick(member.id)}
+                    onMouseEnter={() => setActiveIndex(globalIdx)}
+                    className={`w-full px-3 py-2 flex items-center space-x-3 rounded-md transition-colors text-left ${
+                      isActive ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    data-testid={`search-member-${member.id}`}
+                  >
+                    <div className="flex-shrink-0">
+                      {member.photo_url ? (
+                        <img
+                          src={member.photo_url.startsWith('http') ? member.photo_url : `${import.meta.env.VITE_BACKEND_URL}${member.photo_url}`}
+                          alt=""
+                          className="h-10 w-10 rounded-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          <User className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {member.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {member.phone}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        member.engagement_status === 'active'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : member.engagement_status === 'at_risk'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      }`}>
+                        {member.engagement_status === 'at_risk' ? 'At Risk'
+                          : member.engagement_status === 'active' ? 'Active'
+                          : member.engagement_status === 'disconnected' ? 'Disconnected'
+                          : member.engagement_status}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </li>
           )}
 
           {/* Care Events Section */}
           {results.care_events.length > 0 && (
-            <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <li className="p-2 border-t border-gray-200 dark:border-gray-700" role="presentation">
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider" role="presentation">
                 Care Events ({results.care_events.length})
               </div>
-              {results.care_events.map((event) => (
-                <button
-                  key={event.id}
-                  onClick={() => handleMemberClick(event.member_id)}
-                  className="w-full px-3 py-2 flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-left"
-                  data-testid={`search-event-${event.id}`}
-                >
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                      <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              {results.care_events.map((event, idx) => {
+                const globalIdx = results.members.length + idx;
+                const isActive = activeIndex === globalIdx;
+                return (
+                  <button
+                    key={event.id}
+                    id={`search-result-${globalIdx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onClick={() => handleMemberClick(event.member_id)}
+                    onMouseEnter={() => setActiveIndex(globalIdx)}
+                    className={`w-full px-3 py-2 flex items-center space-x-3 rounded-md transition-colors text-left ${
+                      isActive ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    data-testid={`search-event-${event.id}`}
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {event.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {event.member_name} • {formatDateToJakarta(event.event_date)}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                      {event.event_type.replace('_', ' ')}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {event.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {event.member_name} • {formatDateToJakarta(event.event_date)}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                        {event.event_type.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </li>
           )}
-        </div>
+        </ul>
       )}
 
       {/* No Results */}
       {isOpen && !isLoading && totalResults === 0 && query.trim().length >= 2 && (
         <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4"
-             data-testid="no-search-results">
+             data-testid="no-search-results"
+             role="status"
+             aria-live="polite">
           <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
             No results found for "{query}"
           </p>

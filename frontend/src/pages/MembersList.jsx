@@ -51,7 +51,7 @@ export const MembersList = () => {
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false); // Separate table loading
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebounce(search, 2000); // 2 second debounce for smooth UX
+  const [debouncedSearch] = useDebounce(search, 600); // 600ms debounce for responsive UX
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchLoading, setSearchLoading] = useState(false);
   const [showArchived, setShowArchived] = useState(false);

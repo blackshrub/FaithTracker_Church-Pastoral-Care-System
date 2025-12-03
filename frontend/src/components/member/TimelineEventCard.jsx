@@ -158,8 +158,8 @@ export const TimelineEventCard = memo(({
             {/* Actions Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="min-h-[44px] min-w-[44px] shrink-0">
-                  <MoreVertical className="w-5 h-5" />
+                <Button size="sm" variant="ghost" className="min-h-[44px] min-w-[44px] shrink-0" aria-label="Event actions menu">
+                  <MoreVertical className="w-5 h-5" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -167,7 +167,7 @@ export const TimelineEventCard = memo(({
                   onClick={() => onDelete && onDelete(event.id)}
                   className="text-red-600"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" />
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
