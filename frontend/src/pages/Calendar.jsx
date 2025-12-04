@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { MemberAvatar } from '@/components/MemberAvatar';
+import { MemberLink } from '@/components/LinkWithPrefetch';
 
 // Format phone for WhatsApp link
 const formatPhoneForWhatsApp = (phone) => {
@@ -187,8 +187,8 @@ export const Calendar = () => {
                           <div className="flex items-start gap-3">
                             {/* Member avatar */}
                             {event.member_id && event.member_name && (
-                              <Link
-                                to={`/members/${event.member_id}`}
+                              <MemberLink
+                                memberId={event.member_id}
                                 onClick={() => setDetailsOpen(false)}
                                 className="flex-shrink-0"
                               >
@@ -199,18 +199,18 @@ export const Calendar = () => {
                                   }}
                                   size="md"
                                 />
-                              </Link>
+                              </MemberLink>
                             )}
                             <div className="flex-1 min-w-0">
                               {/* Member name as clickable link */}
                               {event.member_id && event.member_name ? (
-                                <Link
-                                  to={`/members/${event.member_id}`}
+                                <MemberLink
+                                  memberId={event.member_id}
                                   className={`font-semibold text-base hover:underline ${config.color}`}
                                   onClick={() => setDetailsOpen(false)}
                                 >
                                   {event.member_name}
-                                </Link>
+                                </MemberLink>
                               ) : (
                                 <p className="font-semibold text-base">{event.title || 'Unknown'}</p>
                               )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from './LanguageToggle';
 import { ThemeToggle } from './ThemeToggle';
@@ -8,6 +8,7 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { DesktopSidebar } from './DesktopSidebar';
 import SearchBar from './SearchBar';
 import SyncStatusIndicator from './SyncStatusIndicator';
+import { DashboardLink } from './LinkWithPrefetch';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Church, LogOut, ChevronDown } from 'lucide-react';
@@ -29,12 +30,12 @@ export const Layout = ({ children }) => {
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between h-14">
               {/* Logo */}
-              <Link to="/dashboard" className="flex items-center gap-2">
+              <DashboardLink className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
                   <Church className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-lg font-playfair font-bold text-teal-700 dark:text-teal-400">{t('components.app_name')}</span>
-              </Link>
+              </DashboardLink>
 
               {/* Right Side - User Info & Language */}
               <div className="flex items-center gap-1">

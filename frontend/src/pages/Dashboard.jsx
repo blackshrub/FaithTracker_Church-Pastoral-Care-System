@@ -11,8 +11,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useConfirmDialog } from '@/hooks';
 import LazyImage from '@/components/LazyImage';
 import { MemberAvatar } from '@/components/MemberAvatar';
-import { Link } from 'react-router-dom';
-import { MemberLink } from '@/components/LinkWithPrefetch';
+import { MemberLink, LinkWithPrefetch } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDateToJakarta, formatRelativeTime } from '@/lib/dateUtils';
 import { getGriefStageBadge, getAccidentStageBadge } from '@/lib/utils/badges';
@@ -916,11 +915,11 @@ export const Dashboard = () => {
               </form>
             </DialogContent>
           </Dialog>
-          <Link to="/members">
+          <LinkWithPrefetch to="/members" prefetchType="members">
             <Button className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white text-base font-semibold">
               <Users className="w-5 h-5 mr-2" />{t('view_all_members')}
             </Button>
-          </Link>
+          </LinkWithPrefetch>
         </div>
       </div>
       

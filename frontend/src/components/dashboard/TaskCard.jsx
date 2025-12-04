@@ -5,10 +5,10 @@
 
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MemberAvatar } from '@/components/MemberAvatar';
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import { Check } from 'lucide-react';
 
 const formatPhoneForWhatsApp = (phone) => {
@@ -79,12 +79,12 @@ export const TaskCard = memo(({
         </div>
 
         <div className="flex-1 min-w-0">
-          <Link
-            to={`/members/${event.member_id}`}
+          <MemberLink
+            memberId={event.member_id}
             className="font-semibold text-base hover:text-teal-600"
           >
             {event.member_name}
-          </Link>
+          </MemberLink>
           {event.member_phone && (
             <a
               href={`tel:${event.member_phone}`}
