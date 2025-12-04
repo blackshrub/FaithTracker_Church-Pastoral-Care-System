@@ -31,7 +31,11 @@
         </script>
 
         <!-- Resource Hints for Faster Initial Load -->
-        <!-- DNS prefetch for API backend (helps in production) -->
+        <!-- DNS prefetch and preconnect for API backend (50-100ms faster first API request) -->
+        <link rel="dns-prefetch" href="//pastoral.gkbj.org">
+        <link rel="preconnect" href="https://pastoral.gkbj.org" crossorigin>
+
+        <!-- DNS prefetch for Google Fonts -->
         <link rel="dns-prefetch" href="//fonts.googleapis.com">
         <link rel="dns-prefetch" href="//fonts.gstatic.com">
 

@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  Image,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
@@ -19,7 +18,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
-import { Search, User, ChevronRight, Plus } from 'lucide-react-native';
+import { Search, ChevronRight, Plus } from 'lucide-react-native';
 import { useDebouncedCallback } from 'use-debounce';
 
 import { useMembers } from '@/hooks/useMembers';
@@ -28,6 +27,7 @@ import { haptics } from '@/constants/interaction';
 import { FloatingActionButton } from '@/components/ui/FloatingActionButton';
 import { MembersListSkeleton } from '@/components/ui/Skeleton';
 import { EmptyMembers, EmptySearch } from '@/components/ui/EmptyState';
+import { MemberAvatar } from '@/components/ui/CachedImage';
 import type { MemberListItem, EngagementStatus } from '@/types';
 
 // ============================================================================
@@ -49,18 +49,9 @@ const MemberCard = memo(function MemberCard({ member, onPress }: MemberCardProps
       className="flex-row items-center bg-white rounded-xl p-4 mb-3 shadow-sm active:opacity-90 active:scale-[0.98]"
       onPress={onPress}
     >
-      {/* Avatar */}
+      {/* Avatar - Using CachedImage for automatic disk caching */}
       <View className="mr-4">
-        {member.photo_url ? (
-          <Image
-            source={{ uri: member.photo_url }}
-            className="w-12 h-12 rounded-full"
-          />
-        ) : (
-          <View className="w-12 h-12 rounded-full bg-gray-100 items-center justify-center">
-            <User size={24} color="#9ca3af" />
-          </View>
-        )}
+        <MemberAvatar photoUrl={member.photo_url} size="md" />
       </View>
 
       {/* Content */}

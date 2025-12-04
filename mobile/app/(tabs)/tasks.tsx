@@ -10,14 +10,13 @@ import {
   View,
   Text,
   Pressable,
-  ScrollView,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import {
   CheckSquare,
   Cake,
@@ -274,19 +273,21 @@ function TasksScreen() {
           <ActivityIndicator size="large" color="#14b8a6" />
         </View>
       ) : (
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-6 pt-4"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor="#14b8a6"
-            />
-          }
-        >
-          {currentTasks.length === 0 ? (
+        <FlashList
+          data={currentTasks}
+          renderItem={({ item: task, index }) => (
+            <View className="mb-3">
+              <TaskCard
+                task={task}
+                onComplete={() => handleComplete(task)}
+                onPress={() => handleTaskPress(task)}
+              />
+            </View>
+          )}
+          keyExtractor={(task, index) => `${task.type}-${task.member_id}-${index}`}
+          estimatedItemSize={80}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16 }}
+          ListEmptyComponent={
             <View className="items-center py-24">
               <CheckSquare size={48} color="#d1d5db" />
               <Text className="text-base font-semibold text-gray-600 mt-4">
@@ -296,21 +297,16 @@ function TasksScreen() {
                 {t('tasks.emptyState.noTasksDesc')}
               </Text>
             </View>
-          ) : (
-            <Animated.View entering={FadeInDown.duration(300)} className="gap-3">
-              {currentTasks.map((task, index) => (
-                <TaskCard
-                  key={`${task.type}-${task.member_id}-${index}`}
-                  task={task}
-                  onComplete={() => handleComplete(task)}
-                  onPress={() => handleTaskPress(task)}
-                />
-              ))}
-            </Animated.View>
-          )}
-
-          <View className="h-24" />
-        </ScrollView>
+          }
+          ListFooterComponent={<View className="h-24" />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor="#14b8a6"
+            />
+          }
+        />
       )}
     </View>
   );

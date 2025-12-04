@@ -281,6 +281,30 @@ class RequestSizeLimitMiddleware(AbstractMiddleware):
                     return
         await self.app(scope, receive, send)
 
+# Security headers middleware - prevents XSS, clickjacking, MIME sniffing attacks
+class SecurityHeadersMiddleware(AbstractMiddleware):
+    """Add security headers to all responses"""
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            async def send_with_security_headers(message):
+                if message["type"] == "http.response.start":
+                    headers = dict(message.get("headers", []))
+                    # Add security headers
+                    security_headers = [
+                        (b"x-content-type-options", b"nosniff"),
+                        (b"x-frame-options", b"DENY"),
+                        (b"x-xss-protection", b"1; mode=block"),
+                        (b"referrer-policy", b"strict-origin-when-cross-origin"),
+                        (b"permissions-policy", b"geolocation=(), microphone=(), camera=()"),
+                    ]
+                    existing_headers = list(message.get("headers", []))
+                    existing_headers.extend(security_headers)
+                    message = {**message, "headers": existing_headers}
+                await send(message)
+            await self.app(scope, receive, send_with_security_headers)
+        else:
+            await self.app(scope, receive, send)
+
 # ==================== SAFE ERROR HANDLING ====================
 
 # Generic error messages for production (don't expose internal details)
@@ -7005,45 +7029,64 @@ _CACHED_ENGAGEMENT_STATUSES = [
 ]
 
 
-def static_config_response(data: list) -> LitestarResponse:
-    """Return static config data with aggressive HTTP cache headers (1 hour)"""
+def static_config_response(data: list, request: Request = None) -> LitestarResponse:
+    """Return static config data with E-Tag and aggressive HTTP cache headers (1 hour)
+
+    E-Tag enables 304 Not Modified responses, saving bandwidth on repeated requests.
+    """
+    import json
+    # Generate E-Tag from content hash
+    content_str = json.dumps(data, sort_keys=True, default=str)
+    etag = f'"{hashlib.md5(content_str.encode()).hexdigest()}"'
+
+    # Check If-None-Match header for conditional request
+    if request:
+        if_none_match = request.headers.get("if-none-match")
+        if if_none_match and if_none_match == etag:
+            return LitestarResponse(
+                content=None,
+                status_code=304,
+                headers={"ETag": etag}
+            )
+
     return LitestarResponse(
         content=data,
         headers={
             "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
-            "Vary": "Accept-Encoding"
+            "Vary": "Accept-Encoding",
+            "ETag": etag
         }
     )
 
 
 @get("/config/aid-types")
-async def get_aid_types() -> dict:
-    """Get all financial aid types (cached - instant response with HTTP cache headers)"""
-    return static_config_response(_CACHED_AID_TYPES)
+async def get_aid_types(request: Request) -> dict:
+    """Get all financial aid types (cached with E-Tag + HTTP cache headers)"""
+    return static_config_response(_CACHED_AID_TYPES, request)
 
 @get("/config/event-types")
-async def get_event_types() -> dict:
-    """Get all care event types (cached - instant response with HTTP cache headers)"""
-    return static_config_response(_CACHED_EVENT_TYPES)
+async def get_event_types(request: Request) -> dict:
+    """Get all care event types (cached with E-Tag + HTTP cache headers)"""
+    return static_config_response(_CACHED_EVENT_TYPES, request)
 
 @get("/config/relationship-types")
-async def get_relationship_types() -> dict:
-    """Get grief relationship types (cached - instant response with HTTP cache headers)"""
-    return static_config_response(_CACHED_RELATIONSHIP_TYPES)
+async def get_relationship_types(request: Request) -> dict:
+    """Get grief relationship types (cached with E-Tag + HTTP cache headers)"""
+    return static_config_response(_CACHED_RELATIONSHIP_TYPES, request)
 
 @get("/config/user-roles")
-async def get_user_roles() -> dict:
-    """Get user role types (cached - instant response with HTTP cache headers)"""
-    return static_config_response(_CACHED_USER_ROLES)
+async def get_user_roles(request: Request) -> dict:
+    """Get user role types (cached with E-Tag + HTTP cache headers)"""
+    return static_config_response(_CACHED_USER_ROLES, request)
 
 @get("/config/engagement-statuses")
-async def get_engagement_statuses() -> dict:
-    """Get engagement status types (cached - instant response with HTTP cache headers)"""
-    return static_config_response(_CACHED_ENGAGEMENT_STATUSES)
+async def get_engagement_statuses(request: Request) -> dict:
+    """Get engagement status types (cached with E-Tag + HTTP cache headers)"""
+    return static_config_response(_CACHED_ENGAGEMENT_STATUSES, request)
 
 @get("/config/weekdays")
-async def get_weekdays() -> dict:
-    """Get weekday options (cached with HTTP cache headers)"""
+async def get_weekdays(request: Request) -> dict:
+    """Get weekday options (cached with E-Tag + HTTP cache headers)"""
     return static_config_response([
         {"value": "monday", "label": "Monday", "short": "Mon"},
         {"value": "tuesday", "label": "Tuesday", "short": "Tue"},
@@ -7052,11 +7095,11 @@ async def get_weekdays() -> dict:
         {"value": "friday", "label": "Friday", "short": "Fri"},
         {"value": "saturday", "label": "Saturday", "short": "Sat"},
         {"value": "sunday", "label": "Sunday", "short": "Sun"}
-    ])
+    ], request)
 
 @get("/config/months")
-async def get_months() -> dict:
-    """Get month options (cached with HTTP cache headers)"""
+async def get_months(request: Request) -> dict:
+    """Get month options (cached with E-Tag + HTTP cache headers)"""
     return static_config_response([
         {"value": 1, "label": "January", "short": "Jan"},
         {"value": 2, "label": "February", "short": "Feb"},
@@ -7070,28 +7113,28 @@ async def get_months() -> dict:
         {"value": 10, "label": "October", "short": "Oct"},
         {"value": 11, "label": "November", "short": "Nov"},
         {"value": 12, "label": "December", "short": "Dec"}
-    ])
+    ], request)
 
 @get("/config/frequency-types")
-async def get_frequency_types() -> dict:
-    """Get financial aid frequency types (cached with HTTP cache headers)"""
+async def get_frequency_types(request: Request) -> dict:
+    """Get financial aid frequency types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response([
         {"value": "one_time", "label": "One-time Payment", "description": "Single payment (already given)"},
         {"value": "weekly", "label": "Weekly Schedule", "description": "Future weekly payments"},
         {"value": "monthly", "label": "Monthly Schedule", "description": "Future monthly payments"},
         {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"}
-    ])
+    ], request)
 
 @get("/config/membership-statuses")
-async def get_membership_statuses() -> dict:
-    """Get membership status types (cached with HTTP cache headers)"""
+async def get_membership_statuses(request: Request) -> dict:
+    """Get membership status types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response([
         {"value": "Member", "label": "Member", "active": True},
         {"value": "Non Member", "label": "Non Member", "active": False},
         {"value": "Visitor", "label": "Visitor", "active": False},
         {"value": "Sympathizer", "label": "Sympathizer", "active": False},
         {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False}
-    ])
+    ], request)
 
 @get("/config/all")
 async def get_all_config() -> dict:
@@ -9230,6 +9273,8 @@ app = Litestar(
     on_startup=[on_startup],
     on_shutdown=[on_shutdown],
     middleware=[
+        DefineMiddleware(SecurityHeadersMiddleware),  # Security headers (XSS, clickjacking protection)
+        DefineMiddleware(CompressionMiddleware, minimum_size=500),  # Gzip/Brotli compression (60-80% size reduction)
         DefineMiddleware(RequestSizeLimitMiddleware),  # Limit request body size
         rate_limit_config.middleware,  # Rate limiting
     ],
