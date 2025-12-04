@@ -9344,49 +9344,46 @@ async def stream_activity(request: Request, token: Optional[str] = None) -> Stre
     });
     ```
     """
+    # Try to get user from header first, then from query param
+    current_user = None
+
+    # First try Authorization header
     try:
-        # Try to get user from header first, then from query param
-        current_user = None
-        try:
-            current_user = await get_current_user(request)
-        except:
-            pass
-
-        # If no user from header, try query param token
-        if not current_user and token:
-            try:
-                payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-                user_id = payload.get("sub")
-                if user_id:
-                    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
-                    if user_doc:
-                        current_user = user_doc
-            except jwt.ExpiredSignatureError:
-                raise HTTPException(status_code=401, detail="Token expired")
-            except jwt.InvalidTokenError:
-                raise HTTPException(status_code=401, detail="Invalid token")
-
-        if not current_user:
-            raise HTTPException(status_code=401, detail="Authentication required")
-
-        campus_id = current_user.get("campus_id") or "global"
-        user_id = current_user.get("id", "")
-
-        return Stream(
-            activity_event_generator(campus_id, user_id),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",  # Disable nginx buffering
-            }
-        )
-
+        current_user = await get_current_user(request)
     except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error starting activity stream: {str(e)}")
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+        pass  # Will try token param next
+    except Exception:
+        pass  # Will try token param next
+
+    # If no user from header, try query param token
+    if not current_user and token:
+        try:
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("sub")
+            if user_id:
+                user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+                if user_doc:
+                    current_user = user_doc
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expired")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    campus_id = current_user.get("campus_id") or "global"
+    user_id = current_user.get("id", "")
+
+    return Stream(
+        activity_event_generator(campus_id, user_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 # ==================== HEALTH CHECK ENDPOINTS ====================
 
