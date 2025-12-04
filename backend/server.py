@@ -9290,37 +9290,40 @@ async def unsubscribe_from_activities(campus_id: str, queue: Queue):
             if not _activity_subscribers[campus_id]:
                 del _activity_subscribers[campus_id]
 
-async def activity_event_generator(campus_id: str, user_id: str):
-    """Generate SSE events for activity stream"""
-    queue = await subscribe_to_activities(campus_id)
-    try:
-        # Send initial connection event
-        yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
+def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
+    """Generate SSE events for activity stream - sync generator wrapper"""
+    import json
 
-        # Send heartbeat every 30 seconds to keep connection alive
-        heartbeat_interval = 30
-        last_heartbeat = asyncio.get_event_loop().time()
+    async def _inner():
+        try:
+            # Send initial connection event
+            yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
 
-        while True:
-            try:
-                # Wait for event with timeout for heartbeat
+            # Send heartbeat every 30 seconds to keep connection alive
+            heartbeat_interval = 30
+
+            while True:
                 try:
-                    activity = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                    # Wait for event with timeout for heartbeat
+                    try:
+                        activity = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
 
-                    # Don't send user's own activities back to them
-                    if activity.get("user_id") != user_id:
-                        event_data = json.dumps(activity, default=str)
-                        yield f"event: activity\ndata: {event_data}\n\n"
+                        # Don't send user's own activities back to them
+                        if activity.get("user_id") != user_id:
+                            event_data = json.dumps(activity, default=str)
+                            yield f"event: activity\ndata: {event_data}\n\n"
 
-                except asyncio.TimeoutError:
-                    # Send heartbeat
-                    yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
+                    except asyncio.TimeoutError:
+                        # Send heartbeat
+                        yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
 
-            except asyncio.CancelledError:
-                break
+                except asyncio.CancelledError:
+                    break
 
-    finally:
-        await unsubscribe_from_activities(campus_id, queue)
+        finally:
+            await unsubscribe_from_activities(campus_id, queue)
+
+    return _inner()
 
 @get("/stream/activity")
 async def stream_activity(request: Request, token: Optional[str] = None) -> Stream:
@@ -9351,23 +9354,23 @@ async def stream_activity(request: Request, token: Optional[str] = None) -> Stre
     try:
         current_user = await get_current_user(request)
     except HTTPException:
-        pass  # Will try token param next
+        pass  # Header auth not available, will try query param
     except Exception:
-        pass  # Will try token param next
+        pass
 
     # If no user from header, try query param token
     if not current_user and token:
         try:
-            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("sub")
             if user_id:
                 user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
                 if user_doc:
                     current_user = user_doc
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token expired")
-        except jwt.InvalidTokenError:
-            raise HTTPException(status_code=401, detail="Invalid token")
+        except JWTError as e:
+            logger.warning(f"[SSE] Token decode error: {str(e)}")
+            detail = "Token expired" if "expired" in str(e).lower() else "Invalid token"
+            raise HTTPException(status_code=401, detail=detail)
 
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -9375,13 +9378,41 @@ async def stream_activity(request: Request, token: Optional[str] = None) -> Stre
     campus_id = current_user.get("campus_id") or "global"
     user_id = current_user.get("id", "")
 
+    # Subscribe BEFORE creating Stream to avoid async issues in generator
+    queue = await subscribe_to_activities(campus_id)
+    logger.debug(f"[SSE] Connected: user={current_user.get('email')}, campus={campus_id}")
+
     return Stream(
-        activity_event_generator(campus_id, user_id),
+        activity_event_generator(campus_id, user_id, queue),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
+# ==================== SSE TEST ENDPOINT ====================
+
+async def simple_sse_generator():
+    """Simple SSE generator for testing"""
+    import json
+    yield f"event: connected\ndata: {json.dumps({'status': 'connected'})}\n\n"
+
+    for i in range(10):
+        await asyncio.sleep(2)
+        yield f"event: heartbeat\ndata: {json.dumps({'count': i, 'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
+
+@get("/stream/test")
+async def stream_test() -> Stream:
+    """Simple SSE test endpoint - no auth required"""
+    return Stream(
+        simple_sse_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         }
     )
 
@@ -9662,6 +9693,7 @@ route_handlers = [
     get_activity_summary,
     # Real-time SSE stream
     stream_activity,
+    stream_test,
 ]
 
 # Rate limiting configuration
