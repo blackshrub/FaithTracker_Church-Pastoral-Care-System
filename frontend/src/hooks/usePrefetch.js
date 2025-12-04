@@ -34,39 +34,34 @@ export function usePrefetch() {
       clearTimeout(timeoutRef.current[`member-${memberId}`]);
     }
 
-    timeoutRef.current[`member-${memberId}`] = setTimeout(() => {
-      // Prefetch member profile
+    timeoutRef.current[`member-${memberId}`] = setTimeout(async () => {
+      // Prefetch all member data in the same structure as MemberDetail expects
+      // This must match the queryFn in MemberDetail.jsx exactly
       queryClient.prefetchQuery({
         queryKey: ['member', memberId],
-        queryFn: () => api.get(`/members/${memberId}`).then(r => r.data),
-        staleTime: PREFETCH_STALE_TIME,
-      });
+        queryFn: async () => {
+          const [memberRes, eventsRes, griefRes, accidentRes, aidSchedulesRes] = await Promise.all([
+            api.get(`/members/${memberId}`),
+            api.get(`/care-events?member_id=${memberId}`),
+            api.get(`/grief-support/member/${memberId}`).catch(() => ({ data: [] })),
+            api.get(`/accident-followup/member/${memberId}`).catch(() => ({ data: [] })),
+            api.get(`/financial-aid-schedules/member/${memberId}`).catch(() => ({ data: [] }))
+          ]);
 
-      // Prefetch care events
-      queryClient.prefetchQuery({
-        queryKey: ['careEvents', memberId],
-        queryFn: () => api.get(`/care-events?member_id=${memberId}`).then(r => r.data),
-        staleTime: PREFETCH_STALE_TIME,
-      });
+          const sortedEvents = (eventsRes.data || []).sort((a, b) => {
+            const dateCompare = new Date(b.event_date) - new Date(a.event_date);
+            if (dateCompare !== 0) return dateCompare;
+            return new Date(b.created_at) - new Date(a.created_at);
+          });
 
-      // Prefetch grief timeline (if applicable)
-      queryClient.prefetchQuery({
-        queryKey: ['griefTimeline', memberId],
-        queryFn: () => api.get(`/grief-support/member/${memberId}`).then(r => r.data).catch(() => []),
-        staleTime: PREFETCH_STALE_TIME,
-      });
-
-      // Prefetch accident followup (if applicable)
-      queryClient.prefetchQuery({
-        queryKey: ['accidentTimeline', memberId],
-        queryFn: () => api.get(`/accident-followup/member/${memberId}`).then(r => r.data).catch(() => []),
-        staleTime: PREFETCH_STALE_TIME,
-      });
-
-      // Prefetch financial aid schedules
-      queryClient.prefetchQuery({
-        queryKey: ['financialAidSchedules', memberId],
-        queryFn: () => api.get(`/financial-aid-schedules?member_id=${memberId}`).then(r => r.data).catch(() => []),
+          return {
+            member: memberRes.data,
+            careEvents: sortedEvents,
+            griefTimeline: griefRes.data,
+            accidentTimeline: accidentRes.data,
+            aidSchedules: aidSchedulesRes.data || []
+          };
+        },
         staleTime: PREFETCH_STALE_TIME,
       });
     }, PREFETCH_DELAY);
