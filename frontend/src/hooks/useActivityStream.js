@@ -22,8 +22,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
+// Note: VITE_BACKEND_URL already points to the API subdomain (e.g., https://api.pastoral.gkbj.org)
+// No additional /api prefix needed - routes are at the root level
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-const API_BASE_URL = `${BACKEND_URL}/api`;
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds max
 const INITIAL_RECONNECT_DELAY = 1000; // 1 second initial
 
@@ -60,7 +61,7 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
     try {
       // Note: EventSource doesn't support custom headers, so we use query param for auth
       // In production, consider using a fetch-based polyfill for SSE with headers
-      const url = `${API_BASE_URL}/stream/activity?token=${encodeURIComponent(token)}`;
+      const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(token)}`;
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 
