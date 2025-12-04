@@ -123,11 +123,19 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      # API Router
+      # API Router (main - with compression)
       - "traefik.http.routers.backend.rule=Host(`api.${DOMAIN}`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.priority=1"
       - "traefik.http.services.backend.loadbalancer.server.port=8001"
+      # SSE Router (no compression - SSE needs unbuffered streaming)
+      - "traefik.http.routers.backend-sse.rule=Host(`api.${DOMAIN}`) && PathPrefix(`/stream`)"
+      - "traefik.http.routers.backend-sse.entrypoints=websecure"
+      - "traefik.http.routers.backend-sse.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-sse.priority=10"
+      - "traefik.http.routers.backend-sse.service=backend"
+      - "traefik.http.routers.backend-sse.middlewares=backend-cors"
       # Brotli/Gzip compression middleware (15-25% smaller than gzip alone)
       - "traefik.http.middlewares.backend-compress.compress=true"
       - "traefik.http.middlewares.backend-compress.compress.minresponsebodybytes=256"
@@ -137,7 +145,7 @@ services:
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://${DOMAIN}"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=86400"
       - "traefik.http.middlewares.backend-cors.headers.addvaryheader=true"
-      # Apply compression + CORS middlewares
+      # Apply compression + CORS middlewares to main router
       - "traefik.http.routers.backend.middlewares=backend-compress,backend-cors"
     # Resource limits to prevent runaway memory/CPU usage
     deploy:
