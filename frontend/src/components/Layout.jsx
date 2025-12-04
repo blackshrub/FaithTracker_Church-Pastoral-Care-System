@@ -7,6 +7,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './MobileBottomNav';
 import { DesktopSidebar } from './DesktopSidebar';
 import SearchBar from './SearchBar';
+import SyncStatusIndicator from './SyncStatusIndicator';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Church, LogOut, ChevronDown } from 'lucide-react';
@@ -53,6 +54,7 @@ export const Layout = ({ children }) => {
                     </div>
                   )}
                 </div>
+                <SyncStatusIndicator />
                 <ThemeToggle />
                 <LanguageToggle />
               </div>
@@ -75,6 +77,7 @@ export const Layout = ({ children }) => {
 
               {/* Right Side - User & Language */}
               <div className="flex items-center gap-2">
+                <SyncStatusIndicator />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="gap-2 hover:bg-teal-50 dark:hover:bg-teal-900/30">
