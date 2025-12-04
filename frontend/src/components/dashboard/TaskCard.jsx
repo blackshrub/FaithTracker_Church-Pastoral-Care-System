@@ -67,14 +67,16 @@ export const TaskCard = memo(({
       )}
 
       <div className="flex items-start gap-3 mb-3">
-        {/* Avatar with colored ring */}
+        {/* Avatar with colored ring - enables shared element transition */}
         <div className={`flex-shrink-0 rounded-full ring-2 ${config.ringClass}`}>
           <MemberAvatar
             member={{
+              id: event.member_id,
               name: event.member_name,
               photo_url: event.member_photo_url
             }}
             size="md"
+            enableTransition
           />
         </div>
 
@@ -82,6 +84,7 @@ export const TaskCard = memo(({
           <MemberLink
             memberId={event.member_id}
             className="font-semibold text-base hover:text-teal-600"
+            style={{ viewTransitionName: `member-name-${event.member_id}` }}
           >
             {event.member_name}
           </MemberLink>

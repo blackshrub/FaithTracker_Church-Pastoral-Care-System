@@ -35,17 +35,25 @@ export const MemberProfileHeader = memo(({
 
       {/* Profile Section */}
       <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 max-w-full">
-        {/* Profile Photo */}
+        {/* Profile Photo - enables shared element transition from list/dashboard */}
         <div className="shrink-0">
-          <MemberAvatar member={member} size="xl" className="w-20 h-20 sm:w-32 sm:h-32" />
+          <MemberAvatar
+            member={member}
+            size="xl"
+            className="w-20 h-20 sm:w-32 sm:h-32"
+            enableTransition
+          />
         </div>
 
         {/* Member Info */}
         <div className="flex-1 min-w-0 w-full">
           <div className="space-y-3">
-            {/* Name and Contact */}
+            {/* Name and Contact - with view transition */}
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-playfair font-bold text-foreground">
+              <h1
+                className="text-2xl sm:text-3xl font-playfair font-bold text-foreground"
+                style={{ viewTransitionName: member.id ? `member-name-${member.id}` : undefined }}
+              >
                 {member.name}
               </h1>
               <div className="flex flex-wrap items-center gap-2 mt-2">

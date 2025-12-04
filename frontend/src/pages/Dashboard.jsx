@@ -1036,15 +1036,15 @@ export const Dashboard = () => {
                             <div className="flex items-start gap-3 mb-3">
                               {/* Avatar with colored ring - Simplified */}
                               <div className={`flex-shrink-0 rounded-full ring-2 ${
-                                config.color === 'pink' ? 'ring-pink-400' : 
-                                config.color === 'blue' ? 'ring-blue-400' : 
+                                config.color === 'pink' ? 'ring-pink-400' :
+                                config.color === 'blue' ? 'ring-blue-400' :
                                 'ring-purple-400'
                               }`}>
-                                <MemberAvatar member={{name: task.member_name, photo_url: task.member_photo_url}} size="md" />
+                                <MemberAvatar member={{id: task.member_id, name: task.member_name, photo_url: task.member_photo_url}} size="md" enableTransition />
                               </div>
-                              
+
                               <div className="flex-1 min-w-0">
-                                <MemberLink memberId={task.member_id} className="font-semibold text-base hover:text-teal-600">
+                                <MemberLink memberId={task.member_id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${task.member_id}` }}>
                                   {task.member_name}
                                 </MemberLink>
                                 {task.member_phone && (
@@ -1268,10 +1268,10 @@ export const Dashboard = () => {
                           )}
                           <div className="flex items-start gap-3 mb-3">
                             <div className="flex-shrink-0 rounded-full ring-2 ring-amber-400">
-                              <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
+                              <MemberAvatar member={{id: event.member_id, name: event.member_name, photo_url: event.member_photo_url}} size="md" enableTransition />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <MemberLink memberId={event.member_id} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={event.member_id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${event.member_id}` }}>
                                 {event.member_name}
                               </MemberLink>
                               {event.member_phone && event.member_phone !== 'null' && event.member_phone !== 'NULL' && (
@@ -1358,10 +1358,10 @@ export const Dashboard = () => {
                           <div className="flex items-start gap-3 mb-3">
                             {/* Avatar with blue ring */}
                             <div className="flex-shrink-0 rounded-full ring-2 ring-blue-400">
-                              <MemberAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} size="md" />
+                              <MemberAvatar member={{id: event.member_id, name: event.member_name, photo_url: event.member_photo_url}} size="md" enableTransition />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <MemberLink memberId={event.member_id} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={event.member_id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${event.member_id}` }}>
                                 {event.member_name}
                               </MemberLink>
                               {event.member_phone && event.member_phone !== 'null' && event.member_phone !== 'NULL' && (
@@ -1416,10 +1416,10 @@ export const Dashboard = () => {
                           <div className="flex items-start gap-3 mb-3">
                             {/* Avatar with teal ring */}
                             <div className="flex-shrink-0 rounded-full ring-2 ring-teal-400">
-                              <MemberAvatar member={{name: followup.member_name, photo_url: followup.member_photo_url}} size="md" />
+                              <MemberAvatar member={{id: followup.member_id, name: followup.member_name, photo_url: followup.member_photo_url}} size="md" enableTransition />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <MemberLink memberId={followup.member_id} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={followup.member_id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${followup.member_id}` }}>
                                 {followup.member_name}
                               </MemberLink>
                               {followup.member_phone && (
@@ -1506,10 +1506,10 @@ export const Dashboard = () => {
                           <div className="flex items-start gap-3 mb-3">
                             {/* Avatar with purple ring */}
                             <div className="flex-shrink-0 rounded-full ring-2 ring-purple-400">
-                              <MemberAvatar member={{name: stage.member_name, photo_url: stage.member_photo_url}} size="md" />
+                              <MemberAvatar member={{id: stage.member_id, name: stage.member_name, photo_url: stage.member_photo_url}} size="md" enableTransition />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <MemberLink memberId={stage.member_id} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={stage.member_id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${stage.member_id}` }}>
                                 {stage.member_name}
                               </MemberLink>
                               {stage.member_phone && (
@@ -1740,10 +1740,10 @@ export const Dashboard = () => {
                         <div key={member.id} className="p-4 bg-amber-50 rounded-lg border border-amber-200 hover:shadow-lg transition-all">
                           <div className="flex items-start gap-3 mb-3">
                             <div className="flex-shrink-0 rounded-full ring-2 ring-amber-400">
-                              <MemberAvatar member={member} size="md" />
+                              <MemberAvatar member={member} size="md" enableTransition />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <MemberLink memberId={member.id} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={member.id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${member.id}` }}>
                                 {member.name}
                               </MemberLink>
                               {member.phone && member.phone !== 'null' && member.phone !== 'NULL' && (
@@ -1798,10 +1798,10 @@ export const Dashboard = () => {
                         <div key={member.id} className="p-4 bg-red-50 rounded-lg border border-red-200 hover:shadow-lg transition-all">
                           <div className="flex items-start gap-3 mb-3">
                             <div className="flex-shrink-0 rounded-full ring-2 ring-red-400">
-                              <MemberAvatar member={member} size="md" />
+                              <MemberAvatar member={member} size="md" enableTransition />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <MemberLink memberId={member.id} className="font-semibold text-base hover:text-teal-600">
+                              <MemberLink memberId={member.id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${member.id}` }}>
                                 {member.name}
                               </MemberLink>
                               {member.phone && member.phone !== 'null' && member.phone !== 'NULL' && (
@@ -1878,11 +1878,11 @@ export const Dashboard = () => {
                         <div className="flex items-start gap-3 mb-3">
                           {/* Avatar with colored ring */}
                           <div className={`flex-shrink-0 rounded-full ring-2 ${config.ringColor}`}>
-                            <MemberAvatar member={{name: task.member_name, photo_url: task.member_photo_url}} size="md" />
+                            <MemberAvatar member={{id: task.member_id, name: task.member_name, photo_url: task.member_photo_url}} size="md" enableTransition />
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
-                            <MemberLink memberId={task.member_id} className="font-semibold text-base hover:text-teal-600">
+                            <MemberLink memberId={task.member_id} className="font-semibold text-base hover:text-teal-600" style={{ viewTransitionName: `member-name-${task.member_id}` }}>
                               {task.member_name}
                             </MemberLink>
                             {task.member_phone && task.member_phone !== 'null' && task.member_phone !== 'NULL' && (

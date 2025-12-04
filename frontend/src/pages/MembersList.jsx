@@ -539,8 +539,13 @@ export const MembersList = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <MemberAvatar member={member} size="sm" />
-                          <span className="font-medium">{member.name}</span>
+                          <MemberAvatar member={member} size="sm" enableTransition />
+                          <span
+                            className="font-medium"
+                            style={{ viewTransitionName: `member-name-${member.id}` }}
+                          >
+                            {member.name}
+                          </span>
                         </div>
                       </TableCell>
                       {/* Dynamic column cells based on visibility settings */}
