@@ -1310,13 +1310,15 @@ async def log_activity(
                 "care_event_id": care_event_id,
                 "event_type": event_type.value if event_type and hasattr(event_type, 'value') else event_type,
                 "notes": notes,
-                "timestamp": activity.timestamp.isoformat() if activity.timestamp else datetime.now(JAKARTA_TZ).isoformat()
+                "timestamp": activity.created_at.isoformat() if activity.created_at else datetime.now(JAKARTA_TZ).isoformat()
             }
             # Schedule broadcast without blocking (fire and forget)
             import asyncio
-            asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
+            logger.info(f"[SSE] Creating broadcast task for campus={campus_id}")
+            task = asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
+            logger.info(f"[SSE] Broadcast task created: {task}")
         except Exception as broadcast_err:
-            logger.debug(f"SSE broadcast skipped: {str(broadcast_err)}")
+            logger.warning(f"[SSE] broadcast skipped: {str(broadcast_err)}")
 
     except Exception as e:
         logger.error(f"Error logging activity: {str(e)}")
@@ -1325,14 +1327,16 @@ async def log_activity(
 
 async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
     """Safe wrapper for broadcasting that won't fail if broadcast_activity isn't defined yet"""
+    logger.info(f"[SSE] _broadcast_activity_safe called for campus={campus_id}")
     try:
         # broadcast_activity is defined later in the file, but will be available at runtime
         await broadcast_activity(campus_id, activity_data)
-    except NameError:
+        logger.info(f"[SSE] broadcast_activity completed")
+    except NameError as e:
         # broadcast_activity not yet defined during module load
-        pass
+        logger.warning(f"[SSE] NameError in broadcast: {str(e)}")
     except Exception as e:
-        logger.debug(f"SSE broadcast error: {str(e)}")
+        logger.warning(f"[SSE] broadcast error: {str(e)}")
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -9261,10 +9265,13 @@ _subscriber_lock = asyncio.Lock()
 async def broadcast_activity(campus_id: str, activity: dict):
     """Broadcast an activity event to all subscribers for a campus"""
     async with _subscriber_lock:
+        subscriber_count = len(_activity_subscribers.get(campus_id, set()))
+        logger.info(f"[SSE Broadcast] campus={campus_id}, subscribers={subscriber_count}, action={activity.get('action_type')}")
         if campus_id in _activity_subscribers:
             for queue in _activity_subscribers[campus_id]:
                 try:
                     queue.put_nowait(activity)
+                    logger.info(f"[SSE Broadcast] Queued activity for subscriber")
                 except asyncio.QueueFull:
                     # Drop oldest message if queue is full
                     try:
@@ -9280,6 +9287,7 @@ async def subscribe_to_activities(campus_id: str) -> Queue:
         if campus_id not in _activity_subscribers:
             _activity_subscribers[campus_id] = set()
         _activity_subscribers[campus_id].add(queue)
+        logger.info(f"[SSE Subscribe] campus={campus_id}, total_subscribers={len(_activity_subscribers[campus_id])}")
     return queue
 
 async def unsubscribe_from_activities(campus_id: str, queue: Queue):
@@ -9297,6 +9305,7 @@ def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
     async def _inner():
         try:
             # Send initial connection event
+            logger.info(f"[SSE Generator] Starting for campus={campus_id}, user={user_id}")
             yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
 
             # Send heartbeat every 30 seconds to keep connection alive
@@ -9307,20 +9316,26 @@ def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
                     # Wait for event with timeout for heartbeat
                     try:
                         activity = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                        logger.info(f"[SSE Generator] Got activity from queue: {activity.get('action_type')} by {activity.get('user_name')}")
 
                         # Don't send user's own activities back to them
                         if activity.get("user_id") != user_id:
                             event_data = json.dumps(activity, default=str)
+                            logger.info(f"[SSE Generator] Sending activity event to client")
                             yield f"event: activity\ndata: {event_data}\n\n"
+                        else:
+                            logger.info(f"[SSE Generator] Skipping own activity (user_id={user_id})")
 
                     except asyncio.TimeoutError:
                         # Send heartbeat
                         yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
 
                 except asyncio.CancelledError:
+                    logger.info(f"[SSE Generator] Cancelled")
                     break
 
         finally:
+            logger.info(f"[SSE Generator] Cleanup - unsubscribing")
             await unsubscribe_from_activities(campus_id, queue)
 
     return _inner()

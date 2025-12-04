@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import api from '@/lib/api';
 
 // Note: VITE_BACKEND_URL already points to the API subdomain (e.g., https://api.pastoral.gkbj.org)
 // No additional /api prefix needed - routes are at the root level
@@ -42,11 +43,17 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
   const reconnectTimeoutRef = useRef(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
 
+  // Debug: log auth state
+  console.log('[SSE] Hook called, token:', token ? 'present' : 'missing', 'enabled:', enabled, 'user:', user?.email);
+
   /**
    * Connect to SSE endpoint
    */
   const connect = useCallback(() => {
-    if (!token || !enabled) return;
+    if (!token || !enabled) {
+      console.log('[SSE] Not connecting:', { hasToken: !!token, enabled });
+      return;
+    }
 
     // Close existing connection
     if (eventSourceRef.current) {
@@ -62,10 +69,13 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
       // Note: EventSource doesn't support custom headers, so we use query param for auth
       // In production, consider using a fetch-based polyfill for SSE with headers
       const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(token)}`;
+      console.log('[SSE] Connecting to:', url.substring(0, 80) + '...');
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
+      console.log('[SSE] EventSource created, readyState:', eventSource.readyState);
 
       eventSource.onopen = () => {
+        console.log('[SSE] onopen fired, readyState:', eventSource.readyState);
         setIsConnected(true);
         setError(null);
         reconnectDelayRef.current = INITIAL_RECONNECT_DELAY; // Reset delay on successful connection
@@ -73,7 +83,7 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
       };
 
       eventSource.onerror = (e) => {
-        console.error('[SSE] Connection error:', e);
+        console.error('[SSE] Connection error:', e, 'readyState:', eventSource.readyState);
         setIsConnected(false);
         eventSource.close();
 
@@ -83,6 +93,11 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
 
         console.log(`[SSE] Reconnecting in ${delay}ms...`);
         reconnectTimeoutRef.current = setTimeout(connect, delay);
+      };
+
+      // Generic message handler for debugging
+      eventSource.onmessage = (e) => {
+        console.log('[SSE] Generic message received:', e.data);
       };
 
       // Handle connected event
@@ -144,13 +159,59 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
     setLastActivity(null);
   }, []);
 
-  // Connect on mount, disconnect on unmount
+  /**
+   * Load recent activities from API (for initial display)
+   */
+  const loadRecentActivities = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await api.get('/activity-logs', {
+        params: { limit: maxActivities }
+      });
+      const logs = response.data?.logs || [];
+      // Transform to match SSE activity format and filter own activities
+      const transformed = logs
+        .filter(log => log.user_id !== user?.id)
+        .map(log => ({
+          id: log.id,
+          campus_id: log.campus_id,
+          user_id: log.user_id,
+          user_name: log.user_name,
+          user_photo_url: log.user_photo_url,
+          action_type: log.action_type,
+          member_id: log.member_id,
+          member_name: log.member_name,
+          care_event_id: log.care_event_id,
+          event_type: log.event_type,
+          notes: log.notes,
+          timestamp: log.created_at
+        }));
+      setActivities(transformed);
+      console.log('[SSE] Loaded', transformed.length, 'recent activities');
+    } catch (err) {
+      console.error('[SSE] Failed to load recent activities:', err);
+    }
+  }, [token, maxActivities, user?.id]);
+
+  // Load recent activities on mount
   useEffect(() => {
     if (enabled && token) {
+      loadRecentActivities();
+    }
+  }, [enabled, token, loadRecentActivities]);
+
+  // Connect on mount, disconnect on unmount
+  useEffect(() => {
+    console.log('[SSE] useEffect running, enabled:', enabled, 'token:', token ? 'present' : 'missing');
+    if (enabled && token) {
+      console.log('[SSE] Calling connect()...');
       connect();
+    } else {
+      console.log('[SSE] NOT connecting - missing token or disabled');
     }
 
     return () => {
+      console.log('[SSE] Cleanup - disconnecting');
       disconnect();
     };
   }, [connect, disconnect, enabled, token]);
