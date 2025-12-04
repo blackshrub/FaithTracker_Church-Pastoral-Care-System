@@ -367,6 +367,7 @@
     "failed_to_save": "Failed to save data",
     "failed_to_send": "Failed to send message",
     "incorrect_credentials": "Incorrect email or password",
+    "title_required": "Title is required for financial aid",
     "aid_type_required": "Aid type is required",
     "aid_amount_required": "Aid amount must be a valid non-negative number"
   },

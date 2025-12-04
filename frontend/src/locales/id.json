@@ -365,6 +365,7 @@
     "failed_to_save": "Gagal menyimpan data",
     "failed_to_send": "Gagal mengirim pesan",
     "incorrect_credentials": "Email atau kata sandi salah",
+    "title_required": "Judul harus diisi untuk bantuan keuangan",
     "aid_type_required": "Jenis bantuan harus diisi",
     "aid_amount_required": "Jumlah bantuan harus angka yang valid dan tidak negatif"
   },

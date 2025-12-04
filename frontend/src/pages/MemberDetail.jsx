@@ -199,6 +199,11 @@ export const MemberDetail = () => {
     try {
       if (newEvent.event_type === 'financial_aid') {
         // Validate financial aid fields
+        if (!newEvent.title || newEvent.title.trim() === '') {
+          toast.error(t('error_messages.title_required'));
+          setSaving(false);
+          return;
+        }
         if (!newEvent.aid_type) {
           toast.error(t('error_messages.aid_type_required'));
           setSaving(false);

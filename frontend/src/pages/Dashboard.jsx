@@ -337,6 +337,10 @@ export const Dashboard = () => {
     // Validate financial aid fields before proceeding
     let aidAmount = null;
     if (quickEvent.event_type === 'financial_aid') {
+      if (!quickEvent.title || quickEvent.title.trim() === '') {
+        toast.error(t('error_messages.title_required'));
+        return;
+      }
       if (!quickEvent.aid_type) {
         toast.error(t('error_messages.aid_type_required'));
         return;
