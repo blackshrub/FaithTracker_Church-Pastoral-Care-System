@@ -111,12 +111,6 @@ export function LiveActivityFeed({ maxItems = 10, className }) {
   const { t } = useTranslation();
   const [newActivityIds, setNewActivityIds] = useState(new Set());
 
-  // Debug: log when component mounts
-  React.useEffect(() => {
-    console.log('[LiveActivityFeed] Component mounted');
-    return () => console.log('[LiveActivityFeed] Component unmounted');
-  }, []);
-
   const { isConnected, activities, error } = useActivityStream({
     enabled: true,
     maxActivities: maxItems,

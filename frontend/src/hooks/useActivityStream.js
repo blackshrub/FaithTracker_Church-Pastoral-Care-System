@@ -43,17 +43,11 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
   const reconnectTimeoutRef = useRef(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
 
-  // Debug: log auth state
-  console.log('[SSE] Hook called, token:', token ? 'present' : 'missing', 'enabled:', enabled, 'user:', user?.email);
-
   /**
    * Connect to SSE endpoint
    */
   const connect = useCallback(() => {
-    if (!token || !enabled) {
-      console.log('[SSE] Not connecting:', { hasToken: !!token, enabled });
-      return;
-    }
+    if (!token || !enabled) return;
 
     // Close existing connection
     if (eventSourceRef.current) {
@@ -67,49 +61,29 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
 
     try {
       // Note: EventSource doesn't support custom headers, so we use query param for auth
-      // In production, consider using a fetch-based polyfill for SSE with headers
       const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(token)}`;
-      console.log('[SSE] Connecting to:', url.substring(0, 80) + '...');
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
-      console.log('[SSE] EventSource created, readyState:', eventSource.readyState);
 
       eventSource.onopen = () => {
-        console.log('[SSE] onopen fired, readyState:', eventSource.readyState);
         setIsConnected(true);
         setError(null);
-        reconnectDelayRef.current = INITIAL_RECONNECT_DELAY; // Reset delay on successful connection
-        console.log('[SSE] Connected to activity stream');
+        reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
       };
 
-      eventSource.onerror = (e) => {
-        console.error('[SSE] Connection error:', e, 'readyState:', eventSource.readyState);
+      eventSource.onerror = () => {
         setIsConnected(false);
         eventSource.close();
 
         // Schedule reconnect with exponential backoff
         const delay = reconnectDelayRef.current;
         reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_DELAY);
-
-        console.log(`[SSE] Reconnecting in ${delay}ms...`);
         reconnectTimeoutRef.current = setTimeout(connect, delay);
       };
 
-      // Generic message handler for debugging
-      eventSource.onmessage = (e) => {
-        console.log('[SSE] Generic message received:', e.data);
-      };
-
-      // Handle connected event
-      eventSource.addEventListener('connected', (e) => {
-        const data = JSON.parse(e.data);
-        console.log('[SSE] Connected event:', data);
-      });
-
-      // Handle heartbeat
-      eventSource.addEventListener('heartbeat', (e) => {
-        // Heartbeat received, connection is alive
-        console.debug('[SSE] Heartbeat received');
+      // Handle heartbeat (keep-alive)
+      eventSource.addEventListener('heartbeat', () => {
+        // Connection is alive
       });
 
       // Handle activity events
@@ -159,20 +133,20 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
     setLastActivity(null);
   }, []);
 
-  /**
-   * Load recent activities from API (for initial display)
-   */
-  const loadRecentActivities = useCallback(async () => {
-    if (!token) return;
-    try {
-      const response = await api.get('/activity-logs', {
-        params: { limit: maxActivities }
-      });
-      const logs = response.data?.logs || [];
-      // Transform to match SSE activity format and filter own activities
-      const transformed = logs
-        .filter(log => log.user_id !== user?.id)
-        .map(log => ({
+  // Load recent activities when component mounts and token is available
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (!enabled || !token) return;
+      try {
+        const response = await api.get('/activity-logs', { params: { limit: maxActivities } });
+        if (cancelled) return;
+        // API returns array directly, not {logs: [...]}
+        const logs = Array.isArray(response.data) ? response.data : (response.data?.logs || []);
+        // Show ALL recent activities (including own) for initial display
+        // Only real-time SSE filters out own activities
+        const transformed = logs.map(log => ({
           id: log.id,
           campus_id: log.campus_id,
           user_id: log.user_id,
@@ -186,34 +160,22 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
           notes: log.notes,
           timestamp: log.created_at
         }));
-      setActivities(transformed);
-      console.log('[SSE] Loaded', transformed.length, 'recent activities');
-    } catch (err) {
-      console.error('[SSE] Failed to load recent activities:', err);
-    }
-  }, [token, maxActivities, user?.id]);
+        setActivities(transformed);
+      } catch (err) {
+        // Silently fail - activity feed is optional
+      }
+    };
 
-  // Load recent activities on mount
-  useEffect(() => {
-    if (enabled && token) {
-      loadRecentActivities();
-    }
-  }, [enabled, token, loadRecentActivities]);
+    load();
+    return () => { cancelled = true; };
+  }, [enabled, token, maxActivities]);
 
   // Connect on mount, disconnect on unmount
   useEffect(() => {
-    console.log('[SSE] useEffect running, enabled:', enabled, 'token:', token ? 'present' : 'missing');
     if (enabled && token) {
-      console.log('[SSE] Calling connect()...');
       connect();
-    } else {
-      console.log('[SSE] NOT connecting - missing token or disabled');
     }
-
-    return () => {
-      console.log('[SSE] Cleanup - disconnecting');
-      disconnect();
-    };
+    return () => disconnect();
   }, [connect, disconnect, enabled, token]);
 
   return {
