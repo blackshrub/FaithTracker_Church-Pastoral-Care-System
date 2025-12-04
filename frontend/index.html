@@ -52,6 +52,39 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="GKBJ Care">
         <title>FaithTracker Pastoral Care System</title>
+
+        <!-- Speculation Rules API - Browser prefetches likely navigation targets -->
+        <!-- Reduces perceived latency by 50-200ms for predicted navigations -->
+        <script type="speculationrules">
+        {
+            "prefetch": [
+                {
+                    "source": "document",
+                    "where": {
+                        "and": [
+                            { "href_matches": "/*" },
+                            { "not": { "href_matches": "/api/*" } },
+                            { "not": { "href_matches": "*.pdf" } },
+                            { "not": { "selector_matches": "[data-no-prefetch]" } }
+                        ]
+                    },
+                    "eagerness": "moderate"
+                }
+            ],
+            "prerender": [
+                {
+                    "source": "document",
+                    "where": {
+                        "or": [
+                            { "href_matches": "/dashboard" },
+                            { "href_matches": "/members" }
+                        ]
+                    },
+                    "eagerness": "conservative"
+                }
+            ]
+        }
+        </script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>

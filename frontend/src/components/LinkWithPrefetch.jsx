@@ -4,6 +4,11 @@
  * Wraps React Router's Link to automatically prefetch data
  * when user hovers over the link. Makes navigation feel instant.
  *
+ * Features:
+ * - Automatic data prefetching on hover
+ * - View Transitions API for smooth page animations
+ * - Graceful degradation on older browsers
+ *
  * Usage:
  * <LinkWithPrefetch to={`/members/${id}`} prefetchType="member" prefetchId={id}>
  *   View Member
@@ -11,15 +16,21 @@
  */
 
 import React, { useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePrefetch } from '@/hooks/usePrefetch';
 
 /**
- * Enhanced Link with automatic data prefetching
+ * Check if View Transitions API is supported
+ */
+const supportsViewTransitions = typeof document !== 'undefined' && 'startViewTransition' in document;
+
+/**
+ * Enhanced Link with automatic data prefetching and View Transitions
  *
  * @param {string} to - Route path
  * @param {string} prefetchType - Type of data to prefetch: 'member' | 'dashboard' | 'membersList'
  * @param {string} prefetchId - ID to pass to prefetch function (for member)
+ * @param {boolean} useViewTransition - Enable View Transitions API (default: true)
  * @param {React.ReactNode} children - Link content
  * @param {object} props - Additional props passed to Link
  */
@@ -27,10 +38,12 @@ export function LinkWithPrefetch({
   to,
   prefetchType,
   prefetchId,
+  useViewTransition = true,
   children,
   className,
   ...props
 }) {
+  const navigate = useNavigate();
   const { prefetchMember, prefetchDashboard, prefetchMembersList, cancelPrefetch } = usePrefetch();
 
   const handleMouseEnter = useCallback(() => {
@@ -61,6 +74,25 @@ export function LinkWithPrefetch({
     cancelPrefetch();
   }, [cancelPrefetch]);
 
+  /**
+   * Handle click with View Transitions API
+   * Creates smooth morphing animation between pages
+   */
+  const handleClick = useCallback((e) => {
+    // Only use View Transitions for same-origin navigation
+    if (!useViewTransition || !supportsViewTransitions) {
+      return; // Let Link handle normally
+    }
+
+    // Prevent default link behavior
+    e.preventDefault();
+
+    // Start view transition, then navigate
+    document.startViewTransition(() => {
+      navigate(to);
+    });
+  }, [to, useViewTransition, navigate]);
+
   return (
     <Link
       to={to}
@@ -69,6 +101,7 @@ export function LinkWithPrefetch({
       onMouseLeave={handleMouseLeave}
       onFocus={handleMouseEnter}
       onBlur={handleMouseLeave}
+      onClick={handleClick}
       {...props}
     >
       {children}

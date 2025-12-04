@@ -23,3 +23,97 @@
     transform: rotate(360deg);
   }
 }
+
+/* ============================================
+   VIEW TRANSITIONS API - Smooth Page Navigation
+   ============================================ */
+
+/* Default crossfade transition for all pages */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+/* Fade out old page */
+::view-transition-old(root) {
+  animation-name: fade-out;
+}
+
+/* Fade in new page with slight slide */
+::view-transition-new(root) {
+  animation-name: fade-in-slide;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes fade-in-slide {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Member avatar transition - morphs between list and detail views */
+.member-avatar-transition {
+  view-transition-name: member-avatar;
+}
+
+::view-transition-old(member-avatar),
+::view-transition-new(member-avatar) {
+  animation-duration: 250ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Member name transition - morphs between views */
+.member-name-transition {
+  view-transition-name: member-name;
+}
+
+::view-transition-old(member-name),
+::view-transition-new(member-name) {
+  animation-duration: 250ms;
+}
+
+/* Task card transition - morphs from dashboard to member detail */
+.task-card-transition {
+  view-transition-name: task-card;
+}
+
+::view-transition-old(task-card),
+::view-transition-new(task-card) {
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+/* Page header transition */
+.page-header-transition {
+  view-transition-name: page-header;
+}
+
+::view-transition-old(page-header),
+::view-transition-new(page-header) {
+  animation-duration: 150ms;
+}
+
+/* Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

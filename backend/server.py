@@ -1278,7 +1278,7 @@ async def log_activity(
     notes: Optional[str] = None,
     user_photo_url: Optional[str] = None
 ):
-    """Log user activity for accountability tracking"""
+    """Log user activity for accountability tracking and broadcast to SSE subscribers"""
     try:
         activity = ActivityLog(
             campus_id=campus_id,
@@ -1294,10 +1294,45 @@ async def log_activity(
         )
         await db.activity_logs.insert_one(to_mongo_doc(activity))
         logger.info(f"Activity logged: {user_name} - {action_type} - {member_name}")
+
+        # Broadcast to SSE subscribers for real-time updates
+        # Import here to avoid circular import at module level
+        try:
+            activity_data = {
+                "id": activity.id,
+                "campus_id": campus_id,
+                "user_id": user_id,
+                "user_name": user_name,
+                "user_photo_url": user_photo_url,
+                "action_type": action_type.value if hasattr(action_type, 'value') else action_type,
+                "member_id": member_id,
+                "member_name": member_name,
+                "care_event_id": care_event_id,
+                "event_type": event_type.value if event_type and hasattr(event_type, 'value') else event_type,
+                "notes": notes,
+                "timestamp": activity.timestamp.isoformat() if activity.timestamp else datetime.now(JAKARTA_TZ).isoformat()
+            }
+            # Schedule broadcast without blocking (fire and forget)
+            import asyncio
+            asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
+        except Exception as broadcast_err:
+            logger.debug(f"SSE broadcast skipped: {str(broadcast_err)}")
+
     except Exception as e:
         logger.error(f"Error logging activity: {str(e)}")
         # Don't fail the main operation if logging fails
         pass
+
+async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
+    """Safe wrapper for broadcasting that won't fail if broadcast_activity isn't defined yet"""
+    try:
+        # broadcast_activity is defined later in the file, but will be available at runtime
+        await broadcast_activity(campus_id, activity_data)
+    except NameError:
+        # broadcast_activity not yet defined during module load
+        pass
+    except Exception as e:
+        logger.debug(f"SSE broadcast error: {str(e)}")
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -3568,6 +3603,230 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
         raise
     except Exception as e:
         logger.error(f"Error completing care event: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+# ==================== BULK CARE EVENT OPERATIONS ====================
+
+class BulkEventIds(msgspec.Struct):
+    """Request body for bulk operations"""
+    event_ids: List[str]
+
+@post("/care-events/bulk-complete")
+async def bulk_complete_care_events(request: Request, data: BulkEventIds) -> dict:
+    """
+    Mark multiple care events as completed in a single operation.
+
+    Significantly faster than individual completions for batch processing.
+    Returns count of successfully completed events.
+    """
+    current_user = await get_current_user(request)
+    try:
+        event_ids = data.event_ids
+        if not event_ids:
+            raise HTTPException(status_code=400, detail="No event IDs provided")
+
+        if len(event_ids) > 100:
+            raise HTTPException(status_code=400, detail="Maximum 100 events per bulk operation")
+
+        # Build query with campus filter for multi-tenancy
+        query = {"id": {"$in": event_ids}, "completed": {"$ne": True}}
+        campus_filter = get_campus_filter(current_user)
+        if campus_filter:
+            query.update(campus_filter)
+
+        # Get events to process (for logging)
+        events = await db.care_events.find(query, {"_id": 0}).to_list(None)
+        if not events:
+            return {"success": True, "completed_count": 0, "message": "No pending events found"}
+
+        # Bulk update
+        now = datetime.now(timezone.utc)
+        result = await db.care_events.update_many(
+            query,
+            {"$set": {
+                "completed": True,
+                "completed_at": now,
+                "completed_by_user_id": current_user["id"],
+                "completed_by_user_name": current_user["name"],
+                "updated_at": now
+            }}
+        )
+
+        # Log activity for each completed event (batch)
+        for event in events:
+            member = await db.members.find_one({"id": event["member_id"]}, {"name": 1, "_id": 0})
+            member_name = member["name"] if member else "Unknown"
+            await log_activity(
+                campus_id=event["campus_id"],
+                user_id=current_user["id"],
+                user_name=current_user["name"],
+                action_type=ActivityActionType.COMPLETE_TASK,
+                member_id=event["member_id"],
+                member_name=member_name,
+                care_event_id=event["id"],
+                event_type=EventType(event["event_type"]) if event.get("event_type") else None,
+                notes=f"Bulk completed {event.get('event_type', 'care')} task",
+                user_photo_url=current_user.get("photo_url")
+            )
+
+        # Update engagement status for affected members
+        member_ids = list(set(e["member_id"] for e in events))
+        for member_id in member_ids:
+            await db.members.update_one(
+                {"id": member_id},
+                {"$set": {
+                    "last_contact_date": now,
+                    "updated_at": now
+                }}
+            )
+
+        logger.info(f"Bulk completed {result.modified_count} care events by {current_user['name']}")
+        return {
+            "success": True,
+            "completed_count": result.modified_count,
+            "message": f"Successfully completed {result.modified_count} care events"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk complete: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+@post("/care-events/bulk-ignore")
+async def bulk_ignore_care_events(request: Request, data: BulkEventIds) -> dict:
+    """
+    Mark multiple care events as ignored in a single operation.
+
+    Useful for batch dismissing irrelevant or outdated events.
+    Returns count of successfully ignored events.
+    """
+    current_user = await get_current_user(request)
+    try:
+        event_ids = data.event_ids
+        if not event_ids:
+            raise HTTPException(status_code=400, detail="No event IDs provided")
+
+        if len(event_ids) > 100:
+            raise HTTPException(status_code=400, detail="Maximum 100 events per bulk operation")
+
+        # Build query with campus filter
+        query = {"id": {"$in": event_ids}, "ignored": {"$ne": True}}
+        campus_filter = get_campus_filter(current_user)
+        if campus_filter:
+            query.update(campus_filter)
+
+        # Get events to process (for logging)
+        events = await db.care_events.find(query, {"_id": 0}).to_list(None)
+        if not events:
+            return {"success": True, "ignored_count": 0, "message": "No pending events found"}
+
+        # Bulk update
+        now = datetime.now(timezone.utc)
+        result = await db.care_events.update_many(
+            query,
+            {"$set": {
+                "ignored": True,
+                "ignored_at": now,
+                "ignored_by_user_id": current_user["id"],
+                "ignored_by_user_name": current_user["name"],
+                "updated_at": now
+            }}
+        )
+
+        # Log activity for each ignored event
+        for event in events:
+            member = await db.members.find_one({"id": event["member_id"]}, {"name": 1, "_id": 0})
+            member_name = member["name"] if member else "Unknown"
+            await log_activity(
+                campus_id=event["campus_id"],
+                user_id=current_user["id"],
+                user_name=current_user["name"],
+                action_type=ActivityActionType.IGNORE_TASK,
+                member_id=event["member_id"],
+                member_name=member_name,
+                care_event_id=event["id"],
+                event_type=EventType(event["event_type"]) if event.get("event_type") else None,
+                notes=f"Bulk ignored {event.get('event_type', 'care')} task",
+                user_photo_url=current_user.get("photo_url")
+            )
+
+        logger.info(f"Bulk ignored {result.modified_count} care events by {current_user['name']}")
+        return {
+            "success": True,
+            "ignored_count": result.modified_count,
+            "message": f"Successfully ignored {result.modified_count} care events"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk ignore: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+@post("/care-events/bulk-delete")
+async def bulk_delete_care_events(request: Request, data: BulkEventIds) -> dict:
+    """
+    Delete multiple care events in a single operation.
+
+    WARNING: This is a destructive operation. Events cannot be recovered.
+    Returns count of successfully deleted events.
+    """
+    current_user = await get_current_user(request)
+    try:
+        event_ids = data.event_ids
+        if not event_ids:
+            raise HTTPException(status_code=400, detail="No event IDs provided")
+
+        if len(event_ids) > 50:
+            raise HTTPException(status_code=400, detail="Maximum 50 events per bulk delete")
+
+        # Build query with campus filter
+        query = {"id": {"$in": event_ids}}
+        campus_filter = get_campus_filter(current_user)
+        if campus_filter:
+            query.update(campus_filter)
+
+        # Get events to process (for logging and cleanup)
+        events = await db.care_events.find(query, {"_id": 0}).to_list(None)
+        if not events:
+            return {"success": True, "deleted_count": 0, "message": "No events found"}
+
+        # Delete the events
+        result = await db.care_events.delete_many(query)
+
+        # Clean up related data and log activity
+        for event in events:
+            # Delete related activity logs
+            await db.activity_logs.delete_many({"care_event_id": event["id"]})
+
+            # Log the deletion
+            member = await db.members.find_one({"id": event["member_id"]}, {"name": 1, "_id": 0})
+            member_name = member["name"] if member else "Unknown"
+            await log_activity(
+                campus_id=event["campus_id"],
+                user_id=current_user["id"],
+                user_name=current_user["name"],
+                action_type=ActivityActionType.DELETE_EVENT,
+                member_id=event["member_id"],
+                member_name=member_name,
+                care_event_id=event["id"],
+                event_type=EventType(event["event_type"]) if event.get("event_type") else None,
+                notes=f"Bulk deleted {event.get('event_type', 'care')} event",
+                user_photo_url=current_user.get("photo_url")
+            )
+
+        logger.info(f"Bulk deleted {result.deleted_count} care events by {current_user['name']}")
+        return {
+            "success": True,
+            "deleted_count": result.deleted_count,
+            "message": f"Successfully deleted {result.deleted_count} care events"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk delete: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @post("/care-events/{event_id:str}/send-reminder")
@@ -8987,6 +9246,121 @@ async def get_activity_summary(request: Request) -> dict:
     except Exception as e:
         logger.error(f"Error fetching activity summary: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+# ==================== SSE REAL-TIME ACTIVITY STREAM ====================
+
+# In-memory event subscribers (keyed by campus_id)
+# Each subscriber is an asyncio.Queue that receives activity events
+from asyncio import Queue
+from typing import Dict, Set
+import asyncio
+
+_activity_subscribers: Dict[str, Set[Queue]] = {}
+_subscriber_lock = asyncio.Lock()
+
+async def broadcast_activity(campus_id: str, activity: dict):
+    """Broadcast an activity event to all subscribers for a campus"""
+    async with _subscriber_lock:
+        if campus_id in _activity_subscribers:
+            for queue in _activity_subscribers[campus_id]:
+                try:
+                    queue.put_nowait(activity)
+                except asyncio.QueueFull:
+                    # Drop oldest message if queue is full
+                    try:
+                        queue.get_nowait()
+                        queue.put_nowait(activity)
+                    except:
+                        pass
+
+async def subscribe_to_activities(campus_id: str) -> Queue:
+    """Subscribe to activity events for a campus"""
+    queue: Queue = Queue(maxsize=100)
+    async with _subscriber_lock:
+        if campus_id not in _activity_subscribers:
+            _activity_subscribers[campus_id] = set()
+        _activity_subscribers[campus_id].add(queue)
+    return queue
+
+async def unsubscribe_from_activities(campus_id: str, queue: Queue):
+    """Unsubscribe from activity events"""
+    async with _subscriber_lock:
+        if campus_id in _activity_subscribers:
+            _activity_subscribers[campus_id].discard(queue)
+            if not _activity_subscribers[campus_id]:
+                del _activity_subscribers[campus_id]
+
+async def activity_event_generator(campus_id: str, user_id: str):
+    """Generate SSE events for activity stream"""
+    queue = await subscribe_to_activities(campus_id)
+    try:
+        # Send initial connection event
+        yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
+
+        # Send heartbeat every 30 seconds to keep connection alive
+        heartbeat_interval = 30
+        last_heartbeat = asyncio.get_event_loop().time()
+
+        while True:
+            try:
+                # Wait for event with timeout for heartbeat
+                try:
+                    activity = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+
+                    # Don't send user's own activities back to them
+                    if activity.get("user_id") != user_id:
+                        event_data = json.dumps(activity, default=str)
+                        yield f"event: activity\ndata: {event_data}\n\n"
+
+                except asyncio.TimeoutError:
+                    # Send heartbeat
+                    yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
+
+            except asyncio.CancelledError:
+                break
+
+    finally:
+        await unsubscribe_from_activities(campus_id, queue)
+
+@get("/stream/activity")
+async def stream_activity(request: Request) -> Stream:
+    """
+    Server-Sent Events endpoint for real-time activity updates.
+
+    Streams activity events (task completions, new events, etc.) to connected clients.
+    Events are scoped by campus_id for multi-tenant isolation.
+
+    Usage (JavaScript):
+    ```js
+    const eventSource = new EventSource('/api/stream/activity', {
+      headers: { 'Authorization': 'Bearer <token>' }
+    });
+
+    eventSource.addEventListener('activity', (e) => {
+      const activity = JSON.parse(e.data);
+      console.log('New activity:', activity);
+    });
+    ```
+    """
+    try:
+        current_user = await get_current_user(request)
+        campus_id = current_user.get("campus_id") or "global"
+        user_id = current_user.get("id", "")
+
+        return Stream(
+            activity_event_generator(campus_id, user_id),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable nginx buffering
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error starting activity stream: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 # ==================== HEALTH CHECK ENDPOINTS ====================
 
 @get("/health")
@@ -9157,6 +9531,10 @@ route_handlers = [
     add_visitation_log,
     log_additional_visit,
     get_hospital_followup_due,
+    # Bulk care event operations
+    bulk_complete_care_events,
+    bulk_ignore_care_events,
+    bulk_delete_care_events,
     # Grief support endpoints
     list_grief_support,
     get_member_grief_timeline,
@@ -9258,6 +9636,8 @@ route_handlers = [
     # Activity log endpoints
     get_activity_logs,
     get_activity_summary,
+    # Real-time SSE stream
+    stream_activity,
 ]
 
 # Rate limiting configuration
