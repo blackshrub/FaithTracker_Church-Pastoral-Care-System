@@ -7,12 +7,13 @@
  * - Today (Dashboard)
  * - Members
  * - Tasks
+ * - Analytics
  * - Profile
  */
 
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Home, Users, CheckSquare, User } from 'lucide-react-native';
+import { Home, Users, CheckSquare, BarChart3, User } from 'lucide-react-native';
 
 import { AnimatedTabBar } from '@/components/ui/AnimatedTabBar';
 import { colors } from '@/constants/theme';
@@ -55,6 +56,15 @@ export default function TabsLayout() {
           title: t('tasks.title'),
           tabBarIcon: ({ color, size }) => (
             <CheckSquare size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: t('analytics.title', 'Analytics'),
+          tabBarIcon: ({ color, size }) => (
+            <BarChart3 size={size} color={color} />
           ),
         }}
       />
