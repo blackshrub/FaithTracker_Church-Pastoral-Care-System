@@ -90,16 +90,18 @@ async def second_campus(test_db):
 @pytest.fixture
 async def test_admin_user(test_db, test_campus):
     """Create admin user for testing"""
-    from passlib.context import CryptContext
+    import bcrypt
 
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    def hash_password(password: str) -> str:
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
     user_id = str(uuid.uuid4())
 
     user = {
         "id": user_id,
         "name": "Test Admin",
         "email": "admin@test.com",
-        "password": pwd_context.hash("testpass123"),
+        "password": hash_password("testpass123"),
         "phone": "+6281234567890",
         "campus_id": test_campus["id"],
         "role": "full_admin",
@@ -113,16 +115,18 @@ async def test_admin_user(test_db, test_campus):
 @pytest.fixture
 async def test_pastor_user(test_db, test_campus):
     """Create pastor user for testing"""
-    from passlib.context import CryptContext
+    import bcrypt
 
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    def hash_password(password: str) -> str:
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
     user_id = str(uuid.uuid4())
 
     user = {
         "id": user_id,
         "name": "Test Pastor",
         "email": "pastor@test.com",
-        "password": pwd_context.hash("testpass123"),
+        "password": hash_password("testpass123"),
         "phone": "+6281234567891",
         "campus_id": test_campus["id"],
         "role": "pastor",

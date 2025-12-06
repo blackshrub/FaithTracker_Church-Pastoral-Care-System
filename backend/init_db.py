@@ -10,7 +10,7 @@ import sys
 import os
 from datetime import datetime, timezone
 from motor.motor_asyncio import AsyncIOMotorClient
-from passlib.context import CryptContext
+import bcrypt
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -18,8 +18,10 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing helper
+def get_password_hash(password: str) -> str:
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 # Colors for beautiful output
 GREEN = '\033[0;32m'
@@ -144,7 +146,7 @@ async def create_admin_user(db, email, password, name="Administrator"):
     user = {
         "id": str(uuid.uuid4()),  # Required: unique user ID for JWT tokens
         "email": email,
-        "hashed_password": pwd_context.hash(password),  # Must match server.py field name
+        "hashed_password": get_password_hash(password),  # Must match server.py field name
         "name": name,
         "phone": "",  # Required: phone field (can be empty)
         "role": "full_admin",
