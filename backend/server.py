@@ -694,21 +694,16 @@ def validate_phone(phone: str) -> bool:
     return bool(PHONE_PATTERN.match(cleaned))
 
 # Password strength constants
-PASSWORD_MIN_LENGTH = 12
+PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 128
 
 def validate_password_strength(password: str) -> tuple[bool, str]:
     """
-    Validate password strength with comprehensive security checks.
+    Validate password with basic length requirements.
 
     Requirements:
-    - Minimum 12 characters (NIST SP 800-63B recommendation)
+    - Minimum 8 characters
     - Maximum 128 characters (prevent DoS via bcrypt)
-    - At least one uppercase letter
-    - At least one lowercase letter
-    - At least one digit
-    - At least one special character
-    - No common passwords
 
     Returns:
         (is_valid, error_message)
@@ -721,29 +716,6 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
 
     if len(password) > PASSWORD_MAX_LENGTH:
         return False, f"Password must be at most {PASSWORD_MAX_LENGTH} characters"
-
-    if not re.search(r'[A-Z]', password):
-        return False, "Password must contain at least one uppercase letter"
-
-    if not re.search(r'[a-z]', password):
-        return False, "Password must contain at least one lowercase letter"
-
-    if not re.search(r'\d', password):
-        return False, "Password must contain at least one digit"
-
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;\'`~]', password):
-        return False, "Password must contain at least one special character"
-
-    # Check for common weak passwords (case-insensitive)
-    common_passwords = {
-        'password123', 'password1234', 'password12345',
-        'admin123456', 'adminpassword',
-        '123456789012', 'qwerty123456',
-        'letmein12345', 'welcome12345',
-        'changeme1234', 'password!123'
-    }
-    if password.lower() in common_passwords:
-        return False, "Password is too common. Please choose a stronger password."
 
     return True, ""
 
@@ -1118,7 +1090,7 @@ class FinancialAidSchedule(Struct):
 # User Authentication Models
 class UserCreate(Struct):
     email: str  # Email validation handled at route level
-    password: Annotated[str, msgspec.Meta(min_length=12, max_length=128)]  # 12 char min (NIST SP 800-63B)
+    password: Annotated[str, msgspec.Meta(min_length=8, max_length=128)]
     name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
     phone: Annotated[str, msgspec.Meta(max_length=20)]  # Pastoral team member's phone for receiving reminders
     role: UserRole = UserRole.PASTOR
