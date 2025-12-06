@@ -172,6 +172,7 @@ services:
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Authorization,Content-Type,X-Requested-With,Cache-Control,Pragma"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://${DOMAIN}"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=86400"
       - "traefik.http.middlewares.backend-cors.headers.addvaryheader=true"
       # Auth-specific router with stricter rate limiting
