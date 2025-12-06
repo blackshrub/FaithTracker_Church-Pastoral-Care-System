@@ -273,6 +273,7 @@ services:
 # ===================
 networks:
   faithtracker-network:
+    name: faithtracker-network
     driver: bridge
 
 # ===================
