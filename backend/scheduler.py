@@ -377,6 +377,9 @@ async def member_reconciliation_job():
     try:
         logger.info("🔄 Starting daily member reconciliation...")
 
+        # Import the shared sync function from server
+        from server import perform_member_sync_for_campus
+
         # Get all campuses with sync enabled and reconciliation enabled
         sync_configs = await db.sync_configs.find({
             "is_enabled": True,
@@ -387,31 +390,36 @@ async def member_reconciliation_job():
             logger.info("No campuses configured for reconciliation")
             return
 
+        total_synced = 0
+        total_errors = 0
+
         for config in sync_configs:
             try:
                 campus_id = config["campus_id"]
-                logger.info(f"Reconciling campus: {campus_id}")
+                logger.info(f"🔄 Reconciling campus: {campus_id}")
 
-                # Create reconciliation sync log
-                sync_log_id = str(uuid.uuid4())
-                await db.sync_logs.insert_one({
-                    "id": sync_log_id,
-                    "campus_id": campus_id,
-                    "sync_type": "reconciliation",
-                    "status": "in_progress",
-                    "started_at": datetime.now(timezone.utc).isoformat()
-                })
+                # Call the shared sync function
+                result = await perform_member_sync_for_campus(campus_id, sync_type="reconciliation")
 
-                # Note: The actual sync logic would be called here
-                # For now, we trigger it via internal API call
-                # In production, refactor sync logic into a shared function
-
-                logger.info(f"✓ Reconciliation completed for campus {campus_id}")
+                if result.get("success"):
+                    stats = result.get("stats", {})
+                    logger.info(
+                        f"✅ Campus {campus_id}: "
+                        f"fetched={stats.get('fetched', 0)}, "
+                        f"created={stats.get('created', 0)}, "
+                        f"updated={stats.get('updated', 0)}, "
+                        f"matched_by_name={stats.get('matched_by_name_phone', 0) + stats.get('matched_by_name_only', 0)}"
+                    )
+                    total_synced += stats.get('fetched', 0)
+                else:
+                    logger.error(f"❌ Campus {campus_id} sync failed: {result.get('error')}")
+                    total_errors += 1
 
             except Exception as campus_error:
-                logger.error(f"Error reconciling campus {config.get('campus_id')}: {str(campus_error)}")
+                logger.error(f"❌ Error reconciling campus {config.get('campus_id')}: {str(campus_error)}")
+                total_errors += 1
 
-        logger.info("✅ Daily reconciliation complete")
+        logger.info(f"✅ Daily reconciliation complete: {total_synced} members synced, {total_errors} errors")
 
     except Exception as e:
         logger.error(f"Error in reconciliation job: {str(e)}")

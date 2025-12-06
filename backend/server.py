@@ -8251,415 +8251,454 @@ async def test_sync_connection(config: SyncConfigCreate, request: Request) -> di
             "message": f"Connection error: {str(e)}"
         }
 
+async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manual") -> dict:
+    """
+    Core member sync logic - can be called from API endpoint or scheduler.
+
+    Args:
+        campus_id: The campus to sync members for
+        sync_type: Type of sync ("manual", "polling", "reconciliation")
+
+    Returns:
+        dict with success status, stats, and duration
+    """
+    import httpx
+
+    # Get sync config
+    config = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
+    if not config or not config.get("is_enabled"):
+        return {"success": False, "error": "Sync is not configured or enabled for this campus"}
+
+    # Create sync log
+    sync_log = SyncLog(
+        campus_id=campus_id,
+        sync_type=sync_type,
+        status="in_progress"
+    )
+    await db.sync_logs.insert_one(to_mongo_doc(sync_log))
+    sync_log_id = sync_log.id
+
+    start_time = datetime.now(timezone.utc)
+
+    try:
+        # Get api_path_prefix with fallback for existing configs
+        api_path_prefix = config.get('api_path_prefix', '/api')
+        base_url = config['api_base_url'].rstrip('/')
+
+        # Login to core API
+        decrypted_pwd = decrypt_password(config["api_password"])
+        if not decrypted_pwd:
+            raise Exception("Failed to decrypt API password")
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            login_response = await client.post(
+                f"{base_url}{api_path_prefix}/auth/login",
+                json={"email": config["api_email"], "password": decrypted_pwd}
+            )
+
+            if login_response.status_code != 200:
+                raise Exception(f"Login failed: {login_response.text}")
+
+            token = login_response.json().get("access_token")
+
+            # Fetch ALL members using pagination
+            all_members = []
+            page_size = 100
+            offset = 0
+
+            while True:
+                members_response = await client.get(
+                    f"{base_url}{api_path_prefix}/members/?limit={page_size}&skip={offset}",
+                    headers={"Authorization": f"Bearer {token}"}
+                )
+
+                if members_response.status_code != 200:
+                    if members_response.status_code == 500:
+                        raise Exception(f"External API server error (500). The FaithFlow server ({base_url}) is experiencing issues.")
+                    elif members_response.status_code == 401:
+                        raise Exception("Authentication expired. Please check your API credentials.")
+                    elif members_response.status_code == 403:
+                        raise Exception("Access denied. Your API account may not have permission to access member data.")
+                    else:
+                        raise Exception(f"Failed to fetch members (HTTP {members_response.status_code}): {members_response.text}")
+
+                batch = members_response.json()
+
+                # Handle both array response and paginated response
+                if isinstance(batch, dict) and 'data' in batch:
+                    batch_members = batch['data']
+                    all_members.extend(batch_members)
+                    pagination = batch.get('pagination', {})
+                    if not pagination.get('has_more', False):
+                        break
+                elif isinstance(batch, list):
+                    all_members.extend(batch)
+                    if len(batch) < page_size:
+                        break
+                else:
+                    break
+
+                offset += page_size
+                if offset > 10000:
+                    logger.warning(f"Reached safety limit of 10000 members")
+                    break
+
+            core_members = all_members
+            logger.info(f"Fetched {len(core_members)} total members from core API")
+
+            # Stats
+            stats = {
+                "fetched": len(core_members),
+                "created": 0,
+                "updated": 0,
+                "archived": 0,
+                "unarchived": 0,
+                "matched_by_id": 0,
+                "matched_by_name_phone": 0,
+                "matched_by_name_only": 0
+            }
+
+            # Get existing members
+            existing_members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(None)
+            existing_map = {m.get("external_member_id"): m for m in existing_members if m.get("external_member_id")}
+
+            # Build additional lookup maps for name-based matching
+            def normalize_name(name: str) -> str:
+                if not name:
+                    return ""
+                return " ".join(name.lower().strip().split())
+
+            name_map = {}
+            name_phone_map = {}
+
+            for m in existing_members:
+                norm_name = normalize_name(m.get("name", ""))
+                if norm_name:
+                    if norm_name not in name_map or m.get("is_archived"):
+                        name_map[norm_name] = m
+                    phone = m.get("phone", "")
+                    if phone:
+                        norm_phone = normalize_phone_number(phone) if phone else ""
+                        key = (norm_name, norm_phone)
+                        if key not in name_phone_map or m.get("is_archived"):
+                            name_phone_map[key] = m
+
+            # Apply dynamic filters
+            filter_mode = config.get("filter_mode", "include")
+            filter_rules = config.get("filter_rules", [])
+            filtered_members = []
+
+            for core_member in core_members:
+                if not filter_rules or len(filter_rules) == 0:
+                    filtered_members.append(core_member)
+                    continue
+
+                matches_all_rules = True
+                for rule in filter_rules:
+                    field_name = rule.get("field")
+                    operator = rule.get("operator")
+                    filter_value = rule.get("value")
+                    member_value = core_member.get(field_name)
+                    rule_matches = False
+
+                    if operator == "equals":
+                        rule_matches = str(member_value) == str(filter_value)
+                    elif operator == "not_equals":
+                        rule_matches = str(member_value) != str(filter_value)
+                    elif operator == "contains":
+                        if member_value and filter_value:
+                            rule_matches = str(filter_value).lower() in str(member_value).lower()
+                    elif operator == "in":
+                        if isinstance(filter_value, list):
+                            rule_matches = member_value in filter_value
+                    elif operator == "not_in":
+                        if isinstance(filter_value, list):
+                            rule_matches = member_value not in filter_value
+                    elif operator in ["greater_than", "less_than", "between"]:
+                        try:
+                            if "date_of_birth" in field_name or "birth" in field_name:
+                                if member_value:
+                                    birth_date = date.fromisoformat(member_value) if isinstance(member_value, str) else member_value
+                                    age = (date.today() - birth_date).days // 365
+                                    member_value = age
+                            if operator == "greater_than":
+                                rule_matches = float(member_value) > float(filter_value)
+                            elif operator == "less_than":
+                                rule_matches = float(member_value) < float(filter_value)
+                            elif operator == "between":
+                                if isinstance(filter_value, list) and len(filter_value) == 2:
+                                    rule_matches = float(filter_value[0]) <= float(member_value) <= float(filter_value[1])
+                        except (ValueError, TypeError):
+                            rule_matches = False
+                    elif operator == "is_true":
+                        rule_matches = member_value == True or member_value == "true"
+                    elif operator == "is_false":
+                        rule_matches = member_value == False or member_value == "false"
+
+                    if not rule_matches:
+                        matches_all_rules = False
+                        break
+
+                if filter_mode == "include":
+                    if matches_all_rules:
+                        filtered_members.append(core_member)
+                else:
+                    if not matches_all_rules:
+                        filtered_members.append(core_member)
+
+            logger.info(f"Filter mode: {filter_mode}. Filtered {len(core_members)} to {len(filtered_members)}")
+            stats["fetched"] = len(filtered_members)
+
+            # Process each filtered core member
+            for core_member in filtered_members:
+                core_id = core_member.get("id")
+                match_method = None
+
+                # Try matching in order of preference
+                existing = existing_map.get(core_id)
+                if existing:
+                    match_method = "id"
+                    stats["matched_by_id"] += 1
+                else:
+                    core_name = core_member.get("full_name") or core_member.get("name")
+                    core_phone = core_member.get("phone_whatsapp") or core_member.get("phone")
+                    norm_core_name = normalize_name(core_name) if core_name else ""
+                    norm_core_phone = normalize_phone_number(core_phone) if core_phone else ""
+
+                    if norm_core_name and norm_core_phone:
+                        key = (norm_core_name, norm_core_phone)
+                        existing = name_phone_map.get(key)
+                        if existing:
+                            match_method = "name_phone"
+                            stats["matched_by_name_phone"] += 1
+                            logger.info(f"Matched '{core_name}' by name+phone (new ID: {core_id})")
+
+                    if not existing and norm_core_name:
+                        existing = name_map.get(norm_core_name)
+                        if existing:
+                            match_method = "name_only"
+                            stats["matched_by_name_only"] += 1
+                            logger.info(f"Matched '{core_name}' by name only (new ID: {core_id})")
+
+                # Prepare member data
+                membership_status = (
+                    core_member.get("membership_status") or
+                    core_member.get("membershipStatus") or
+                    core_member.get("member_type") or
+                    core_member.get("memberType") or
+                    core_member.get("type") or
+                    core_member.get("status")
+                )
+                category = (
+                    core_member.get("member_status") or
+                    core_member.get("memberStatus") or
+                    core_member.get("category") or
+                    core_member.get("group") or
+                    core_member.get("classification")
+                )
+
+                member_data = {
+                    "external_member_id": core_id,
+                    "name": core_member.get("full_name") or core_member.get("name"),
+                    "phone": normalize_phone_number(core_member.get("phone_whatsapp", "")) if core_member.get("phone_whatsapp") else (normalize_phone_number(core_member.get("phone", "")) if core_member.get("phone") else None),
+                    "birth_date": core_member.get("date_of_birth") or core_member.get("birthDate") or core_member.get("birth_date"),
+                    "gender": core_member.get("gender"),
+                    "membership_status": membership_status,
+                    "category": category,
+                    "updated_at": datetime.now(timezone.utc)
+                }
+
+                # Calculate age
+                if core_member.get("date_of_birth"):
+                    try:
+                        dob = core_member["date_of_birth"]
+                        birth_date_obj = date.fromisoformat(dob) if isinstance(dob, str) else dob
+                        age = (date.today() - birth_date_obj).days // 365
+                        member_data["age"] = age
+                    except (ValueError, TypeError):
+                        member_data["age"] = None
+                else:
+                    member_data["age"] = None
+
+                # Handle photo URL
+                external_photo_url = (
+                    core_member.get("photo_url") or
+                    core_member.get("photo") or
+                    core_member.get("image_url") or
+                    core_member.get("avatar_url") or
+                    core_member.get("profile_photo")
+                )
+                if external_photo_url and isinstance(external_photo_url, str) and external_photo_url.startswith("http"):
+                    member_data["photo_url"] = external_photo_url
+
+                is_active = core_member.get("is_active", True)
+
+                if existing:
+                    if not is_active and not existing.get("is_archived"):
+                        member_data["is_archived"] = True
+                        member_data["archived_at"] = datetime.now(timezone.utc)
+                        member_data["archived_reason"] = "Deactivated in core system"
+                        stats["archived"] += 1
+                    elif is_active and existing.get("is_archived"):
+                        member_data["is_archived"] = False
+                        member_data["archived_at"] = None
+                        member_data["archived_reason"] = None
+                        stats["unarchived"] += 1
+                    else:
+                        stats["updated"] += 1
+
+                    await db.members.update_one(
+                        {"id": existing["id"]},
+                        {"$set": member_data}
+                    )
+                else:
+                    new_member = {
+                        "id": generate_uuid(),
+                        "campus_id": campus_id,
+                        **member_data,
+                        "is_archived": not is_active,
+                        "engagement_status": "active",
+                        "days_since_last_contact": 999,
+                        "created_at": datetime.now(timezone.utc)
+                    }
+                    await db.members.insert_one(new_member)
+                    stats["created"] += 1
+
+                    # Create birthday event if member has birth_date
+                    if new_member.get("birth_date"):
+                        birthday_event = {
+                            "id": generate_uuid(),
+                            "member_id": new_member["id"],
+                            "campus_id": campus_id,
+                            "church_id": campus_id,
+                            "event_type": EventType.BIRTHDAY.value,
+                            "event_date": new_member["birth_date"],
+                            "title": "Birthday Celebration",
+                            "description": "Annual birthday reminder",
+                            "completed": False,
+                            "ignored": False,
+                            "created_at": datetime.now(timezone.utc),
+                            "updated_at": datetime.now(timezone.utc)
+                        }
+                        await db.care_events.insert_one(birthday_event)
+
+            # Archive members not in filtered list
+            filtered_core_ids = set(m.get("id") for m in filtered_members)
+            for existing_member in existing_members:
+                external_id = existing_member.get("external_member_id")
+                if external_id and external_id not in filtered_core_ids and not existing_member.get("is_archived"):
+                    await db.members.update_one(
+                        {"id": existing_member["id"]},
+                        {"$set": {
+                            "is_archived": True,
+                            "archived_at": datetime.now(timezone.utc),
+                            "archived_reason": "No longer matches sync filter rules",
+                            "updated_at": datetime.now(timezone.utc)
+                        }}
+                    )
+                    stats["archived"] += 1
+                    logger.info(f"Archived member {existing_member['name']} (no longer matches filter)")
+
+            # Log matching summary
+            logger.info(
+                f"Sync matching summary: by_id={stats.get('matched_by_id', 0)}, "
+                f"by_name_phone={stats.get('matched_by_name_phone', 0)}, "
+                f"by_name_only={stats.get('matched_by_name_only', 0)}, new={stats['created']}"
+            )
+
+            # Update sync config
+            end_time = datetime.now(timezone.utc)
+            duration = (end_time - start_time).total_seconds()
+
+            match_details = []
+            if stats.get("matched_by_name_phone", 0) > 0:
+                match_details.append(f"{stats['matched_by_name_phone']} matched by name+phone")
+            if stats.get("matched_by_name_only", 0) > 0:
+                match_details.append(f"{stats['matched_by_name_only']} matched by name")
+
+            sync_message = f"Synced {stats['fetched']} members successfully"
+            if match_details:
+                sync_message += f" ({', '.join(match_details)})"
+
+            await db.sync_configs.update_one(
+                {"campus_id": campus_id},
+                {"$set": {
+                    "last_sync_at": end_time,
+                    "last_sync_status": "success",
+                    "last_sync_message": sync_message
+                }}
+            )
+
+            # Update sync log
+            await db.sync_logs.update_one(
+                {"id": sync_log_id},
+                {"$set": {
+                    "status": "success",
+                    "members_fetched": stats["fetched"],
+                    "members_created": stats["created"],
+                    "members_updated": stats["updated"],
+                    "members_archived": stats["archived"],
+                    "members_unarchived": stats["unarchived"],
+                    "matched_by_id": stats.get("matched_by_id", 0),
+                    "matched_by_name_phone": stats.get("matched_by_name_phone", 0),
+                    "matched_by_name_only": stats.get("matched_by_name_only", 0),
+                    "completed_at": end_time,
+                    "duration_seconds": duration
+                }}
+            )
+
+            return {
+                "success": True,
+                "message": "Sync completed successfully",
+                "stats": stats,
+                "duration_seconds": duration
+            }
+
+    except Exception as sync_error:
+        end_time = datetime.now(timezone.utc)
+        duration = (end_time - start_time).total_seconds()
+
+        await db.sync_configs.update_one(
+            {"campus_id": campus_id},
+            {"$set": {
+                "last_sync_at": end_time,
+                "last_sync_status": "error",
+                "last_sync_message": str(sync_error)
+            }}
+        )
+
+        await db.sync_logs.update_one(
+            {"id": sync_log_id},
+            {"$set": {
+                "status": "error",
+                "error_message": str(sync_error),
+                "completed_at": end_time,
+                "duration_seconds": duration
+            }}
+        )
+
+        logger.error(f"Sync error for campus {campus_id}: {str(sync_error)}")
+        return {"success": False, "error": str(sync_error), "duration_seconds": duration}
+
+
 @post("/sync/members/pull")
 async def sync_members_from_core(request: Request) -> dict:
     """Pull members from core API and sync"""
     current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can sync members")
-    
-    try:
-        import httpx
-        from io import BytesIO
-        import base64
-        
-        campus_id = current_user.get("campus_id")
-        if not campus_id:
-            raise HTTPException(status_code=400, detail="Please select a campus first")
-        
-        # Get sync config
-        config = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
-        if not config or not config.get("is_enabled"):
-            raise HTTPException(status_code=400, detail="Sync is not configured or enabled for this campus")
-        
-        # Create sync log
-        sync_log = SyncLog(
-            campus_id=campus_id,
-            sync_type="manual",
-            status="in_progress"
-        )
-        # Use to_mongo_doc for consistent date serialization (ISO strings)
-        await db.sync_logs.insert_one(to_mongo_doc(sync_log))
-        sync_log_id = sync_log.id
-        
-        start_time = datetime.now(timezone.utc)
-        
-        try:
-            # Get api_path_prefix with fallback for existing configs
-            api_path_prefix = config.get('api_path_prefix', '/api')
-            base_url = config['api_base_url'].rstrip('/')
 
-            # Login to core API
-            decrypted_pwd = decrypt_password(config["api_password"])
-            if not decrypted_pwd:
-                raise Exception("Failed to decrypt API password")
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                login_response = await client.post(
-                    f"{base_url}{api_path_prefix}/auth/login",
-                    json={"email": config["api_email"], "password": decrypted_pwd}
-                )
+    campus_id = current_user.get("campus_id")
+    if not campus_id:
+        raise HTTPException(status_code=400, detail="Please select a campus first")
 
-                if login_response.status_code != 200:
-                    raise Exception(f"Login failed: {login_response.text}")
+    result = await perform_member_sync_for_campus(campus_id, sync_type="manual")
 
-                token = login_response.json().get("access_token")
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Sync failed"))
 
-                # Fetch ALL members using pagination
-                all_members = []
-                page_size = 100
-                offset = 0
+    return result
 
-                while True:
-                    members_response = await client.get(
-                        f"{base_url}{api_path_prefix}/members/?limit={page_size}&skip={offset}",
-                        headers={"Authorization": f"Bearer {token}"}
-                    )
-
-                    if members_response.status_code != 200:
-                        if members_response.status_code == 500:
-                            raise Exception(f"External API server error (500). The FaithFlow server ({base_url}) is experiencing issues. Please try again later or contact FaithFlow support.")
-                        elif members_response.status_code == 401:
-                            raise Exception("Authentication expired. Please check your API credentials.")
-                        elif members_response.status_code == 403:
-                            raise Exception("Access denied. Your API account may not have permission to access member data.")
-                        else:
-                            raise Exception(f"Failed to fetch members (HTTP {members_response.status_code}): {members_response.text}")
-                    
-                    batch = members_response.json()
-                    
-                    # Handle both array response and paginated response
-                    if isinstance(batch, dict) and 'data' in batch:
-                        # Paginated response: {"data": [...], "pagination": {...}}
-                        batch_members = batch['data']
-                        all_members.extend(batch_members)
-                        
-                        # Check if there are more pages
-                        pagination = batch.get('pagination', {})
-                        if not pagination.get('has_more', False):
-                            break
-                    elif isinstance(batch, list):
-                        # Direct array response
-                        all_members.extend(batch)
-                        
-                        # If batch size is less than page_size, we've reached the end
-                        if len(batch) < page_size:
-                            break
-                    else:
-                        break
-                    
-                    offset += page_size
-                    
-                    # Safety limit to prevent infinite loop
-                    if offset > 10000:
-                        logger.warning(f"Reached safety limit of 10000 members")
-                        break
-                
-                core_members = all_members
-                logger.info(f"Fetched {len(core_members)} total members from core API using pagination")
-                
-                # Stats
-                stats = {
-                    "fetched": len(core_members),
-                    "created": 0,
-                    "updated": 0,
-                    "archived": 0,
-                    "unarchived": 0
-                }
-                
-                # Get existing members
-                existing_members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(None)
-                existing_map = {m.get("external_member_id"): m for m in existing_members if m.get("external_member_id")}
-                
-                # Apply dynamic filters
-                filter_mode = config.get("filter_mode", "include")
-                filter_rules = config.get("filter_rules", [])
-                filtered_members = []
-                
-                for core_member in core_members:
-                    # Check if member matches filter rules
-                    if not filter_rules or len(filter_rules) == 0:
-                        # No filters, include all
-                        filtered_members.append(core_member)
-                        continue
-                    
-                    matches_all_rules = True
-                    
-                    for rule in filter_rules:
-                        field_name = rule.get("field")
-                        operator = rule.get("operator")
-                        filter_value = rule.get("value")
-                        
-                        member_value = core_member.get(field_name)
-                        
-                        # Apply operator
-                        rule_matches = False
-                        
-                        if operator == "equals":
-                            rule_matches = str(member_value) == str(filter_value)
-                        
-                        elif operator == "not_equals":
-                            rule_matches = str(member_value) != str(filter_value)
-                        
-                        elif operator == "contains":
-                            if member_value and filter_value:
-                                rule_matches = str(filter_value).lower() in str(member_value).lower()
-                        
-                        elif operator == "in":
-                            if isinstance(filter_value, list):
-                                rule_matches = member_value in filter_value
-                        
-                        elif operator == "not_in":
-                            if isinstance(filter_value, list):
-                                rule_matches = member_value not in filter_value
-                        
-                        elif operator in ["greater_than", "less_than", "between"]:
-                            # Numeric or age comparison
-                            try:
-                                if "date_of_birth" in field_name or "birth" in field_name:
-                                    # Calculate age
-                                    if member_value:
-                                        birth_date = date.fromisoformat(member_value) if isinstance(member_value, str) else member_value
-                                        age = (date.today() - birth_date).days // 365
-                                        member_value = age
-                                
-                                if operator == "greater_than":
-                                    rule_matches = float(member_value) > float(filter_value)
-                                elif operator == "less_than":
-                                    rule_matches = float(member_value) < float(filter_value)
-                                elif operator == "between":
-                                    if isinstance(filter_value, list) and len(filter_value) == 2:
-                                        rule_matches = float(filter_value[0]) <= float(member_value) <= float(filter_value[1])
-                            except (ValueError, TypeError):
-                                rule_matches = False
-                        
-                        elif operator == "is_true":
-                            rule_matches = member_value == True or member_value == "true"
-                        
-                        elif operator == "is_false":
-                            rule_matches = member_value == False or member_value == "false"
-                        
-                        # If any rule doesn't match, mark as not matching all
-                        if not rule_matches:
-                            matches_all_rules = False
-                            break
-                    
-                    # Apply include/exclude logic
-                    if filter_mode == "include":
-                        if matches_all_rules:
-                            filtered_members.append(core_member)
-                    else:  # exclude
-                        if not matches_all_rules:
-                            filtered_members.append(core_member)
-                
-                logger.info(f"Filter mode: {filter_mode}. Filtered {len(core_members)} members to {len(filtered_members)} using {len(filter_rules)} rules")
-                
-                # Update stats
-                stats["fetched"] = len(filtered_members)
-                
-                # Process each filtered core member
-                for core_member in filtered_members:
-                    core_id = core_member.get("id")
-                    existing = existing_map.get(core_id)
-                    
-                    # Prepare member data - try multiple common field names for better compatibility
-                    # Membership status: try various common field names from external APIs
-                    membership_status = (
-                        core_member.get("membership_status") or
-                        core_member.get("membershipStatus") or
-                        core_member.get("member_type") or
-                        core_member.get("memberType") or
-                        core_member.get("type") or
-                        core_member.get("status")
-                    )
-                    # Category: try member_status first, then category field
-                    category = (
-                        core_member.get("member_status") or
-                        core_member.get("memberStatus") or
-                        core_member.get("category") or
-                        core_member.get("group") or
-                        core_member.get("classification")
-                    )
-
-                    member_data = {
-                        "external_member_id": core_id,
-                        "name": core_member.get("full_name") or core_member.get("name"),
-                        "phone": normalize_phone_number(core_member.get("phone_whatsapp", "")) if core_member.get("phone_whatsapp") else (normalize_phone_number(core_member.get("phone", "")) if core_member.get("phone") else None),
-                        "birth_date": core_member.get("date_of_birth") or core_member.get("birthDate") or core_member.get("birth_date"),
-                        "gender": core_member.get("gender"),
-                        "membership_status": membership_status,
-                        "category": category,
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                    
-                    # Calculate age if birth_date exists
-                    if core_member.get("date_of_birth"):
-                        try:
-                            dob = core_member["date_of_birth"]
-                            birth_date = date.fromisoformat(dob) if isinstance(dob, str) else dob
-                            age = (date.today() - birth_date).days // 365
-                            member_data["age"] = age
-                        except (ValueError, TypeError):
-                            member_data["age"] = None
-                    else:
-                        member_data["age"] = None
-
-                    # Handle photo URL from external API (CDN approach - no local storage)
-                    # Check common field names for photo URL
-                    external_photo_url = (
-                        core_member.get("photo_url") or
-                        core_member.get("photo") or
-                        core_member.get("image_url") or
-                        core_member.get("avatar_url") or
-                        core_member.get("profile_photo")
-                    )
-                    if external_photo_url and isinstance(external_photo_url, str) and external_photo_url.startswith("http"):
-                        # Store external URL directly - photos served from API provider (CDN approach)
-                        member_data["photo_url"] = external_photo_url
-                    
-                    # Check if member is active
-                    is_active = core_member.get("is_active", True)
-                    
-                    if existing:
-                        # Update existing member
-                        if not is_active and not existing.get("is_archived"):
-                            # Archive member
-                            member_data["is_archived"] = True
-                            member_data["archived_at"] = datetime.now(timezone.utc)
-                            member_data["archived_reason"] = "Deactivated in core system"
-                            stats["archived"] += 1
-                        elif is_active and existing.get("is_archived"):
-                            # Unarchive member
-                            member_data["is_archived"] = False
-                            member_data["archived_at"] = None
-                            member_data["archived_reason"] = None
-                            stats["unarchived"] += 1
-                        else:
-                            stats["updated"] += 1
-                        
-                        await db.members.update_one(
-                            {"id": existing["id"]},
-                            {"$set": member_data}
-                        )
-                    else:
-                        # Create new member
-                        new_member = {
-                            "id": generate_uuid(),
-                            "campus_id": campus_id,
-                            **member_data,
-                            "is_archived": not is_active,
-                            "engagement_status": "active",
-                            "days_since_last_contact": 999,
-                            "created_at": datetime.now(timezone.utc)
-                        }
-                        
-                        await db.members.insert_one(new_member)
-                        stats["created"] += 1
-
-                        # Create birthday event if member has birth_date
-                        if new_member.get("birth_date"):
-                            birthday_event = {
-                                "id": generate_uuid(),
-                                "member_id": new_member["id"],
-                                "campus_id": campus_id,
-                                "church_id": campus_id,
-                                "event_type": EventType.BIRTHDAY.value,
-                                "event_date": new_member["birth_date"],
-                                "title": "Birthday Celebration",
-                                "description": "Annual birthday reminder",
-                                "completed": False,
-                                "ignored": False,
-                                "created_at": datetime.now(timezone.utc),
-                                "updated_at": datetime.now(timezone.utc)
-                            }
-                            await db.care_events.insert_one(birthday_event)
-
-                # Archive members that no longer match filter (Option A)
-                # Get all core member IDs that passed filter
-                filtered_core_ids = set(m.get("id") for m in filtered_members)
-                
-                # Find existing synced members that are NOT in filtered list
-                for existing_member in existing_members:
-                    external_id = existing_member.get("external_member_id")
-                    if external_id and external_id not in filtered_core_ids and not existing_member.get("is_archived"):
-                        # This member was synced before but doesn't match new filter
-                        await db.members.update_one(
-                            {"id": existing_member["id"]},
-                            {"$set": {
-                                "is_archived": True,
-                                "archived_at": datetime.now(timezone.utc),
-                                "archived_reason": "No longer matches sync filter rules",
-                                "updated_at": datetime.now(timezone.utc)
-                            }}
-                        )
-                        stats["archived"] += 1
-                        logger.info(f"Archived member {existing_member['name']} (no longer matches filter)")
-
-                # Update sync config
-                end_time = datetime.now(timezone.utc)
-                duration = (end_time - start_time).total_seconds()
-                
-                await db.sync_configs.update_one(
-                    {"campus_id": campus_id},
-                    {"$set": {
-                        "last_sync_at": end_time,
-                        "last_sync_status": "success",
-                        "last_sync_message": f"Synced {stats['fetched']} members successfully"
-                    }}
-                )
-                
-                # Update sync log
-                await db.sync_logs.update_one(
-                    {"id": sync_log_id},
-                    {"$set": {
-                        "status": "success",
-                        "members_fetched": stats["fetched"],
-                        "members_created": stats["created"],
-                        "members_updated": stats["updated"],
-                        "members_archived": stats["archived"],
-                        "members_unarchived": stats["unarchived"],
-                        "completed_at": end_time,
-                        "duration_seconds": duration
-                    }}
-                )
-                
-                return {
-                    "success": True,
-                    "message": "Sync completed successfully",
-                    "stats": stats,
-                    "duration_seconds": duration
-                }
-        
-        except Exception as sync_error:
-            # Log sync failure
-            end_time = datetime.now(timezone.utc)
-            duration = (end_time - start_time).total_seconds()
-            
-            await db.sync_configs.update_one(
-                {"campus_id": campus_id},
-                {"$set": {
-                    "last_sync_at": end_time,
-                    "last_sync_status": "error",
-                    "last_sync_message": str(sync_error)
-                }}
-            )
-            
-            await db.sync_logs.update_one(
-                {"id": sync_log_id},
-                {"$set": {
-                    "status": "error",
-                    "error_message": str(sync_error),
-                    "completed_at": end_time,
-                    "duration_seconds": duration
-                }}
-            )
-            
-            raise HTTPException(status_code=500, detail=str(sync_error))
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in sync members: {str(e)}")
-        raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @get("/sync/logs")
 async def get_sync_logs(
