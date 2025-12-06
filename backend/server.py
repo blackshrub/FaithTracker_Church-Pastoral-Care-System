@@ -11,7 +11,7 @@ from litestar.di import Provide
 from litestar.exceptions import HTTPException, NotAuthorizedException, PermissionDeniedException
 from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_413_REQUEST_ENTITY_TOO_LARGE, HTTP_429_TOO_MANY_REQUESTS, HTTP_500_INTERNAL_SERVER_ERROR
 from litestar.datastructures import UploadFile, State
-from litestar.params import Parameter
+from litestar.params import Parameter, Body
 from litestar.response import Response as LitestarResponse, File as LitestarFile, Stream
 from litestar.middleware.base import AbstractMiddleware, DefineMiddleware
 from litestar.middleware.compression import CompressionMiddleware
@@ -8032,7 +8032,7 @@ async def run_reminders_now(request: Request) -> dict:
 # ==================== SYNC ENDPOINTS ====================
 
 @post("/sync/config")
-async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
+async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
     """Save sync configuration for campus"""
     current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
@@ -8047,7 +8047,7 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
         existing = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
         
         # Normalize api_path_prefix (ensure it starts with / if not empty, no trailing /)
-        api_path_prefix = config.api_path_prefix.strip()
+        api_path_prefix = data.api_path_prefix.strip()
         if api_path_prefix and not api_path_prefix.startswith('/'):
             api_path_prefix = '/' + api_path_prefix
         api_path_prefix = api_path_prefix.rstrip('/')
@@ -8056,14 +8056,14 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
         core_church_id = None
         try:
             import httpx
-            base_url = config.api_base_url.rstrip('/')
+            base_url = data.api_base_url.rstrip('/')
             async with httpx.AsyncClient(timeout=10.0) as client:
-                decrypted_pwd = decrypt_password(config.api_password)
+                decrypted_pwd = decrypt_password(data.api_password)
                 if not decrypted_pwd:
                     raise Exception("Failed to decrypt API password")
                 login_response = await client.post(
                     f"{base_url}{api_path_prefix}/auth/login",
-                    json={"email": config.api_email, "password": decrypted_pwd}
+                    json={"email": data.api_email, "password": decrypted_pwd}
                 )
                 if login_response.status_code == 200:
                     login_data = login_response.json()
@@ -8074,17 +8074,17 @@ async def save_sync_config(config: SyncConfigCreate, request: Request) -> dict:
         sync_config_data = {
             "campus_id": campus_id,
             "core_church_id": core_church_id,
-            "sync_method": config.sync_method,
-            "api_base_url": config.api_base_url.rstrip('/'),
+            "sync_method": data.sync_method,
+            "api_base_url": data.api_base_url.rstrip('/'),
             "api_path_prefix": api_path_prefix,
-            "api_email": config.api_email,
-            "api_password": encrypt_password(config.api_password),  # Encrypt password
-            "polling_interval_hours": config.polling_interval_hours,
-            "reconciliation_enabled": config.reconciliation_enabled,
-            "reconciliation_time": config.reconciliation_time,
-            "filter_mode": config.filter_mode,
-            "filter_rules": config.filter_rules or [],
-            "is_enabled": config.is_enabled,
+            "api_email": data.api_email,
+            "api_password": encrypt_password(data.api_password),  # Encrypt password
+            "polling_interval_hours": data.polling_interval_hours,
+            "reconciliation_enabled": data.reconciliation_enabled,
+            "reconciliation_time": data.reconciliation_time,
+            "filter_mode": data.filter_mode,
+            "filter_rules": data.filter_rules or [],
+            "is_enabled": data.is_enabled,
             "updated_at": datetime.now(timezone.utc)
         }
         
@@ -8166,7 +8166,7 @@ async def regenerate_webhook_secret(request: Request) -> dict:
 
 
 @post("/sync/discover-fields")
-async def discover_fields_from_core(config_test: SyncConfigCreate, request: Request) -> dict:
+async def discover_fields_from_core(data: SyncConfigCreate, request: Request) -> dict:
     """
     Analyze sample members from core API to discover available fields and their values
     Returns field metadata for building dynamic filters
@@ -8174,22 +8174,22 @@ async def discover_fields_from_core(config_test: SyncConfigCreate, request: Requ
     current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can discover fields")
-    
+
     try:
         import httpx
 
         # Normalize api_path_prefix
-        api_path_prefix = config_test.api_path_prefix.strip()
+        api_path_prefix = data.api_path_prefix.strip()
         if api_path_prefix and not api_path_prefix.startswith('/'):
             api_path_prefix = '/' + api_path_prefix
         api_path_prefix = api_path_prefix.rstrip('/')
-        base_url = config_test.api_base_url.rstrip('/')
+        base_url = data.api_base_url.rstrip('/')
 
         # Login to core API
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 f"{base_url}{api_path_prefix}/auth/login",
-                json={"email": config_test.api_email, "password": config_test.api_password}
+                json={"email": data.api_email, "password": data.api_password}
             )
 
             if login_response.status_code != 200:
@@ -8302,41 +8302,41 @@ async def get_sync_config(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @post("/sync/test-connection")
-async def test_sync_connection(config: SyncConfigCreate, request: Request) -> dict:
+async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict:
     """Test connection to core API"""
     current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can test sync")
-    
+
     try:
         import httpx
 
         # Normalize paths
-        api_path_prefix = config.api_path_prefix.strip()
+        api_path_prefix = data.api_path_prefix.strip()
         if api_path_prefix and not api_path_prefix.startswith('/'):
             api_path_prefix = '/' + api_path_prefix
         api_path_prefix = api_path_prefix.rstrip('/')
-        base_url = config.api_base_url.rstrip('/')
+        base_url = data.api_base_url.rstrip('/')
 
         # Normalize login endpoint
-        login_endpoint = getattr(config, 'api_login_endpoint', '/auth/login').strip()
+        login_endpoint = getattr(data, 'api_login_endpoint', '/auth/login').strip()
         if login_endpoint and not login_endpoint.startswith('/'):
             login_endpoint = '/' + login_endpoint
 
         # Normalize members endpoint
-        members_endpoint = getattr(config, 'api_members_endpoint', '/members/').strip()
+        members_endpoint = getattr(data, 'api_members_endpoint', '/members/').strip()
         if members_endpoint and not members_endpoint.startswith('/'):
             members_endpoint = '/' + members_endpoint
 
         # Test login - send as 'email' key even if it's not email format (core API requirement)
         login_url = f"{base_url}{api_path_prefix}{login_endpoint}"
-        decrypted_pwd = decrypt_password(config.api_password)
+        decrypted_pwd = decrypt_password(data.api_password)
         if not decrypted_pwd:
             raise HTTPException(status_code=400, detail="Failed to decrypt API password. Please re-enter it.")
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 login_url,
-                json={"email": config.api_email, "password": decrypted_pwd}
+                json={"email": data.api_email, "password": decrypted_pwd}
             )
 
             if login_response.status_code != 200:
