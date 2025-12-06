@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { TrendingUp, Users, DollarSign, Heart, Target } from 'lucide-react';
+
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PieChart, BarChart, AreaChart } from '@/components/charts';
-import { TrendingUp, Users, DollarSign, Heart, Target } from 'lucide-react';
 
 const COLORS = {
   primary: ['#14b8a6', '#f59e0b', '#ec4899', '#a78bfa', '#06b6d4', '#84cc16', '#f97316'],

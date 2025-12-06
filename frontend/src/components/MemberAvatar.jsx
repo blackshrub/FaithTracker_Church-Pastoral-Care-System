@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import LazyImage from '@/components/LazyImage';
 import { cn } from '@/lib/utils';

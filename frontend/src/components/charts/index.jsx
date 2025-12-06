@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Lazy load chart components - Chart.js only loads when charts are rendered

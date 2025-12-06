@@ -5,11 +5,12 @@
 
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
+import { Check } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { MemberLink } from '@/components/LinkWithPrefetch';
-import { Check } from 'lucide-react';
 
 const formatPhoneForWhatsApp = (phone) => {
   if (!phone) return '#';

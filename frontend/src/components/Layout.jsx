@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { Church, LogOut, ChevronDown } from 'lucide-react';
+
 import { LanguageToggle } from './LanguageToggle';
 import { ThemeToggle } from './ThemeToggle';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -9,9 +10,11 @@ import { DesktopSidebar } from './DesktopSidebar';
 import SearchBar from './SearchBar';
 import SyncStatusIndicator from './SyncStatusIndicator';
 import { DashboardLink } from './LinkWithPrefetch';
+
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Church, LogOut, ChevronDown } from 'lucide-react';
+
 
 export const Layout = ({ children }) => {
   const { t } = useTranslation();

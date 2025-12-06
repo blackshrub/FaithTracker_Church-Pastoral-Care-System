@@ -8,8 +8,9 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
 import { toast } from 'sonner';
+
+import api from '@/lib/api';
 
 /**
  * Optimistic mutation for completing a care event

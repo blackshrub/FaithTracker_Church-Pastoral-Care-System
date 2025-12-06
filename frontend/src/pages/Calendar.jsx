@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check, MessageCircle } from 'lucide-react';
+import { toast } from 'sonner';
+
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check, MessageCircle } from 'lucide-react';
-import { toast } from 'sonner';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { MemberLink } from '@/components/LinkWithPrefetch';
 

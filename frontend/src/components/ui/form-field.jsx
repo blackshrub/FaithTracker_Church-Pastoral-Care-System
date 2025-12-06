@@ -1,6 +1,7 @@
 import * as React from "react"
-import { cn } from "@/lib/utils"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
+
+import { cn } from "@/lib/utils"
 
 /**
  * FormField - Wrapper component for form inputs with validation feedback
@@ -23,7 +24,8 @@ const FormField = React.forwardRef(({
   id,
   ...props
 }, ref) => {
-  const fieldId = id || React.useId();
+  const generatedId = React.useId();
+  const fieldId = id || generatedId;
   const errorId = `${fieldId}-error`;
   const helperId = `${fieldId}-helper`;
 

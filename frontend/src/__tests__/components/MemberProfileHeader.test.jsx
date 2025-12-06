@@ -7,6 +7,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+
 import { MemberProfileHeader } from '../../components/member/MemberProfileHeader';
 
 // Mock react-i18next

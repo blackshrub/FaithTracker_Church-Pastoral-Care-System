@@ -5,11 +5,12 @@
 
 import React, { memo } from 'react';
 import PropTypes from 'prop-types';
+import { CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EventTypeBadge } from '@/components/EventTypeBadge';
-import { CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
 import { formatDate, formatDateToJakarta, formatTimeToLocalTimezone } from '@/lib/dateUtils';
 
 const getEventColors = (eventType) => {

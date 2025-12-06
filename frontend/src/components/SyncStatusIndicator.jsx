@@ -8,8 +8,9 @@
  */
 
 import React from 'react';
-import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { Wifi, WifiOff, RefreshCw, CloudOff, Check } from 'lucide-react';
+
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 

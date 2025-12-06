@@ -25,8 +25,9 @@
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { offlineQueue } from '@/lib/offlineQueue';
 import { toast } from 'sonner';
+
+import { offlineQueue } from '@/lib/offlineQueue';
 import api from '@/lib/api';
 
 /**

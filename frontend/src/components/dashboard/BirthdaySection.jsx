@@ -6,10 +6,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TaskCard } from './TaskCard';
-import api from '@/lib/api';
 import { toast } from 'sonner';
+
+import { TaskCard } from './TaskCard';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import api from '@/lib/api';
+
 
 const triggerHaptic = () => {
   if ('vibrate' in navigator) {

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { MemberLink } from '@/components/LinkWithPrefetch';
 import { useDebounce } from 'use-debounce';
+import { toast } from 'sonner';
+import { Plus, Search, Loader2 } from 'lucide-react';
+
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,8 +17,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { Plus, Search, Loader2 } from 'lucide-react';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { EngagementBadge } from '@/components/EngagementBadge';
 import { ErrorState } from '@/components/ErrorState';

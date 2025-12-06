@@ -1,7 +1,8 @@
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
 import { useTranslation } from 'react-i18next';
 import { Calendar, Baby, Heart, Home, Ambulance, Hospital, DollarSign, Phone } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
 
 export const EventTypeBadge = ({ type }) => {
   const { t } = useTranslation();

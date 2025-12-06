@@ -7,6 +7,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { format as formatDateFns } from 'date-fns';
+import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Phone, Cake, CalendarIcon, CheckSquare, Square } from 'lucide-react';
+
 import { useAuth } from '@/context/AuthContext';
 import { useConfirmDialog } from '@/hooks';
 import LazyImage from '@/components/LazyImage';
@@ -17,8 +21,6 @@ import { formatDateToJakarta, formatRelativeTime } from '@/lib/dateUtils';
 import { getGriefStageBadge, getAccidentStageBadge } from '@/lib/utils/badges';
 import { getInitials, formatPhoneForWhatsApp } from '@/lib/utils/formatting';
 import { handleApiError } from '@/lib/utils/errorHandling';
-import { toast } from 'sonner';
-import { format as formatDateFns } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +35,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Phone, Cake, CalendarIcon, CheckSquare, Square } from 'lucide-react';
 import { DashboardStats, BirthdaySection, LiveActivityFeed, BulkActionBar } from '@/components/dashboard';
 import { useBulkMutation, useBulkSelection } from '@/hooks/useBulkMutation';
 import { DashboardSkeleton } from '@/components/skeletons';

@@ -1,6 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import {
+  FileText, Users, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2,
+  Calendar, DollarSign, Heart, Gift, Activity, Download, Printer,
+  ChevronUp, ChevronDown, Minus, Target, UserCheck, Clock, AlertCircle,
+  Award, Scale, Lightbulb, BarChart3
+} from 'lucide-react';
+
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,12 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, PieChart, AreaChart } from '@/components/charts';
-import {
-  FileText, Users, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2,
-  Calendar, DollarSign, Heart, Gift, Activity, Download, Printer,
-  ChevronUp, ChevronDown, Minus, Target, UserCheck, Clock, AlertCircle,
-  Award, Scale, Lightbulb, BarChart3
-} from 'lucide-react';
 
 const MONTHS = [
   { value: 1, label: 'January' },

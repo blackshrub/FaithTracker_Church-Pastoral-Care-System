@@ -1,9 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
-import { LinkWithPrefetch } from '@/components/LinkWithPrefetch';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import {
   Home,
   Users,
@@ -19,6 +16,10 @@ import {
   Activity,
   FileText
 } from 'lucide-react';
+
+import { LinkWithPrefetch } from '@/components/LinkWithPrefetch';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/context/AuthContext';
 
 export const DesktopSidebar = () => {

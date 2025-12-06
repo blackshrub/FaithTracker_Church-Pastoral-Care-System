@@ -3,7 +3,6 @@
  * Provides helpful messaging and optional action button
  */
 
-import { Button } from '@/components/ui/button';
 import {
   Users,
   Calendar,
@@ -12,6 +11,8 @@ import {
   Heart,
   Inbox
 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 const icons = {
   members: Users,

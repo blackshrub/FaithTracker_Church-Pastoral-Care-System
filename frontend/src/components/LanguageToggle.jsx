@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 export const LanguageToggle = () => {
   const { i18n } = useTranslation();

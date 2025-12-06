@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { Upload, Download, FileJson, FileSpreadsheet } from 'lucide-react';
+
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,8 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { Upload, Download, FileJson, FileSpreadsheet } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -213,7 +215,7 @@ export const ImportExport = () => {
       const mappingErrors = [];
       
       Object.entries(fieldMapping).forEach(([ourField, theirField]) => {
-        const hasField = sample.hasOwnProperty(theirField);
+        const hasField = Object.hasOwn(sample, theirField);
         mappingValid[ourField] = hasField;
         if (!hasField && ['name', 'phone'].includes(ourField)) {
           mappingErrors.push(`Required field "${theirField}" not found in API response`);

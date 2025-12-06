@@ -7,10 +7,11 @@ import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ArrowLeft, Plus } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { EngagementBadge } from '@/components/EngagementBadge';
-import { ArrowLeft, Plus } from 'lucide-react';
 import { formatDate } from '@/lib/dateUtils';
 
 // Memoized to prevent re-renders when member detail state changes

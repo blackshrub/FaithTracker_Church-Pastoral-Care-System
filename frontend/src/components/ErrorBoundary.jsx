@@ -1,7 +1,8 @@
 import React from 'react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 /**
  * Error Boundary component to catch JavaScript errors anywhere in the child component tree

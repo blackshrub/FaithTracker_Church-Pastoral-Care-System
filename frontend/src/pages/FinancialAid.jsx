@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { MemberLink } from '@/components/LinkWithPrefetch';
 import { useQuery } from '@tanstack/react-query';
+import { DollarSign, Users } from 'lucide-react';
+
+import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, Users } from 'lucide-react';
 import LazyImage from '@/components/LazyImage';
 import PieChart from '@/components/charts/PieChart';
 

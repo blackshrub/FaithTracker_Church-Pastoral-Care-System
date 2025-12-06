@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+
 import api, { setAuthToken, clearAuthToken } from '@/lib/api';
 
 const AuthContext = createContext(null);

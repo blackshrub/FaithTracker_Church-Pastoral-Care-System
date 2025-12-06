@@ -3,8 +3,9 @@
  * Provides friendly error messaging with retry option
  */
 
-import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw, WifiOff, ServerCrash } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 const errorTypes = {
   network: {

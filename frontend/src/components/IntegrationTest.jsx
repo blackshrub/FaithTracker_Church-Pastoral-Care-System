@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { Loader2, CheckCircle2, XCircle, MessageSquare, Mail } from 'lucide-react';
+
 import api from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle2, XCircle, MessageSquare, Mail } from 'lucide-react';
 
 export const IntegrationTest = () => {
   const [whatsappPhone, setWhatsappPhone] = useState('6281290080025');

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
 import { useTranslation } from 'react-i18next';
+
+import { Badge } from '@/components/ui/badge';
 
 export const EngagementBadge = ({ status, days }) => {
   const { t } = useTranslation();
