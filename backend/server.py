@@ -8763,8 +8763,10 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                     new_member = {
                         "id": generate_uuid(),
                         "campus_id": campus_id,
+                        "church_id": campus_id,  # Use campus_id as church_id for multi-tenancy
                         **member_data,
                         "is_archived": not is_active,
+                        "is_active": is_active,
                         "engagement_status": "active",
                         "days_since_last_contact": 999,
                         "created_at": datetime.now(timezone.utc)
