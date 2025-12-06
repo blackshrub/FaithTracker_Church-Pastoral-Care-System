@@ -9,7 +9,7 @@ Framework: Litestar + msgspec (migrated from FastAPI + Pydantic)
 from litestar import Litestar, Router, get, post, put, patch, delete, Request, Response
 from litestar.di import Provide
 from litestar.exceptions import HTTPException, NotAuthorizedException, PermissionDeniedException
-from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_413_REQUEST_ENTITY_TOO_LARGE, HTTP_500_INTERNAL_SERVER_ERROR
+from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_413_REQUEST_ENTITY_TOO_LARGE, HTTP_429_TOO_MANY_REQUESTS, HTTP_500_INTERNAL_SERVER_ERROR
 from litestar.datastructures import UploadFile, State
 from litestar.params import Parameter
 from litestar.response import Response as LitestarResponse, File as LitestarFile, Stream
@@ -305,6 +305,114 @@ class SecurityHeadersMiddleware(AbstractMiddleware):
         else:
             await self.app(scope, receive, send)
 
+# ==================== LOGIN RATE LIMITING & ACCOUNT LOCKOUT ====================
+
+# In-memory storage for login attempts (per IP and per account)
+# Format: {"ip:email": {"attempts": int, "last_attempt": datetime, "locked_until": datetime | None}}
+_login_attempts: Dict[str, Dict[str, Any]] = {}
+
+# Security constants for brute force protection
+LOGIN_MAX_ATTEMPTS = 5  # Max failed attempts before lockout
+LOGIN_LOCKOUT_MINUTES = 15  # Account lockout duration
+LOGIN_ATTEMPT_WINDOW_MINUTES = 5  # Time window to count attempts
+
+def _get_client_ip(request: Request) -> str:
+    """Extract client IP from request, handling proxied requests"""
+    # Check X-Forwarded-For header (from Traefik/reverse proxy)
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        # Take the first IP (original client)
+        return forwarded_for.split(",")[0].strip()
+    # Check X-Real-IP header
+    real_ip = request.headers.get("x-real-ip", "")
+    if real_ip:
+        return real_ip.strip()
+    # Fallback to direct connection IP
+    client = request.scope.get("client")
+    return client[0] if client else "unknown"
+
+def _check_login_rate_limit(ip: str, email: str) -> tuple[bool, str | None]:
+    """
+    Check if login attempt is allowed.
+    Returns (is_allowed, error_message).
+    """
+    key = f"{ip}:{email.lower()}"
+    now = datetime.now(timezone.utc)
+
+    if key in _login_attempts:
+        record = _login_attempts[key]
+
+        # Check if account is locked
+        if record.get("locked_until"):
+            if now < record["locked_until"]:
+                remaining = int((record["locked_until"] - now).total_seconds() // 60) + 1
+                return False, f"Account temporarily locked. Try again in {remaining} minutes."
+            else:
+                # Lockout expired, reset
+                del _login_attempts[key]
+                return True, None
+
+        # Check if within attempt window
+        window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
+        if record["last_attempt"] > window_start:
+            if record["attempts"] >= LOGIN_MAX_ATTEMPTS:
+                # Lock the account
+                record["locked_until"] = now + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+                logger.warning(f"Account locked due to too many failed attempts: {email} from {ip}")
+                return False, f"Too many failed attempts. Account locked for {LOGIN_LOCKOUT_MINUTES} minutes."
+
+    return True, None
+
+def _record_failed_login(ip: str, email: str) -> None:
+    """Record a failed login attempt"""
+    key = f"{ip}:{email.lower()}"
+    now = datetime.now(timezone.utc)
+
+    if key in _login_attempts:
+        record = _login_attempts[key]
+        window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
+
+        if record["last_attempt"] > window_start:
+            record["attempts"] += 1
+        else:
+            # Outside window, reset counter
+            record["attempts"] = 1
+        record["last_attempt"] = now
+    else:
+        _login_attempts[key] = {
+            "attempts": 1,
+            "last_attempt": now,
+            "locked_until": None
+        }
+
+    # Log failed attempt
+    attempts = _login_attempts[key]["attempts"]
+    logger.warning(f"Failed login attempt {attempts}/{LOGIN_MAX_ATTEMPTS} for {email} from {ip}")
+
+def _clear_login_attempts(ip: str, email: str) -> None:
+    """Clear login attempts after successful login"""
+    key = f"{ip}:{email.lower()}"
+    if key in _login_attempts:
+        del _login_attempts[key]
+
+# Cleanup old entries periodically (called on each login attempt)
+def _cleanup_old_login_attempts() -> None:
+    """Remove expired login attempt records to prevent memory growth"""
+    now = datetime.now(timezone.utc)
+    expiry = now - timedelta(minutes=LOGIN_LOCKOUT_MINUTES + LOGIN_ATTEMPT_WINDOW_MINUTES)
+
+    keys_to_delete = []
+    for key, record in _login_attempts.items():
+        # Remove if last attempt was long ago and not locked
+        if record["last_attempt"] < expiry and not record.get("locked_until"):
+            keys_to_delete.append(key)
+        # Remove if lockout has expired
+        elif record.get("locked_until") and record["locked_until"] < now:
+            keys_to_delete.append(key)
+
+    for key in keys_to_delete:
+        del _login_attempts[key]
+
 # ==================== SAFE ERROR HANDLING ====================
 
 # Generic error messages for production (don't expose internal details)
@@ -583,6 +691,60 @@ def validate_phone(phone: str) -> bool:
     # Strip common separators for validation
     cleaned = phone.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
     return bool(PHONE_PATTERN.match(cleaned))
+
+# Password strength constants
+PASSWORD_MIN_LENGTH = 12
+PASSWORD_MAX_LENGTH = 128
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password strength with comprehensive security checks.
+
+    Requirements:
+    - Minimum 12 characters (NIST SP 800-63B recommendation)
+    - Maximum 128 characters (prevent DoS via bcrypt)
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+    - At least one special character
+    - No common passwords
+
+    Returns:
+        (is_valid, error_message)
+    """
+    if not password:
+        return False, "Password is required"
+
+    if len(password) < PASSWORD_MIN_LENGTH:
+        return False, f"Password must be at least {PASSWORD_MIN_LENGTH} characters"
+
+    if len(password) > PASSWORD_MAX_LENGTH:
+        return False, f"Password must be at most {PASSWORD_MAX_LENGTH} characters"
+
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+
+    if not re.search(r'\d', password):
+        return False, "Password must contain at least one digit"
+
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;\'`~]', password):
+        return False, "Password must contain at least one special character"
+
+    # Check for common weak passwords (case-insensitive)
+    common_passwords = {
+        'password123', 'password1234', 'password12345',
+        'admin123456', 'adminpassword',
+        '123456789012', 'qwerty123456',
+        'letmein12345', 'welcome12345',
+        'changeme1234', 'password!123'
+    }
+    if password.lower() in common_passwords:
+        return False, "Password is too common. Please choose a stronger password."
+
+    return True, ""
 
 def is_valid_uuid(value: str) -> bool:
     """Check if a string is a valid UUID format."""
@@ -955,7 +1117,7 @@ class FinancialAidSchedule(Struct):
 # User Authentication Models
 class UserCreate(Struct):
     email: str  # Email validation handled at route level
-    password: Annotated[str, msgspec.Meta(min_length=8, max_length=128)]
+    password: Annotated[str, msgspec.Meta(min_length=12, max_length=128)]  # 12 char min (NIST SP 800-63B)
     name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
     phone: Annotated[str, msgspec.Meta(max_length=20)]  # Pastoral team member's phone for receiving reminders
     role: UserRole = UserRole.PASTOR
@@ -1643,15 +1805,20 @@ async def register_user(data: UserCreate, request: Request) -> dict:
         if not validate_email(data.email):
             raise HTTPException(status_code=400, detail="Invalid email format")
 
+        # Validate password strength (security requirement)
+        is_valid_password, password_error = validate_password_strength(data.password)
+        if not is_valid_password:
+            raise HTTPException(status_code=400, detail=password_error)
+
         # Check if email already exists
         existing = await db.users.find_one({"email": data.email}, {"_id": 0})
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
-        
+
         # Validate campus_id for non-full-admin users
         if data.role != UserRole.FULL_ADMIN and not data.campus_id:
             raise HTTPException(status_code=400, detail="campus_id required for campus admin and pastor roles")
-        
+
         user = User(
             email=data.email,
             name=data.name,
@@ -1687,27 +1854,50 @@ async def register_user(data: UserCreate, request: Request) -> dict:
 
 @post("/auth/login")
 async def login(data: UserLogin, request: Request) -> dict:
-    """Login and get access token (rate limited: 5 attempts per minute)"""
+    """Login and get access token with brute force protection.
+
+    Security features:
+    - Rate limited: 5 failed attempts per 5 minutes per IP+email
+    - Account lockout: 15 minutes after 5 failed attempts
+    - Same error message for invalid email/password (prevents enumeration)
+    """
+    client_ip = _get_client_ip(request)
+
+    # Cleanup old entries periodically
+    _cleanup_old_login_attempts()
+
+    # Check rate limit BEFORE processing login
+    is_allowed, error_msg = _check_login_rate_limit(client_ip, data.email)
+    if not is_allowed:
+        raise HTTPException(
+            status_code=HTTP_429_TOO_MANY_REQUESTS,
+            detail=error_msg
+        )
+
     try:
         user = await db.users.find_one({"email": data.email}, {"_id": 0})
         if not user:
+            # Record failed attempt (user not found)
+            _record_failed_login(client_ip, data.email)
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
             )
-        
+
         if not verify_password(data.password, user["hashed_password"]):
+            # Record failed attempt (wrong password)
+            _record_failed_login(client_ip, data.email)
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
             )
-        
+
         if not user.get("is_active", True):
             raise HTTPException(
                 status_code=HTTP_403_FORBIDDEN,
                 detail="User account is disabled"
             )
-        
+
         # For campus-specific users, validate campus_id
         if user.get("role") in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             if data.campus_id and user["campus_id"] != data.campus_id:
@@ -1715,7 +1905,7 @@ async def login(data: UserLogin, request: Request) -> dict:
                     status_code=HTTP_403_FORBIDDEN,
                     detail="You don't have access to this campus"
                 )
-        
+
         # For full admins, use the selected campus_id from login
         active_campus_id = user.get("campus_id")
         if user.get("role") == UserRole.FULL_ADMIN.value:
@@ -1732,14 +1922,19 @@ async def login(data: UserLogin, request: Request) -> dict:
                     status_code=HTTP_400_BAD_REQUEST,
                     detail="Please select a campus to continue"
                 )
-        
+
+        # Clear failed attempts on successful login
+        _clear_login_attempts(client_ip, data.email)
+
         access_token = create_access_token(data={"sub": user["id"]})
-        
+
         campus_name = None
         if active_campus_id:
             campus = await db.campuses.find_one({"id": active_campus_id}, {"_id": 0})
             campus_name = campus["campus_name"] if campus else None
-        
+
+        logger.info(f"Successful login for {data.email} from {client_ip}")
+
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
@@ -1861,8 +2056,11 @@ async def update_user(user_id: str, data: UserUpdate, request: Request) -> dict:
         if 'phone' in update_data and update_data['phone']:
             update_data['phone'] = normalize_phone_number(update_data['phone'])
 
-        # Hash password if provided
+        # Hash password if provided (with strength validation)
         if 'password' in update_data:
+            is_valid_password, password_error = validate_password_strength(update_data['password'])
+            if not is_valid_password:
+                raise HTTPException(status_code=400, detail=password_error)
             update_data['hashed_password'] = get_password_hash(update_data['password'])
             del update_data['password']
 
@@ -1961,9 +2159,14 @@ async def change_password(data: PasswordChange, request: Request) -> dict:
         if not verify_password(data.current_password, user["hashed_password"]):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
 
-        # Validate new password (8 chars minimum to match registration)
-        if len(data.new_password) < 8:
-            raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+        # Validate new password strength (security requirement)
+        is_valid_password, password_error = validate_password_strength(data.new_password)
+        if not is_valid_password:
+            raise HTTPException(status_code=400, detail=password_error)
+
+        # Ensure new password is different from current
+        if verify_password(data.new_password, user["hashed_password"]):
+            raise HTTPException(status_code=400, detail="New password must be different from current password")
 
         # Hash and update password
         new_hashed = get_password_hash(data.new_password)
