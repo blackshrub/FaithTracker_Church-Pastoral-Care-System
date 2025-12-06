@@ -8052,22 +8052,31 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
             api_path_prefix = '/' + api_path_prefix
         api_path_prefix = api_path_prefix.rstrip('/')
 
+        # Handle password: if masked (********), use existing; otherwise use new plaintext
+        if data.api_password == "********":
+            if existing and existing.get("api_password"):
+                password_to_store = existing["api_password"]  # Keep existing encrypted password
+                password_for_login = decrypt_password(existing["api_password"])
+            else:
+                raise HTTPException(status_code=400, detail="No stored password found. Please enter your password.")
+        else:
+            password_to_store = encrypt_password(data.api_password)  # Encrypt new password
+            password_for_login = data.api_password
+
         # Get core church_id by logging in to core API
         core_church_id = None
         try:
             import httpx
             base_url = data.api_base_url.rstrip('/')
             async with httpx.AsyncClient(timeout=10.0) as client:
-                decrypted_pwd = decrypt_password(data.api_password)
-                if not decrypted_pwd:
-                    raise Exception("Failed to decrypt API password")
-                login_response = await client.post(
-                    f"{base_url}{api_path_prefix}/auth/login",
-                    json={"email": data.api_email, "password": decrypted_pwd}
-                )
-                if login_response.status_code == 200:
-                    login_data = login_response.json()
-                    core_church_id = login_data.get("user", {}).get("church_id") or login_data.get("church", {}).get("id")
+                if password_for_login:
+                    login_response = await client.post(
+                        f"{base_url}{api_path_prefix}/auth/login",
+                        json={"email": data.api_email, "password": password_for_login}
+                    )
+                    if login_response.status_code == 200:
+                        login_data = login_response.json()
+                        core_church_id = login_data.get("user", {}).get("church_id") or login_data.get("church", {}).get("id")
         except Exception:
             pass  # If we can't get church_id, continue without it
 
@@ -8078,7 +8087,7 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
             "api_base_url": data.api_base_url.rstrip('/'),
             "api_path_prefix": api_path_prefix,
             "api_email": data.api_email,
-            "api_password": encrypt_password(data.api_password),  # Encrypt password
+            "api_password": password_to_store,  # Use determined password
             "polling_interval_hours": data.polling_interval_hours,
             "reconciliation_enabled": data.reconciliation_enabled,
             "reconciliation_time": data.reconciliation_time,
@@ -8185,11 +8194,23 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
         api_path_prefix = api_path_prefix.rstrip('/')
         base_url = data.api_base_url.rstrip('/')
 
+        # Handle password: if masked (********), fetch from database; otherwise use plaintext
+        if data.api_password == "********":
+            campus_id = current_user.get("campus_id")
+            stored_config = await db.sync_configs.find_one({"campus_id": campus_id})
+            if not stored_config or not stored_config.get("api_password"):
+                raise HTTPException(status_code=400, detail="No stored password found. Please enter your password.")
+            password_to_use = decrypt_password(stored_config["api_password"])
+            if not password_to_use:
+                raise HTTPException(status_code=400, detail="Failed to decrypt stored password. Please re-enter it.")
+        else:
+            password_to_use = data.api_password
+
         # Login to core API
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 f"{base_url}{api_path_prefix}/auth/login",
-                json={"email": data.api_email, "password": data.api_password}
+                json={"email": data.api_email, "password": password_to_use}
             )
 
             if login_response.status_code != 200:
@@ -8330,13 +8351,24 @@ async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict
 
         # Test login - send as 'email' key even if it's not email format (core API requirement)
         login_url = f"{base_url}{api_path_prefix}{login_endpoint}"
-        decrypted_pwd = decrypt_password(data.api_password)
-        if not decrypted_pwd:
-            raise HTTPException(status_code=400, detail="Failed to decrypt API password. Please re-enter it.")
+
+        # Handle password: if masked (********), fetch from database; otherwise use plaintext
+        if data.api_password == "********":
+            # Fetch stored encrypted password from database
+            campus_id = current_user.get("campus_id")
+            stored_config = await db.sync_configs.find_one({"campus_id": campus_id})
+            if not stored_config or not stored_config.get("api_password"):
+                raise HTTPException(status_code=400, detail="No stored password found. Please enter your password.")
+            password_to_use = decrypt_password(stored_config["api_password"])
+            if not password_to_use:
+                raise HTTPException(status_code=400, detail="Failed to decrypt stored password. Please re-enter it.")
+        else:
+            # Password is plaintext from frontend
+            password_to_use = data.api_password
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
                 login_url,
-                json={"email": data.api_email, "password": decrypted_pwd}
+                json={"email": data.api_email, "password": password_to_use}
             )
 
             if login_response.status_code != 200:
