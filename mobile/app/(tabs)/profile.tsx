@@ -33,6 +33,7 @@ import {
   Shield,
   Fingerprint,
   ScanFace,
+  FileText,
 } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 
@@ -358,6 +359,24 @@ function ProfileScreen() {
                 </Pressable>
               </>
             )}
+          </View>
+        </View>
+
+        {/* Tools Section */}
+        <View className="mt-6">
+          <Text className="text-sm font-semibold text-gray-500 mb-2 ml-1 uppercase tracking-wide">
+            {t('profile.tools', 'Tools')}
+          </Text>
+
+          <View className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <SettingsRow
+              icon={FileText}
+              label={t('reports.title', 'Reports')}
+              onPress={() => {
+                haptics.tap();
+                router.push('/reports');
+              }}
+            />
           </View>
         </View>
 
