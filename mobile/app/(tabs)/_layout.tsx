@@ -1,7 +1,7 @@
 /**
  * Tabs Layout
  *
- * Main tab navigation with native performance optimizations
+ * Main tab navigation with premium animated tab bar
  *
  * Tabs:
  * - Today (Dashboard)
@@ -14,6 +14,7 @@ import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Home, Users, CheckSquare, User } from 'lucide-react-native';
 
+import { AnimatedTabBar } from '@/components/ui/AnimatedTabBar';
 import { colors } from '@/constants/theme';
 
 export default function TabsLayout() {
@@ -21,23 +22,9 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      tabBar={(props) => <AnimatedTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        // Tab bar styling
-        tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.gray[200],
-          borderTopWidth: 1,
-          height: 80,
-          paddingBottom: 20,
-          paddingTop: 10,
-        },
-        tabBarActiveTintColor: colors.primary[600],
-        tabBarInactiveTintColor: colors.gray[400],
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        },
         // Performance optimizations
         lazy: false, // Pre-mount all tabs
         freezeOnBlur: true, // Freeze inactive tabs (90% CPU reduction)
