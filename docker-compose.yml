@@ -143,8 +143,8 @@ services:
       - "traefik.http.middlewares.backend-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.backend-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
       # Strict rate limit for auth endpoints (login/register)
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.average=10"
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.burst=5"
+      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.average=30"
+      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.burst=20"
       - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.period=1m"
       # In-Flight Requests - Limit concurrent connections per IP (prevents slowloris)
       - "traefik.http.middlewares.backend-inflightreq.inflightreq.amount=50"
@@ -181,9 +181,9 @@ services:
       - "traefik.http.routers.backend-auth.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend-auth.priority=20"
       - "traefik.http.routers.backend-auth.service=backend"
-      - "traefik.http.routers.backend-auth.middlewares=backend-auth-ratelimit,backend-security,backend-cors,backend-buffering"
+      - "traefik.http.routers.backend-auth.middlewares=backend-cors,backend-auth-ratelimit,backend-security,backend-buffering"
       # Apply all security middlewares to main router
-      - "traefik.http.routers.backend.middlewares=backend-ratelimit,backend-inflightreq,backend-security,backend-compress,backend-cors,backend-buffering"
+      - "traefik.http.routers.backend.middlewares=backend-cors,backend-ratelimit,backend-inflightreq,backend-security,backend-compress,backend-buffering"
     # Resource limits to prevent runaway memory/CPU usage
     deploy:
       resources:
