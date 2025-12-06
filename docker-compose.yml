@@ -138,13 +138,14 @@ services:
       - "traefik.http.routers.backend-sse.middlewares=backend-cors"
       # ==================== WAF-LIKE SECURITY MIDDLEWARES ====================
       # Rate Limiting - Prevent DDoS and brute force at edge
-      - "traefik.http.middlewares.backend-ratelimit.ratelimit.average=100"
-      - "traefik.http.middlewares.backend-ratelimit.ratelimit.burst=50"
+      # NOTE: Rate limiter 429 responses don't include CORS headers, so limits must be generous
+      - "traefik.http.middlewares.backend-ratelimit.ratelimit.average=500"
+      - "traefik.http.middlewares.backend-ratelimit.ratelimit.burst=200"
       - "traefik.http.middlewares.backend-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.backend-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
-      # Strict rate limit for auth endpoints (login/register)
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.average=30"
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.burst=20"
+      # Rate limit for auth endpoints (login/register) - higher to avoid CORS issues
+      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.average=200"
+      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.burst=100"
       - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.period=1m"
       # In-Flight Requests - Limit concurrent connections per IP (prevents slowloris)
       - "traefik.http.middlewares.backend-inflightreq.inflightreq.amount=50"
