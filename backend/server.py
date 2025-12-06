@@ -1093,6 +1093,18 @@ class FinancialAidSchedule(Struct):
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Settings Models
+class AutomationSettingsUpdate(Struct):
+    """Automation settings (daily digest time, WhatsApp gateway)"""
+    digestTime: str = "08:00"
+    whatsappGateway: str = ""
+    enabled: bool = True
+
+class OverdueWriteoffSettingsUpdate(Struct):
+    """Overdue task writeoff settings"""
+    days: int = 30
+    enabled: bool = False
+
 # User Authentication Models
 class UserCreate(Struct):
     email: str  # Email validation handled at route level
@@ -7806,12 +7818,12 @@ async def get_automation_settings(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @put("/settings/automation")
-async def update_automation_settings(settings: dict, request: Request) -> dict:
+async def update_automation_settings(data: AutomationSettingsUpdate, request: Request) -> dict:
     """Update automation settings (daily digest time, WhatsApp gateway)"""
     current_admin = await get_current_admin(request)
     try:
         # Validate digestTime format (HH:MM)
-        digest_time = settings.get("digestTime", "08:00")
+        digest_time = data.digestTime
         if digest_time:
             try:
                 hour, minute = digest_time.split(":")
@@ -7826,8 +7838,8 @@ async def update_automation_settings(settings: dict, request: Request) -> dict:
                 "type": "automation",
                 "data": {
                     "digestTime": digest_time,
-                    "whatsappGateway": settings.get("whatsappGateway", ""),
-                    "enabled": settings.get("enabled", True)
+                    "whatsappGateway": data.whatsappGateway,
+                    "enabled": data.enabled
                 },
                 "updated_at": datetime.now(timezone.utc),
                 "updated_by": current_admin["id"]
@@ -7869,18 +7881,17 @@ async def get_overdue_writeoff_settings(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @put("/settings/overdue_writeoff")
-async def update_overdue_writeoff_settings(settings_data: dict, request: Request) -> dict:
+async def update_overdue_writeoff_settings(data: OverdueWriteoffSettingsUpdate, request: Request) -> dict:
     """Update overdue write-off threshold settings"""
+    current_admin = await get_current_admin(request)
     try:
-        if user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
-            raise HTTPException(status_code=403, detail="Only admins can update settings")
-
         await db.settings.update_one(
             {"key": "overdue_writeoff"},
             {"$set": {
                 "key": "overdue_writeoff",
-                "data": settings_data.get("data", {}),
-                "updated_at": datetime.now(timezone.utc)
+                "data": {"days": data.days, "enabled": data.enabled},
+                "updated_at": datetime.now(timezone.utc),
+                "updated_by": current_admin["id"]
             }},
             upsert=True
         )
