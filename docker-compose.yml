@@ -182,7 +182,7 @@ services:
       - "traefik.http.routers.backend-auth.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend-auth.priority=20"
       - "traefik.http.routers.backend-auth.service=backend"
-      - "traefik.http.routers.backend-auth.middlewares=backend-cors,backend-auth-ratelimit,backend-security,backend-buffering"
+      - "traefik.http.routers.backend-auth.middlewares=backend-cors,backend-security,backend-buffering"
       # Apply all security middlewares to main router
       - "traefik.http.routers.backend.middlewares=backend-cors,backend-ratelimit,backend-inflightreq,backend-security,backend-compress,backend-buffering"
     # Resource limits to prevent runaway memory/CPU usage
