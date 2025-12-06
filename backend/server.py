@@ -1745,14 +1745,18 @@ async def list_campuses() -> list:
         logger.error(f"Error listing campuses: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+async def _get_campus_by_id(campus_id: str) -> dict:
+    """Internal helper to get campus by ID"""
+    campus = await db.campuses.find_one({"id": campus_id}, {"_id": 0})
+    if not campus:
+        raise HTTPException(status_code=404, detail="Campus not found")
+    return campus
+
 @get("/campuses/{campus_id:str}")
 async def get_campus(campus_id: str) -> dict:
     """Get campus by ID"""
     try:
-        campus = await db.campuses.find_one({"id": campus_id}, {"_id": 0})
-        if not campus:
-            raise HTTPException(status_code=404, detail="Campus not found")
-        return campus
+        return await _get_campus_by_id(campus_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -1779,7 +1783,7 @@ async def update_campus(campus_id: str, data: CampusCreate, request: Request) ->
         # Invalidate campus cache
         invalidate_cache("campuses:")
 
-        return await get_campus(campus_id)
+        return await _get_campus_by_id(campus_id)
     except HTTPException:
         raise
     except Exception as e:
