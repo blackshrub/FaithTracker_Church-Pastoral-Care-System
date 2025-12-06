@@ -241,7 +241,7 @@ services:
       - "traefik.http.middlewares.frontend-security.headers.frameDeny=true"
       - "traefik.http.middlewares.frontend-security.headers.referrerPolicy=strict-origin-when-cross-origin"
       - "traefik.http.middlewares.frontend-security.headers.permissionsPolicy=geolocation=(), microphone=(), camera=(), payment=()"
-      - "traefik.http.middlewares.frontend-security.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      - "traefik.http.middlewares.frontend-security.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       # Brotli/Gzip compression middleware for static assets
       - "traefik.http.middlewares.frontend-compress.compress=true"
       - "traefik.http.middlewares.frontend-compress.compress.minresponsebodybytes=256"
