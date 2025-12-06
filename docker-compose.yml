@@ -248,7 +248,7 @@ services:
       - "traefik.http.middlewares.frontend-compress.compress=true"
       - "traefik.http.middlewares.frontend-compress.compress.minresponsebodybytes=256"
       # Apply all middlewares
-      - "traefik.http.routers.frontend.middlewares=frontend-ratelimit,frontend-security,frontend-compress"
+      - "traefik.http.routers.frontend.middlewares=frontend-security,frontend-compress"
     # Resource limits to prevent runaway memory/CPU usage
     deploy:
       resources:
