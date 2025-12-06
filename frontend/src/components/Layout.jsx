@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Church, LogOut, ChevronDown } from 'lucide-react';
@@ -14,8 +14,6 @@ import { DashboardLink } from './LinkWithPrefetch';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-
-
 export const Layout = ({ children }) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();

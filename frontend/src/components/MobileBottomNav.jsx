@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Users, Calendar, BarChart3, MoreHorizontal, DollarSign, Shield, Upload, MessageSquare, Bell, Settings as SettingsIcon, LogOut, Activity, FileText } from 'lucide-react';

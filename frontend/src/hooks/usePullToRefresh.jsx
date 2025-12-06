@@ -83,8 +83,7 @@ export function usePullToRefresh(onRefresh, options = {}) {
 
       try {
         await onRefresh();
-      } catch (error) {
-        console.error('Pull to refresh error:', error);
+      } catch (_error) {
       } finally {
         setIsRefreshing(false);
         setPullProgress(0);

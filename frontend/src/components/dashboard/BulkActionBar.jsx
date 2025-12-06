@@ -3,8 +3,6 @@
  *
  * Appears when items are selected, provides bulk complete/ignore/delete actions.
  */
-
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, Trash2, XCircle } from 'lucide-react';
 

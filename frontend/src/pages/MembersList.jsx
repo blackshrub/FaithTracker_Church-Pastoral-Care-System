@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
@@ -174,7 +174,6 @@ export const MembersList = () => {
       setSearchLoading(false); // Clear loading on error too
       setLoadError(error);
       toast.error(t('error_messages.failed_to_save'));
-      console.error('Error loading members:', error);
     } finally {
       setLoading(false);
       setTableLoading(false);
@@ -196,7 +195,7 @@ export const MembersList = () => {
       setAddModalOpen(false);
       setNewMember({ name: '', phone: '', notes: '' });
       loadMembers();
-    } catch (error) {
+    } catch (_error) {
       toast.error(t('error_messages.failed_to_save'));
     } finally {
       setSaving(false);
@@ -212,7 +211,7 @@ export const MembersList = () => {
       setEditModalOpen(false);
       setEditingMember(null);
       loadMembers();
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to update');
     } finally {
       setSaving(false);
@@ -229,7 +228,7 @@ export const MembersList = () => {
           toast.success('Member deleted');
           loadMembers();
           closeConfirm();
-        } catch (error) {
+        } catch (_error) {
           toast.error('Failed to delete member');
           closeConfirm();
         }
@@ -249,7 +248,7 @@ export const MembersList = () => {
           setSelectedMembers([]);
           loadMembers();
           closeConfirm();
-        } catch (error) {
+        } catch (_error) {
           toast.error('Failed to delete members');
           closeConfirm();
         }

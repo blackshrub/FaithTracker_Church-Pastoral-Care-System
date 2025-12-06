@@ -4,7 +4,7 @@
  * Manages all care event operations with complete accountability tracking
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,8 +31,6 @@ import { EngagementBadge } from '@/components/EngagementBadge';
 import { EventTypeBadge } from '@/components/EventTypeBadge';
 import { MemberProfileHeader, TimelineEventCard } from '@/components/member';
 import { formatDate, getTodayLocal, formatDateToLocalTimezone } from '@/lib/dateUtils';
-
-
 // Aid type icon helper
 const getAidTypeIcon = (aidType) => {
   const icons = {
@@ -160,7 +158,6 @@ export const MemberDetail = () => {
       });
       queryClient.invalidateQueries(['member', id]);
     } catch (error) {
-      console.error('Full error:', error);
       const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
       toast.error('Failed to log visit: ' + errorMsg);
     }
@@ -363,7 +360,6 @@ export const MemberDetail = () => {
       }
     } catch (error) {
       toast.error(t('error_messages.failed_to_send'));
-      console.error('Error sending reminder:', error);
     }
   };
   
@@ -376,7 +372,6 @@ export const MemberDetail = () => {
       api.get(`/dashboard/reminders`).catch(() => {});
     } catch (error) {
       toast.error(t('toasts.failed_mark_birthday'));
-      console.error('Error completing birthday:', error);
     }
   };
   
@@ -387,7 +382,6 @@ export const MemberDetail = () => {
       queryClient.invalidateQueries(['member', id]);
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
-      console.error('Error completing stage:', error);
     }
   };
   
@@ -1071,7 +1065,6 @@ export const MemberDetail = () => {
                                         queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
                                         toast.error('Failed to ignore');
-                                        console.error('Error ignoring grief stage:', error);
                                       }
                                     }}>
                                       Ignore
@@ -1340,7 +1333,6 @@ export const MemberDetail = () => {
                                         queryClient.invalidateQueries(['member', id]);
                                       } catch (error) {
                                         toast.error('Failed to ignore');
-                                        console.error('Error ignoring accident stage:', error);
                                       }
                                     }}>
                                       Ignore
@@ -1603,8 +1595,6 @@ export const MemberDetail = () => {
                                 {/* Frequency + Aid Type */}
                                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                                   <span className="inline-flex items-center gap-1">
-
-
                                     🔄 {schedule.frequency?.charAt(0).toUpperCase() + schedule.frequency?.slice(1)}
                                   </span>
                                   <span>•</span>

@@ -66,7 +66,12 @@ export default [
 
       // General best practices
       'no-console': 'warn',
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        caughtErrors: 'none'  // Don't warn on unused catch clause variables
+      }],
       'no-debugger': 'warn',
       'prefer-const': 'warn',
       'no-var': 'error',

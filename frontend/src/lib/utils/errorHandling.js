@@ -36,7 +36,6 @@ export const handleApiError = (error, defaultMessage = 'Something went wrong') =
 
   // Log in development only
   if (import.meta.env.DEV) {
-    console.error('API Error:', error);
   }
 
   return message;

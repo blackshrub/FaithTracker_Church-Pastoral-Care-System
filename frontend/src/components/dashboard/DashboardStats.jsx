@@ -3,7 +3,7 @@
  * Displays 4 key metrics: Total Members, Tasks Due Today, Overdue Follow-ups, Members Needing Care
  */
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
 import { Users, Bell, Heart, AlertTriangle } from 'lucide-react';

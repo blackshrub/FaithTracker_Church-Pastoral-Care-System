@@ -3,8 +3,6 @@
  *
  * Tests the member profile header display, interactions, and responsive behavior
  */
-
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 

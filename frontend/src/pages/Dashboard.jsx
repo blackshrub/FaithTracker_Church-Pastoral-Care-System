@@ -4,12 +4,12 @@
  * Uses React Query for optimized data fetching and caching
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format as formatDateFns } from 'date-fns';
-import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Phone, Cake, CalendarIcon, CheckSquare, Square } from 'lucide-react';
+import { Heart, Users, Hospital, AlertTriangle, DollarSign, Bell, Plus, Check, MoreVertical, Cake, CalendarIcon, CheckSquare, Square } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import { useConfirmDialog } from '@/hooks';
@@ -17,10 +17,9 @@ import LazyImage from '@/components/LazyImage';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { MemberLink, LinkWithPrefetch } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
-import { formatDateToJakarta, formatRelativeTime } from '@/lib/dateUtils';
+import { formatDateToJakarta } from '@/lib/dateUtils';
 import { getGriefStageBadge, getAccidentStageBadge } from '@/lib/utils/badges';
-import { getInitials, formatPhoneForWhatsApp } from '@/lib/utils/formatting';
-import { handleApiError } from '@/lib/utils/errorHandling';
+import { formatPhoneForWhatsApp } from '@/lib/utils/formatting';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +30,6 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -39,7 +37,6 @@ import { DashboardStats, BirthdaySection, LiveActivityFeed, BulkActionBar } from
 import { useBulkMutation, useBulkSelection } from '@/hooks/useBulkMutation';
 import { DashboardSkeleton } from '@/components/skeletons';
 import { ErrorState } from '@/components/ErrorState';
-import { EmptyTasks } from '@/components/EmptyState';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -132,7 +129,7 @@ const markBirthdayComplete = async (eventId, queryClient, t) => {
     toast.success(t('toasts.birthday_completed'));
     // Refetch to get accurate data
     await queryClient.invalidateQueries(['dashboard']);
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete'));
     // Revert optimistic update on error
     queryClient.invalidateQueries(['dashboard']);
@@ -155,7 +152,7 @@ const markGriefStageComplete = async (stageId, queryClient, t) => {
     await api.post(`/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
     await queryClient.invalidateQueries(['dashboard']);
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete'));
     queryClient.invalidateQueries(['dashboard']);
   }
@@ -167,7 +164,7 @@ const markAccidentComplete = async (eventId, queryClient, t) => {
     toast.success(t('toasts.accident_completed'));
     // Invalidate and refetch dashboard data
     await queryClient.invalidateQueries(['dashboard']);
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete'));
   }
 };
@@ -197,9 +194,8 @@ const markMemberContacted = async (memberId, memberName, user, queryClient, t) =
     toast.success(t('toasts.member_contacted', {name: memberName}));
     // Invalidate and refetch dashboard data
     await queryClient.invalidateQueries(['dashboard']);
-  } catch (error) {
+  } catch (_error) {
     toast.error('Failed to mark as contacted');
-    console.error('Error marking member contacted:', error);
   }
 };
 
@@ -456,7 +452,7 @@ export const Dashboard = () => {
       // Refresh dashboard to show new tasks - Invalidate React Query cache
       queryClient.invalidateQueries(['dashboard']);
       queryClient.invalidateQueries(['members']);
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to add events');
     }
   };
@@ -1103,7 +1099,7 @@ export const Dashboard = () => {
                                       await api.post(`/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success(t('toasts.payment_distributed'));
                                       await queryClient.invalidateQueries(['dashboard']);
-                                    } catch (error) {
+                                    } catch (_error) {
                                       toast.error(t('toasts.failed_mark_distributed'));
                                     }
                                   }} className="h-11 flex-1 min-w-0">
@@ -1122,7 +1118,7 @@ export const Dashboard = () => {
                                           await api.post(`/financial-aid-schedules/${task.data.id}/ignore`);
                                           toast.success(t('toasts.financial_aid_ignored'));
                                           await queryClient.invalidateQueries(['dashboard']);
-                                        } catch (error) {
+                                        } catch (_error) {
                                           toast.error(t('toasts.failed_ignore'));
                                         }
                                       }}>
@@ -1135,7 +1131,7 @@ export const Dashboard = () => {
                                             await api.post(`/financial-aid-schedules/${task.data.id}/stop`);
                                             toast.success(t('toasts.schedule_stopped'));
                                             await queryClient.invalidateQueries(['dashboard']);
-                                          } catch (error) {
+                                          } catch (_error) {
                                             toast.error(t('toasts.failed_stop'));
                                           }
                                         }}
@@ -1158,7 +1154,7 @@ export const Dashboard = () => {
                                         toast.success(t('toasts.followup_completed'));
                                         await queryClient.invalidateQueries(['dashboard']);
                                       }
-                                    } catch (error) {
+                                    } catch (_error) {
                                       toast.error(t('toasts.failed_mark_completed'));
                                     }
                                   }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
@@ -1182,7 +1178,7 @@ export const Dashboard = () => {
                                             toast.success(t('toasts.accident_ignored'));
                                           }
                                           await queryClient.invalidateQueries(['dashboard']);
-                                        } catch (error) {
+                                        } catch (_error) {
                                       toast.error('Failed to ignore');
                                     }
                                   }}>
@@ -1319,7 +1315,7 @@ export const Dashboard = () => {
                                 await api.post(`/care-events/${event.id}/complete`);
                                 toast.success(t('toasts.birthday_marked_completed'));
                                 await queryClient.invalidateQueries(['dashboard']);
-                              } catch (error) {
+                              } catch (_error) {
                                 toast.error(t('toasts.failed_mark_completed'));
                               }
                             }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
@@ -1338,7 +1334,7 @@ export const Dashboard = () => {
                                     await api.post(`/care-events/${event.id}/ignore`);
                                     toast.success(t('toasts.birthday_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
-                                  } catch (error) {
+                                  } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
                                 }}>
@@ -1470,7 +1466,7 @@ export const Dashboard = () => {
                                 await api.post(`/accident-followup/${followup.id}/complete`);
                                 toast.success(t('toasts.accident_completed'));
                                 await queryClient.invalidateQueries(['dashboard']);
-                              } catch (error) {
+                              } catch (_error) {
                                 toast.error(t('toasts.failed_complete'));
                               }
                             }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
@@ -1489,7 +1485,7 @@ export const Dashboard = () => {
                                     await api.post(`/accident-followup/${followup.id}/ignore`);
                                     toast.success(t('toasts.accident_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
-                                  } catch (error) {
+                                  } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
                                 }}>
@@ -1570,7 +1566,7 @@ export const Dashboard = () => {
                                     await api.post(`/grief-support/${stage.id}/ignore`);
                                     toast.success(t('toasts.grief_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
-                                  } catch (error) {
+                                  } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
                                 }}>
@@ -1677,7 +1673,7 @@ export const Dashboard = () => {
                                       toast.success(t('toasts.payment_distributed_advanced'));
                                       await queryClient.invalidateQueries(['dashboard']);
                                       closeConfirm();
-                                    } catch (error) {
+                                    } catch (_error) {
                                       toast.error('Failed to mark as distributed');
                                       closeConfirm();
                                     }
@@ -1701,7 +1697,7 @@ export const Dashboard = () => {
                                     await api.post(`/financial-aid-schedules/${schedule.id}/ignore`);
                                     toast.success(t('toasts.financial_aid_schedule_ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
-                                  } catch (error) {
+                                  } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
                                 }}>
@@ -1719,7 +1715,7 @@ export const Dashboard = () => {
                                           toast.success(t('toasts.schedule_stopped'));
                                           await queryClient.invalidateQueries(['dashboard']);
                                           closeConfirm();
-                                        } catch (error) {
+                                        } catch (_error) {
                                           toast.error(t('toasts.failed_stop_schedule'));
                                           closeConfirm();
                                         }
@@ -1961,7 +1957,7 @@ export const Dashboard = () => {
                                 await api.post(`/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                 toast.success(t('toasts.payment_distributed'));
                                 await queryClient.invalidateQueries(['dashboard']);
-                              } catch (error) {
+                              } catch (_error) {
                                 toast.error(t('toasts.failed'));
                               }
                             }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
@@ -1984,8 +1980,7 @@ export const Dashboard = () => {
                                   toast.success(t('toasts.completed'));
                                   await queryClient.invalidateQueries(['dashboard']);
                                 }
-                              } catch (error) {
-                                console.error('Error completing upcoming task:', error);
+                              } catch (_error) {
                                 toast.error(t('toasts.failed'));
                               }
                             }} className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50">
@@ -2015,7 +2010,7 @@ export const Dashboard = () => {
                                     toast.success(t('toasts.ignored'));
                                     await queryClient.invalidateQueries(['dashboard']);
                                   }
-                                } catch (error) {
+                                } catch (_error) {
                                   toast.error(t('toasts.failed'));
                                 }
                               }}>

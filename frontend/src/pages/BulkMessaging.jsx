@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Send, Users } from 'lucide-react';
@@ -24,7 +24,7 @@ export const BulkMessaging = () => {
     try {
       const response = await api.get(`/users`);
       setUsers(response.data);
-    } catch (error) {
+    } catch (_error) {
       toast.error(t('bulk_messaging_page.failed_load_users'));
     }
   };
@@ -75,7 +75,7 @@ export const BulkMessaging = () => {
       toast.success(t('bulk_messaging_page.sent_results', {sent, failed}));
       setMessage('');
       setSelectedUsers([]);
-    } catch (error) {
+    } catch (_error) {
       toast.error(t('bulk_messaging_page.bulk_send_failed'));
     } finally {
       setSending(false);

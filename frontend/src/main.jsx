@@ -71,7 +71,9 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // Method 3: Override console.error temporarily
+// eslint-disable-next-line no-console
 const originalError = console.error;
+// eslint-disable-next-line no-console
 console.error = (...args) => {
   if (args[0] && typeof args[0] === 'string' && args[0].includes('ResizeObserver')) {
     return;

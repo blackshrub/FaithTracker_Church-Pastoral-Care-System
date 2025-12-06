@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check, MessageCircle } from 'lucide-react';
@@ -269,7 +269,7 @@ export const Calendar = () => {
                                     );
                                     // Refresh events list
                                     loadEvents();
-                                  } catch (error) {
+                                  } catch (_error) {
                                     toast.error(t('toasts.failed_mark_completed'));
                                   }
                                 }}

@@ -5,7 +5,7 @@
  * Supports keyboard navigation (ArrowUp/Down, Enter, Escape)
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, User, Calendar, X } from 'lucide-react';
 
@@ -67,7 +67,7 @@ const SearchBar = () => {
       const response = await api.get(`/search?q=${encodeURIComponent(searchQuery)}`);
       setResults(response.data);
       setIsOpen(true);
-    } catch (error) {
+    } catch (_error) {
       // Silent error handling - don't log to console in production
       setResults({ members: [], care_events: [] });
     } finally {

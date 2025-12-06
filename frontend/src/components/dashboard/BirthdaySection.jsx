@@ -2,8 +2,6 @@
  * Birthday Section Component
  * Displays today's birthdays or overdue birthdays
  */
-
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -12,8 +10,6 @@ import { TaskCard } from './TaskCard';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import api from '@/lib/api';
-
-
 const triggerHaptic = () => {
   if ('vibrate' in navigator) {
     navigator.vibrate(50);
@@ -36,7 +32,7 @@ const markBirthdayComplete = async (eventId, queryClient, t) => {
     toast.success(t('toasts.birthday_completed'));
     // Refetch to get accurate data
     await queryClient.invalidateQueries(['dashboard']);
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete'));
     // Revert optimistic update on error
     queryClient.invalidateQueries(['dashboard']);

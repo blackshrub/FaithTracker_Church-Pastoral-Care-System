@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,8 +17,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-
-
 export const AdminDashboard = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -229,7 +227,7 @@ export const AdminDashboard = () => {
                                     toast.success(t('toasts.deleted'));
                                     loadData();
                                     closeConfirm();
-                                  } catch (e) {
+                                  } catch (_e) {
                                     toast.error(t('toasts.cannot_delete_has_members'));
                                     closeConfirm();
                                   }
@@ -292,7 +290,7 @@ export const AdminDashboard = () => {
                                         toast.success(t('toasts.deleted'));
                                         loadData();
                                         closeConfirm();
-                                      } catch (e) {
+                                      } catch (_e) {
                                         toast.error(t('toasts.cannot_delete_has_members'));
                                         closeConfirm();
                                       }

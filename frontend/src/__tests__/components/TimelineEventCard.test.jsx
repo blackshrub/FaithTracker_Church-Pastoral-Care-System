@@ -3,8 +3,6 @@
  *
  * Tests the timeline event card display logic and interactions
  */
-
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { TimelineEventCard } from '../../components/member/TimelineEventCard';

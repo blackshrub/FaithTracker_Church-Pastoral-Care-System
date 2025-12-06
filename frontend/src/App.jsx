@@ -8,7 +8,7 @@
  * - TanStack Query handles caching (staleTime/gcTime for fast navigation)
  */
 
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import {
   createBrowserRouter,
   RouterProvider,
@@ -41,8 +41,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-
 // Lazy load components for code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const MembersList = lazy(() => import('@/pages/MembersList'));
@@ -98,8 +96,7 @@ const RootLayout = () => {
       try {
         const response = await api.get('/setup/status');
         setNeedsSetup(response.data.needs_setup);
-      } catch (error) {
-        console.error('Error checking setup status:', error);
+      } catch (_error) {
         setNeedsSetup(false);
       }
     };
@@ -130,7 +127,6 @@ const RootLayout = () => {
 // Handles chunk load failures (common after deployments) by auto-reloading
 const RouteError = () => {
   const error = useRouteError();
-  console.error('Route error:', error);
 
   // Detect chunk load failures (after new deployments)
   const isChunkLoadError =

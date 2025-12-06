@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 import api, { setAuthToken, clearAuthToken } from '@/lib/api';
 
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
         const response = await api.get('/auth/me');
         setUser(response.data);
         setToken(storedToken);
-      } catch (error) {
+      } catch (_error) {
         localStorage.removeItem('token');
         clearAuthToken();
         setToken(null);
@@ -59,7 +59,6 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data);
       return response.data;
     } catch (error) {
-      console.error('Failed to refresh user:', error);
       throw error;
     }
   };

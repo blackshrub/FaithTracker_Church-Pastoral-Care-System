@@ -98,6 +98,7 @@ api.interceptors.response.use(
 
       // Log retry attempt (in development only)
       if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
         console.log(`Retrying request (attempt ${config.__retryCount}/${MAX_RETRIES}):`, config.url);
       }
 

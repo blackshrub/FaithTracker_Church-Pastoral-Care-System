@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -14,8 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-
-
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
@@ -68,7 +66,7 @@ const markBirthdayComplete = async (eventId, loadReminders, t) => {
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
     loadReminders();
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete') || 'Failed to complete');
   }
 };
@@ -78,7 +76,7 @@ const markGriefStageComplete = async (stageId, loadReminders, t) => {
     await api.post(`/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
     loadReminders();
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete') || 'Failed to complete');
   }
 };
@@ -88,7 +86,7 @@ const markAccidentComplete = async (eventId, loadReminders, t) => {
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.accident_completed'));
     loadReminders();
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_complete') || 'Failed to complete');
   }
 };
@@ -110,7 +108,7 @@ const markMemberContacted = async (memberId, memberName, user, loadReminders, t)
     });
     toast.success(t('toasts.member_contacted', {name: memberName}));
     loadReminders(); // Refresh to remove from at-risk/disconnected
-  } catch (error) {
+  } catch (_error) {
     toast.error(t('toasts.failed_mark_contacted'));
   }
 };
@@ -226,8 +224,7 @@ export const Reminders = () => {
       setFinancialAidDue(aidDueRes.data);
       setAtRiskMembers(atRisk);
       setDisconnectedMembers(disconnected);
-    } catch (error) {
-      console.error('Error loading reminders');
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -385,7 +382,7 @@ export const Reminders = () => {
                                   toast.success(t('toasts.payment_distributed_advanced'));
                                   loadReminders();
                                   closeConfirm();
-                                } catch (error) {
+                                } catch (_error) {
                                   toast.error(t('toasts.failed_mark_distributed'));
                                 }
                               }
@@ -408,7 +405,7 @@ export const Reminders = () => {
                                   toast.success(t('toasts.schedule_stopped'));
                                   loadReminders();
                                   closeConfirm();
-                                } catch (error) {
+                                } catch (_error) {
                                   toast.error(t('toasts.failed_stop_schedule'));
                                 }
                               }

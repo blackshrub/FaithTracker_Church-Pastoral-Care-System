@@ -4,7 +4,7 @@
  * Tracks WHO did WHAT on WHICH member with timezone-aware timestamps
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, Download, Filter, User, Activity, Search } from 'lucide-react';
@@ -97,16 +97,13 @@ const ActivityLog = () => {
         date: formattedDate,
         time: formattedTime
       };
-    } catch (error) {
-      console.error('Error formatting date:', dateString, 'timezone:', campusTimezone, error);
+    } catch (_error) {
       return { 
         date: new Date(dateString).toLocaleDateString('id-ID'),
         time: new Date(dateString).toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit', hour12: false})
       };
     }
   };
-
-
   // Load campus timezone
   useEffect(() => {
     const loadCampusTimezone = async () => {
@@ -122,16 +119,13 @@ const ActivityLog = () => {
             Intl.DateTimeFormat().resolvedOptions().timeZone;
           setCampusTimezone(timezone);
         }
-      } catch (error) {
-        console.error('Error loading campus timezone:', error);
+      } catch (_error) {
         // Fallback to initial default (env var or browser timezone)
       }
     };
 
     loadCampusTimezone();
   }, []);
-
-
   // Get default start date (30 days ago)
   function getDefaultStartDate() {
     const date = new Date();
@@ -143,8 +137,6 @@ const ActivityLog = () => {
   function getDefaultEndDate() {
     return new Date().toISOString().split('T')[0];
   }
-
-
   const exportToCSV = () => {
     // CSV headers
     const headers = ['Date', 'Time', 'Staff Member', 'Action', 'Member', 'Event Type', 'Notes'];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -107,8 +107,7 @@ export const FinancialAid = () => {
       setLoadingRecipients(true);
       const response = await api.get('/financial-aid/recipients');
       setRecipients(response.data);
-    } catch (error) {
-      console.error('Error loading recipients:', error);
+    } catch (_error) {
     } finally {
       setLoadingRecipients(false);
     }

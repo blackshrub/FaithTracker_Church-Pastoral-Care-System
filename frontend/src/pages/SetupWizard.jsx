@@ -3,7 +3,7 @@
  * Guides user through creating first admin account and campus
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Church } from 'lucide-react';

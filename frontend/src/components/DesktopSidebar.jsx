@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -9,7 +9,6 @@ import {
   DollarSign,
   Settings,
   Shield,
-  Upload,
   MessageSquare,
   Bell,
   Church,

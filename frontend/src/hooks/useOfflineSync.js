@@ -141,7 +141,6 @@ export function useOfflineSync() {
 
       return result;
     } catch (error) {
-      console.error('[useOfflineSync] Sync error:', error);
       toast.error('Sync failed');
     } finally {
       setIsSyncing(false);

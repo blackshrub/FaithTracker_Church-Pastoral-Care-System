@@ -29,6 +29,7 @@ export const sendToAnalytics = (metric) => {
   // Production analytics endpoint not implemented - metrics logged locally only
   if (import.meta.env.DEV) {
     const { name, value, rating } = metric;
+    // eslint-disable-next-line no-console
     console.log(`[Web Vitals] ${name}: ${Math.round(value)} (${rating})`);
   }
 

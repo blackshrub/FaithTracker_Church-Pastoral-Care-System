@@ -15,7 +15,7 @@
  * </LinkWithPrefetch>
  */
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { usePrefetch } from '@/hooks/usePrefetch';
@@ -99,8 +99,7 @@ export function LinkWithPrefetch({
 
     // Handle transition errors gracefully
     transition.finished.catch(() => {
-      // If transition fails, ensure navigation still happens
-      console.debug('[ViewTransition] Transition interrupted');
+      // Transition interrupted - navigation still happens, no action needed
     });
   }, [to, useViewTransition, navigate]);
 

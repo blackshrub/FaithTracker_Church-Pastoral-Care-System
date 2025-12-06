@@ -261,7 +261,6 @@ class OfflineQueue {
         await this.updateStatus(operation.id, 'completed');
         synced++;
       } catch (error) {
-        console.error('[OfflineQueue] Sync failed:', error);
         await this.updateStatus(operation.id, 'failed', error.message);
 
         // If max retries exceeded, mark as permanently failed

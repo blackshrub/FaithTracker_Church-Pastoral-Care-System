@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { RefreshCw, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -29,7 +29,7 @@ export const WhatsAppLogs = () => {
       setLoading(true);
       const response = await api.get('/notification-logs?limit=100');
       setLogs(response.data);
-    } catch (error) {
+    } catch (_error) {
       toast.error(t('whatsapp_logs_page.failed_load_logs'));
     } finally {
       setLoading(false);
@@ -51,7 +51,7 @@ export const WhatsAppLogs = () => {
       } else {
         toast.error(t('whatsapp_logs_page.failed_send'));
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Retry failed');
     } finally {
       setRetrying(null);

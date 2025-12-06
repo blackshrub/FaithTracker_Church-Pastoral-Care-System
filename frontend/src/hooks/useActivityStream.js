@@ -106,7 +106,6 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
         }
       });
     } catch (err) {
-      console.error('[SSE] Failed to create EventSource:', err);
       setError(err.message);
     }
   }, [token, enabled, user?.id, onActivity, maxActivities]);

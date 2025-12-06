@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Loader2, CheckCircle2, XCircle, MessageSquare, Mail } from 'lucide-react';
 
 import api from '@/lib/api';

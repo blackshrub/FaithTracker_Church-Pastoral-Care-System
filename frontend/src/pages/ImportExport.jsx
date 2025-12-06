@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -81,7 +81,6 @@ export const ImportExport = () => {
         setSelectedCampusId(response.data[0].id);
       }
     } catch (error) {
-      console.error('Error loading campuses');
     }
   };
   

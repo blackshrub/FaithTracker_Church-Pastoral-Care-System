@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,6 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // Log the error to console (in production, send to error tracking service)
-    console.error('Error caught by ErrorBoundary:', error, errorInfo);
     this.setState({ errorInfo });
 
     // In production, you could send this to an error tracking service like Sentry

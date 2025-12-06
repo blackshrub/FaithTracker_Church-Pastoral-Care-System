@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -264,8 +264,7 @@ export const Reports = () => {
 
       // Clean up after a delay
       setTimeout(() => window.URL.revokeObjectURL(url), 60000);
-    } catch (error) {
-      console.error('Error printing PDF:', error);
+    } catch (_error) {
       alert('Failed to generate PDF for printing. Please try again.');
     } finally {
       setPrinting(false);
@@ -285,8 +284,7 @@ export const Reports = () => {
       document.body.removeChild(link);
       // Delay URL revocation to ensure download completes
       setTimeout(() => window.URL.revokeObjectURL(url), 5000);
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
+    } catch (_error) {
       alert('Failed to export PDF. Please try again.');
     } finally {
       setExporting(false);

@@ -3,7 +3,7 @@
  * Reusable card for displaying care events in timeline format
  */
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { CheckCircle2, MoreVertical, Trash2 } from 'lucide-react';
 

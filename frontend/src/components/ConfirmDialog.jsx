@@ -3,8 +3,6 @@
  * Replaces native browser confirm() to avoid suppression issues
  */
 
-import React from 'react';
-
 import {
   AlertDialog,
   AlertDialogAction,

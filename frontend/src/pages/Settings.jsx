@@ -4,7 +4,7 @@
  * Full admin can configure timezone, WhatsApp, sync settings, and automation
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Settings as SettingsIcon, Bell, Heart, Zap, Users, Clock, UserCircle, Upload, RefreshCw, Search, Eye, EyeOff } from 'lucide-react';
@@ -138,8 +138,6 @@ export const Settings = () => {
   const closeConfirm = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
-
-
   const [whatsappGateway, setWhatsappGateway] = useState('');
   const [digestTime, setDigestTime] = useState('08:00');
   const [automationLoading, setAutomationLoading] = useState(false);
@@ -154,7 +152,6 @@ export const Settings = () => {
           setWhatsappGateway(response.data.whatsappGateway || '');
         }
       } catch (error) {
-        console.error('Failed to load automation settings:', error);
       }
     };
     loadAutomationSettings();
@@ -175,8 +172,6 @@ export const Settings = () => {
       setAutomationLoading(false);
     }
   };
-
-
   const [campusData, setCampusData] = useState(null);
 
   const [accidentFollowUp, setAccidentFollowUp] = useState([
@@ -205,7 +200,6 @@ export const Settings = () => {
       await refreshUser();
     } catch (error) {
       toast.error('Failed to upload photo');
-      console.error('Photo upload error:', error);
     } finally {
       setUploading(false);
     }
@@ -257,7 +251,6 @@ export const Settings = () => {
         // Debug: console.log('No sync config data returned');
       }
     } catch (error) {
-      console.error('Error loading sync config:', error);
     }
   };
   
@@ -270,7 +263,6 @@ export const Settings = () => {
       setSyncLogsHasMore(response.data.has_more || false);
       setSyncLogsPage(page);
     } catch (error) {
-      console.error('Error loading sync logs:', error);
     }
   };
   
@@ -346,8 +338,6 @@ export const Settings = () => {
       loadSyncLogs();
     }
   }, [activeTab]);
-
-
   const discoverFields = async () => {
     setDiscovering(true);
     try {
@@ -386,7 +376,6 @@ export const Settings = () => {
           setCampusTimezone(campusRes.data.timezone || defaultTimezone);
           setCampusData(campusRes.data);  // Store full campus data
         } catch (error) {
-          console.error('Error loading campus timezone:', error);
           setCampusTimezone(defaultTimezone);
         }
       }
@@ -400,7 +389,6 @@ export const Settings = () => {
         setWriteoffGrief(writeoffRes.data.data.grief_support || 14);
       }
     } catch (error) {
-      console.error('Error loading settings');
     }
   };
   
@@ -417,7 +405,6 @@ export const Settings = () => {
       toast.success(t('toasts.writeoff_saved'));
     } catch (error) {
       toast.error(t('toasts.failed_save_writeoff'));
-      console.error('Error saving writeoff settings:', error);
     }
   };
   
@@ -441,7 +428,6 @@ export const Settings = () => {
       toast.success(t('toasts.timezone_saved'));
     } catch (error) {
       toast.error(t('toasts.failed_save_timezone'));
-      console.error('Error saving timezone:', error);
     }
   };
   
@@ -1154,7 +1140,7 @@ export const Settings = () => {
                     placeholder={syncConfig.api_password === '********' ? '(stored securely)' : 'Enter API password'}
                     value={syncConfig.api_password === '********' ? '••••••••••••••••' : syncConfig.api_password}
                     onChange={(e) => setSyncConfig({...syncConfig, api_password: e.target.value})}
-                    onFocus={(e) => {
+                    onFocus={() => {
                       if (syncConfig.api_password === '********') {
                         setSyncConfig({...syncConfig, api_password: ''});
                       }

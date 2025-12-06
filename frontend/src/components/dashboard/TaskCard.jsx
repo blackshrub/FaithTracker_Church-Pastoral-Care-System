@@ -3,7 +3,7 @@
  * Used for birthdays, grief support, accidents, and financial aid tasks
  */
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Check } from 'lucide-react';
 

@@ -6,8 +6,6 @@
  * - Pending operations count
  * - Sync in progress animation
  */
-
-import React from 'react';
 import { Wifi, WifiOff, RefreshCw, CloudOff, Check } from 'lucide-react';
 
 import { useOfflineSync } from '@/hooks/useOfflineSync';
