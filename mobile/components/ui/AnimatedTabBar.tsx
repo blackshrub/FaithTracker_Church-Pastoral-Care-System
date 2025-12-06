@@ -141,9 +141,11 @@ const TabButton = memo(function TabButton({
 
   return (
     <AnimatedPressable
-      accessibilityRole="button"
+      accessible
+      accessibilityRole="tab"
       accessibilityState={{ selected: isFocused }}
-      accessibilityLabel={options.tabBarAccessibilityLabel}
+      accessibilityLabel={options.tabBarAccessibilityLabel || (typeof label === 'string' ? label : route.name)}
+      accessibilityHint={isFocused ? 'Currently selected' : 'Double tap to navigate'}
       onPress={handlePress}
       onLongPress={onLongPress}
       onPressIn={handlePressIn}
