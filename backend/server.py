@@ -2269,6 +2269,10 @@ async def create_member(data: MemberCreate, request: Request) -> dict:
 
         member_dict = to_mongo_doc(member_obj)
         await db.members.insert_one(member_dict)
+
+        # Invalidate dashboard cache since member count changed
+        await invalidate_dashboard_cache(campus_id)
+
         return {"id": member_obj.id, "name": member_obj.name, "campus_id": member_obj.campus_id}
     except Exception as e:
         logger.error(f"Error creating member: {str(e)}")
@@ -3050,6 +3054,9 @@ async def delete_member(member_id: str, request: Request) -> dict:
             notes=f"Deleted member {member.get('name', 'Unknown')}",
             user_photo_url=current_user.get("photo_url")
         )
+
+        # Invalidate dashboard cache since member count changed
+        await invalidate_dashboard_cache(member.get("campus_id") or current_user.get("campus_id"))
 
         return {"success": True, "message": "Member deleted successfully"}
     except HTTPException:
