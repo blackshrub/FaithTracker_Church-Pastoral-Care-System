@@ -1325,8 +1325,8 @@ def invalidate_cache(pattern: Optional[str] = None) -> None:
             del _cache[key]
             del _cache_timestamps[key]
 
-async def get_engagement_settings():
-    """Get engagement threshold settings from database (cached for 10 minutes)"""
+async def _get_engagement_settings_cached():
+    """Get engagement threshold settings from database (cached for 10 minutes) - internal helper"""
     cache_key = "engagement_settings"
     cached = get_from_cache(cache_key, ttl_seconds=600)
     if cached is not None:
@@ -1374,7 +1374,7 @@ async def get_writeoff_settings():
 
 async def calculate_engagement_status_async(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
     """Calculate engagement status using configurable thresholds"""
-    settings = await get_engagement_settings()
+    settings = await _get_engagement_settings_cached()
     at_risk_days = settings.get("atRiskDays", ENGAGEMENT_AT_RISK_DAYS_DEFAULT)
     disconnected_days = settings.get("disconnectedDays", ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT)
 
@@ -5089,7 +5089,7 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
         )
         
         # Update member's last contact date and engagement status
-        settings = await get_engagement_settings()
+        settings = await _get_engagement_settings_cached()
         status, days = calculate_engagement_status(datetime.now(timezone.utc), settings.get("atRiskDays", 60), settings.get("disconnectedDays", 90))
         
         await db.members.update_one(
@@ -7736,7 +7736,7 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
             raise HTTPException(status_code=403, detail="Only admins can recalculate engagement")
         
         # Get engagement settings
-        settings = await get_engagement_settings()
+        settings = await _get_engagement_settings_cached()
         at_risk_days = settings.get("atRiskDays", 60)
         disconnected_days = settings.get("disconnectedDays", 90)
         
