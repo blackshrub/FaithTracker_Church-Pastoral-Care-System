@@ -150,15 +150,10 @@ const ActivityItem = memo(function ActivityItem({ activity, isNew }: ActivityIte
       {/* Avatar */}
       {photoUrl ? (
         <CachedImage
-          uri={photoUrl}
+          source={photoUrl}
           className="w-8 h-8 rounded-full"
-          fallback={
-            <View className="w-8 h-8 rounded-full bg-teal-100 items-center justify-center">
-              <Text className="text-teal-700 text-xs font-semibold">
-                {getInitials(activity.user_name)}
-              </Text>
-            </View>
-          }
+          isAvatar
+          avatarIconSize={16}
         />
       ) : (
         <View className="w-8 h-8 rounded-full bg-teal-100 items-center justify-center">

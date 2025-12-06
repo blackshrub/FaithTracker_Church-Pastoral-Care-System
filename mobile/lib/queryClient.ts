@@ -1,40 +1,38 @@
 /**
- * Query Client with MMKV Persistence
+ * Query Client with Persistence
  *
  * Provides offline-first data caching using:
  * - TanStack Query for data fetching and caching
- * - MMKV for fast, synchronous disk persistence
+ * - Storage abstraction (MMKV in production, in-memory in Expo Go)
  * - Automatic cache restoration on app start
  *
  * Benefits:
  * - Instant data display on subsequent app opens
  * - Works offline with cached data
  * - Automatic background refresh when online
- * - 10x faster than AsyncStorage
  */
 
 import { QueryClient } from '@tanstack/react-query';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
-import { MMKV } from 'react-native-mmkv';
 
-// Create MMKV storage instance
-const storage = new MMKV({
-  id: 'faithtracker-query-cache',
-  encryptionKey: 'faithtracker-cache-key', // Optional encryption
-});
+// Use centralized storage (works in both Expo Go and production)
+import { storage } from '@/lib/storage';
 
-// MMKV adapter for TanStack Query persister
-const mmkvStorage = {
+// Key prefix for query cache storage
+const CACHE_KEY_PREFIX = 'query-cache:';
+
+// Storage adapter for TanStack Query persister
+const storageAdapter = {
   setItem: (key: string, value: string) => {
-    storage.set(key, value);
+    storage.set(CACHE_KEY_PREFIX + key, value);
   },
   getItem: (key: string) => {
-    const value = storage.getString(key);
+    const value = storage.getString(CACHE_KEY_PREFIX + key);
     return value ?? null;
   },
   removeItem: (key: string) => {
-    storage.delete(key);
+    storage.remove(CACHE_KEY_PREFIX + key);
   },
 };
 
@@ -61,9 +59,9 @@ export const queryClient = new QueryClient({
   },
 });
 
-// Create persister with MMKV storage
+// Create persister with storage adapter
 const persister = createSyncStoragePersister({
-  storage: mmkvStorage,
+  storage: storageAdapter,
   // Throttle writes to avoid performance issues
   throttleTime: 1000,
 });
@@ -90,21 +88,28 @@ persistQueryClient({
  */
 export function clearQueryCache() {
   queryClient.clear();
-  storage.clearAll();
+  // Clear storage keys with our prefix
+  const allKeys = storage.getAllKeys();
+  allKeys.forEach((key) => {
+    if (key.startsWith(CACHE_KEY_PREFIX)) {
+      storage.remove(key);
+    }
+  });
 }
 
 /**
  * Get cache statistics for debugging
  */
 export function getCacheStats() {
-  const keys = storage.getAllKeys();
-  const totalSize = keys.reduce((acc, key) => {
+  const allKeys = storage.getAllKeys();
+  const cacheKeys = allKeys.filter((key) => key.startsWith(CACHE_KEY_PREFIX));
+  const totalSize = cacheKeys.reduce((acc: number, key: string) => {
     const value = storage.getString(key);
     return acc + (value?.length ?? 0);
   }, 0);
 
   return {
-    itemCount: keys.length,
+    itemCount: cacheKeys.length,
     totalSizeBytes: totalSize,
     totalSizeKB: (totalSize / 1024).toFixed(2),
   };

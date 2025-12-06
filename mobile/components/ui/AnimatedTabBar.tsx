@@ -49,14 +49,8 @@ interface TabButtonProps {
     key: string;
     name: string;
   };
-  descriptor: {
-    options: {
-      tabBarIcon?: (props: { focused: boolean; color: string; size: number }) => React.ReactNode;
-      tabBarLabel?: string | ((props: { focused: boolean; color: string }) => React.ReactNode);
-      title?: string;
-      tabBarAccessibilityLabel?: string;
-    };
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  descriptor: any;
   isFocused: boolean;
   onPress: () => void;
   onLongPress: () => void;

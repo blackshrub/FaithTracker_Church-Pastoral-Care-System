@@ -45,6 +45,10 @@ import {
   AlertCircle,
   Ban,
   ClipboardList,
+  MoreVertical,
+  Trash2,
+  Users,
+  Tag,
 } from 'lucide-react-native';
 
 import { useMember } from '@/hooks/useMembers';
@@ -52,6 +56,7 @@ import {
   useMemberCareEvents,
   useCompleteCareEvent,
   useIgnoreCareEvent,
+  useDeleteCareEvent,
   useMemberGriefTimeline,
   useCompleteGriefStage,
   useIgnoreGriefStage,
@@ -175,14 +180,17 @@ interface TimelineCardProps {
   event: CareEvent;
   onComplete: () => void;
   onIgnore: () => void;
+  onDelete: () => void;
 }
 
 const TimelineCard = memo(function TimelineCard({
   event,
   onComplete,
   onIgnore,
+  onDelete,
 }: TimelineCardProps) {
   const { t } = useTranslation();
+  const [showMenu, setShowMenu] = useState(false);
   const Icon = getEventIcon(event.event_type);
   const color = getEventColor(event.event_type);
 
@@ -211,18 +219,30 @@ const TimelineCard = memo(function TimelineCard({
       <View className="flex-1 bg-white rounded-xl p-4 mb-4 ml-2 shadow-sm">
         <View className="flex-row items-center justify-between mb-1">
           <Text className="text-xs text-gray-500">{formatDate(event.event_date)}</Text>
-          <View
-            className="flex-row items-center px-2 py-0.5 rounded-full gap-1"
-            style={{ backgroundColor: `${statusColor}15` }}
-          >
-            <StatusIcon size={12} color={statusColor} />
-            <Text className="text-[11px] font-medium" style={{ color: statusColor }}>
-              {event.completed
-                ? t('common.completed')
-                : event.ignored
-                ? 'Ignored'
-                : t('common.pending')}
-            </Text>
+          <View className="flex-row items-center gap-2">
+            <View
+              className="flex-row items-center px-2 py-0.5 rounded-full gap-1"
+              style={{ backgroundColor: `${statusColor}15` }}
+            >
+              <StatusIcon size={12} color={statusColor} />
+              <Text className="text-[11px] font-medium" style={{ color: statusColor }}>
+                {event.completed
+                  ? t('common.completed')
+                  : event.ignored
+                  ? 'Ignored'
+                  : t('common.pending')}
+              </Text>
+            </View>
+            {/* Three dots menu */}
+            <Pressable
+              className="p-1 active:opacity-70"
+              onPress={() => {
+                haptics.tap();
+                setShowMenu(true);
+              }}
+            >
+              <MoreVertical size={16} color="#9ca3af" />
+            </Pressable>
           </View>
         </View>
 
@@ -273,6 +293,42 @@ const TimelineCard = memo(function TimelineCard({
           </View>
         )}
       </View>
+
+      {/* Delete Menu Modal */}
+      {showMenu && (
+        <Pressable
+          className="absolute inset-0 z-50"
+          style={{ left: -100, right: -100, top: -100, bottom: -100 }}
+          onPress={() => setShowMenu(false)}
+        >
+          <View className="absolute right-4 top-8 bg-white rounded-xl shadow-lg border border-gray-200 py-2 min-w-[140px]">
+            <Pressable
+              className="flex-row items-center px-4 py-3 gap-2 active:bg-gray-100"
+              onPress={() => {
+                setShowMenu(false);
+                Alert.alert(
+                  'Delete Care Event',
+                  'Are you sure you want to delete this care event? This will also delete all related follow-up stages.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        haptics.warning();
+                        onDelete();
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Trash2 size={16} color="#dc2626" />
+              <Text className="text-sm font-medium text-red-600">Delete</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      )}
     </View>
   );
 });
@@ -320,7 +376,7 @@ const GriefStageCard = memo(function GriefStageCard({
       <View className="flex-row items-start justify-between">
         <View className="flex-1">
           <Text className="text-[15px] font-semibold text-gray-900">
-            {t(`careEvents.griefStages.${stage.stage_type}`, stage.stage_type)}
+            {t(`careEvents.griefStages.${stage.stage_type || 'unknown'}`, { defaultValue: stage.stage_type || stage.stage })}
           </Text>
           <Text className="text-xs text-gray-500 mt-0.5">
             {formatDate(stage.scheduled_date)}
@@ -438,7 +494,7 @@ const AccidentFollowupCard = memo(function AccidentFollowupCard({
       <View className="flex-row items-start justify-between">
         <View className="flex-1">
           <Text className="text-[15px] font-semibold text-gray-900">
-            {t(`careEvents.accidentStages.${followup.stage_type}`, followup.stage_type)}
+            {t(`careEvents.accidentStages.${followup.stage_type || followup.stage}`, { defaultValue: followup.stage_type || followup.stage })}
           </Text>
           <Text className="text-xs text-gray-500 mt-0.5">
             {formatDate(followup.scheduled_date)}
@@ -722,6 +778,7 @@ function MemberDetailScreen() {
   // Mutations
   const completeCareEvent = useCompleteCareEvent();
   const ignoreCareEvent = useIgnoreCareEvent();
+  const deleteCareEvent = useDeleteCareEvent();
   const completeGriefStage = useCompleteGriefStage();
   const ignoreGriefStage = useIgnoreGriefStage();
   const undoGriefStage = useUndoGriefStage();
@@ -732,12 +789,44 @@ function MemberDetailScreen() {
   const ignoreAidPayment = useIgnoreAidPayment();
   const stopAidSchedule = useStopAidSchedule();
 
-  // Sort events by date (newest first)
+  // Sort events by date (newest first) - filter out birthday events from timeline
   const sortedEvents = useMemo(() => {
     if (!careEvents) return [];
-    return [...careEvents].sort(
-      (a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
-    );
+    return [...careEvents]
+      .filter(e => e.event_type !== 'birthday')
+      .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime());
+  }, [careEvents]);
+
+  // Find upcoming birthday event (within 7 days or overdue up to 7 days)
+  const upcomingBirthday = useMemo(() => {
+    if (!careEvents) return null;
+    const birthdayEvent = careEvents.find(e => e.event_type === 'birthday' && !e.completed);
+    if (!birthdayEvent) return null;
+
+    const eventDate = new Date(birthdayEvent.event_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const thisYearBirthday = new Date(today.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+
+    // If birthday already passed this year, check next year
+    if (thisYearBirthday < today) {
+      thisYearBirthday.setFullYear(today.getFullYear() + 1);
+    }
+
+    const daysUntil = Math.ceil((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Show if within next 7 days or overdue up to 7 days
+    const writeoffLimit = 7;
+    if (daysUntil <= 7 && daysUntil >= -writeoffLimit) {
+      return {
+        event: birthdayEvent,
+        daysUntil,
+        isToday: daysUntil === 0,
+        isOverdue: daysUntil < 0,
+        daysOverdue: daysUntil < 0 ? Math.abs(daysUntil) : 0,
+      };
+    }
+    return null;
   }, [careEvents]);
 
   // Past financial aid - care events with event_type === 'financial_aid' (one-time payments already given)
@@ -968,6 +1057,41 @@ function MemberDetailScreen() {
           </View>
         </Animated.View>
 
+        {/* Upcoming Birthday Banner */}
+        {upcomingBirthday && (
+          <Animated.View
+            entering={FadeInDown.delay(150).duration(400)}
+            className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4"
+          >
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 rounded-full bg-amber-100 items-center justify-center">
+                <Cake size={20} color="#f59e0b" />
+              </View>
+              <View className="flex-1 ml-3">
+                <Text className="text-sm font-semibold text-amber-800">
+                  {upcomingBirthday.isToday
+                    ? `Birthday Today!`
+                    : upcomingBirthday.isOverdue
+                    ? `Birthday was ${upcomingBirthday.daysOverdue} day${upcomingBirthday.daysOverdue !== 1 ? 's' : ''} ago`
+                    : `Birthday in ${upcomingBirthday.daysUntil} day${upcomingBirthday.daysUntil !== 1 ? 's' : ''}`}
+                </Text>
+                <Text className="text-xs text-amber-600 mt-0.5">
+                  {formatDate(upcomingBirthday.event.event_date)} - {member.name} turns {formatAge(member.birth_date)}
+                </Text>
+              </View>
+              <Pressable
+                className="px-3 py-2 bg-amber-500 rounded-lg active:opacity-80"
+                onPress={() => {
+                  haptics.success();
+                  completeCareEvent.mutate(upcomingBirthday.event.id);
+                }}
+              >
+                <Text className="text-xs font-semibold text-white">Complete</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Profile Info */}
         <Animated.View
           entering={FadeInDown.delay(200).duration(400)}
@@ -995,6 +1119,64 @@ function MemberDetailScreen() {
               </Text>
               <Text className="flex-1 text-sm text-gray-900">
                 {formatDate(member.birth_date)} ({formatAge(member.birth_date)})
+              </Text>
+            </View>
+          )}
+
+          {member.gender && (
+            <View className="flex-row items-start py-3 border-b border-gray-100">
+              <Users size={18} color="#9ca3af" />
+              <Text className="w-[90px] text-sm text-gray-500 ml-3">
+                {t('memberDetail.fields.gender', { defaultValue: 'Gender' })}
+              </Text>
+              <Text className="flex-1 text-sm text-gray-900 capitalize">
+                {t(`members.gender.${member.gender}`, { defaultValue: member.gender })}
+              </Text>
+            </View>
+          )}
+
+          {member.category && (
+            <View className="flex-row items-start py-3 border-b border-gray-100">
+              <Tag size={18} color="#9ca3af" />
+              <Text className="w-[90px] text-sm text-gray-500 ml-3">
+                {t('memberDetail.fields.category', { defaultValue: 'Category' })}
+              </Text>
+              <Text className="flex-1 text-sm text-gray-900 capitalize">
+                {t(`members.category.${member.category}`, { defaultValue: member.category })}
+              </Text>
+            </View>
+          )}
+
+          {member.marital_status && (
+            <View className="flex-row items-start py-3 border-b border-gray-100">
+              <Heart size={18} color="#9ca3af" />
+              <Text className="w-[90px] text-sm text-gray-500 ml-3">
+                {t('memberDetail.fields.maritalStatus', { defaultValue: 'Marital Status' })}
+              </Text>
+              <Text className="flex-1 text-sm text-gray-900 capitalize">
+                {t(`members.maritalStatus.${member.marital_status}`, { defaultValue: member.marital_status })}
+              </Text>
+            </View>
+          )}
+
+          {member.blood_type && (
+            <View className="flex-row items-start py-3 border-b border-gray-100">
+              <Hospital size={18} color="#9ca3af" />
+              <Text className="w-[90px] text-sm text-gray-500 ml-3">
+                {t('memberDetail.fields.bloodType', { defaultValue: 'Blood Type' })}
+              </Text>
+              <Text className="flex-1 text-sm text-gray-900">{member.blood_type}</Text>
+            </View>
+          )}
+
+          {member.membership_status && (
+            <View className="flex-row items-start py-3 border-b border-gray-100">
+              <User size={18} color="#9ca3af" />
+              <Text className="w-[90px] text-sm text-gray-500 ml-3">
+                {t('memberDetail.fields.status', { defaultValue: 'Status' })}
+              </Text>
+              <Text className="flex-1 text-sm text-gray-900 capitalize">
+                {t(`members.membershipStatus.${member.membership_status}`, { defaultValue: member.membership_status })}
               </Text>
             </View>
           )}
@@ -1076,6 +1258,7 @@ function MemberDetailScreen() {
                       event={event}
                       onComplete={() => completeCareEvent.mutate(event.id)}
                       onIgnore={() => ignoreCareEvent.mutate(event.id)}
+                      onDelete={() => deleteCareEvent.mutate(event.id)}
                     />
                   ))}
                 </View>
@@ -1157,7 +1340,7 @@ function MemberDetailScreen() {
                             </Text>
                           </View>
                           <Text className="text-xs text-gray-500 mt-0.5">
-                            {t(`careEvents.aidTypes.${event.aid_type}`, event.aid_type)} • {formatDate(event.event_date)}
+                            {t(`careEvents.aidTypes.${event.aid_type || 'other'}`, { defaultValue: event.aid_type || 'Other' })} • {formatDate(event.event_date)}
                           </Text>
                           {event.aid_notes && (
                             <Text className="text-xs text-gray-500 mt-1 italic">{event.aid_notes}</Text>

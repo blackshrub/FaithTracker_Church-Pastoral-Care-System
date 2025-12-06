@@ -270,16 +270,47 @@
     },
     "types": {
       "birthday": "Ulang Tahun",
+      "grief": "Kedukaan",
       "grief_stage": "Kedukaan",
+      "grief_loss": "Kedukaan & Kehilangan",
+      "accident": "Kecelakaan/Sakit",
       "accident_followup": "Kunjungan Sakit",
+      "accident_illness": "Kecelakaan/Sakit",
       "financial_aid": "Bantuan Dana",
-      "at_risk": "Jemaat Berisiko",
-      "disconnected": "Jemaat Tidak Aktif"
+      "at_risk": "Berisiko",
+      "disconnected": "Tidak Aktif",
+      "childbirth": "Kelahiran Anak",
+      "new_house": "Rumah Baru",
+      "regular_contact": "Kontak Rutin",
+      "task": "Tugas"
     },
     "actions": {
       "complete": "Selesai",
       "ignore": "Abaikan",
-      "view": "Lihat Jemaat"
+      "view": "Lihat Jemaat",
+      "whatsapp": "WhatsApp",
+      "markContact": "Tandai Kontak",
+      "distributed": "Disalurkan"
+    },
+    "info": {
+      "willBeYearsOld": "Akan berusia {{age}} tahun",
+      "yearsOld": "{{age}} tahun",
+      "daysSinceContact": "{{days}} hari tanpa kontak",
+      "lastContact": "Kontak terakhir: {{days}}h lalu",
+      "inDays": "dalam {{days}}h",
+      "daysOverdue": "{{days}}h terlambat",
+      "afterMourning": "setelah pemakaman"
+    },
+    "stages": {
+      "week1": "Minggu 1",
+      "week2": "Minggu 2",
+      "month1": "Bulan 1",
+      "month3": "Bulan 3",
+      "month6": "Bulan 6",
+      "year1": "Tahun 1",
+      "firstFollowup": "Kunjungan Pertama",
+      "secondFollowup": "Kunjungan Kedua",
+      "finalFollowup": "Kunjungan Terakhir"
     },
     "emptyState": {
       "noTasks": "Tidak ada tugas",

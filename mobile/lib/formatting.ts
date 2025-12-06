@@ -175,6 +175,28 @@ export function formatName(name: string | null | undefined): string {
     .join(' ');
 }
 
+/**
+ * Format phone number for WhatsApp deep link
+ * Converts Indonesian local format to international format
+ * @param phone - Phone number string (can be +62xxx, 62xxx, 08xxx)
+ * @returns WhatsApp URL like "https://wa.me/628123456789"
+ */
+export function formatPhoneForWhatsApp(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+
+  // Remove all non-digit characters except leading +
+  let formatted = phone.replace(/[^\d+]/g, '');
+
+  // Convert Indonesian local format to international
+  if (formatted.startsWith('0')) {
+    formatted = '62' + formatted.substring(1);
+  } else if (formatted.startsWith('+')) {
+    formatted = formatted.substring(1);
+  }
+
+  return `https://wa.me/${formatted}`;
+}
+
 export default {
   formatCurrency,
   formatCurrencyAmount,
@@ -183,6 +205,7 @@ export default {
   formatPercent,
   formatPercentValue,
   formatPhoneNumber,
+  formatPhoneForWhatsApp,
   truncateText,
   capitalize,
   formatName,

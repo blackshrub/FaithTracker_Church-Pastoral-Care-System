@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  Linking,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,12 +28,18 @@ import {
   Clock,
   AlertTriangle,
   User,
+  MessageCircle,
+  Phone,
+  UserCheck,
+  Baby,
+  Home,
 } from 'lucide-react-native';
 
-import { useDashboardReminders, useCompleteTask } from '@/hooks/useDashboard';
+import { useDashboardReminders, useCompleteTask, useMarkMemberContacted } from '@/hooks/useDashboard';
 import { eventTypeColors, colors } from '@/constants/theme';
 import { haptics } from '@/constants/interaction';
 import { formatDateToLocalTimezone } from '@/lib/dateUtils';
+import { formatPhoneForWhatsApp, formatPhoneNumber, formatCurrency } from '@/lib/formatting';
 import type { DashboardTask } from '@/types';
 
 // ============================================================================
@@ -55,9 +62,32 @@ function getTaskIcon(type: string) {
       return Clock;
     case 'disconnected':
       return AlertTriangle;
+    case 'childbirth':
+      return Baby;
+    case 'new_house':
+      return Home;
     default:
       return CheckSquare;
   }
+}
+
+// Task type styling configuration
+const TASK_TYPE_STYLES: Record<string, { ring: string; bg: string; text: string }> = {
+  birthday: { ring: 'border-amber-400', bg: 'bg-amber-50', text: 'text-amber-600' },
+  grief_stage: { ring: 'border-purple-400', bg: 'bg-purple-50', text: 'text-purple-600' },
+  grief_loss: { ring: 'border-purple-400', bg: 'bg-purple-50', text: 'text-purple-600' },
+  accident_followup: { ring: 'border-teal-400', bg: 'bg-teal-50', text: 'text-teal-600' },
+  accident_illness: { ring: 'border-teal-400', bg: 'bg-teal-50', text: 'text-teal-600' },
+  financial_aid: { ring: 'border-violet-400', bg: 'bg-violet-50', text: 'text-violet-600' },
+  at_risk: { ring: 'border-amber-400', bg: 'bg-amber-50', text: 'text-amber-600' },
+  disconnected: { ring: 'border-red-400', bg: 'bg-red-50', text: 'text-red-600' },
+  childbirth: { ring: 'border-pink-400', bg: 'bg-pink-50', text: 'text-pink-600' },
+  new_house: { ring: 'border-emerald-400', bg: 'bg-emerald-50', text: 'text-emerald-600' },
+  regular_contact: { ring: 'border-blue-400', bg: 'bg-blue-50', text: 'text-blue-600' },
+};
+
+function getTaskStyles(type: string) {
+  return TASK_TYPE_STYLES[type] || { ring: 'border-gray-300', bg: 'bg-gray-50', text: 'text-gray-600' };
 }
 
 function getTaskColor(type: string) {
@@ -73,12 +103,46 @@ function getTaskColor(type: string) {
     case 'financial_aid':
       return eventTypeColors.financial_aid;
     case 'at_risk':
-      return colors.status.warning; // Orange/amber for at risk
+      return colors.status.warning;
     case 'disconnected':
-      return colors.status.error; // Red for disconnected
+      return colors.status.error;
+    case 'childbirth':
+      return '#ec4899'; // pink-500
+    case 'new_house':
+      return '#10b981'; // emerald-500
     default:
       return colors.primary[500];
   }
+}
+
+// Calculate days until a date (positive = future, negative = past)
+function getDaysUntil(dateStr: string | undefined): number | null {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  const diffTime = date.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Get the task type from various backend fields
+function getTaskType(task: DashboardTask): string {
+  if (task.type) return task.type;
+  if ((task as any).event_type) return (task as any).event_type;
+  if ((task as any).stage) {
+    const stageValue = (task as any).stage;
+    if (typeof stageValue === 'string' &&
+        (stageValue.includes('followup') || stageValue === 'first_followup' ||
+         stageValue === 'second_followup' || stageValue === 'final_followup')) {
+      return 'accident_followup';
+    }
+    return 'grief_stage';
+  }
+  if ((task as any).aid_type || (task as any).aid_amount !== undefined) {
+    return 'financial_aid';
+  }
+  return '';
 }
 
 type TabKey = 'today' | 'upcoming' | 'overdue';
@@ -90,43 +154,34 @@ type TabKey = 'today' | 'upcoming' | 'overdue';
 interface TaskCardProps {
   task: DashboardTask;
   onComplete: () => void;
+  onMarkContact?: () => void;
   onPress: () => void;
+  activeTab: TabKey;
 }
 
-const TaskCard = memo(function TaskCard({ task, onComplete, onPress }: TaskCardProps) {
+const TaskCard = memo(function TaskCard({ task, onComplete, onMarkContact, onPress, activeTab }: TaskCardProps) {
   const { t } = useTranslation();
-  // Backend uses different fields depending on task source:
-  // - upcoming_tasks/today_tasks: has "type" field
-  // - birthdays_today/overdue_birthdays: has "event_type" field (from care_events)
-  // - grief_today: has "stage" field (from grief_support collection)
-  // - accident_followup: has "stage" field (from accident_followups collection)
-  // - financial_aid_due: has "aid_type" field (from financial_aid_schedules collection)
-  const getTaskType = () => {
-    if (task.type) return task.type;
-    if ((task as any).event_type) return (task as any).event_type;
-    // For grief/accident stages without explicit type, detect from stage or collection fields
-    if ((task as any).stage) {
-      // Check if it's an accident followup (has specific stage names)
-      const stageValue = (task as any).stage;
-      if (typeof stageValue === 'string' &&
-          (stageValue.includes('followup') || stageValue === 'first_followup' ||
-           stageValue === 'second_followup' || stageValue === 'final_followup')) {
-        return 'accident_followup';
-      }
-      // Otherwise it's grief support
-      return 'grief_stage';
-    }
-    // For financial aid schedules
-    if ((task as any).aid_type || (task as any).aid_amount !== undefined) {
-      return 'financial_aid';
-    }
-    return '';
-  };
-  const taskType = getTaskType();
+  const taskType = getTaskType(task);
   const Icon = getTaskIcon(taskType);
   const color = getTaskColor(taskType);
+  const styles = getTaskStyles(taskType);
 
-  // Determine the type label based on task type
+  // Get phone info
+  const phone = task.member_phone || (task as any).phone;
+  const whatsappUrl = formatPhoneForWhatsApp(phone);
+
+  // Calculate days info
+  const scheduledDate = task.scheduled_date || (task as any).date || (task as any).next_distribution_date;
+  const daysUntil = getDaysUntil(scheduledDate);
+
+  // Get type-specific data
+  const aidAmount = (task as any).aid_amount;
+  const aidType = (task as any).aid_type;
+  const stage = task.stage || (task as any).stage;
+  const memberAge = task.member_age || (task as any).age;
+  const daysSinceContact = task.days_since_last_contact || (task as any).days_since_last_contact;
+
+  // Determine the type label
   const getTypeLabel = () => {
     switch (taskType) {
       case 'birthday':
@@ -155,55 +210,219 @@ const TaskCard = memo(function TaskCard({ task, onComplete, onPress }: TaskCardP
   };
   const typeLabel = getTypeLabel();
 
+  // Get stage label for grief/accident
+  const getStageLabel = () => {
+    if (!stage) return null;
+    const stageMap: Record<string, string> = {
+      '1_week': t('tasks.stages.week1', 'Week 1'),
+      '2_weeks': t('tasks.stages.week2', 'Week 2'),
+      '1_month': t('tasks.stages.month1', 'Month 1'),
+      '3_months': t('tasks.stages.month3', 'Month 3'),
+      '6_months': t('tasks.stages.month6', 'Month 6'),
+      '1_year': t('tasks.stages.year1', 'Year 1'),
+      'first_followup': t('tasks.stages.firstFollowup', 'First Follow-up'),
+      'second_followup': t('tasks.stages.secondFollowup', 'Second Follow-up'),
+      'final_followup': t('tasks.stages.finalFollowup', 'Final Follow-up'),
+    };
+    return stageMap[stage] || stage;
+  };
+  const stageLabel = getStageLabel();
+
+  // Handle WhatsApp
+  const handleWhatsApp = useCallback(() => {
+    if (whatsappUrl) {
+      haptics.tap();
+      Linking.openURL(whatsappUrl);
+    }
+  }, [whatsappUrl]);
+
+  // Determine if this is an at-risk/disconnected member
+  const isContactType = taskType === 'at_risk' || taskType === 'disconnected';
+
+  // Determine action button text and handler
+  const getActionButton = () => {
+    if (isContactType && onMarkContact) {
+      return {
+        label: t('tasks.actions.markContact', 'Mark Contact'),
+        onPress: onMarkContact,
+        icon: UserCheck,
+        bgClass: 'bg-blue-500',
+        activeBgClass: 'active:bg-blue-600',
+      };
+    }
+    if (taskType === 'financial_aid') {
+      return {
+        label: t('tasks.actions.distributed', 'Distributed'),
+        onPress: onComplete,
+        icon: CheckSquare,
+        bgClass: 'bg-violet-500',
+        activeBgClass: 'active:bg-violet-600',
+      };
+    }
+    return {
+      label: t('tasks.actions.complete', 'Complete'),
+      onPress: onComplete,
+      icon: CheckSquare,
+      bgClass: 'bg-success-500',
+      activeBgClass: 'active:bg-success-600',
+    };
+  };
+  const actionButton = getActionButton();
+
   return (
     <Pressable
-      className="flex-row items-center bg-white rounded-xl p-4 shadow-sm active:opacity-90 active:scale-[0.98]"
+      className="bg-white rounded-xl p-4 shadow-sm active:opacity-95"
       onPress={onPress}
     >
-      {/* Profile Photo or Icon */}
-      {task.member_photo_url ? (
-        <Image
-          source={{ uri: task.member_photo_url }}
-          className="w-10 h-10 rounded-full"
-        />
-      ) : (
-        <View
-          className="w-10 h-10 rounded-full items-center justify-center bg-gray-100"
-        >
-          <User size={20} color="#9ca3af" />
+      {/* Header Row: Photo + Name + Badge */}
+      <View className="flex-row items-start">
+        {/* Profile Photo with colored ring */}
+        <View className={`rounded-full p-0.5 border-2 ${styles.ring}`}>
+          {task.member_photo_url ? (
+            <Image
+              source={{ uri: task.member_photo_url }}
+              className="w-11 h-11 rounded-full"
+            />
+          ) : (
+            <View className="w-11 h-11 rounded-full items-center justify-center bg-gray-100">
+              <User size={22} color="#9ca3af" />
+            </View>
+          )}
         </View>
-      )}
 
-      <View className="flex-1 ml-3">
-        <Text className="text-base font-semibold text-gray-900" numberOfLines={1}>
-          {task.member_name}
-        </Text>
-        <Text className="text-[13px] text-gray-500 mt-0.5">
-          {typeLabel}
-          {task.stage && ` - ${task.stage}`}
-        </Text>
-        {task.scheduled_date && (
-          <Text className="text-xs text-gray-400 mt-0.5">
-            {formatDateToLocalTimezone(task.scheduled_date, 'short')}
-          </Text>
-        )}
-        {task.days_since_last_contact !== undefined && task.days_since_last_contact > 0 && (
-          <Text className="text-xs text-gray-400 mt-0.5">
-            {t('members.daysSinceContact', { days: task.days_since_last_contact })}
-          </Text>
-        )}
+        {/* Name and Info */}
+        <View className="flex-1 ml-3">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-base font-semibold text-gray-900 flex-1" numberOfLines={1}>
+              {task.member_name}
+            </Text>
+
+            {/* Days Badge */}
+            {daysUntil !== null && daysUntil > 0 && (
+              <View className="bg-blue-100 px-2 py-0.5 rounded-full ml-2">
+                <Text className="text-xs font-medium text-blue-700">
+                  {t('tasks.info.inDays', { days: daysUntil })}
+                </Text>
+              </View>
+            )}
+            {daysUntil !== null && daysUntil < 0 && (
+              <View className="bg-red-100 px-2 py-0.5 rounded-full ml-2">
+                <Text className="text-xs font-medium text-red-700">
+                  {t('tasks.info.daysOverdue', { days: Math.abs(daysUntil) })}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Phone Number */}
+          {phone && (
+            <View className="flex-row items-center mt-1">
+              <Phone size={12} color="#9ca3af" />
+              <Text className="text-xs text-gray-500 ml-1">
+                {formatPhoneNumber(phone)}
+              </Text>
+            </View>
+          )}
+
+          {/* Type Label with Icon */}
+          <View className="flex-row items-center mt-1.5">
+            <Icon size={14} color={color} />
+            <Text className={`text-[13px] ml-1.5 font-medium ${styles.text}`}>
+              {typeLabel}
+              {stageLabel && ` - ${stageLabel}`}
+            </Text>
+          </View>
+
+          {/* Birthday: Will be X years old */}
+          {taskType === 'birthday' && memberAge !== undefined && (
+            <Text className="text-xs text-gray-500 mt-0.5">
+              {activeTab === 'upcoming'
+                ? t('tasks.info.willBeYearsOld', { age: memberAge + 1 })
+                : t('tasks.info.yearsOld', { age: memberAge })}
+            </Text>
+          )}
+
+          {/* Grief: Stage info */}
+          {(taskType === 'grief_stage' || taskType === 'grief_loss') && stageLabel && (
+            <Text className="text-xs text-gray-500 mt-0.5">
+              {stageLabel} {t('tasks.info.afterMourning', 'after mourning')}
+            </Text>
+          )}
+
+          {/* Financial Aid: Amount and Type */}
+          {taskType === 'financial_aid' && (
+            <View className="mt-0.5">
+              {aidAmount && (
+                <Text className="text-xs text-gray-600 font-medium">
+                  {formatCurrency(aidAmount)}
+                </Text>
+              )}
+              {aidType && (
+                <Text className="text-xs text-gray-500">
+                  {t(`careEvents.aidTypes.${aidType}`, aidType)}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* At-Risk/Disconnected: Days since contact + Age */}
+          {isContactType && (
+            <View className="mt-0.5">
+              {daysSinceContact !== undefined && daysSinceContact > 0 && (
+                <Text className="text-xs text-red-500 font-medium">
+                  {t('tasks.info.daysSinceContact', { days: daysSinceContact })}
+                </Text>
+              )}
+              {memberAge !== undefined && (
+                <Text className="text-xs text-gray-500">
+                  {t('tasks.info.yearsOld', { age: memberAge })}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Scheduled Date */}
+          {scheduledDate && !isContactType && (
+            <Text className="text-xs text-gray-400 mt-0.5">
+              {formatDateToLocalTimezone(scheduledDate, 'short')}
+            </Text>
+          )}
+        </View>
       </View>
 
-      <Pressable
-        className="w-10 h-10 rounded-lg bg-success-50 items-center justify-center active:bg-success-100"
-        onPress={(e) => {
-          e.stopPropagation();
-          haptics.success();
-          onComplete();
-        }}
-      >
-        <CheckSquare size={18} color="#22c55e" />
-      </Pressable>
+      {/* Action Buttons Row */}
+      <View className="flex-row gap-2 mt-3">
+        {/* WhatsApp Button */}
+        {whatsappUrl && (
+          <Pressable
+            className="flex-1 flex-row items-center justify-center py-2.5 rounded-lg bg-green-500 active:bg-green-600"
+            onPress={(e) => {
+              e.stopPropagation();
+              handleWhatsApp();
+            }}
+          >
+            <MessageCircle size={16} color="white" />
+            <Text className="text-white font-medium text-sm ml-1.5">
+              WhatsApp
+            </Text>
+          </Pressable>
+        )}
+
+        {/* Complete/Mark Contact Button */}
+        <Pressable
+          className={`flex-1 flex-row items-center justify-center py-2.5 rounded-lg ${actionButton.bgClass} ${actionButton.activeBgClass}`}
+          onPress={(e) => {
+            e.stopPropagation();
+            haptics.success();
+            actionButton.onPress();
+          }}
+        >
+          <actionButton.icon size={16} color="white" />
+          <Text className="text-white font-medium text-sm ml-1.5">
+            {actionButton.label}
+          </Text>
+        </Pressable>
+      </View>
     </Pressable>
   );
 });
@@ -225,6 +444,7 @@ function TasksScreen() {
   } = useDashboardReminders();
 
   const completeTask = useCompleteTask();
+  const markContacted = useMarkMemberContacted();
 
   // Group tasks by tab
   const todayTasks = useMemo(() => {
@@ -278,10 +498,19 @@ function TasksScreen() {
   // Handle task completion
   const handleComplete = useCallback(
     (task: DashboardTask) => {
-      const eventId = task.event_id || task.stage_id || task.member_id;
-      completeTask.mutate({ eventId, type: task.type });
+      const taskType = getTaskType(task);
+      const eventId = task.event_id || (task as any).stage_id || (task as any).schedule_id || task.member_id;
+      completeTask.mutate({ eventId, type: taskType });
     },
     [completeTask]
+  );
+
+  // Handle mark contact for at-risk/disconnected members
+  const handleMarkContact = useCallback(
+    (memberId: string) => {
+      markContacted.mutate(memberId);
+    },
+    [markContacted]
   );
 
   // Handle task press
@@ -371,11 +600,13 @@ function TasksScreen() {
               <TaskCard
                 task={task}
                 onComplete={() => handleComplete(task)}
+                onMarkContact={() => handleMarkContact(task.member_id)}
                 onPress={() => handleTaskPress(task)}
+                activeTab={activeTab}
               />
             </View>
           )}
-          keyExtractor={(task, index) => `${task.type}-${task.member_id}-${index}`}
+          keyExtractor={(task, index) => `${getTaskType(task)}-${task.member_id}-${index}`}
           contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16 }}
           ListEmptyComponent={
             <View className="items-center py-24">

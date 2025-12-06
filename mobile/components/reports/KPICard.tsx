@@ -12,7 +12,7 @@ import React, { memo, useEffect } from 'react';
 import { View, Text } from 'react-native';
 import Animated, {
   useSharedValue,
-  useAnimatedStyle,
+  useAnimatedProps,
   withTiming,
   Easing,
   interpolate,
@@ -70,7 +70,7 @@ const CircularProgress = memo(function CircularProgress({
     }
   }, [progress, animated]);
 
-  const animatedStyle = useAnimatedStyle(() => {
+  const animatedProps = useAnimatedProps(() => {
     const strokeDashoffset = interpolate(
       animatedProgress.value,
       [0, 100],
@@ -102,7 +102,7 @@ const CircularProgress = memo(function CircularProgress({
         fill="transparent"
         strokeDasharray={circumference}
         strokeLinecap="round"
-        style={animatedStyle}
+        animatedProps={animatedProps}
       />
     </Svg>
   );

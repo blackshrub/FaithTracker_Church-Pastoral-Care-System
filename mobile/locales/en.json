@@ -270,16 +270,47 @@
     },
     "types": {
       "birthday": "Birthday",
+      "grief": "Grief Support",
       "grief_stage": "Grief Support",
+      "grief_loss": "Grief & Loss",
+      "accident": "Accident/Illness",
       "accident_followup": "Accident Follow-up",
+      "accident_illness": "Accident/Illness",
       "financial_aid": "Financial Aid",
-      "at_risk": "At Risk Member",
-      "disconnected": "Disconnected Member"
+      "at_risk": "At Risk",
+      "disconnected": "Disconnected",
+      "childbirth": "Childbirth",
+      "new_house": "New House",
+      "regular_contact": "Regular Contact",
+      "task": "Task"
     },
     "actions": {
       "complete": "Complete",
       "ignore": "Ignore",
-      "view": "View Member"
+      "view": "View Member",
+      "whatsapp": "WhatsApp",
+      "markContact": "Mark Contact",
+      "distributed": "Distributed"
+    },
+    "info": {
+      "willBeYearsOld": "Will be {{age}} years old",
+      "yearsOld": "{{age}} years old",
+      "daysSinceContact": "{{days}} days since contact",
+      "lastContact": "Last contact: {{days}}d ago",
+      "inDays": "in {{days}}d",
+      "daysOverdue": "{{days}}d overdue",
+      "afterMourning": "after mourning"
+    },
+    "stages": {
+      "week1": "Week 1",
+      "week2": "Week 2",
+      "month1": "Month 1",
+      "month3": "Month 3",
+      "month6": "Month 6",
+      "year1": "Year 1",
+      "firstFollowup": "First Follow-up",
+      "secondFollowup": "Second Follow-up",
+      "finalFollowup": "Final Follow-up"
     },
     "emptyState": {
       "noTasks": "No tasks",

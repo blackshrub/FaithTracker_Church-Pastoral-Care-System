@@ -17,7 +17,9 @@ import React, {
   useMemo,
 } from 'react';
 import { useColorScheme, Appearance } from 'react-native';
-import { MMKV } from 'react-native-mmkv';
+
+// Use centralized storage (works in both Expo Go and production)
+import { storage } from '@/lib/storage';
 
 // ============================================================================
 // TYPES
@@ -45,8 +47,7 @@ interface ThemeContextValue {
 // STORAGE
 // ============================================================================
 
-const storage = new MMKV({ id: 'theme-storage' });
-const THEME_KEY = 'theme_mode';
+const THEME_KEY = 'theme:mode';
 
 function getStoredTheme(): ThemeMode {
   const stored = storage.getString(THEME_KEY);

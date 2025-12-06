@@ -473,7 +473,7 @@ export async function unregisterPushToken(): Promise<void> {
       await api.delete('/users/push-token', {
         data: { token },
       });
-      storage.delete(STORAGE_KEYS.PUSH_TOKEN);
+      storage.remove(STORAGE_KEYS.PUSH_TOKEN);
     }
   } catch (error) {
     console.error('Failed to unregister push token:', error);

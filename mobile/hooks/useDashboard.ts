@@ -162,3 +162,45 @@ export function useIgnoreTask() {
     },
   });
 }
+
+/**
+ * Mark a member as contacted (creates a regular_contact care event)
+ * Used for at-risk and disconnected members in the Overdue tab
+ */
+export function useMarkMemberContacted() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (memberId: string) => {
+      if (USE_MOCK_DATA) {
+        // In mock mode, just simulate success
+        return;
+      }
+      await api.post(API_ENDPOINTS.CARE_EVENTS.CREATE, {
+        member_id: memberId,
+        event_type: 'regular_contact',
+        event_date: new Date().toISOString().split('T')[0],
+        title: 'Contact made',
+        completed: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+      Toast.show({
+        type: 'success',
+        text1: 'Contact Marked',
+        text2: 'Member contact has been recorded',
+        visibilityTime: 2000,
+      });
+    },
+    onError: () => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to mark contact',
+        visibilityTime: 3000,
+      });
+    },
+  });
+}

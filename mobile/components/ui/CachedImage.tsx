@@ -10,13 +10,31 @@
  * 40-60% bandwidth reduction compared to standard Image component
  */
 
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View } from 'react-native';
 import { Image, ImageContentFit, ImageStyle } from 'expo-image';
 import { User } from 'lucide-react-native';
 
 // Default blurhash for avatar placeholder (gray gradient)
 const AVATAR_BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+
+// Get API base URL for prepending to relative photo URLs
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.pastoral.gkbj.org';
+// Remove /api suffix if present for uploads path
+const BACKEND_URL = API_BASE_URL.replace(/\/api$/, '');
+
+/**
+ * Convert relative photo URL to absolute URL
+ */
+function getFullPhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Already absolute URL
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // Relative URL - prepend backend URL
+  return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+}
 
 interface CachedImageProps {
   source: string | null | undefined;
@@ -57,8 +75,11 @@ export const CachedImage = memo(function CachedImage({
   isAvatar = false,
   avatarIconSize = 24,
 }: CachedImageProps) {
+  // Convert relative URL to absolute
+  const fullUrl = useMemo(() => getFullPhotoUrl(source), [source]);
+
   // Show fallback for avatars with no source
-  if (!source && isAvatar) {
+  if (!fullUrl && isAvatar) {
     return (
       <View
         className={`bg-gray-100 items-center justify-center ${className || ''}`}
@@ -69,13 +90,13 @@ export const CachedImage = memo(function CachedImage({
     );
   }
 
-  if (!source) {
+  if (!fullUrl) {
     return null;
   }
 
   return (
     <Image
-      source={{ uri: source }}
+      source={{ uri: fullUrl }}
       style={style}
       className={className}
       contentFit={contentFit}

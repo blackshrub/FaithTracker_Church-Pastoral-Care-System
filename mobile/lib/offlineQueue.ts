@@ -1,9 +1,9 @@
 /**
- * Offline Queue - MMKV-backed sync queue for offline operations
+ * Offline Queue - Storage-backed sync queue for offline operations
  *
  * Provides offline-first capabilities by:
  * - Queuing mutations when offline
- * - Persisting queue to MMKV (fast, synchronous)
+ * - Persisting queue to storage (MMKV in production, in-memory in Expo Go)
  * - Auto-syncing when back online
  * - Retry with exponential backoff
  *
@@ -22,8 +22,10 @@
  * await offlineQueue.sync();
  */
 
-import { MMKV } from 'react-native-mmkv';
 import NetInfo from '@react-native-community/netinfo';
+
+// Use centralized storage (works in both Expo Go and production)
+import { storage } from '@/lib/storage';
 
 // ============================================================================
 // TYPES
@@ -60,18 +62,9 @@ export type OperationExecutor = (operation: QueuedOperation) => Promise<unknown>
 // CONSTANTS
 // ============================================================================
 
-const STORAGE_KEY = 'faithtracker-offline-queue';
-const ID_COUNTER_KEY = 'faithtracker-offline-queue-id';
+const STORAGE_KEY = 'offline-queue:operations';
+const ID_COUNTER_KEY = 'offline-queue:id-counter';
 const MAX_RETRIES = 3;
-
-// ============================================================================
-// MMKV STORAGE
-// ============================================================================
-
-const storage = new MMKV({
-  id: 'faithtracker-offline-queue',
-  encryptionKey: 'faithtracker-queue-key',
-});
 
 // ============================================================================
 // OFFLINE QUEUE CLASS
@@ -317,7 +310,7 @@ class OfflineQueue {
    * Clear all operations
    */
   async clear(): Promise<void> {
-    storage.delete(STORAGE_KEY);
+    storage.remove(STORAGE_KEY);
     this.notify();
   }
 

@@ -9,7 +9,7 @@
  * Flow with initialEventType: (member if needed) -> form
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Keyboard,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -1027,13 +1029,20 @@ export function CreateCareEventSheet({
     );
   };
 
+  // Calculate max height for the bottom sheet (screen height - status bar - some margin)
+  const screenHeight = Dimensions.get('window').height;
+  const maxSheetHeight = screenHeight * 0.85;
+
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="w-full"
-      keyboardVerticalOffset={0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
     >
-      <View className="bg-white rounded-t-3xl shadow-2xl">
+      <View
+        className="bg-white rounded-t-3xl shadow-2xl"
+        style={{ maxHeight: maxSheetHeight }}
+      >
         {/* Handle bar */}
         <View className="items-center pt-3 pb-2">
           <View className="w-10 h-1 bg-gray-300 rounded-full" />

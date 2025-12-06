@@ -1,21 +1,111 @@
 /**
  * Storage Utilities
  *
- * MMKV-based persistent storage for the mobile app
- * MMKV is faster and more reliable than AsyncStorage
+ * Uses MMKV for production builds (faster and more reliable)
+ * Falls back to in-memory storage for Expo Go development
  */
 
-import { MMKV } from 'react-native-mmkv';
+import Constants from 'expo-constants';
+
+// ============================================================================
+// STORAGE INTERFACE
+// ============================================================================
+
+/**
+ * Storage interface matching MMKV's API
+ */
+interface StorageInterface {
+  getString(key: string): string | undefined;
+  set(key: string, value: string | number | boolean): void;
+  getNumber(key: string): number | undefined;
+  getBoolean(key: string): boolean | undefined;
+  remove(key: string): void;
+  clearAll(): void;
+  getAllKeys(): string[];
+  contains(key: string): boolean;
+}
+
+// ============================================================================
+// IN-MEMORY STORAGE (for Expo Go)
+// ============================================================================
+
+/**
+ * In-memory storage implementation for Expo Go
+ * Provides same interface as MMKV but data doesn't persist
+ */
+class InMemoryStorage implements StorageInterface {
+  private data: Map<string, string | number | boolean> = new Map();
+
+  getString(key: string): string | undefined {
+    const value = this.data.get(key);
+    return typeof value === 'string' ? value : undefined;
+  }
+
+  set(key: string, value: string | number | boolean): void {
+    this.data.set(key, value);
+  }
+
+  getNumber(key: string): number | undefined {
+    const value = this.data.get(key);
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  getBoolean(key: string): boolean | undefined {
+    const value = this.data.get(key);
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  remove(key: string): void {
+    this.data.delete(key);
+  }
+
+  clearAll(): void {
+    this.data.clear();
+  }
+
+  getAllKeys(): string[] {
+    return Array.from(this.data.keys());
+  }
+
+  contains(key: string): boolean {
+    return this.data.has(key);
+  }
+}
 
 // ============================================================================
 // STORAGE INSTANCE
 // ============================================================================
 
 /**
- * Main storage instance
- * Uses default MMKV ID for general app data
+ * Check if we're running in Expo Go
  */
-export const storage = new MMKV({ id: 'faithtracker-storage' });
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+
+/**
+ * Create storage instance based on environment
+ */
+function createStorage(): StorageInterface {
+  if (isExpoGo) {
+    console.log('[Storage] Using in-memory storage (Expo Go mode)');
+    return new InMemoryStorage();
+  }
+
+  try {
+    // Dynamic import for MMKV - only loads in production builds
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { createMMKV } = require('react-native-mmkv');
+    console.log('[Storage] Using MMKV storage (production mode)');
+    return createMMKV({ id: 'faithtracker-storage' });
+  } catch (error) {
+    console.warn('[Storage] MMKV not available, falling back to in-memory storage');
+    return new InMemoryStorage();
+  }
+}
+
+/**
+ * Main storage instance
+ */
+export const storage: StorageInterface = createStorage();
 
 // ============================================================================
 // STORAGE KEYS
@@ -90,7 +180,7 @@ export function setJSON(key: string, value: unknown): void {
  * Remove a key from storage
  */
 export function remove(key: string): void {
-  storage.delete(key);
+  storage.remove(key);
 }
 
 /**
@@ -114,6 +204,13 @@ export function has(key: string): boolean {
   return storage.contains(key);
 }
 
+/**
+ * Check if storage is persistent (MMKV) or temporary (in-memory)
+ */
+export function isPersistent(): boolean {
+  return !isExpoGo;
+}
+
 export default {
   storage,
   STORAGE_KEYS,
@@ -123,4 +220,5 @@ export default {
   clearAll,
   getAllKeys,
   has,
+  isPersistent,
 };

@@ -7,16 +7,16 @@
 
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { MMKV } from 'react-native-mmkv';
 import { NativeModules, Platform } from 'react-native';
 
 // Import translation files
 import en from '@/locales/en.json';
 import id from '@/locales/id.json';
 
-// Storage for language preference
-const storage = new MMKV({ id: 'faithtracker-settings' });
-const LANGUAGE_KEY = 'user-language';
+// Use centralized storage (works in both Expo Go and production)
+import { storage } from '@/lib/storage';
+
+const LANGUAGE_KEY = 'i18n-user-language';
 
 // Get device language without expo-localization
 function getDeviceLanguage(): string {
@@ -48,10 +48,17 @@ export function setLanguage(lang: string) {
   i18n.changeLanguage(lang);
 }
 
+// Aliases for backward compatibility
+export const changeLang = setLanguage;
+export const changeLanguage = setLanguage;
+
 // Get current language
 export function getLanguage(): string {
   return i18n.language || 'en';
 }
+
+// Alias for backward compatibility
+export const getCurrentLanguage = getLanguage;
 
 // Initialize i18n (called once on app start)
 export async function initializeI18n(): Promise<void> {

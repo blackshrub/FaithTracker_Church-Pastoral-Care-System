@@ -229,8 +229,8 @@ export default function AnalyticsScreen() {
     value: item.count,
   })) || [];
 
-  const eventsData = data?.events_by_type?.map((item) => ({
-    label: item.type.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+  const eventsData = data?.events_by_type?.filter(item => item.type).map((item) => ({
+    label: (item.type || 'other').replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
     value: item.count,
     color: EVENT_TYPE_COLORS[item.type] || colors.gray[400],
   })) || [];

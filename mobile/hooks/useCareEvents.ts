@@ -31,6 +31,7 @@ import type {
   CareEventFilters,
   GriefStage,
   AccidentFollowup,
+  AccidentFollowupStage,
   FinancialAidSchedule,
   MemberListItem,
 } from '@/types';
@@ -380,7 +381,7 @@ export function useMemberAccidentTimeline(memberId: string) {
         // First check pre-generated followups
         const preGenerated = mockAccidentFollowups.filter((f) => f.member_id === memberId);
         if (preGenerated.length > 0) {
-          return preGenerated.map((f) => ({
+          return preGenerated.map((f): AccidentFollowup => ({
             id: f.id,
             care_event_id: f.care_event_id,
             member_id: f.member_id,
@@ -391,7 +392,7 @@ export function useMemberAccidentTimeline(memberId: string) {
             scheduled_date: f.scheduled_date,
             hospital_name: undefined,
             completed: f.completed,
-            completed_at: f.completed_at,
+            completed_at: (f as { completed_at?: string }).completed_at,
             ignored: f.ignored,
             notes: undefined,
             created_at: f.created_at,
@@ -405,7 +406,7 @@ export function useMemberAccidentTimeline(memberId: string) {
         );
 
         const followups: AccidentFollowup[] = [];
-        const stageTypes = ['first_followup', 'second_followup', 'final_followup'];
+        const stageTypes: AccidentFollowupStage[] = ['first_followup', 'second_followup', 'final_followup'];
         const dayOffsets = [3, 7, 14];
 
         accidentEvents.forEach((event) => {
@@ -541,15 +542,10 @@ export function useMemberFinancialAid(memberId: string) {
           campus_id: event.campus_id,
           title: event.title,
           aid_type: event.aid_type || 'emergency',
-          amount: event.aid_amount || 0,
           aid_amount: event.aid_amount || 0,
-          frequency: 'one_time',
-          scheduled_date: event.event_date,
-          payment_date: event.event_date,
+          frequency: 'one_time' as const,
+          start_date: event.event_date,
           is_active: true,
-          distributed: event.completed,
-          distributed_at: event.completed_at,
-          distributed_by_user_name: event.completed_by_user_name,
           ignored: event.ignored,
           ignored_occurrences: [],
           occurrences_completed: event.completed ? 1 : 0,

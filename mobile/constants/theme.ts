@@ -23,6 +23,8 @@ export const colors = {
     700: '#0f766e',
     800: '#115e59',
     900: '#134e4a',
+    // Named aliases
+    teal: '#14b8a6',
   },
 
   // Secondary - Amber (Warmth, Attention)
@@ -37,6 +39,8 @@ export const colors = {
     700: '#b45309',
     800: '#92400e',
     900: '#78350f',
+    // Named aliases
+    amber: '#f59e0b',
   },
 
   // Success - Green (Completed, Growth)
@@ -123,6 +127,14 @@ export const colors = {
     secondary: '#6b7280',
     tertiary: '#9ca3af',
     inverse: '#ffffff',
+  },
+
+  // Status colors (for quick access)
+  status: {
+    success: '#22c55e',        // green-500
+    warning: '#f59e0b',        // amber-500
+    error: '#ef4444',          // red-500
+    info: '#3b82f6',           // blue-500
   },
 };
 
