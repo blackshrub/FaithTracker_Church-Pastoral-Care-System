@@ -1105,6 +1105,30 @@ class OverdueWriteoffSettingsUpdate(Struct):
     days: int = 30
     enabled: bool = False
 
+class EngagementSettingsUpdate(Struct):
+    """Engagement threshold settings"""
+    active_days: int = 60
+    at_risk_days: int = 90
+
+class UserPreferencesUpdate(Struct):
+    """User preferences for notifications, etc."""
+    email_notifications: bool = True
+    whatsapp_notifications: bool = True
+
+class FinancialAidScheduleCreate(Struct):
+    """Create a financial aid schedule"""
+    member_id: str
+    title: str
+    aid_type: str  # AidType enum value as string
+    aid_amount: float
+    frequency: str  # ScheduleFrequency enum value as string
+    start_date: str  # ISO date string
+    end_date: str | None = None
+    day_of_week: str | None = None  # WeekDay enum value
+    day_of_month: int | None = None
+    month_of_year: int | None = None
+    notes: str | None = None
+
 # User Authentication Models
 class UserCreate(Struct):
     email: str  # Email validation handled at route level
@@ -4624,9 +4648,11 @@ async def undo_accident_stage(stage_id: str, request: Request) -> dict:
 # ==================== FINANCIAL AID SCHEDULE ENDPOINTS ====================
 
 @post("/financial-aid-schedules")
-async def create_aid_schedule(schedule: dict, request: Request) -> dict:
+async def create_aid_schedule(data: FinancialAidScheduleCreate, request: Request) -> dict:
     """Create a financial aid schedule"""
     current_user = await get_current_user(request)
+    # Convert Struct to dict for existing code compatibility
+    schedule = to_mongo_doc(data)
     try:
         # Calculate next occurrence based on frequency
         today = date.today()
@@ -7777,7 +7803,7 @@ async def get_engagement_settings() -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @put("/settings/engagement")
-async def update_engagement_settings(settings: dict, request: Request) -> dict:
+async def update_engagement_settings(data: EngagementSettingsUpdate, request: Request) -> dict:
     """Update engagement threshold settings"""
     current_admin = await get_current_admin(request)
     try:
@@ -7785,7 +7811,7 @@ async def update_engagement_settings(settings: dict, request: Request) -> dict:
             {"type": "engagement"},
             {"$set": {
                 "type": "engagement",
-                "data": settings,
+                "data": to_mongo_doc(data),
                 "updated_at": datetime.now(timezone.utc),
                 "updated_by": current_admin["id"]
             }},
@@ -7999,14 +8025,14 @@ async def get_user_preferences(user_id: str) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @put("/settings/user-preferences/{user_id:str}")
-async def update_user_preferences(user_id: str, preferences: dict) -> dict:
+async def update_user_preferences(user_id: str, data: UserPreferencesUpdate) -> dict:
     """Update user preferences"""
     try:
         await db.user_preferences.update_one(
             {"user_id": user_id},
             {"$set": {
                 "user_id": user_id,
-                "data": preferences,
+                "data": to_mongo_doc(data),
                 "updated_at": datetime.now(timezone.utc)
             }},
             upsert=True
