@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, Heart, Hospital, DollarSign, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 import api from '@/lib/api';
@@ -32,7 +32,7 @@ const WhatsAppIcon = () => (
 
 export const Calendar = () => {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
+  const _queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState([]);
@@ -135,8 +135,11 @@ export const Calendar = () => {
               return (
                 <div
                   key={day.toISOString()}
+                  role="button"
+                  tabIndex={0}
                   className={`border rounded-lg p-2 min-h-[80px] transition-all ${isToday ? 'ring-2 ring-teal-500 bg-teal-50' : ''} ${dayEvents.length > 0 ? 'hover:bg-teal-50 cursor-pointer hover:shadow-md' : 'hover:bg-muted/50'}`}
                   onClick={() => handleDateClick(day, dayEvents)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleDateClick(day, dayEvents); }}
                 >
                   <div className={`text-sm font-semibold mb-1 ${isToday ? 'text-teal-700' : ''}`}>{day.getDate()}</div>
                   {dayEvents.slice(0, 2).map(e => (

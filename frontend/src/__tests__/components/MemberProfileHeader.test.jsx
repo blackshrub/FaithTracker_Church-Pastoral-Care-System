@@ -251,7 +251,7 @@ describe('MemberProfileHeader', () => {
   });
 
   test('displays engagement badge before last contact date', () => {
-    const { container } = renderWithRouter(
+    renderWithRouter(
       <MemberProfileHeader member={mockMember} onAddCareEvent={mockOnAddCareEvent} />
     );
 

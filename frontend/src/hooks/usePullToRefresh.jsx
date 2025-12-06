@@ -84,6 +84,7 @@ export function usePullToRefresh(onRefresh, options = {}) {
       try {
         await onRefresh();
       } catch (_error) {
+        // Silently ignore refresh errors - UI will reset
       } finally {
         setIsRefreshing(false);
         setPullProgress(0);

@@ -54,13 +54,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshUser = async () => {
-    try {
-      const response = await api.get('/auth/me');
-      setUser(response.data);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await api.get('/auth/me');
+    setUser(response.data);
+    return response.data;
   };
 
   return (

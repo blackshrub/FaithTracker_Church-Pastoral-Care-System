@@ -151,7 +151,8 @@ export const Settings = () => {
           setDigestTime(response.data.digestTime || '08:00');
           setWhatsappGateway(response.data.whatsappGateway || '');
         }
-      } catch (error) {
+      } catch (_error) {
+        // Settings not available - use defaults
       }
     };
     loadAutomationSettings();
@@ -190,7 +191,7 @@ export const Settings = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.post(`/users/${user.id}/photo`, formData, {
+      await api.post(`/users/${user.id}/photo`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -250,10 +251,11 @@ export const Settings = () => {
       } else {
         // Debug: console.log('No sync config data returned');
       }
-    } catch (error) {
+    } catch (_error) {
+      // Config not available - use defaults
     }
   };
-  
+
   const loadSyncLogs = async (page = 0) => {
     try {
       const skip = page * SYNC_LOGS_PER_PAGE;
@@ -262,10 +264,11 @@ export const Settings = () => {
       setSyncLogsTotal(response.data.total || 0);
       setSyncLogsHasMore(response.data.has_more || false);
       setSyncLogsPage(page);
-    } catch (error) {
+    } catch (_error) {
+      // Logs not available - keep empty
     }
   };
-  
+
   const testConnection = async () => {
     setTesting(true);
     try {
@@ -388,10 +391,11 @@ export const Settings = () => {
         setWriteoffAccident(writeoffRes.data.data.accident_illness || 14);
         setWriteoffGrief(writeoffRes.data.data.grief_support || 14);
       }
-    } catch (error) {
+    } catch (_error) {
+      // Settings not available - use defaults
     }
   };
-  
+
   const saveWriteoffSettings = async () => {
     try {
       await api.put(`/settings/overdue_writeoff`, {
@@ -1591,7 +1595,7 @@ export const Settings = () => {
                                 'Regenerate webhook secret? You must update the core system with the new secret after regeneration.',
                                 async () => {
                                   try {
-                                    const response = await api.post(`/sync/regenerate-secret`);
+                                    await api.post(`/sync/regenerate-secret`);
                                     toast.success('Secret regenerated. Update core system!');
                                     setShowWebhookSecret(false);
                                     await loadSyncConfig();

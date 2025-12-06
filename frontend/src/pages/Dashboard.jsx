@@ -29,7 +29,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -47,7 +46,7 @@ const formatDate = (dateStr, style = 'short') => {
   return formatDateToJakarta(dateStr, styleMap[style] || style);
 };
 
-const getRelativeDate = (dateStr) => {
+const _getRelativeDate = (dateStr) => {
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -76,7 +75,7 @@ const triggerHaptic = () => {
   }
 };
 
-const MemberNameWithAvatar = ({ member, memberId }) => {
+const _MemberNameWithAvatar = ({ member, memberId }) => {
   const getInitials = (name) => {
     if (!name) return '?';
     const parts = name.trim().split(' ');
@@ -113,7 +112,7 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
 
 // formatPhoneForWhatsApp imported from @/lib/utils/formatting
 
-const markBirthdayComplete = async (eventId, queryClient, t) => {
+const _markBirthdayComplete = async (eventId, queryClient, t) => {
   try {
     // Optimistic update - remove from UI immediately
     queryClient.setQueryData(['dashboard'], (old) => {
@@ -236,15 +235,15 @@ export const Dashboard = () => {
   const overdueBirthdays = dashboardData?.overdue_birthdays || [];
   const todayTasks = dashboardData?.today_tasks || [];
   const griefDue = dashboardData?.grief_today || [];
-  const griefToday = dashboardData?.grief_today || [];
+  const _griefToday = dashboardData?.grief_today || [];
   const accidentFollowUp = dashboardData?.accident_followup || [];
   const hospitalFollowUp = [];
   const atRiskMembers = dashboardData?.at_risk_members || [];
   const disconnectedMembers = dashboardData?.disconnected_members || [];
-  const upcomingBirthdays = dashboardData?.upcoming_birthdays || [];
+  const _upcomingBirthdays = dashboardData?.upcoming_birthdays || [];
   const upcomingTasks = dashboardData?.upcoming_tasks || [];
   const financialAidDue = dashboardData?.financial_aid_due || [];
-  const suggestions = dashboardData?.ai_suggestions || [];
+  const _suggestions = dashboardData?.ai_suggestions || [];
   
   // UI state (not related to server data)
   const [quickEventOpen, setQuickEventOpen] = useState(false);
@@ -503,7 +502,7 @@ export const Dashboard = () => {
     );
   }
 
-  const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
+  const _totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
   
   return (
     <div className="space-y-8 pb-12 max-w-full">

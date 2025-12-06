@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import LazyImage from '@/components/LazyImage';
@@ -68,7 +66,7 @@ export const FinancialAid = () => {
   const [loadingRecipients, setLoadingRecipients] = useState(false);
 
   // Use TanStack Query for data fetching with long cache time
-  const { data: financialData, isLoading: loading, isFetching } = useQuery({
+  const { data: financialData, isLoading: loading } = useQuery({
     queryKey: ['financial-aid-data'],
     queryFn: async () => {
       const [summaryRes, eventsRes, membersRes] = await Promise.all([
@@ -108,6 +106,7 @@ export const FinancialAid = () => {
       const response = await api.get('/financial-aid/recipients');
       setRecipients(response.data);
     } catch (_error) {
+      // Error handled silently - UI will show empty state
     } finally {
       setLoadingRecipients(false);
     }

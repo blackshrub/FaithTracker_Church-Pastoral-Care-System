@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Heart, Users, Hospital, Calendar, AlertTriangle, DollarSign } from 'lucide-react';
 
@@ -15,7 +14,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 // Use centralized date formatting with Jakarta timezone
 const formatDate = (dateStr) => formatDateToJakarta(dateStr, 'short');
@@ -225,11 +223,12 @@ export const Reminders = () => {
       setAtRiskMembers(atRisk);
       setDisconnectedMembers(disconnected);
     } catch (_error) {
+      // Error handled silently - data will be empty
     } finally {
       setLoading(false);
     }
   };
-  
+
   if (loading) return <div>Loading...</div>;
   
   const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);

@@ -5,7 +5,7 @@
  * Shows who completed what task, with animations for new items.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Activity, Wifi, WifiOff, Bell, Check, X, UserPlus, Edit, Trash2, Clock } from 'lucide-react';
 
@@ -13,7 +13,6 @@ import { useActivityStream, formatActivityMessage } from '@/hooks/useActivityStr
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 

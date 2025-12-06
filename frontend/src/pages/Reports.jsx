@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   FileText, Users, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2,
   Calendar, DollarSign, Heart, Gift, Activity, Download, Printer,
-  ChevronUp, ChevronDown, Minus, Target, UserCheck, Clock, AlertCircle,
+  ChevronUp, ChevronDown, Minus, Target, UserCheck, AlertCircle,
   Award, Scale, Lightbulb, BarChart3
 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { BarChart, PieChart, AreaChart } from '@/components/charts';
+import { AreaChart } from '@/components/charts';
 
 const MONTHS = [
   { value: 1, label: 'January' },
@@ -127,7 +127,7 @@ const InsightCard = ({ type, category, message }) => {
   );
 };
 
-const StaffPerformanceRow = ({ staff, rank, avgTasks }) => {
+const StaffPerformanceRow = ({ staff, rank }) => {
   const workloadColor = {
     overworked: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
     underworked: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',

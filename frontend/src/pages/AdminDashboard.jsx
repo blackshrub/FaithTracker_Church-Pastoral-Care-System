@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, Building2, Users as UsersIcon, Shield, MoreVertical, Edit, Phone } from 'lucide-react';
+import { Plus, Trash2, Building2, Users as UsersIcon, Shield, MoreVertical, Edit } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 export const AdminDashboard = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const _queryClient = useQueryClient();
   const [campusModalOpen, setCampusModalOpen] = useState(false);
   const [newCampus, setNewCampus] = useState({ id: null, campus_name: '', location: '' });
   const [userModalOpen, setUserModalOpen] = useState(false);

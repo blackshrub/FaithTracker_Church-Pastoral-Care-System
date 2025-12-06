@@ -20,7 +20,7 @@ export function useCompleteEventOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ eventId, memberId }) =>
+    mutationFn: ({ eventId }) =>
       api.post(`/care-events/${eventId}/complete`),
 
     // Optimistically update before server responds

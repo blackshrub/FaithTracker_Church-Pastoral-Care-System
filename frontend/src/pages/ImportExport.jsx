@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Upload, Download, FileJson, FileSpreadsheet } from 'lucide-react';
+import { Upload, Download, FileJson } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
@@ -15,11 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-
 export const ImportExport = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  useAuth(); // Auth context required for API calls
   const [apiUrl, setApiUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [syncInterval, setSyncInterval] = useState(60);
@@ -65,7 +63,7 @@ export const ImportExport = () => {
   const [apiPreview, setApiPreview] = useState(null);
   const [showApiPreview, setShowApiPreview] = useState(false);
   const [apiValidation, setApiValidation] = useState(null);
-  const [editingSyncId, setEditingSyncId] = useState(null);
+  const [_editingSyncId, setEditingSyncId] = useState(null);
   const [editSyncOpen, setEditSyncOpen] = useState(false);
   
   useEffect(() => {
@@ -80,10 +78,11 @@ export const ImportExport = () => {
       if (response.data.length > 0) {
         setSelectedCampusId(response.data[0].id);
       }
-    } catch (error) {
+    } catch (_error) {
+      // Error handled silently - campuses will be empty
     }
   };
-  
+
   const loadActiveSyncs = async () => {
     // Mock data for now - would load from backend in production
     setActiveSyncs([

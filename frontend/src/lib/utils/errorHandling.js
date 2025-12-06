@@ -34,9 +34,7 @@ export const handleApiError = (error, defaultMessage = 'Something went wrong') =
   // Show toast
   toast.error(message);
 
-  // Log in development only
-  if (import.meta.env.DEV) {
-  }
+  // Error already shown via toast - no additional logging needed
 
   return message;
 };

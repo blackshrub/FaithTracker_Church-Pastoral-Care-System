@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
 import { toast } from 'sonner';
 import { Plus, Search, Loader2 } from 'lucide-react';
@@ -8,7 +7,7 @@ import { Plus, Search, Loader2 } from 'lucide-react';
 import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,8 +21,6 @@ import { EngagementBadge } from '@/components/EngagementBadge';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyMembers, EmptySearch } from '@/components/EmptyState';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export const MembersList = () => {
   const { t } = useTranslation();
@@ -44,7 +41,7 @@ export const MembersList = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
 
-  const [allMembers, setAllMembers] = useState([]);
+  const [_allMembers, _setAllMembers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalMembers, setTotalMembers] = useState(0);

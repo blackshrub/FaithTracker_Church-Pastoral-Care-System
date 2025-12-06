@@ -6,14 +6,14 @@
  * - Pending operations count
  * - Sync in progress animation
  */
-import { Wifi, WifiOff, RefreshCw, CloudOff, Check } from 'lucide-react';
+import { WifiOff, RefreshCw, CloudOff, Check } from 'lucide-react';
 
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function SyncStatusIndicator({ className }) {
-  const { isOnline, isSyncing, pendingCount, sync, stats } = useOfflineSync();
+  const { isOnline, isSyncing, pendingCount, sync } = useOfflineSync();
 
   // Don't show anything if online with no pending operations
   if (isOnline && pendingCount === 0 && !isSyncing) {
