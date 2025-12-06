@@ -52,7 +52,7 @@ export const Skeleton = memo(function Skeleton({
 
   return (
     <View
-      className={`bg-gray-200 overflow-hidden ${className}`}
+      className={`bg-gray-200 dark:bg-slate-700 overflow-hidden ${className}`}
       style={[
         {
           width: width as any,
@@ -64,7 +64,7 @@ export const Skeleton = memo(function Skeleton({
     >
       <Animated.View style={[{ flex: 1, width: 200 }, animatedStyle]}>
         <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+          colors={['transparent', 'rgba(255,255,255,0.3)', 'transparent']}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={{ flex: 1 }}
