@@ -26,6 +26,7 @@ import {
   Sunset,
   Moon,
   Users,
+  User,
   CheckSquare,
   ChevronRight,
   Cake,
