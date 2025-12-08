@@ -6350,15 +6350,15 @@ class WhatsAppTestResponse(Struct):
     details: dict | None = None
 
 @post("/integrations/ping/whatsapp")
-async def test_whatsapp_integration(request: WhatsAppTestRequest) -> dict:
+async def test_whatsapp_integration(data: WhatsAppTestRequest) -> dict:
     """Test WhatsApp gateway integration by sending a test message"""
     try:
-        result = await send_whatsapp_message(request.phone, request.message, member_id="test")
-        
+        result = await send_whatsapp_message(data.phone, data.message, member_id="test")
+
         if result['success']:
             return WhatsAppTestResponse(
                 success=True,
-                message=f"✅ WhatsApp message sent successfully to {request.phone}!",
+                message=f"✅ WhatsApp message sent successfully to {data.phone}!",
                 details=result
             )
         else:

@@ -109,6 +109,10 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 if not event:
                     continue
 
+                # Skip members without phone number
+                if not member.get('phone'):
+                    continue
+
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
 
                 if this_year_birthday == today:
@@ -131,10 +135,10 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         grief_members = []
         for stage in grief_due:
             member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0})
-            if member:
+            if member and member.get('phone'):
                 stage_names = {
                     "1_week": "1 minggu",
-                    "2_weeks": "2 minggu", 
+                    "2_weeks": "2 minggu",
                     "1_month": "1 bulan",
                     "3_months": "3 bulan",
                     "6_months": "6 bulan",
@@ -162,7 +166,7 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
 
         for followup in accident_followups_due:
             member = await db.members.find_one({"id": followup["member_id"]}, {"_id": 0})
-            if member:
+            if member and member.get('phone'):
                 stage_name = stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
                 hospital_followups.append(f"  • {member['name']} ({stage_name})\n    📱 wa.me/{phone_clean}")
@@ -171,6 +175,10 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(1000)
         at_risk_list = []
         for member in members:
+            # Skip members without phone number
+            if not member.get('phone'):
+                continue
+
             last_contact = member.get('last_contact_date')
             if last_contact:
                 if isinstance(last_contact, str):
@@ -180,7 +188,7 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 days = (datetime.now(timezone.utc) - last_contact).days
             else:
                 days = 999
-            
+
             if days >= 30:
                 at_risk_list.append((member['name'], days, member['phone']))
         
