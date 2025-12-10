@@ -80,8 +80,12 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         birthday_week_members = []
 
         # Get all members with birth_date in this campus
+        # Note: MongoDB $and is required for multiple conditions on same field
         members_with_birthday = await db.members.find(
-            {"campus_id": campus_id, "birth_date": {"$exists": True, "$ne": None, "$ne": ""}},
+            {
+                "campus_id": campus_id,
+                "birth_date": {"$exists": True, "$type": "string", "$ne": ""}
+            },
             {"_id": 0, "id": 1, "name": 1, "phone": 1, "birth_date": 1}
         ).to_list(5000)
 
@@ -122,7 +126,10 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                     # Birthday in next 7 days
                     days_until = (this_year_birthday - today).days
                     birthday_week_members.append(f"  • {member['name']} ({days_until} hari lagi)\n    📱 wa.me/{phone_clean}")
-            except (ValueError, KeyError):
+            except (ValueError, KeyError, TypeError):
+                # TypeError: birth_date is None/not a string
+                # ValueError: invalid date format
+                # KeyError: missing field
                 continue
         
         # 3. Grief stages due today
