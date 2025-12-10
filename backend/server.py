@@ -6303,8 +6303,9 @@ async def export_members_csv(request: Request) -> Response:
                 writer.writerow({k: member.get(k, '') for k in fieldnames})
         
         output.seek(0)
-        return StreamingResponse(
-            iter([output.getvalue()]),
+        csv_content = output.getvalue()
+        return Response(
+            content=csv_content,
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=members.csv"}
         )
@@ -6339,8 +6340,9 @@ async def export_care_events_csv() -> Response:
                 writer.writerow({k: event.get(k, '') for k in fieldnames})
         
         output.seek(0)
-        return StreamingResponse(
-            iter([output.getvalue()]),
+        csv_content = output.getvalue()
+        return Response(
+            content=csv_content,
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=care_events.csv"}
         )
@@ -6544,15 +6546,15 @@ async def get_demographic_trends(request: Request) -> dict:
         }
 
         for member in members:
-            age = member.get('age', 0)
+            age = member.get('age') or 0  # Handle None explicitly
             # Use membership_status, fallback to category if empty (external sync pattern)
             membership = member.get('membership_status') or member.get('category') or 'Unknown'
-            days_since_contact = member.get('days_since_last_contact', 999)
+            days_since_contact = member.get('days_since_last_contact') or 999
 
             # Initialize membership trend entry if not exists
             if membership not in membership_trends:
                 membership_trends[membership] = {'count': 0, 'engagement_score': 0}
-            
+
             # Age group classification
             if age <= 12:
                 age_group = 'Children (0-12)'
@@ -7147,8 +7149,8 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
 @get("/reports/monthly")
 async def get_monthly_management_report(
     request: Request,
-    year: int = None,
-    month: int = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
 ) -> dict:
     """
     Comprehensive monthly management report for church leadership.
@@ -7161,8 +7163,8 @@ async def get_monthly_management_report(
 @get("/reports/monthly/pdf")
 async def export_monthly_report_pdf(
     request: Request,
-    year: int = None,
-    month: int = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
 ) -> Response:
     """
     Export monthly management report as a professionally formatted PDF.
@@ -7209,8 +7211,8 @@ async def export_monthly_report_pdf(
 @get("/reports/staff-performance")
 async def get_staff_performance_report(
     request: Request,
-    year: int = None,
-    month: int = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
 ) -> dict:
     """
     Detailed staff performance report for workload balancing and recognition.
