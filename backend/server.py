@@ -319,7 +319,7 @@ LOGIN_ATTEMPT_WINDOW_MINUTES = 5  # Time window to count attempts
 
 def _get_client_ip(request: Request) -> str:
     """Extract client IP from request, handling proxied requests"""
-    # Check X-Forwarded-For header (from Traefik/reverse proxy)
+    # Check X-Forwarded-For header (from Angie/reverse proxy)
     forwarded_for = request.headers.get("x-forwarded-for", "")
     if forwarded_for:
         # Take the first IP (original client)
@@ -10088,7 +10088,7 @@ app = Litestar(
     on_shutdown=[on_shutdown],
     middleware=[
         DefineMiddleware(SecurityHeadersMiddleware),  # Security headers (XSS, clickjacking protection)
-        # Note: Compression handled by Traefik at edge (Brotli/gzip)
+        # Note: Compression handled by Angie at edge (Brotli/gzip)
         DefineMiddleware(RequestSizeLimitMiddleware),  # Limit request body size
         rate_limit_config.middleware,  # Rate limiting
     ],

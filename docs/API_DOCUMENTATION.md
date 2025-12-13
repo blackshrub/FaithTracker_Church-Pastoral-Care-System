@@ -885,7 +885,7 @@ eventSource.onerror = () => {
 - Activities are filtered to exclude the connected user's own actions
 - Stream only shows activities from the same campus
 - Connection auto-reconnects on failure (browser handles this)
-- Traefik must have compression disabled for SSE endpoints
+- Angie (reverse proxy) must have compression disabled for SSE endpoints
 
 ---
 

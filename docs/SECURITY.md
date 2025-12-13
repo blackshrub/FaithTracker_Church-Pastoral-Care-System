@@ -68,7 +68,7 @@ FaithTracker implements the following security measures:
 
 ### Infrastructure
 
-- **HTTPS only** in production (via Traefik/Let's Encrypt)
+- **HTTPS only** in production (via Angie/Let's Encrypt)
 - **HTTP to HTTPS redirect**
 - **MongoDB authentication** required
 - **Environment variables** for sensitive configuration

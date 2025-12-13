@@ -82,23 +82,30 @@ openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 
 ```
                     ┌─────────────┐
-                    │   Traefik   │
+                    │    Angie    │  ← Host-level (not Docker)
                     │  (Reverse   │
                     │   Proxy)    │
                     └──────┬──────┘
                            │
-           ┌───────────────┼───────────────┐
-           │               │               │
-    ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-    │  Frontend   │ │   Backend   │ │  Dashboard  │
-    │   (Nginx)   │ │  (Granian)  │ │  (Traefik)  │
-    └─────────────┘ └──────┬──────┘ └─────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │   MongoDB   │
-                    │   (7.0)     │
-                    └─────────────┘
+           ┌───────────────┴───────────────┐
+           │                               │
+    ┌──────▼──────┐                 ┌──────▼──────┐
+    │  Frontend   │                 │   Backend   │
+    │   (Nginx)   │                 │  (Granian)  │
+    └─────────────┘                 └──────┬──────┘
+                                           │
+                                    ┌──────▼──────┐
+                                    │   MongoDB   │
+                                    │   (7.0)     │
+                                    └─────────────┘
 ```
+
+**Angie** runs at the host level (not in Docker), handling:
+- SSL termination (Let's Encrypt via Certbot)
+- Rate limiting
+- Security headers (OWASP)
+- HTTP/3 (QUIC) support
+- Brotli compression
 
 ## Resource Requirements
 
@@ -107,7 +114,7 @@ openssl s_client -connect yourdomain.com:443 -servername yourdomain.com
 | MongoDB   | 2 cores   | 2 GB         | Adjust based on data size|
 | Backend   | 2 cores   | 1 GB         | Handles API + scheduler  |
 | Frontend  | 1 core    | 256 MB       | Static files only        |
-| Traefik   | 0.5 core  | 128 MB       | Reverse proxy            |
+| Angie     | -         | ~50 MB       | Host-level reverse proxy |
 
 ## Updating
 
@@ -174,17 +181,18 @@ df -h
 ### SSL certificate issues
 
 ```bash
-# Check acme.json permissions
-ls -la letsencrypt/acme.json  # Should be 600
+# Check certificate status
+sudo certbot certificates
 
-# View Traefik logs
-docker compose logs traefik | grep -i cert
+# Check certificate dates
+echo | openssl s_client -servername $DOMAIN -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -dates
 
 # Force certificate renewal
-rm letsencrypt/acme.json
-touch letsencrypt/acme.json
-chmod 600 letsencrypt/acme.json
-docker compose restart traefik
+sudo certbot renew --force-renewal
+sudo systemctl reload angie
+
+# View Angie logs
+sudo journalctl -u angie -n 50
 ```
 
 ### Database connection issues
@@ -215,8 +223,7 @@ docker stats
 - [ ] Enable firewall (allow only 80, 443)
 - [ ] Configure backup schedule
 - [ ] Set up monitoring/alerting
-- [ ] Review Traefik dashboard access
-- [ ] Enable rate limiting
+- [ ] Review Angie rate limiting config
 - [ ] Configure CORS properly
 
 ## Monitoring

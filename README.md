@@ -89,7 +89,7 @@ make up
 |-------|--------------|
 | **Backend** | FastAPI, MongoDB 7.0, Granian (Rust ASGI) |
 | **Frontend** | React 19, Vite, TanStack Query, Tailwind |
-| **Infrastructure** | Docker, Traefik v3.6, HTTP/3, Let's Encrypt |
+| **Infrastructure** | Docker, Angie (nginx fork), HTTP/3, Let's Encrypt |
 
 ## Project Structure
 

@@ -14,7 +14,7 @@ All notable changes to FaithTracker will be documented in this file.
   - Custom `CustomORJSONResponse` for MongoDB datetime handling
   - Set as default response class for all endpoints
 - **Brotli Compression** - 15-25% smaller responses than gzip
-  - Configured via Traefik middleware
+  - Configured via Angie (built-in support)
   - Minimum response size: 256 bytes
 - **HTTP/3 (QUIC) Support** - Lower latency for mobile users
   - UDP port 443 exposed

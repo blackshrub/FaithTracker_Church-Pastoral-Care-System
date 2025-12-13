@@ -100,6 +100,7 @@ angie/
 ├── angie.conf                          # Main configuration
 ├── conf.d/
 │   ├── faithtracker.conf.template      # Site config template (uses ${DOMAIN})
+│   ├── faithtracker.conf.example       # Example generated config (reference)
 │   ├── ssl.conf                        # SSL/TLS settings
 │   ├── security-headers.conf           # OWASP security headers
 │   └── rate-limit.conf                 # Rate limiting zones
@@ -283,33 +284,6 @@ If CORS errors appear in browser:
 1. Check that `DOMAIN` in `.env` matches the request origin
 2. Regenerate config: `./angie/generate-config.sh`
 3. Reload: `sudo systemctl reload angie`
-
-## Migration from Traefik
-
-This setup replaces Traefik with host-level Angie. Key differences:
-
-| Feature | Traefik | Angie |
-|---------|---------|-------|
-| SSL Certificates | Built-in ACME | Certbot |
-| Configuration | Docker labels | Config files |
-| Rate Limiting | Middleware | nginx directives |
-| HTTP/3 | Built-in | Built-in |
-| Compression | Middleware | Built-in |
-
-### Rollback to Traefik
-
-If you need to rollback:
-
-```bash
-# Stop Angie
-sudo systemctl stop angie
-
-# Restore Traefik docker-compose
-git checkout docker-compose.yml
-
-# Start with Traefik
-docker compose up -d
-```
 
 ## Performance Notes
 
