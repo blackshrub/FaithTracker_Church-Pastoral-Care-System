@@ -1,0 +1,263 @@
+# ===========================================
+# FaithTracker - Site Configuration Template
+# ===========================================
+# This file uses environment variable placeholders.
+# Run generate-config.sh to create the final config.
+#
+# Variables used:
+#   ${DOMAIN} - Main domain (e.g., pastoral.gkbj.org)
+
+# ===========================================
+# Rate Limiting Zones
+# ===========================================
+# Include rate limit configuration
+include /etc/angie/conf.d/rate-limit.conf;
+
+# ===========================================
+# HTTP -> HTTPS Redirect
+# ===========================================
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN} api.${DOMAIN};
+
+    # ACME challenge for Certbot
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        allow all;
+    }
+
+    # Redirect all other traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ===========================================
+# Frontend - Main Domain (HTTPS)
+# ===========================================
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    # HTTP/3 (QUIC) - Angie built-in support
+    listen 443 quic reuseport;
+    listen [::]:443 quic reuseport;
+
+    server_name ${DOMAIN};
+
+    # SSL Configuration
+    include /etc/angie/conf.d/ssl.conf;
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+    # HTTP/3 Alt-Svc header
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+
+    # Security Headers
+    include /etc/angie/conf.d/security-headers.conf;
+
+    # Frontend-specific CSP (more permissive for React app)
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
+    # Rate Limiting
+    limit_req zone=frontend burst=50 nodelay;
+    limit_conn conn_limit 20;
+
+    # Frontend proxy
+    location / {
+        proxy_pass http://frontend;
+        include /etc/angie/snippets/proxy-headers.conf;
+
+        # Cache headers for SPA
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+    }
+
+    # Static assets with long cache
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://frontend;
+        include /etc/angie/snippets/proxy-headers.conf;
+
+        # Long cache for hashed assets
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Service worker - no cache
+    location = /sw.js {
+        proxy_pass http://frontend;
+        include /etc/angie/snippets/proxy-headers.conf;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    # Health check
+    location /health {
+        proxy_pass http://frontend;
+        access_log off;
+    }
+}
+
+# ===========================================
+# Backend API - api.DOMAIN (HTTPS)
+# ===========================================
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    # HTTP/3 (QUIC)
+    listen 443 quic;
+    listen [::]:443 quic;
+
+    server_name api.${DOMAIN};
+
+    # SSL Configuration
+    include /etc/angie/conf.d/ssl.conf;
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+    # HTTP/3 Alt-Svc header
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+
+    # Security Headers
+    include /etc/angie/conf.d/security-headers.conf;
+
+    # Backend-specific CSP
+    add_header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'" always;
+
+    # Request body size limit (for file uploads)
+    client_max_body_size 15M;
+
+    # ===================
+    # SSE Streaming Endpoint (No compression, no buffering)
+    # ===================
+    location /stream {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+
+        # SSE-specific settings
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        chunked_transfer_encoding on;
+
+        # Disable compression for SSE
+        gzip off;
+        brotli off;
+
+        # CORS headers for SSE
+        add_header Access-Control-Allow-Origin "https://${DOMAIN}" always;
+        add_header Access-Control-Allow-Credentials "true" always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type, Cache-Control" always;
+
+        # Handle OPTIONS preflight
+        if ($request_method = 'OPTIONS') {
+            add_header Access-Control-Allow-Origin "https://${DOMAIN}" always;
+            add_header Access-Control-Allow-Credentials "true" always;
+            add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Authorization, Content-Type, Cache-Control" always;
+            add_header Access-Control-Max-Age 86400;
+            add_header Content-Length 0;
+            add_header Content-Type text/plain;
+            return 204;
+        }
+    }
+
+    # ===================
+    # Auth Endpoints (Stricter rate limiting)
+    # ===================
+    location /auth {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+
+        # Stricter rate limiting for auth
+        limit_req zone=auth burst=10 nodelay;
+
+        # CORS
+        add_header Access-Control-Allow-Origin "https://${DOMAIN}" always;
+        add_header Access-Control-Allow-Credentials "true" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, Cache-Control, Pragma" always;
+        add_header Access-Control-Max-Age 86400 always;
+        add_header Vary "Origin" always;
+
+        # Handle OPTIONS preflight
+        if ($request_method = 'OPTIONS') {
+            add_header Access-Control-Allow-Origin "https://${DOMAIN}" always;
+            add_header Access-Control-Allow-Credentials "true" always;
+            add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH" always;
+            add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, Cache-Control, Pragma" always;
+            add_header Access-Control-Max-Age 86400;
+            add_header Content-Length 0;
+            add_header Content-Type text/plain;
+            return 204;
+        }
+    }
+
+    # ===================
+    # Main API Endpoint
+    # ===================
+    location / {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+
+        # General rate limiting
+        limit_req zone=api burst=100 nodelay;
+        limit_conn conn_limit 50;
+
+        # CORS headers
+        add_header Access-Control-Allow-Origin "https://${DOMAIN}" always;
+        add_header Access-Control-Allow-Credentials "true" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, Cache-Control, Pragma" always;
+        add_header Access-Control-Max-Age 86400 always;
+        add_header Vary "Origin" always;
+
+        # Handle OPTIONS preflight
+        if ($request_method = 'OPTIONS') {
+            add_header Access-Control-Allow-Origin "https://${DOMAIN}" always;
+            add_header Access-Control-Allow-Credentials "true" always;
+            add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH" always;
+            add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, Cache-Control, Pragma" always;
+            add_header Access-Control-Max-Age 86400;
+            add_header Content-Length 0;
+            add_header Content-Type text/plain;
+            return 204;
+        }
+    }
+
+    # Health check endpoint (no rate limiting)
+    location = /health {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+        access_log off;
+        limit_req off;
+    }
+
+    # Ready check endpoint (no rate limiting)
+    location = /ready {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+        access_log off;
+        limit_req off;
+    }
+
+    # API Documentation (Swagger)
+    location /docs {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+
+        # Allow iframe for Swagger UI
+        add_header X-Frame-Options "SAMEORIGIN" always;
+    }
+
+    location /redoc {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+    }
+
+    location /openapi.json {
+        proxy_pass http://backend;
+        include /etc/angie/snippets/proxy-headers.conf;
+    }
+}

@@ -7,6 +7,7 @@
 #
 # Usage:
 #   ./scripts/validate-deployment.sh
+#   ./scripts/validate-deployment.sh --local    # Test against localhost only
 #
 # Exit codes:
 #   0 - All checks passed
@@ -31,7 +32,7 @@ FRONTEND_URL="https://${DOMAIN}"
 # For local testing
 if [ "$1" == "--local" ]; then
     API_URL="http://localhost:8001"
-    FRONTEND_URL="http://localhost:3000"
+    FRONTEND_URL="http://localhost:8080"
 fi
 
 # Colors for output
@@ -78,13 +79,48 @@ log_warn() {
 }
 
 # ===========================================
+# Angie Web Server Checks (Host-level)
+# ===========================================
+check_angie() {
+    log_header "Angie Web Server (Host-level)"
+
+    log_check "Angie service status"
+    if systemctl is-active --quiet angie 2>/dev/null; then
+        log_pass
+    else
+        log_fail "Angie is not running. Run: sudo systemctl start angie"
+    fi
+
+    log_check "Angie configuration syntax"
+    if angie -t 2>/dev/null; then
+        log_pass
+    else
+        log_warn "Could not test config (may need sudo)"
+    fi
+
+    log_check "Angie listening on port 80"
+    if netstat -tlnp 2>/dev/null | grep -q ":80 " || ss -tlnp 2>/dev/null | grep -q ":80 "; then
+        log_pass
+    else
+        log_warn "Port 80 not detected"
+    fi
+
+    log_check "Angie listening on port 443"
+    if netstat -tlnp 2>/dev/null | grep -q ":443 " || ss -tlnp 2>/dev/null | grep -q ":443 "; then
+        log_pass
+    else
+        log_warn "Port 443 not detected"
+    fi
+}
+
+# ===========================================
 # Docker Container Checks
 # ===========================================
 check_docker_containers() {
     log_header "Docker Container Status"
 
     # Check if containers are running
-    for container in faithtracker-traefik faithtracker-mongo faithtracker-backend faithtracker-frontend; do
+    for container in faithtracker-mongo faithtracker-backend faithtracker-frontend; do
         log_check "Container ${container}"
         if docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
             STATUS=$(docker inspect --format='{{.State.Status}}' ${container})
@@ -121,10 +157,33 @@ check_docker_containers() {
 }
 
 # ===========================================
-# API Health Checks
+# Local Service Checks (via localhost)
+# ===========================================
+check_local_services() {
+    log_header "Local Service Health (Direct)"
+
+    log_check "Backend on localhost:8001"
+    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time ${TIMEOUT} "http://127.0.0.1:8001/health" 2>/dev/null || echo "000")
+    if [ "$RESPONSE" == "200" ]; then
+        log_pass
+    else
+        log_fail "HTTP ${RESPONSE}"
+    fi
+
+    log_check "Frontend on localhost:8080"
+    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time ${TIMEOUT} "http://127.0.0.1:8080/health" 2>/dev/null || echo "000")
+    if [ "$RESPONSE" == "200" ]; then
+        log_pass
+    else
+        log_fail "HTTP ${RESPONSE}"
+    fi
+}
+
+# ===========================================
+# API Health Checks (via Angie)
 # ===========================================
 check_api_health() {
-    log_header "API Health Checks"
+    log_header "API Health Checks (via Angie)"
 
     log_check "API health endpoint"
     RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time ${TIMEOUT} "${API_URL}/health" 2>/dev/null || echo "000")
@@ -163,7 +222,7 @@ check_api_health() {
 # Frontend Checks
 # ===========================================
 check_frontend() {
-    log_header "Frontend Checks"
+    log_header "Frontend Checks (via Angie)"
 
     log_check "Frontend accessible"
     RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time ${TIMEOUT} "${FRONTEND_URL}" 2>/dev/null || echo "000")
@@ -203,6 +262,14 @@ check_ssl() {
         log_fail "Certificate expired or expiring within 24 hours"
     fi
 
+    log_check "Certificate for api subdomain"
+    CERT_CHECK=$(echo | openssl s_client -servername "api.${DOMAIN}" -connect "api.${DOMAIN}:443" 2>/dev/null | openssl x509 -noout -checkend 86400 2>/dev/null && echo "valid" || echo "invalid")
+    if [ "$CERT_CHECK" == "valid" ]; then
+        log_pass
+    else
+        log_fail "API certificate invalid"
+    fi
+
     log_check "HTTPS redirect working"
     RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time ${TIMEOUT} "http://${DOMAIN}" 2>/dev/null || echo "000")
     if [ "$RESPONSE" == "301" ] || [ "$RESPONSE" == "302" ] || [ "$RESPONSE" == "308" ]; then
@@ -220,6 +287,13 @@ check_security_headers() {
 
     HEADERS=$(curl -s -I --max-time ${TIMEOUT} "${API_URL}/health" 2>/dev/null || echo "")
 
+    log_check "Strict-Transport-Security (HSTS)"
+    if echo "$HEADERS" | grep -qi "strict-transport-security"; then
+        log_pass
+    else
+        log_warn "Header not found"
+    fi
+
     log_check "X-Frame-Options header"
     if echo "$HEADERS" | grep -qi "x-frame-options"; then
         log_pass
@@ -234,8 +308,8 @@ check_security_headers() {
         log_warn "Header not found"
     fi
 
-    log_check "Content-Security-Policy header"
-    if echo "$HEADERS" | grep -qi "content-security-policy"; then
+    log_check "Referrer-Policy header"
+    if echo "$HEADERS" | grep -qi "referrer-policy"; then
         log_pass
     else
         log_warn "Header not found"
@@ -301,7 +375,9 @@ main() {
     echo "  API URL:  ${API_URL}"
     echo "  Time:     $(date)"
 
+    check_angie
     check_docker_containers
+    check_local_services
     check_api_health
     check_frontend
     check_ssl "$1"

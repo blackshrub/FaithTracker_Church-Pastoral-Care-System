@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ASGI Server: Granian (Rust-based, faster than Uvicorn)
 - JSON: msgspec (faster than orjson, lower memory)
 - Frontend: React 19 + React Compiler, Vite, TanStack React Query, Shadcn/UI, Tailwind CSS
-- Infrastructure: Docker, Traefik v3.6 (HTTP/3, Brotli compression), Let's Encrypt
+- Infrastructure: Docker (application services), Angie (host-level reverse proxy with HTTP/3, Brotli), Let's Encrypt (Certbot)
 
 ## Development Commands
 
@@ -420,7 +420,7 @@ Live team collaboration via Server-Sent Events:
   - Activity types: complete, ignore, create_event, delete_event, etc.
   - Filters out own user's activities in real-time stream
   - Loads recent activities from REST API on mount
-- **Traefik config:** SSE router has compression disabled (required for streaming)
+- **Angie config:** SSE location has compression disabled (required for streaming)
 
 ```javascript
 // Frontend usage
@@ -668,6 +668,24 @@ mobile/
 ├── tailwind.config.js          # NativeWind Tailwind config
 ├── babel.config.js             # Babel configuration
 └── app.json                    # Expo configuration
+```
+
+### Angie (Host-level Web Server)
+```
+angie/
+├── README.md                   # Setup documentation
+├── angie.conf                  # Main Angie configuration
+├── conf.d/
+│   ├── faithtracker.conf.template  # Site config (uses ${DOMAIN})
+│   ├── ssl.conf                # SSL/TLS settings
+│   ├── security-headers.conf   # OWASP security headers
+│   └── rate-limit.conf         # Rate limiting zones
+├── snippets/
+│   ├── proxy-headers.conf      # Common proxy headers
+│   └── ssl-params.conf         # SSL parameters
+├── install.sh                  # Installation script (Debian/Ubuntu)
+├── setup-ssl.sh                # Certbot SSL setup
+└── generate-config.sh          # Generate config from .env
 ```
 
 ## Mobile App Styling Guidelines
@@ -1017,14 +1035,15 @@ git diff <commit1> <commit2>
 - Used as default response class for all FastAPI endpoints
 - Handles `datetime`, `date`, `ObjectId`, `Decimal128`, and other types automatically
 
-**Response Compression (Traefik):**
-- Brotli compression enabled (15-25% smaller than gzip)
+**Response Compression (Angie):**
+- Brotli compression built-in (15-25% smaller than gzip)
+- Gzip fallback for older clients
 - Minimum response size: 256 bytes
 - Applied to both frontend and backend responses
-- Configured via Traefik middleware labels
+- Configured in `/angie/angie.conf`
 
 **HTTP/3 (QUIC) Support:**
-- Enabled in Traefik for lower latency
+- Enabled in Angie (built-in support) for lower latency
 - UDP port 443 exposed for QUIC protocol
 - Automatic protocol negotiation (HTTP/1.1, HTTP/2, HTTP/3)
 - Benefits mobile users with unstable connections

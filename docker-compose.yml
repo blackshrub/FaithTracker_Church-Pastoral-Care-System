@@ -1,61 +1,17 @@
 # FaithTracker Docker Compose
-# Production deployment with Traefik SSL/Let's Encrypt
+# Production deployment with Angie (host-level reverse proxy)
+#
+# Architecture:
+#   - Angie runs at HOST level (handles SSL, rate limiting, security)
+#   - All application services run in Docker containers
+#   - Services exposed to localhost only (127.0.0.1)
+#
+# Setup:
+#   1. Install Angie: sudo ./angie/install.sh
+#   2. Setup SSL: sudo ./angie/setup-ssl.sh
+#   3. Start services: docker compose up -d
 
 services:
-  # ===================
-  # Traefik - Reverse Proxy & SSL (v3.6)
-  # ===================
-  traefik:
-    image: traefik:v3.6
-    container_name: faithtracker-traefik
-    restart: unless-stopped
-    command:
-      # API and Dashboard
-      - "--api.dashboard=true"
-      - "--api.insecure=false"
-      # Docker provider
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=faithtracker-network"
-      # Entrypoints - HTTP, HTTPS, and HTTP/3 (QUIC)
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.websecure.http3"
-      - "--entrypoints.websecure.http3.advertisedport=443"
-      # HTTP to HTTPS redirect
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # Let's Encrypt - Using TLS-ALPN-01 challenge (works on port 443)
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-      # Logging
-      - "--log.level=INFO"
-      - "--accesslog=true"
-    ports:
-      - "80:80"
-      - "443:443/tcp"
-      - "443:443/udp"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./letsencrypt/acme.json:/letsencrypt/acme.json
-    networks:
-      - faithtracker-network
-    labels:
-      # Dashboard (optional - disable in production if not needed)
-      # Security: Protected with basic auth + IP whitelist
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN}`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      # Apply both auth and IP whitelist (chain middlewares)
-      - "traefik.http.routers.dashboard.middlewares=dashboard-auth,dashboard-ipwhitelist"
-      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
-      # IP whitelist - only allow from these IPs (add your admin IPs)
-      # To disable whitelist, comment out the ipwhitelist middleware above
-      - "traefik.http.middlewares.dashboard-ipwhitelist.ipallowlist.sourcerange=127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
-
   # ===================
   # MongoDB Database
   # ===================
@@ -94,7 +50,7 @@ services:
       start_period: 20s
 
   # ===================
-  # Backend - FastAPI
+  # Backend - FastAPI/Litestar
   # ===================
   backend:
     build:
@@ -102,6 +58,9 @@ services:
       dockerfile: Dockerfile
     container_name: faithtracker-backend
     restart: unless-stopped
+    # Expose to localhost only (Angie will proxy)
+    ports:
+      - "127.0.0.1:8001:8001"
     environment:
       - ENVIRONMENT=production
       - MONGO_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/faithtracker?authSource=admin
@@ -121,70 +80,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      # API Router (main - with compression)
-      - "traefik.http.routers.backend.rule=Host(`api.${DOMAIN}`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend.priority=1"
-      - "traefik.http.services.backend.loadbalancer.server.port=8001"
-      # SSE Router (no compression - SSE needs unbuffered streaming)
-      - "traefik.http.routers.backend-sse.rule=Host(`api.${DOMAIN}`) && PathPrefix(`/stream`)"
-      - "traefik.http.routers.backend-sse.entrypoints=websecure"
-      - "traefik.http.routers.backend-sse.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend-sse.priority=10"
-      - "traefik.http.routers.backend-sse.service=backend"
-      - "traefik.http.routers.backend-sse.middlewares=backend-cors"
-      # ==================== WAF-LIKE SECURITY MIDDLEWARES ====================
-      # Rate Limiting - Prevent DDoS and brute force at edge
-      # NOTE: Rate limiter 429 responses don't include CORS headers, so limits must be generous
-      - "traefik.http.middlewares.backend-ratelimit.ratelimit.average=500"
-      - "traefik.http.middlewares.backend-ratelimit.ratelimit.burst=200"
-      - "traefik.http.middlewares.backend-ratelimit.ratelimit.period=1m"
-      - "traefik.http.middlewares.backend-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
-      # Rate limit for auth endpoints (login/register) - higher to avoid CORS issues
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.average=200"
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.burst=100"
-      - "traefik.http.middlewares.backend-auth-ratelimit.ratelimit.period=1m"
-      # In-Flight Requests - Limit concurrent connections per IP (prevents slowloris)
-      - "traefik.http.middlewares.backend-inflightreq.inflightreq.amount=50"
-      - "traefik.http.middlewares.backend-inflightreq.inflightreq.sourcecriterion.ipstrategy.depth=1"
-      # Security Headers - OWASP recommended
-      - "traefik.http.middlewares.backend-security.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.backend-security.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.backend-security.headers.stsPreload=true"
-      - "traefik.http.middlewares.backend-security.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.backend-security.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.backend-security.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.backend-security.headers.frameDeny=true"
-      - "traefik.http.middlewares.backend-security.headers.referrerPolicy=strict-origin-when-cross-origin"
-      - "traefik.http.middlewares.backend-security.headers.permissionsPolicy=geolocation=(), microphone=(), camera=(), payment=()"
-      - "traefik.http.middlewares.backend-security.headers.customResponseHeaders.X-Robots-Tag=noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex"
-      - "traefik.http.middlewares.backend-security.headers.customResponseHeaders.X-Download-Options=noopen"
-      - "traefik.http.middlewares.backend-security.headers.customResponseHeaders.X-Permitted-Cross-Domain-Policies=none"
-      # Request Body Limits - Prevent large payload attacks
-      - "traefik.http.middlewares.backend-buffering.buffering.maxRequestBodyBytes=15728640"
-      - "traefik.http.middlewares.backend-buffering.buffering.memRequestBodyBytes=2097152"
-      # Brotli/Gzip compression middleware (15-25% smaller than gzip alone)
-      - "traefik.http.middlewares.backend-compress.compress=true"
-      - "traefik.http.middlewares.backend-compress.compress.minresponsebodybytes=256"
-      # CORS headers middleware
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Authorization,Content-Type,X-Requested-With,Cache-Control,Pragma"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://${DOMAIN}"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=86400"
-      - "traefik.http.middlewares.backend-cors.headers.addvaryheader=true"
-      # Auth-specific router with stricter rate limiting
-      - "traefik.http.routers.backend-auth.rule=Host(`api.${DOMAIN}`) && PathPrefix(`/auth`)"
-      - "traefik.http.routers.backend-auth.entrypoints=websecure"
-      - "traefik.http.routers.backend-auth.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend-auth.priority=20"
-      - "traefik.http.routers.backend-auth.service=backend"
-      - "traefik.http.routers.backend-auth.middlewares=backend-cors,backend-security,backend-buffering"
-      # Apply all security middlewares to main router
-      - "traefik.http.routers.backend.middlewares=backend-cors,backend-ratelimit,backend-inflightreq,backend-security,backend-compress,backend-buffering"
     # Resource limits to prevent runaway memory/CPU usage
     deploy:
       resources:
@@ -217,38 +112,13 @@ services:
         VITE_BACKEND_URL: https://api.${DOMAIN}
     container_name: faithtracker-frontend
     restart: unless-stopped
+    # Expose to localhost only (Angie will proxy)
+    ports:
+      - "127.0.0.1:8080:80"
     networks:
       - faithtracker-network
     depends_on:
       - backend
-    labels:
-      - "traefik.enable=true"
-      # Frontend Router
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      # ==================== FRONTEND SECURITY MIDDLEWARES ====================
-      # Rate Limiting - Prevent DDoS
-      - "traefik.http.middlewares.frontend-ratelimit.ratelimit.average=200"
-      - "traefik.http.middlewares.frontend-ratelimit.ratelimit.burst=100"
-      - "traefik.http.middlewares.frontend-ratelimit.ratelimit.period=1m"
-      # Security Headers - OWASP recommended for frontend
-      - "traefik.http.middlewares.frontend-security.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.frontend-security.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.frontend-security.headers.stsPreload=true"
-      - "traefik.http.middlewares.frontend-security.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.frontend-security.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.frontend-security.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.frontend-security.headers.frameDeny=true"
-      - "traefik.http.middlewares.frontend-security.headers.referrerPolicy=strict-origin-when-cross-origin"
-      - "traefik.http.middlewares.frontend-security.headers.permissionsPolicy=geolocation=(), microphone=(), camera=(), payment=()"
-      - "traefik.http.middlewares.frontend-security.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-      # Brotli/Gzip compression middleware for static assets
-      - "traefik.http.middlewares.frontend-compress.compress=true"
-      - "traefik.http.middlewares.frontend-compress.compress.minresponsebodybytes=256"
-      # Apply all middlewares
-      - "traefik.http.routers.frontend.middlewares=frontend-security,frontend-compress"
     # Resource limits to prevent runaway memory/CPU usage
     deploy:
       resources:

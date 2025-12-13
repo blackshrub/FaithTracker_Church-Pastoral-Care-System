@@ -11,10 +11,19 @@
 #   make rebuild   - Build images without cache (fresh build)
 #   make status    - Show service status
 #
+# Angie (Host-level Web Server):
+#   make angie-install   - Install Angie and dependencies
+#   make angie-status    - Check Angie status
+#   make angie-reload    - Reload Angie configuration
+#   make angie-test      - Test Angie configuration
+#   make angie-logs      - View Angie logs
+#   make ssl-setup       - Setup SSL certificates
+#   make ssl-renew       - Force certificate renewal
+#
 # Individual Services:
 #   make restart-backend   - Restart only backend
 #   make rebuild-frontend  - Rebuild frontend without cache
-#   make logs-backend      - View backend logs only
+#   make logs-backend      - View backend logs
 #
 # Database:
 #   make backup    - Backup MongoDB
@@ -26,8 +35,10 @@
 
 .PHONY: help up down restart logs build rebuild status health clean \
         restart-backend restart-frontend rebuild-backend rebuild-frontend \
-        logs-backend logs-frontend logs-mongo logs-traefik \
-        backup shell-db shell-backend ps
+        logs-backend logs-frontend logs-mongo \
+        backup shell-db shell-backend ps \
+        angie-install angie-status angie-reload angie-test angie-logs \
+        ssl-setup ssl-renew ssl-status
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -62,13 +73,24 @@ help: ## Show this help message
 	@echo "  $(GREEN)make rebuild-backend$(NC) Rebuild backend only (no cache)"
 	@echo "  $(GREEN)make rebuild-frontend$(NC) Rebuild frontend only (no cache)"
 	@echo ""
+	@echo "$(BOLD)Angie Web Server (Host-level):$(NC)"
+	@echo "  $(GREEN)make angie-install$(NC)   Install Angie and Certbot"
+	@echo "  $(GREEN)make angie-status$(NC)    Check Angie status"
+	@echo "  $(GREEN)make angie-reload$(NC)    Reload Angie configuration"
+	@echo "  $(GREEN)make angie-test$(NC)      Test configuration syntax"
+	@echo "  $(GREEN)make angie-logs$(NC)      View Angie logs"
+	@echo ""
+	@echo "$(BOLD)SSL Certificates:$(NC)"
+	@echo "  $(GREEN)make ssl-setup$(NC)       Setup SSL certificates"
+	@echo "  $(GREEN)make ssl-renew$(NC)       Force certificate renewal"
+	@echo "  $(GREEN)make ssl-status$(NC)      Check certificate status"
+	@echo ""
 	@echo "$(BOLD)Individual Services:$(NC)"
 	@echo "  $(GREEN)make restart-backend$(NC)  Restart backend only"
 	@echo "  $(GREEN)make restart-frontend$(NC) Restart frontend only"
 	@echo "  $(GREEN)make logs-backend$(NC)     View backend logs"
 	@echo "  $(GREEN)make logs-frontend$(NC)    View frontend logs"
 	@echo "  $(GREEN)make logs-mongo$(NC)       View MongoDB logs"
-	@echo "  $(GREEN)make logs-traefik$(NC)     View Traefik logs"
 	@echo ""
 	@echo "$(BOLD)Database:$(NC)"
 	@echo "  $(GREEN)make backup$(NC)          Backup MongoDB to ./backups/"
@@ -114,6 +136,10 @@ ps: ## Show running containers
 	@echo "$(CYAN)===============$(NC)"
 	@docker compose ps
 	@echo ""
+	@echo "$(CYAN)$(BOLD)Angie Status$(NC)"
+	@echo "$(CYAN)=============$(NC)"
+	@systemctl is-active angie 2>/dev/null && echo "  Angie: $(GREEN)running$(NC)" || echo "  Angie: $(RED)stopped$(NC)"
+	@echo ""
 
 #===============================================================================
 # BUILD COMMANDS
@@ -140,6 +166,55 @@ rebuild-frontend: ## Rebuild frontend without cache
 	@echo "$(YELLOW)Run 'make restart-frontend' to apply changes$(NC)"
 
 #===============================================================================
+# ANGIE WEB SERVER COMMANDS (Host-level)
+#===============================================================================
+
+angie-install: ## Install Angie web server and Certbot
+	@echo "$(GREEN)Installing Angie...$(NC)"
+	@echo "$(YELLOW)This requires root privileges$(NC)"
+	sudo ./angie/install.sh
+
+angie-status: ## Check Angie status
+	@echo "$(CYAN)$(BOLD)Angie Status$(NC)"
+	@echo "$(CYAN)=============$(NC)"
+	@systemctl status angie --no-pager -l || true
+
+angie-reload: ## Reload Angie configuration
+	@echo "$(YELLOW)Reloading Angie configuration...$(NC)"
+	sudo systemctl reload angie
+	@echo "$(GREEN)Angie reloaded.$(NC)"
+
+angie-test: ## Test Angie configuration syntax
+	@echo "$(CYAN)Testing Angie configuration...$(NC)"
+	sudo angie -t
+
+angie-logs: ## View Angie logs
+	sudo journalctl -u angie -f --no-pager -n 100
+
+angie-access-logs: ## View Angie access logs
+	sudo tail -f /var/log/angie/access.log
+
+#===============================================================================
+# SSL CERTIFICATE COMMANDS
+#===============================================================================
+
+ssl-setup: ## Setup SSL certificates with Certbot
+	@echo "$(GREEN)Setting up SSL certificates...$(NC)"
+	@echo "$(YELLOW)This requires root privileges$(NC)"
+	sudo ./angie/setup-ssl.sh
+
+ssl-renew: ## Force certificate renewal
+	@echo "$(YELLOW)Forcing certificate renewal...$(NC)"
+	sudo certbot renew --force-renewal
+	sudo systemctl reload angie
+	@echo "$(GREEN)Certificates renewed and Angie reloaded.$(NC)"
+
+ssl-status: ## Check SSL certificate status
+	@echo "$(CYAN)$(BOLD)SSL Certificate Status$(NC)"
+	@echo "$(CYAN)======================$(NC)"
+	@sudo certbot certificates 2>/dev/null || echo "Certbot not installed or no certificates"
+
+#===============================================================================
 # INDIVIDUAL SERVICE COMMANDS
 #===============================================================================
 
@@ -153,11 +228,6 @@ restart-frontend: ## Restart frontend only
 	docker compose restart frontend
 	@echo "$(GREEN)Frontend restarted.$(NC)"
 
-restart-traefik: ## Restart Traefik (reverse proxy)
-	@echo "$(YELLOW)Restarting Traefik...$(NC)"
-	docker compose restart traefik
-	@echo "$(GREEN)Traefik restarted.$(NC)"
-
 logs-backend: ## View backend logs
 	docker compose logs -f --tail=100 backend
 
@@ -166,9 +236,6 @@ logs-frontend: ## View frontend logs
 
 logs-mongo: ## View MongoDB logs
 	docker compose logs -f --tail=100 mongo
-
-logs-traefik: ## View Traefik logs
-	docker compose logs -f --tail=100 traefik
 
 #===============================================================================
 # DATABASE COMMANDS
@@ -202,14 +269,26 @@ health: ## Check service health
 	@echo "$(CYAN)$(BOLD)Health Check$(NC)"
 	@echo "$(CYAN)=============$(NC)"
 	@echo ""
-	@echo "$(BOLD)Container Status:$(NC)"
+	@echo "$(BOLD)Angie (Host-level):$(NC)"
+	@systemctl is-active angie 2>/dev/null && echo "  $(GREEN)✓ Angie is running$(NC)" || echo "  $(RED)✗ Angie not running$(NC)"
+	@echo ""
+	@echo "$(BOLD)Docker Containers:$(NC)"
 	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 	@echo ""
-	@echo "$(BOLD)API Health:$(NC)"
-	@curl -sf https://api.pastoral.gkbj.org/health && echo " $(GREEN)✓ API is healthy$(NC)" || echo " $(RED)✗ API not responding$(NC)"
+	@echo "$(BOLD)Backend Health:$(NC)"
+	@curl -sf http://127.0.0.1:8001/health && echo " $(GREEN)✓ Backend is healthy$(NC)" || echo " $(RED)✗ Backend not responding$(NC)"
 	@echo ""
-	@echo "$(BOLD)Frontend:$(NC)"
-	@curl -sf -o /dev/null https://pastoral.gkbj.org && echo " $(GREEN)✓ Frontend is accessible$(NC)" || echo " $(RED)✗ Frontend not responding$(NC)"
+	@echo "$(BOLD)Frontend Health:$(NC)"
+	@curl -sf http://127.0.0.1:8080/health && echo " $(GREEN)✓ Frontend is healthy$(NC)" || echo " $(RED)✗ Frontend not responding$(NC)"
+	@echo ""
+	@if [ -f .env ]; then \
+		DOMAIN=$$(grep ^DOMAIN= .env | cut -d= -f2 | tr -d '"'); \
+		if [ -n "$$DOMAIN" ]; then \
+			echo "$(BOLD)External Access:$(NC)"; \
+			curl -sf -o /dev/null "https://$$DOMAIN" && echo "  $(GREEN)✓ https://$$DOMAIN accessible$(NC)" || echo "  $(YELLOW)⚠ https://$$DOMAIN not accessible$(NC)"; \
+			curl -sf -o /dev/null "https://api.$$DOMAIN/health" && echo "  $(GREEN)✓ https://api.$$DOMAIN accessible$(NC)" || echo "  $(YELLOW)⚠ https://api.$$DOMAIN not accessible$(NC)"; \
+		fi; \
+	fi
 	@echo ""
 
 clean: ## Remove unused Docker resources (safe)
@@ -269,3 +348,28 @@ clear-cache: ## Clear dashboard cache in MongoDB
 		"mongodb://$(shell grep MONGO_ROOT_USERNAME .env | cut -d= -f2):$(shell grep MONGO_ROOT_PASSWORD .env | cut -d= -f2)@localhost:27017/faithtracker?authSource=admin" \
 		--quiet --eval "db.dashboard_cache.deleteMany({})"
 	@echo "$(GREEN)Dashboard cache cleared.$(NC)"
+
+#===============================================================================
+# FIRST-TIME SETUP
+#===============================================================================
+
+setup: ## First-time setup: install Angie, get SSL, start services
+	@echo "$(GREEN)$(BOLD)FaithTracker First-Time Setup$(NC)"
+	@echo ""
+	@echo "Step 1: Installing Angie web server..."
+	$(MAKE) angie-install
+	@echo ""
+	@echo "Step 2: Setting up SSL certificates..."
+	$(MAKE) ssl-setup
+	@echo ""
+	@echo "Step 3: Building Docker images..."
+	$(MAKE) build
+	@echo ""
+	@echo "Step 4: Starting services..."
+	$(MAKE) up
+	@echo ""
+	@echo "Step 5: Checking health..."
+	@sleep 10
+	$(MAKE) health
+	@echo ""
+	@echo "$(GREEN)$(BOLD)Setup complete!$(NC)"
