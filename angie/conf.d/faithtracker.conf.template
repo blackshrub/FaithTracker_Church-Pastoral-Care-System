@@ -8,10 +8,10 @@
 #   ${DOMAIN} - Main domain (e.g., pastoral.gkbj.org)
 
 # ===========================================
-# Rate Limiting Zones
+# Rate Limiting
 # ===========================================
-# Include rate limit configuration
-include /etc/angie/conf.d/rate-limit.conf;
+# Rate limit zones are defined in rate-limit.conf
+# which is automatically included via angie.conf
 
 # ===========================================
 # HTTP -> HTTPS Redirect
@@ -225,20 +225,18 @@ server {
         }
     }
 
-    # Health check endpoint (no rate limiting)
+    # Health check endpoint (no rate limiting - inherits none)
     location = /health {
         proxy_pass http://backend;
         include /etc/angie/snippets/proxy-headers.conf;
         access_log off;
-        limit_req off;
     }
 
-    # Ready check endpoint (no rate limiting)
+    # Ready check endpoint (no rate limiting - inherits none)
     location = /ready {
         proxy_pass http://backend;
         include /etc/angie/snippets/proxy-headers.conf;
         access_log off;
-        limit_req off;
     }
 
     # API Documentation (Swagger)

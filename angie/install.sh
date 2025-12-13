@@ -101,11 +101,22 @@ install_angie() {
 
     # Add Angie signing key
     log_info "Adding Angie GPG key..."
-    curl -fsSL https://angie.software/keys/angie-signing.gpg | gpg --dearmor -o /usr/share/keyrings/angie-archive-keyring.gpg
+    curl -o /etc/apt/trusted.gpg.d/angie-signing.gpg https://angie.software/keys/angie-signing.gpg
 
     # Add Angie repository
+    # Angie uses version numbers (10, 11, 12, 13) instead of codenames
     log_info "Adding Angie repository..."
-    echo "deb [signed-by=/usr/share/keyrings/angie-archive-keyring.gpg] https://download.angie.software/angie/${OS_ID}/ ${OS_VERSION} main" > /etc/apt/sources.list.d/angie.list
+    case "$OS_ID" in
+        debian)
+            OS_VERSION_NUM=$(cat /etc/debian_version | cut -d. -f1)
+            echo "deb https://download.angie.software/angie/debian/${OS_VERSION_NUM}/ ${OS_VERSION} main" > /etc/apt/sources.list.d/angie.list
+            ;;
+        ubuntu)
+            # Ubuntu uses version like 22.04, 24.04
+            OS_VERSION_NUM=$(lsb_release -rs)
+            echo "deb https://download.angie.software/angie/ubuntu/${OS_VERSION_NUM}/ ${OS_VERSION} main" > /etc/apt/sources.list.d/angie.list
+            ;;
+    esac
 
     # Update and install
     apt-get update
