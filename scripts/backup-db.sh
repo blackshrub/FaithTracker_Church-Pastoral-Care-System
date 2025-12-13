@@ -1,18 +1,19 @@
 #!/bin/bash
 # ===========================================
-# FaithTracker Database Backup Script
+# FaithTracker Backup Script
 # ===========================================
-# Creates a timestamped backup of the MongoDB database
+# Creates timestamped backups of MongoDB database and uploads
 # Stores backups in ./backups/ directory
 # Automatically cleans up backups older than 30 days
 #
 # Usage:
-#   ./scripts/backup-db.sh              # Create backup
-#   ./scripts/backup-db.sh --restore    # Restore latest backup
-#   ./scripts/backup-db.sh --restore <filename>  # Restore specific backup
+#   ./scripts/backup-db.sh              # Backup database only
+#   ./scripts/backup-db.sh --full       # Backup database + uploads (recommended)
+#   ./scripts/backup-db.sh --restore    # Restore latest database backup
+#   ./scripts/backup-db.sh --restore-full  # Restore database + uploads
 #
 # Cron example (daily at 2 AM):
-#   0 2 * * * /path/to/faithtracker/scripts/backup-db.sh >> /var/log/faithtracker-backup.log 2>&1
+#   0 2 * * * /path/to/faithtracker/scripts/backup-db.sh --full >> /var/log/faithtracker-backup.log 2>&1
 
 set -e
 
@@ -20,6 +21,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BACKUP_DIR="${PROJECT_DIR}/backups"
+DATA_DIR="${PROJECT_DIR}/data"
+UPLOADS_DIR="${DATA_DIR}/uploads"
 RETENTION_DAYS=30
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
@@ -146,13 +149,110 @@ restore_database() {
     log_info "Database restore completed successfully"
 }
 
+backup_uploads() {
+    log_info "Starting uploads backup..."
+
+    if [ ! -d "${UPLOADS_DIR}" ]; then
+        log_warn "Uploads directory not found: ${UPLOADS_DIR}"
+        return 0
+    fi
+
+    UPLOADS_BACKUP="${BACKUP_DIR}/faithtracker_uploads_${TIMESTAMP}.tar.gz"
+
+    # Count files
+    FILE_COUNT=$(find "${UPLOADS_DIR}" -type f | wc -l)
+    log_info "Found ${FILE_COUNT} files to backup"
+
+    if [ "$FILE_COUNT" -eq 0 ]; then
+        log_info "No files to backup in uploads"
+        return 0
+    fi
+
+    tar -czf "${UPLOADS_BACKUP}" -C "${DATA_DIR}" uploads
+
+    if [ -f "${UPLOADS_BACKUP}" ]; then
+        BACKUP_SIZE=$(du -h "${UPLOADS_BACKUP}" | cut -f1)
+        log_info "Uploads backup created: ${UPLOADS_BACKUP} (${BACKUP_SIZE})"
+    else
+        log_error "Uploads backup failed"
+        exit 1
+    fi
+}
+
+restore_uploads() {
+    local BACKUP_FILE="$1"
+
+    if [ -z "${BACKUP_FILE}" ]; then
+        # Use latest backup
+        BACKUP_FILE=$(ls -t "${BACKUP_DIR}"/faithtracker_uploads_*.tar.gz 2>/dev/null | head -1)
+        if [ -z "${BACKUP_FILE}" ]; then
+            log_error "No uploads backup files found in ${BACKUP_DIR}"
+            exit 1
+        fi
+    fi
+
+    if [ ! -f "${BACKUP_FILE}" ]; then
+        log_error "Uploads backup file not found: ${BACKUP_FILE}"
+        exit 1
+    fi
+
+    log_warn "This will OVERWRITE the current uploads!"
+    log_warn "Backup file: ${BACKUP_FILE}"
+    read -p "Are you sure you want to continue? (yes/no): " CONFIRM
+
+    if [ "$CONFIRM" != "yes" ]; then
+        log_info "Restore cancelled"
+        exit 0
+    fi
+
+    log_info "Starting uploads restore..."
+
+    # Create backup of current uploads before restoring
+    if [ -d "${UPLOADS_DIR}" ] && [ "$(ls -A "${UPLOADS_DIR}")" ]; then
+        log_info "Creating backup of current uploads..."
+        mv "${UPLOADS_DIR}" "${UPLOADS_DIR}.bak.${TIMESTAMP}"
+    fi
+
+    mkdir -p "${DATA_DIR}"
+    tar -xzf "${BACKUP_FILE}" -C "${DATA_DIR}"
+
+    log_info "Uploads restore completed successfully"
+
+    # Clean up old backup if restore was successful
+    if [ -d "${UPLOADS_DIR}.bak.${TIMESTAMP}" ]; then
+        rm -rf "${UPLOADS_DIR}.bak.${TIMESTAMP}"
+        log_info "Cleaned up temporary backup"
+    fi
+}
+
+full_backup() {
+    log_info "=== Starting full backup (database + uploads) ==="
+    backup_database
+    backup_uploads
+    cleanup_old_backups
+    log_info "=== Full backup completed ==="
+}
+
+full_restore() {
+    log_info "=== Starting full restore (database + uploads) ==="
+    restore_database "$1"
+    restore_uploads "$2"
+    log_info "=== Full restore completed ==="
+}
+
 cleanup_old_backups() {
     log_info "Cleaning up backups older than ${RETENTION_DAYS} days..."
 
-    DELETED_COUNT=$(find "${BACKUP_DIR}" -name "faithtracker_*.archive" -mtime +${RETENTION_DAYS} -delete -print | wc -l)
+    # Clean old database backups
+    DB_DELETED=$(find "${BACKUP_DIR}" -name "faithtracker_*.archive" -mtime +${RETENTION_DAYS} -delete -print 2>/dev/null | wc -l)
 
-    if [ "$DELETED_COUNT" -gt 0 ]; then
-        log_info "Deleted ${DELETED_COUNT} old backup(s)"
+    # Clean old uploads backups
+    UPLOADS_DELETED=$(find "${BACKUP_DIR}" -name "faithtracker_uploads_*.tar.gz" -mtime +${RETENTION_DAYS} -delete -print 2>/dev/null | wc -l)
+
+    TOTAL_DELETED=$((DB_DELETED + UPLOADS_DELETED))
+
+    if [ "$TOTAL_DELETED" -gt 0 ]; then
+        log_info "Deleted ${TOTAL_DELETED} old backup(s) (${DB_DELETED} db, ${UPLOADS_DELETED} uploads)"
     else
         log_info "No old backups to delete"
     fi
@@ -161,14 +261,31 @@ cleanup_old_backups() {
 list_backups() {
     log_info "Available backups in ${BACKUP_DIR}:"
     echo ""
-    ls -lh "${BACKUP_DIR}"/faithtracker_*.archive 2>/dev/null || echo "No backups found"
+    echo "Database backups:"
+    ls -lh "${BACKUP_DIR}"/faithtracker_*.archive 2>/dev/null || echo "  No database backups found"
+    echo ""
+    echo "Uploads backups:"
+    ls -lh "${BACKUP_DIR}"/faithtracker_uploads_*.tar.gz 2>/dev/null || echo "  No uploads backups found"
     echo ""
 }
 
 # Main script logic
 case "${1}" in
+    --full)
+        full_backup
+        ;;
     --restore)
         restore_database "$2"
+        ;;
+    --restore-uploads)
+        restore_uploads "$2"
+        ;;
+    --restore-full)
+        restore_database "$2"
+        restore_uploads "$3"
+        ;;
+    --uploads)
+        backup_uploads
         ;;
     --list)
         list_backups
@@ -180,12 +297,20 @@ case "${1}" in
         echo "Usage: $0 [option]"
         echo ""
         echo "Options:"
-        echo "  (no option)     Create a new backup"
-        echo "  --restore       Restore from latest backup"
-        echo "  --restore FILE  Restore from specific backup file"
-        echo "  --list          List available backups"
-        echo "  --cleanup       Remove backups older than ${RETENTION_DAYS} days"
-        echo "  --help          Show this help message"
+        echo "  (no option)       Backup database only"
+        echo "  --full            Backup database + uploads (recommended)"
+        echo "  --uploads         Backup uploads only"
+        echo "  --restore         Restore latest database backup"
+        echo "  --restore FILE    Restore specific database backup"
+        echo "  --restore-uploads Restore latest uploads backup"
+        echo "  --restore-full    Restore both database and uploads"
+        echo "  --list            List available backups"
+        echo "  --cleanup         Remove backups older than ${RETENTION_DAYS} days"
+        echo "  --help            Show this help message"
+        echo ""
+        echo "Data location: ${DATA_DIR}"
+        echo "  - MongoDB:  ${DATA_DIR}/mongo"
+        echo "  - Uploads:  ${DATA_DIR}/uploads"
         ;;
     *)
         backup_database

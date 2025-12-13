@@ -1,0 +1,11 @@
+# This file ensures the data/ directory structure exists in git
+# The actual data files (mongo/, uploads/) are ignored for security
+
+# Directory structure:
+#   data/
+#   ├── mongo/     - MongoDB database files (bind mount)
+#   └── uploads/   - User-uploaded files like member photos (bind mount)
+
+# To migrate to a new server:
+# 1. Copy the entire project folder including data/
+# 2. Run: make setup

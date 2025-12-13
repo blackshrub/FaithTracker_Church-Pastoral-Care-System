@@ -593,6 +593,15 @@ All components must be responsive. Design for mobile first, then enhance for lar
 
 ## File Organization
 
+### Data Directory (Bind Mounts)
+```
+data/                            # All persistent data (bind mounts for easy migration)
+├── mongo/                       # MongoDB database files
+└── uploads/                     # User-uploaded files (member photos)
+```
+
+**Migration:** Copy entire project folder (including `data/`) to new server. Run `make setup`.
+
 ### Backend
 ```
 backend/
@@ -601,8 +610,7 @@ backend/
 ├── requirements.txt             # Python dependencies
 ├── test_api.sh                  # Comprehensive API test suite
 ├── TESTING_GUIDE.md            # Testing documentation
-├── uploads/                     # User-uploaded files (member photos)
-├── jemaat/                      # Member photo archive
+├── jemaat/                      # Member photo archive (legacy, for import)
 └── *.py                         # Utility scripts (import, indexes, etc.)
 ```
 
@@ -882,6 +890,58 @@ members = await db.members.find({
 - `full_admin`: Can access all campuses, switch views dynamically
 - `campus_admin`: Manage single campus with full control
 - `pastor`: Regular pastoral care staff with task management
+
+## Server Migration
+
+The application is fully portable. All data is stored in bind mounts within the project folder.
+
+### What to Copy
+
+```
+FaithTracker/
+├── data/              # Database + uploads (REQUIRED)
+│   ├── mongo/         # MongoDB data files
+│   └── uploads/       # Member photos
+├── .env               # Environment secrets (REQUIRED)
+└── ... (all code)     # Application code
+```
+
+### Migration Steps
+
+```bash
+# On OLD server: Create backup (optional but recommended)
+make backup-full
+
+# Copy entire project folder to new server
+rsync -avz /path/to/FaithTracker/ newserver:/path/to/FaithTracker/
+
+# On NEW server:
+cd /path/to/FaithTracker
+
+# 1. Install Angie reverse proxy
+make angie-install
+
+# 2. Setup SSL certificates
+make ssl-setup
+
+# 3. Start services
+make up
+
+# Verify
+make health
+```
+
+### Backup Commands
+
+```bash
+make backup           # Database only
+make backup-full      # Database + uploads (recommended)
+make backup-list      # List available backups
+
+# Restore
+./scripts/backup-db.sh --restore              # Latest database
+./scripts/backup-db.sh --restore-full         # Database + uploads
+```
 
 ## Code Management & Version Control
 

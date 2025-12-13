@@ -139,6 +139,11 @@ temp/
 # Production Data (DO NOT COMMIT)
 # These contain real member data/photos
 # ===================
+# Docker bind mount data directory
+data/
+!data/.gitkeep
+
+# Legacy paths
 backend/jemaat/
 backend/jemaat.zip
 backend/uploads/

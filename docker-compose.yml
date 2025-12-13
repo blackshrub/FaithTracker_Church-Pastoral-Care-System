@@ -5,11 +5,15 @@
 #   - Angie runs at HOST level (handles SSL, rate limiting, security)
 #   - All application services run in Docker containers
 #   - Services exposed to localhost only (127.0.0.1)
+#   - Data stored in ./data/ directory (bind mounts for easy migration)
 #
 # Setup:
 #   1. Install Angie: sudo ./angie/install.sh
 #   2. Setup SSL: sudo ./angie/setup-ssl.sh
 #   3. Start services: docker compose up -d
+#
+# Migration:
+#   Copy entire project folder (including ./data/) to new server
 
 services:
   # ===================
@@ -24,7 +28,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: faithtracker
     volumes:
-      - mongo-data:/data/db
+      - ./data/mongo:/data/db
       - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
     networks:
       - faithtracker-network
@@ -74,7 +78,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_PHONE=${ADMIN_PHONE:-}
     volumes:
-      - backend-uploads:/app/uploads
+      - ./data/uploads:/app/uploads
     networks:
       - faithtracker-network
     depends_on:
@@ -149,10 +153,11 @@ networks:
     driver: bridge
 
 # ===================
-# Volumes
+# Data Directories (Bind Mounts)
 # ===================
-volumes:
-  mongo-data:
-    driver: local
-  backend-uploads:
-    driver: local
+# Data is stored in ./data/ directory for easy backup and migration:
+#   - ./data/mongo    - MongoDB database files
+#   - ./data/uploads  - User-uploaded files (member photos)
+#
+# To migrate to a new server, simply copy the entire project folder
+# including the ./data/ directory.

@@ -25,9 +25,11 @@
 #   make rebuild-frontend  - Rebuild frontend without cache
 #   make logs-backend      - View backend logs
 #
-# Database:
-#   make backup    - Backup MongoDB
-#   make shell-db  - Open MongoDB shell
+# Database & Backups:
+#   make backup       - Backup MongoDB only
+#   make backup-full  - Backup MongoDB + uploads (recommended)
+#   make backup-list  - List available backups
+#   make shell-db     - Open MongoDB shell
 #
 # Troubleshooting:
 #   make health    - Check all service health
@@ -92,8 +94,10 @@ help: ## Show this help message
 	@echo "  $(GREEN)make logs-frontend$(NC)    View frontend logs"
 	@echo "  $(GREEN)make logs-mongo$(NC)       View MongoDB logs"
 	@echo ""
-	@echo "$(BOLD)Database:$(NC)"
-	@echo "  $(GREEN)make backup$(NC)          Backup MongoDB to ./backups/"
+	@echo "$(BOLD)Database & Backups:$(NC)"
+	@echo "  $(GREEN)make backup$(NC)          Backup MongoDB only"
+	@echo "  $(GREEN)make backup-full$(NC)     Backup MongoDB + uploads (recommended)"
+	@echo "  $(GREEN)make backup-list$(NC)     List available backups"
 	@echo "  $(GREEN)make shell-db$(NC)        Open MongoDB shell"
 	@echo ""
 	@echo "$(BOLD)Troubleshooting:$(NC)"
@@ -243,13 +247,14 @@ logs-mongo: ## View MongoDB logs
 
 backup: ## Backup MongoDB to ./backups/
 	@echo "$(GREEN)Creating MongoDB backup...$(NC)"
-	@mkdir -p backups
-	@docker exec faithtracker-mongo mongodump \
-		--uri="mongodb://$(shell grep MONGO_ROOT_USERNAME .env | cut -d= -f2):$(shell grep MONGO_ROOT_PASSWORD .env | cut -d= -f2)@localhost:27017/faithtracker?authSource=admin" \
-		--archive=/tmp/backup.archive \
-		--gzip
-	@docker cp faithtracker-mongo:/tmp/backup.archive ./backups/faithtracker_$(shell date +%Y%m%d_%H%M%S).archive
-	@echo "$(GREEN)Backup saved to ./backups/$(NC)"
+	@./scripts/backup-db.sh
+
+backup-full: ## Backup MongoDB + uploads to ./backups/
+	@echo "$(GREEN)Creating full backup (database + uploads)...$(NC)"
+	@./scripts/backup-db.sh --full
+
+backup-list: ## List available backups
+	@./scripts/backup-db.sh --list
 
 shell-db: ## Open MongoDB shell
 	@echo "$(CYAN)Opening MongoDB shell...$(NC)"
