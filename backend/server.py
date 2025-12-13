@@ -1648,11 +1648,17 @@ def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: 
     
     return timeline
 
-async def send_whatsapp_message(phone: str, message: str, care_event_id: Optional[str] = None, 
+async def send_whatsapp_message(phone: str, message: str, care_event_id: Optional[str] = None,
                                 grief_support_id: Optional[str] = None, member_id: str = None) -> Dict[str, Any]:
     """Send WhatsApp message via gateway"""
     try:
-        whatsapp_url = os.environ.get('WHATSAPP_GATEWAY_URL')
+        # Read from database settings first, fall back to environment variable
+        settings = await db.settings.find_one({"type": "automation"}, {"_id": 0})
+        whatsapp_url = None
+        if settings and settings.get("data", {}).get("whatsappGateway"):
+            whatsapp_url = settings["data"]["whatsappGateway"]
+        if not whatsapp_url:
+            whatsapp_url = os.environ.get('WHATSAPP_GATEWAY_URL')
         if not whatsapp_url:
             raise Exception("WhatsApp gateway URL not configured")
         
