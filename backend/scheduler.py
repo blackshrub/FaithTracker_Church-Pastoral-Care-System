@@ -37,7 +37,14 @@ scheduler = AsyncIOScheduler()
 async def send_whatsapp(phone: str, message: str, log_context: dict):
     """Send WhatsApp message and log result"""
     try:
+        # Try environment variable first, then fall back to database settings
         whatsapp_url = os.environ.get('WHATSAPP_GATEWAY_URL')
+        if not whatsapp_url:
+            # Fall back to database settings
+            settings = await db.settings.find_one({"type": "automation"})
+            if settings and settings.get("data"):
+                whatsapp_url = settings["data"].get("whatsappGateway")
+
         if not whatsapp_url:
             return {"success": False, "error": "Gateway not configured"}
         
