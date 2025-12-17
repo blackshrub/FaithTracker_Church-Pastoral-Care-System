@@ -89,13 +89,13 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             writeoff_task, members_task, grief_task, accident_task, aid_task, birthday_events_task
         )
 
-        # Build set of member_ids with completed/ignored birthdays this year (to filter out)
+        # Build map of member_ids with completed/ignored birthdays this year
+        # We keep them visible but mark as completed so other staff can see them
         year_start_dt = datetime.strptime(year_start, '%Y-%m-%d')
-        completed_birthday_member_ids = set()
+        completed_birthday_info = {}  # member_id -> {completed, completed_by_user_name, ignored}
 
         for e in birthday_events:
             member_id = e["member_id"]
-            # Check if completed/ignored this year
             completed_at = e.get("completed_at")
             ignored_at = e.get("ignored_at")
 
@@ -107,7 +107,10 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     except ValueError:
                         completed_at = None
                 if completed_at and completed_at >= year_start_dt:
-                    completed_birthday_member_ids.add(member_id)
+                    completed_birthday_info[member_id] = {
+                        "completed": True,
+                        "completed_by_user_name": e.get("completed_by_user_name", "Unknown")
+                    }
                     continue
 
             if e.get("ignored") and ignored_at:
@@ -117,7 +120,10 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     except ValueError:
                         ignored_at = None
                 if ignored_at and ignored_at >= year_start_dt:
-                    completed_birthday_member_ids.add(member_id)
+                    completed_birthday_info[member_id] = {
+                        "ignored": True,
+                        "ignored_by_name": e.get("ignored_by_name", "Unknown")
+                    }
 
         logger.info(f"Found {len(members)} members for campus {campus_id}")
         
@@ -255,43 +261,51 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             except (ValueError, TypeError):
                 continue
 
-        # Process birthdays (skip members whose birthdays were already completed/ignored this year)
+        # Process birthdays - include completed ones so other staff can see them
         # Note: Frontend uses member_id-based endpoint which creates events on-the-fly
         birthday_writeoff = writeoff_settings.get("birthday", 7)
         for member in members:
             member_id = member["id"]
-            # Skip if birthday already completed/ignored this year
-            if member_id in completed_birthday_member_ids:
-                continue
             birth_date_str = member.get("birth_date")
             if not birth_date_str:
                 continue
+
+            # Check if this birthday was completed/ignored this year
+            completion_info = completed_birthday_info.get(member_id, {})
+            is_completed = completion_info.get("completed", False)
+            is_ignored = completion_info.get("ignored", False)
+
             try:
                 birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
                 this_year_birthday = birth_date.replace(year=today.year)
+
+                # Build base birthday data
+                base_data = {
+                    "type": "birthday", "member_id": member_id,
+                    "member_name": member.get("name"), "member_phone": member.get("phone"),
+                    "member_photo_url": member.get("photo_url"), "member_age": member.get("age"),
+                    "days_since_last_contact": member.get("days_since_last_contact"),
+                    "details": f"Turning {member.get('age', '?')} years old", "data": member,
+                    "completed": is_completed,
+                    "ignored": is_ignored,
+                    "completed_by_user_name": completion_info.get("completed_by_user_name"),
+                    "ignored_by_name": completion_info.get("ignored_by_name")
+                }
+
                 if this_year_birthday == today:
-                    birthdays_today.append({
-                        "type": "birthday", "date": today_date, "member_id": member_id,
-                        "member_name": member.get("name"), "member_phone": member.get("phone"),
-                        "member_photo_url": member.get("photo_url"), "member_age": member.get("age"),
-                        "days_since_last_contact": member.get("days_since_last_contact"),
-                        "details": f"Turning {member.get('age', '?')} years old", "data": member
-                    })
+                    birthdays_today.append({**base_data, "date": today_date})
                 elif this_year_birthday < today:
                     days_overdue = (today - this_year_birthday).days
-                    if birthday_writeoff == 0 or days_overdue <= birthday_writeoff:
+                    # For completed/ignored, always show (no writeoff); for incomplete, apply writeoff
+                    if is_completed or is_ignored or birthday_writeoff == 0 or days_overdue <= birthday_writeoff:
                         overdue_birthdays.append({
-                            "type": "birthday", "date": this_year_birthday.isoformat(),
-                            "member_id": member_id, "member_name": member.get("name"),
-                            "member_phone": member.get("phone"), "member_photo_url": member.get("photo_url"),
-                            "member_age": member.get("age"), "days_overdue": days_overdue, "data": member
+                            **base_data, "date": this_year_birthday.isoformat(),
+                            "days_overdue": days_overdue
                         })
                 elif tomorrow <= this_year_birthday <= week_ahead:
                     upcoming_birthdays.append({
-                        "type": "birthday", "date": this_year_birthday.isoformat(),
-                        "member_id": member_id, "member_name": member.get("name"),
-                        "member_phone": member.get("phone"), "member_photo_url": member.get("photo_url"),
-                        "member_age": member.get("age"), "days_until": (this_year_birthday - today).days, "data": member
+                        **base_data, "date": this_year_birthday.isoformat(),
+                        "days_until": (this_year_birthday - today).days
                     })
             except (ValueError, TypeError):
                 continue

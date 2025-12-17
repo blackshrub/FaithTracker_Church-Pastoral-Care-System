@@ -133,6 +133,15 @@ export const TaskCard = memo(({
             <Check className="w-4 h-4 mr-1" />
             <span className="truncate">{completedLabel}</span>
           </Button>
+        ) : event.ignored ? (
+          <Button
+            size="default"
+            variant="outline"
+            disabled
+            className="bg-white text-gray-500 border-gray-300 h-11 flex-1 min-w-0"
+          >
+            <span className="truncate">Ignored</span>
+          </Button>
         ) : (
           <Button
             size="default"
@@ -166,7 +175,8 @@ TaskCard.propTypes = {
     member_phone: PropTypes.string,
     member_photo_url: PropTypes.string,
     days_overdue: PropTypes.number,
-    completed: PropTypes.bool
+    completed: PropTypes.bool,
+    ignored: PropTypes.bool
   }).isRequired,
   config: PropTypes.shape({
     bgClass: PropTypes.string,

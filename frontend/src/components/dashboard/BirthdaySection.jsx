@@ -40,13 +40,18 @@ export const BirthdaySection = ({
     setLoadingIds(prev => new Set(prev).add(memberId));
 
     try {
-      // Optimistic update - remove from UI immediately
+      // Optimistic update - mark as completed (don't remove, so other staff can see)
       queryClient.setQueryData(['dashboard'], (old) => {
         if (!old) return old;
+        const markCompleted = (list) => list?.map(e =>
+          e.member_id === memberId
+            ? { ...e, completed: true, completed_by_user_name: 'You' }
+            : e
+        );
         return {
           ...old,
-          birthdays_today: old.birthdays_today?.filter(e => e.member_id !== memberId),
-          overdue_birthdays: old.overdue_birthdays?.filter(e => e.member_id !== memberId)
+          birthdays_today: markCompleted(old.birthdays_today),
+          overdue_birthdays: markCompleted(old.overdue_birthdays)
         };
       });
 
@@ -103,7 +108,9 @@ export const BirthdaySection = ({
               onSelectionChange={onSelectionChange}
             >
               {event.completed
-                ? "✅ Birthday contact completed"
+                ? `✅ Completed by ${event.completed_by_user_name || 'staff'}`
+                : event.ignored
+                ? `⏭️ Ignored by ${event.ignored_by_name || 'staff'}`
                 : t('labels.call_wish_birthday')}
               {event.member_age && (
                 <span className="ml-2 text-xs">• {event.member_age} years old</span>
