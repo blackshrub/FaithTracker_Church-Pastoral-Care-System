@@ -77,10 +77,28 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             {"_id": 0, "id": 1, "member_id": 1, "campus_id": 1, "aid_amount": 1,
              "frequency": 1, "next_occurrence": 1, "is_active": 1, "notes": 1}
         ).to_list(MAX_TASKS_LIST)
+        # Fetch completed/ignored birthday events for this year to filter out from dashboard
+        # Birthday events are stored with the original birth date (e.g., "1990-05-15")
+        # but we check completed_at to see if it was completed this year
+        year_start = f"{today.year}-01-01"
+        birthday_events_task = db.care_events.find(
+            {
+                "campus_id": campus_id,
+                "event_type": "birthday",
+                "$or": [
+                    {"completed": True, "completed_at": {"$gte": datetime.strptime(year_start, '%Y-%m-%d')}},
+                    {"ignored": True, "ignored_at": {"$gte": datetime.strptime(year_start, '%Y-%m-%d')}}
+                ]
+            },
+            {"_id": 0, "member_id": 1}
+        ).to_list(MAX_TASKS_LIST)
 
-        writeoff_settings, members, grief_stages, accident_followups, aid_schedules = await asyncio.gather(
-            writeoff_task, members_task, grief_task, accident_task, aid_task
+        writeoff_settings, members, grief_stages, accident_followups, aid_schedules, completed_birthday_events = await asyncio.gather(
+            writeoff_task, members_task, grief_task, accident_task, aid_task, birthday_events_task
         )
+
+        # Build set of member_ids with completed/ignored birthdays this year
+        completed_birthday_member_ids = {e["member_id"] for e in completed_birthday_events}
 
         logger.info(f"Found {len(members)} members for campus {campus_id}")
         
@@ -218,9 +236,12 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             except (ValueError, TypeError):
                 continue
 
-        # Process birthdays
+        # Process birthdays (skip members whose birthdays were already completed/ignored this year)
         birthday_writeoff = writeoff_settings.get("birthday", 7)
         for member in members:
+            # Skip if birthday already completed/ignored this year
+            if member["id"] in completed_birthday_member_ids:
+                continue
             birth_date_str = member.get("birth_date")
             if not birth_date_str:
                 continue
