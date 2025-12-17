@@ -6,6 +6,7 @@ from .care_events import route_handlers as care_event_handlers, init_care_event_
 from .grief_support import route_handlers as grief_support_handlers, init_grief_support_routes
 from .accident_followup import route_handlers as accident_followup_handlers, init_accident_followup_routes
 from .financial_aid import route_handlers as financial_aid_handlers, init_financial_aid_routes
+from .dashboard import route_handlers as dashboard_handlers, init_dashboard_routes
 
 __all__ = [
     'campus_handlers', 'auth_handlers', 
@@ -13,5 +14,6 @@ __all__ = [
     'care_event_handlers', 'init_care_event_routes',
     'grief_support_handlers', 'init_grief_support_routes',
     'accident_followup_handlers', 'init_accident_followup_routes',
-    'financial_aid_handlers', 'init_financial_aid_routes'
+    'financial_aid_handlers', 'init_financial_aid_routes',
+    'dashboard_handlers', 'init_dashboard_routes'
 ]
