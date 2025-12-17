@@ -82,7 +82,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         year_start = f"{today.year}-01-01"
         birthday_events_task = db.care_events.find(
             {"campus_id": campus_id, "event_type": "birthday"},
-            {"_id": 0, "member_id": 1, "completed": 1, "completed_at": 1, "ignored": 1, "ignored_at": 1}
+            {"_id": 0, "member_id": 1, "completed": 1, "completed_at": 1, "ignored": 1, "ignored_at": 1,
+             "completed_by_user_name": 1, "ignored_by_name": 1}
         ).to_list(MAX_TASKS_LIST)
 
         writeoff_settings, members, grief_stages, accident_followups, aid_schedules, birthday_events = await asyncio.gather(
