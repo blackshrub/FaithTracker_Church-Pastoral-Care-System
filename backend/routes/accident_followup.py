@@ -11,10 +11,11 @@ from litestar.exceptions import HTTPException
 from litestar.connection import Request
 
 from dependencies import (
-    db, get_current_user, get_campus_filter,
-    generate_uuid, safe_error_detail, logger,
-    MAX_PAGE_NUMBER, MAX_LIMIT
+    get_db, get_current_user, get_campus_filter,
+    safe_error_detail, logger
 )
+from constants import MAX_PAGE_NUMBER, MAX_LIMIT
+from models import generate_uuid
 from enums import ActivityActionType, EventType
 
 # Callbacks to be injected from server.py
@@ -48,6 +49,7 @@ async def list_accident_followup(
 ) -> dict:
     """List all accident follow-up stages with pagination"""
     current_user = await get_current_user(request)
+    db = get_db()
     try:
         query = get_campus_filter(current_user)
         if completed is not None:
@@ -65,6 +67,7 @@ async def list_accident_followup(
 async def get_member_accident_timeline(member_id: str, request: Request) -> dict:
     """Get accident follow-up timeline for specific member"""
     current_user = await get_current_user(request)
+    db = get_db()
     try:
         # Build query with campus filter
         query = {"member_id": member_id}
@@ -86,6 +89,7 @@ async def get_member_accident_timeline(member_id: str, request: Request) -> dict
 async def complete_accident_stage(stage_id: str, request: Request, notes: Optional[str] = None) -> dict:
     """Mark accident follow-up stage as completed"""
     current_user = await get_current_user(request)
+    db = get_db()
     try:
         # Get stage first
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
@@ -173,6 +177,7 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: Option
 @post("/accident-followup/{stage_id:str}/undo")
 async def undo_accident_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of accident followup stage"""
+    db = get_db()
     try:
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
         if not stage:
@@ -216,6 +221,7 @@ async def undo_accident_stage(stage_id: str, request: Request) -> dict:
 async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
     """Mark an accident followup stage as ignored/dismissed"""
     current_user = await get_current_user(request)
+    db = get_db()
     try:
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
         if not stage:

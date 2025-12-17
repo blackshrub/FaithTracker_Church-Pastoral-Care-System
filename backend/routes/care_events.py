@@ -372,7 +372,12 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
         event = await db.care_events.find_one(query, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
-        
+
+        # Idempotency check: if already completed, return success without re-processing
+        # This prevents duplicate activity logs and "Birthday Contact" events on double-clicks
+        if event.get("completed"):
+            return {"success": True, "message": "Care event already completed"}
+
         # Get member name for logging
         member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
         member_name = member["name"] if member else "Unknown"

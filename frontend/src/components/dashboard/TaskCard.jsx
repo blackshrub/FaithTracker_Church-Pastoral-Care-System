@@ -5,7 +5,7 @@
 
 import { memo } from 'react';
 import PropTypes from 'prop-types';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,6 +33,7 @@ export const TaskCard = memo(({
     ringClass: 'ring-gray-400'
   },
   onComplete,
+  isLoading = false, // Loading state to disable button during API call
   children, // Additional content like badges
   actionLabel = 'Mark Complete',
   completedLabel = 'Completed',
@@ -136,14 +137,20 @@ export const TaskCard = memo(({
           <Button
             size="default"
             variant="outline"
+            disabled={isLoading}
             onClick={() => {
+              if (isLoading) return; // Extra guard against double-clicks
               triggerHaptic();
               onComplete && onComplete(event.id);
             }}
-            className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50"
+            className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50 disabled:opacity-50"
           >
-            <Check className="w-4 h-4 mr-1" />
-            <span className="truncate">{actionLabel}</span>
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4 mr-1" />
+            )}
+            <span className="truncate">{isLoading ? 'Processing...' : actionLabel}</span>
           </Button>
         )}
       </div>
@@ -168,6 +175,7 @@ TaskCard.propTypes = {
     ringClass: PropTypes.string
   }),
   onComplete: PropTypes.func,
+  isLoading: PropTypes.bool,
   children: PropTypes.node,
   actionLabel: PropTypes.string,
   completedLabel: PropTypes.string,
