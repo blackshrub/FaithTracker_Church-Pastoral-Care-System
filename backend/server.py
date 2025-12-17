@@ -43,6 +43,66 @@ from zoneinfo import ZoneInfo
 import asyncio
 import re
 
+# Import extracted enums and constants
+from enums import (
+    EngagementStatus, EventType, GriefStage, AidType,
+    NotificationChannel, NotificationStatus, UserRole,
+    ScheduleFrequency, WeekDay, ActivityActionType, NoteCategory
+)
+from constants import (
+    ENGAGEMENT_AT_RISK_DAYS_DEFAULT, ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
+    ENGAGEMENT_NO_CONTACT_DAYS, GRIEF_ONE_WEEK_DAYS, GRIEF_TWO_WEEKS_DAYS,
+    GRIEF_ONE_MONTH_DAYS, GRIEF_THREE_MONTHS_DAYS, GRIEF_SIX_MONTHS_DAYS,
+    GRIEF_ONE_YEAR_DAYS, ACCIDENT_FIRST_FOLLOWUP_DAYS, ACCIDENT_SECOND_FOLLOWUP_DAYS,
+    ACCIDENT_FINAL_FOLLOWUP_DAYS, DEFAULT_REMINDER_DAYS_BIRTHDAY,
+    DEFAULT_REMINDER_DAYS_CHILDBIRTH, DEFAULT_REMINDER_DAYS_FINANCIAL_AID,
+    DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS, DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT,
+    JWT_TOKEN_EXPIRE_HOURS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_PAGE_NUMBER,
+    MAX_LIMIT, DEFAULT_ANALYTICS_DAYS, DEFAULT_UPCOMING_DAYS, MAX_IMAGE_SIZE,
+    MAX_CSV_SIZE, MAX_REQUEST_BODY_SIZE, IMAGE_MAGIC_BYTES
+)
+from models import (
+    # UUID utilities
+    is_valid_uuid, generate_uuid, UUID_PATTERN,
+    # Campus models
+    CampusCreate, Campus,
+    # Member models
+    MemberCreate, MemberUpdate, Member,
+    # Care event models
+    VisitationLogEntry, CareEventCreate, CareEventUpdate, CareEvent,
+    # Setup models
+    SetupAdminRequest, SetupCampusRequest, AdditionalVisitRequest,
+    # Grief/accident models
+    GriefSupport, AccidentFollowup,
+    # Notification models
+    NotificationLog,
+    # Financial aid models
+    FinancialAidSchedule, FinancialAidScheduleCreate,
+    # Settings models
+    AutomationSettingsUpdate, OverdueWriteoffSettingsUpdate,
+    EngagementSettingsUpdate, UserPreferencesUpdate,
+    # Pastoral notes models
+    PastoralNoteCreate, PastoralNoteUpdate,
+    # User models
+    UserCreate, UserUpdate, UserLogin, User, UserResponse, TokenResponse,
+    # Activity log models
+    ActivityLog, ActivityLogResponse,
+    # Sync models
+    SyncConfig, SyncConfigCreate, SyncLog,
+)
+from utils import (
+    # Validation
+    EMAIL_PATTERN, PHONE_PATTERN,
+    PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH,
+    escape_regex, validate_email, validate_phone, validate_password_strength,
+    # Phone normalization
+    normalize_phone_number,
+    # Engagement calculation
+    calculate_engagement_status,
+    # Cache
+    get_from_cache, set_in_cache, invalidate_cache,
+)
+
 
 # Custom msgspec response class for proper BSON/MongoDB type serialization
 def msgspec_enc_hook(obj):
@@ -490,143 +550,8 @@ def global_exception_handler(request: Request, exc: Exception) -> LitestarRespon
 # Route handlers list (will be collected and passed to Litestar app)
 route_handlers: List[Any] = []
 
-# ==================== ENUMS ====================
-
-class EngagementStatus(str, Enum):
-    ACTIVE = "active"
-    AT_RISK = "at_risk"
-    DISCONNECTED = "disconnected"
-
-class EventType(str, Enum):
-    BIRTHDAY = "birthday"
-    CHILDBIRTH = "childbirth"
-    GRIEF_LOSS = "grief_loss"
-    NEW_HOUSE = "new_house"
-    ACCIDENT_ILLNESS = "accident_illness"  # Merged hospital_visit into this
-    FINANCIAL_AID = "financial_aid"
-    REGULAR_CONTACT = "regular_contact"
-
-class GriefStage(str, Enum):
-    MOURNING = "mourning"
-    ONE_WEEK = "1_week"
-    TWO_WEEKS = "2_weeks"
-    ONE_MONTH = "1_month"
-    THREE_MONTHS = "3_months"
-    SIX_MONTHS = "6_months"
-    ONE_YEAR = "1_year"
-
-class AidType(str, Enum):
-    EDUCATION = "education"
-    MEDICAL = "medical"
-    EMERGENCY = "emergency"
-    HOUSING = "housing"
-    FOOD = "food"
-    FUNERAL_COSTS = "funeral_costs"
-    OTHER = "other"
-
-class NotificationChannel(str, Enum):
-    WHATSAPP = "whatsapp"
-    EMAIL = "email"
-
-class NotificationStatus(str, Enum):
-    SENT = "sent"
-    FAILED = "failed"
-    PENDING = "pending"
-
-class UserRole(str, Enum):
-    FULL_ADMIN = "full_admin"  # Can access all campuses
-    CAMPUS_ADMIN = "campus_admin"  # Can manage their campus only
-    PASTOR = "pastor"  # Regular pastoral care staff
-
-class ScheduleFrequency(str, Enum):
-    ONE_TIME = "one_time"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
-    ANNUALLY = "annually"
-
-class WeekDay(str, Enum):
-    MONDAY = "monday"
-    TUESDAY = "tuesday"
-    WEDNESDAY = "wednesday"
-    THURSDAY = "thursday"
-    FRIDAY = "friday"
-    SATURDAY = "saturday"
-    SUNDAY = "sunday"
-
-
-class ActivityActionType(str, Enum):
-    COMPLETE_TASK = "complete_task"
-    IGNORE_TASK = "ignore_task"
-    UNIGNORE_TASK = "unignore_task"
-    SEND_REMINDER = "send_reminder"
-    STOP_SCHEDULE = "stop_schedule"
-    CLEAR_IGNORED = "clear_ignored"
-    CREATE_MEMBER = "create_member"
-    UPDATE_MEMBER = "update_member"
-    DELETE_MEMBER = "delete_member"
-    CREATE_CARE_EVENT = "create_care_event"
-    UPDATE_CARE_EVENT = "update_care_event"
-    DELETE_CARE_EVENT = "delete_care_event"
-
-# ==================== CONSTANTS ====================
-
-# Engagement Status Thresholds (defaults - can be overridden by settings)
-ENGAGEMENT_AT_RISK_DAYS_DEFAULT = 60
-ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT = 90
-ENGAGEMENT_NO_CONTACT_DAYS = 999  # Used when member has never been contacted
-
-# Grief Support Timeline (days after mourning date)
-GRIEF_ONE_WEEK_DAYS = 7
-GRIEF_TWO_WEEKS_DAYS = 14
-GRIEF_ONE_MONTH_DAYS = 30
-GRIEF_THREE_MONTHS_DAYS = 90
-GRIEF_SIX_MONTHS_DAYS = 180
-GRIEF_ONE_YEAR_DAYS = 365
-
-# Accident/Illness Follow-up Timeline (days after event)
-ACCIDENT_FIRST_FOLLOWUP_DAYS = 3
-ACCIDENT_SECOND_FOLLOWUP_DAYS = 7
-ACCIDENT_FINAL_FOLLOWUP_DAYS = 14
-
-# Reminder Settings (days before event)
-DEFAULT_REMINDER_DAYS_BIRTHDAY = 7
-DEFAULT_REMINDER_DAYS_CHILDBIRTH = 14
-DEFAULT_REMINDER_DAYS_FINANCIAL_AID = 0
-DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS = 14
-DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT = 14
-
-# JWT Token Settings
-JWT_TOKEN_EXPIRE_HOURS = 4  # Reduced from 24h for better security
-
-# Pagination Defaults
-DEFAULT_PAGE_SIZE = 50
-MAX_PAGE_SIZE = 1000
-
-# Dashboard Lookback (days)
-DEFAULT_ANALYTICS_DAYS = 30
-DEFAULT_UPCOMING_DAYS = 7
-
-# File Upload Limits (bytes)
-MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB for images
-MAX_CSV_SIZE = 5 * 1024 * 1024      # 5 MB for CSV imports
-
-# Request Body Size Limits
-MAX_REQUEST_BODY_SIZE = 15 * 1024 * 1024  # 15 MB max request body
-
-# Pagination Bounds (for query parameter validation)
-MAX_PAGE_NUMBER = 10000
-MAX_LIMIT = 2000
-
 # ==================== IMAGE VALIDATION ====================
-
-# Magic bytes for allowed image types (security: validate file content, not just Content-Type)
-IMAGE_MAGIC_BYTES = {
-    b'\xff\xd8\xff': 'image/jpeg',           # JPEG
-    b'\x89PNG\r\n\x1a\n': 'image/png',       # PNG
-    b'GIF87a': 'image/gif',                   # GIF87a
-    b'GIF89a': 'image/gif',                   # GIF89a
-    b'RIFF': 'image/webp',                    # WebP (partial check)
-}
+# (Enums and constants now imported from enums.py and constants.py)
 
 def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
     """
@@ -646,94 +571,8 @@ def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
 
     return False, "Invalid image format. Allowed: JPEG, PNG, GIF, WebP"
 
-# ==================== UUID VALIDATION & REGEX UTILITIES ====================
-
-import re
-
-def escape_regex(text: str) -> str:
-    """
-    Escape special regex characters to prevent NoSQL injection.
-    This makes the text safe to use in MongoDB $regex queries.
-    """
-    # Escape all regex special characters
-    special_chars = r'\.^$*+?{}[]|()'
-    for char in special_chars:
-        text = text.replace(char, '\\' + char)
-    return text
-
-# UUID v4 pattern for validation
-UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.IGNORECASE)
-
-# Email validation pattern (RFC 5322 simplified)
-EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-# Phone validation: digits only after stripping, reasonable length
-PHONE_PATTERN = re.compile(r'^\+?[0-9]{7,15}$')
-
-def validate_email(email: str) -> bool:
-    """Validate email format with additional security checks"""
-    if not email:
-        return False
-    # RFC 5321 length limit
-    if len(email) > 254:
-        return False
-    # Check for consecutive dots (invalid per RFC)
-    if ".." in email:
-        return False
-    # Check for leading/trailing dots in local part
-    local_part = email.split("@")[0] if "@" in email else ""
-    if local_part.startswith(".") or local_part.endswith("."):
-        return False
-    return bool(EMAIL_PATTERN.match(email))
-
-def validate_phone(phone: str) -> bool:
-    """Validate phone number format"""
-    if not phone:
-        return True  # Empty phone is allowed (optional field)
-    # Strip common separators for validation
-    cleaned = phone.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-    return bool(PHONE_PATTERN.match(cleaned))
-
-# Password strength constants
-PASSWORD_MIN_LENGTH = 8
-PASSWORD_MAX_LENGTH = 128
-
-def validate_password_strength(password: str) -> tuple[bool, str]:
-    """
-    Validate password with basic length requirements.
-
-    Requirements:
-    - Minimum 8 characters
-    - Maximum 128 characters (prevent DoS via bcrypt)
-
-    Returns:
-        (is_valid, error_message)
-    """
-    if not password:
-        return False, "Password is required"
-
-    if len(password) < PASSWORD_MIN_LENGTH:
-        return False, f"Password must be at least {PASSWORD_MIN_LENGTH} characters"
-
-    if len(password) > PASSWORD_MAX_LENGTH:
-        return False, f"Password must be at most {PASSWORD_MAX_LENGTH} characters"
-
-    return True, ""
-
-def is_valid_uuid(value: str) -> bool:
-    """Check if a string is a valid UUID format."""
-    if not isinstance(value, str):
-        return False
-    return bool(UUID_PATTERN.match(value))
-
-def generate_uuid() -> str:
-    """Generate a valid UUID string with validation."""
-    new_uuid = str(uuid.uuid4())
-    # Double-check the generated UUID is valid (defensive programming)
-    if not is_valid_uuid(new_uuid):
-        logger.error(f"Generated invalid UUID: {new_uuid}")
-        # Retry once
-        new_uuid = str(uuid.uuid4())
-    return new_uuid
+# ==================== VALIDATION UTILITIES ====================
+# (Validation functions now imported from utils.py)
 
 # ==================== AUTH CONFIGURATION ====================
 
@@ -855,475 +694,10 @@ def get_campus_filter(current_user: dict):
         return {"campus_id": {"$exists": False, "$eq": "IMPOSSIBLE_VALUE"}}
 
 # ==================== MODELS ====================
-# Using msgspec.Struct instead of Pydantic BaseModel for faster serialization
-
-class CampusCreate(Struct):
-    campus_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
-    location: str | None = None  # msgspec doesn't support max_length on union types
-    timezone: str = "Asia/Jakarta"  # Default to UTC+7
-
-class Campus(Struct):
-    campus_name: str
-    id: str = field(default_factory=generate_uuid)
-    location: str | None = None
-    timezone: str = "Asia/Jakarta"  # Campus timezone (default UTC+7)
-    is_active: bool = True
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class MemberCreate(Struct):
-    name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
-    campus_id: str
-    phone: str | None = None
-    external_member_id: str | None = None
-    notes: str | None = None
-    birth_date: date | None = None
-    address: str | None = None
-    category: str | None = None
-    gender: str | None = None
-    blood_type: str | None = None
-    marital_status: str | None = None
-    membership_status: str | None = None
-    age: int | None = None
-
-class MemberUpdate(Struct):
-    name: str | None = None
-    phone: str | None = None
-    external_member_id: str | None = None
-    notes: str | None = None
-    birth_date: date | None = None
-    address: str | None = None
-    category: str | None = None
-    gender: str | None = None
-    blood_type: str | None = None
-    marital_status: str | None = None
-    membership_status: str | None = None
-
-class Member(Struct):
-    name: str
-    campus_id: str
-    id: str = field(default_factory=generate_uuid)
-    phone: str | None = None  # Some members may not have phone numbers
-    photo_url: str | None = None
-    last_contact_date: datetime | None = None
-    engagement_status: EngagementStatus = EngagementStatus.ACTIVE
-    days_since_last_contact: int = 0
-    is_archived: bool = False
-    archived_at: datetime | None = None
-    archived_reason: str | None = None
-    external_member_id: str | None = None
-    notes: str | None = None
-    birth_date: date | None = None
-    address: str | None = None
-    category: str | None = None
-    gender: str | None = None
-    blood_type: str | None = None
-    marital_status: str | None = None
-    membership_status: str | None = None
-    age: int | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class VisitationLogEntry(Struct):
-    visitor_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
-    visit_date: date
-    notes: Annotated[str, msgspec.Meta(max_length=2000)]
-    prayer_offered: bool = False
-
-class CareEventCreate(Struct):
-    member_id: str
-    campus_id: str
-    event_type: EventType
-    event_date: date
-    title: Annotated[str, msgspec.Meta(min_length=1, max_length=300)]
-    description: str | None = None
-    # Grief support fields
-    grief_relationship: str | None = None
-    # Accident/illness fields (merged from hospital)
-    hospital_name: str | None = None
-    initial_visitation: VisitationLogEntry | None = None
-    # Financial aid fields
-    aid_type: AidType | None = None
-    aid_amount: float | None = None
-    aid_notes: str | None = None
-
-class CareEventUpdate(Struct):
-    event_type: EventType | None = None
-    event_date: date | None = None
-    title: str | None = None
-    description: str | None = None
-    completed: bool | None = None
-    # Hospital fields
-    discharge_date: date | None = None
-
-class CareEvent(Struct):
-    member_id: str
-    campus_id: str
-    event_type: EventType
-    event_date: date
-    title: str
-    id: str = field(default_factory=generate_uuid)
-    care_event_id: str | None = None  # Parent event ID (for linking child events)
-    description: str | None = None
-    completed: bool = False
-    completed_at: datetime | None = None
-    completed_by_user_id: str | None = None
-    completed_by_user_name: str | None = None
-    ignored: bool = False
-    ignored_at: datetime | None = None
-    ignored_by: str | None = None
-    ignored_by_name: str | None = None
-    created_by_user_id: str | None = None
-    created_by_user_name: str | None = None
-    # Member information (enriched from members collection)
-    member_name: str | None = None
-    member_phone: str | None = None
-    member_photo_url: str | None = None
-    # Grief support fields (only relationship, use event_date as mourning date)
-    grief_relationship: str | None = None
-    grief_stage: GriefStage | None = None
-    grief_stage_id: str | None = None  # Link to grief_support stage (for timeline entries)
-    # Accident/illness fields (merged from hospital, only hospital_name, use event_date as admission)
-    hospital_name: str | None = None
-    accident_stage_id: str | None = None  # Link to accident_followup stage (for timeline entries)
-    visitation_log: List[Dict[str, Any]] = field(default_factory=list)
-    # Follow-up type marker
-    followup_type: str | None = None  # "scheduled" or "additional" (for grief/accident follow-ups)
-    # Financial aid fields
-    aid_type: AidType | None = None
-    aid_amount: float | None = None
-    aid_notes: str | None = None
-    reminder_sent: bool = False
-    reminder_sent_at: datetime | None = None
-    reminder_sent_by_user_id: str | None = None
-    reminder_sent_by_user_name: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class SetupAdminRequest(Struct):
-    email: str  # Email validation handled at route level
-    password: str
-    name: str
-    phone: str  # Required for WhatsApp notifications
-
-class SetupCampusRequest(Struct):
-    campus_name: str
-    location: str
-    timezone: str
-
-
-class AdditionalVisitRequest(Struct):
-    visit_date: str
-    visit_type: str
-    notes: str
-
-
-class GriefSupport(Struct):
-    care_event_id: str
-    member_id: str
-    campus_id: str
-    stage: GriefStage
-    scheduled_date: date
-    id: str = field(default_factory=generate_uuid)
-    completed: bool = False
-    completed_at: datetime | None = None
-    ignored: bool = False
-    ignored_at: datetime | None = None
-    ignored_by: str | None = None
-    notes: str | None = None
-    reminder_sent: bool = False
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class AccidentFollowup(Struct):
-    care_event_id: str
-    member_id: str
-    campus_id: str
-    stage: str  # "first_followup", "second_followup", "final_followup"
-    scheduled_date: date
-    id: str = field(default_factory=generate_uuid)
-    completed: bool = False
-    completed_at: datetime | None = None
-    ignored: bool = False
-    ignored_at: datetime | None = None
-    ignored_by: str | None = None
-    notes: str | None = None
-    reminder_sent: bool = False
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class NotificationLog(Struct):
-    channel: NotificationChannel
-    recipient: str
-    message: str
-    status: NotificationStatus
-    id: str = field(default_factory=generate_uuid)
-    care_event_id: str | None = None
-    grief_support_id: str | None = None
-    member_id: str | None = None
-    campus_id: str | None = None
-    pastoral_team_user_id: str | None = None  # If sent to pastoral team
-    response_data: Dict[str, Any] | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class FinancialAidSchedule(Struct):
-    member_id: str
-    campus_id: str
-    title: str
-    aid_type: AidType
-    aid_amount: float
-    frequency: ScheduleFrequency
-    start_date: date
-    next_occurrence: date
-    created_by: str  # User ID who created the schedule
-    id: str = field(default_factory=generate_uuid)
-    end_date: date | None = None  # None means no end
-    # Weekly specific
-    day_of_week: WeekDay | None = None
-    # Monthly specific
-    day_of_month: int | None = None  # 1-31
-    # Annual specific
-    month_of_year: int | None = None  # 1-12
-    # Tracking
-    is_active: bool = True
-    ignored_occurrences: List[str] = field(default_factory=list)  # List of dates (YYYY-MM-DD) that were ignored
-    occurrences_completed: int = 0
-    notes: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-# Settings Models
-class AutomationSettingsUpdate(Struct):
-    """Automation settings (daily digest time, WhatsApp gateway)"""
-    digestTime: str = "08:00"
-    whatsappGateway: str = ""
-    enabled: bool = True
-
-class OverdueWriteoffSettingsUpdate(Struct):
-    """Overdue task writeoff settings"""
-    days: int = 30
-    enabled: bool = False
-
-class EngagementSettingsUpdate(Struct):
-    """Engagement threshold settings"""
-    active_days: int = 60
-    at_risk_days: int = 90
-
-class UserPreferencesUpdate(Struct):
-    """User preferences for notifications, etc."""
-    email_notifications: bool = True
-    whatsapp_notifications: bool = True
-
-class FinancialAidScheduleCreate(Struct):
-    """Create a financial aid schedule"""
-    member_id: str
-    title: str
-    aid_type: str  # AidType enum value as string
-    aid_amount: float
-    frequency: str  # ScheduleFrequency enum value as string
-    start_date: str  # ISO date string
-    end_date: str | None = None
-    day_of_week: str | None = None  # WeekDay enum value
-    day_of_month: int | None = None
-    month_of_year: int | None = None
-    notes: str | None = None
-
-# User Authentication Models
-class UserCreate(Struct):
-    email: str  # Email validation handled at route level
-    password: Annotated[str, msgspec.Meta(min_length=8, max_length=128)]
-    name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
-    phone: Annotated[str, msgspec.Meta(max_length=20)]  # Pastoral team member's phone for receiving reminders
-    role: UserRole = UserRole.PASTOR
-    campus_id: str | None = None  # Required for campus_admin and pastor, null for full_admin
-
-class UserUpdate(Struct):
-    name: str | None = None
-    phone: str | None = None
-    password: str | None = None
-    role: UserRole | None = None
-    campus_id: str | None = None
-
-class UserLogin(Struct):
-    email: str  # Email validation handled at route level
-    password: str
-    campus_id: str | None = None  # Campus selection at login
-
-class User(Struct):
-    email: str  # Email validation handled at route level
-    name: str
-    role: UserRole
-    hashed_password: str
-    id: str = field(default_factory=generate_uuid)
-    campus_id: str | None = None
-    phone: str | None = None  # For receiving pastoral care task reminders
-    photo_url: str | None = None
-    is_active: bool = True
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class UserResponse(Struct):
-    id: str
-    email: str  # Email validation handled at route level
-    name: str
-    role: UserRole
-    is_active: bool
-    created_at: datetime
-    campus_id: str | None = None
-    campus_name: str | None = None
-    phone: str | None = None
-    photo_url: str | None = None
-
-class TokenResponse(Struct):
-    access_token: str
-    token_type: str
-    user: UserResponse
-
-
-class ActivityLog(Struct):
-    campus_id: str
-    user_id: str
-    user_name: str
-    action_type: ActivityActionType
-    id: str = field(default_factory=generate_uuid)
-    user_photo_url: str | None = None
-    member_id: str | None = None
-    member_name: str | None = None
-    care_event_id: str | None = None
-    event_type: EventType | None = None
-    notes: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class ActivityLogResponse(Struct):
-    id: str
-    campus_id: str
-    user_id: str
-    user_name: str
-    action_type: str
-    created_at: datetime
-    user_photo_url: str | None = None
-    member_id: str | None = None
-    member_name: str | None = None
-    care_event_id: str | None = None
-    event_type: str | None = None
-    notes: str | None = None
-
-
-# ==================== SYNC MODELS ====================
-
-class SyncConfig(Struct):
-    campus_id: str  # FaithTracker campus ID
-    api_base_url: str  # e.g., https://faithflow.yourdomain.com
-    api_email: str
-    api_password: str  # Encrypted in database
-    id: str = field(default_factory=generate_uuid)
-    core_church_id: str | None = None  # Core system's church_id (for webhook matching)
-    sync_method: str = "polling"  # "polling" or "webhook"
-    api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
-    api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
-    api_members_endpoint: str = "/members/"  # Members endpoint path
-    webhook_secret: str = field(default_factory=lambda: secrets.token_hex(32))  # Full 256-bit entropy for HMAC-SHA256
-    is_enabled: bool = False
-    polling_interval_hours: int = 6  # For polling method
-    reconciliation_enabled: bool = False  # Daily 3 AM reconciliation (recommended for webhook mode)
-    reconciliation_time: str = "03:00"  # Time for daily reconciliation (HH:MM format)
-    # Sync filters (optional - empty means sync all)
-    filter_mode: str = "include"  # "include" or "exclude"
-    filter_rules: List[Dict[str, Any]] | None = None  # Dynamic filter rules
-    # Example: [{"field": "gender", "operator": "equals", "value": "Female"}, {"field": "age", "operator": "between", "value": [18, 35]}]
-    last_sync_at: datetime | None = None
-    last_sync_status: str | None = None  # success, error
-    last_sync_message: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-class SyncConfigCreate(Struct):
-    api_base_url: str
-    api_email: str
-    api_password: str
-    sync_method: str = "polling"
-    api_path_prefix: str = "/api"  # API path prefix (e.g., "/api" or "" for no prefix)
-    api_login_endpoint: str = "/auth/login"  # Login endpoint path (e.g., "/auth/login" or "/login")
-    api_members_endpoint: str = "/members/"  # Members endpoint path
-    polling_interval_hours: int = 6
-    reconciliation_enabled: bool = False
-    reconciliation_time: str = "03:00"
-    filter_mode: str = "include"
-    filter_rules: List[Dict[str, Any]] | None = None
-    is_enabled: bool = False
-
-class SyncLog(Struct):
-    campus_id: str
-    sync_type: str  # manual, scheduled, webhook
-    status: str  # success, error, partial
-    id: str = field(default_factory=generate_uuid)
-    members_fetched: int = 0
-    members_created: int = 0
-    members_updated: int = 0
-    members_archived: int = 0
-    members_unarchived: int = 0
-    error_message: str | None = None
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: datetime | None = None
-    duration_seconds: float | None = None
-
+# (All models now imported from models.py)
 
 # ==================== UTILITY FUNCTIONS ====================
-
-# Simple in-memory cache for static data
-_cache = {}
-_cache_timestamps = {}
-
-def get_from_cache(key: str, ttl_seconds: int = 300) -> Optional[Any]:
-    """
-    Get value from cache if not expired
-
-    Args:
-        key: Cache key
-        ttl_seconds: Time to live in seconds (default 5 minutes)
-
-    Returns:
-        Cached value or None if expired/not found
-    """
-    if key in _cache:
-        age = (datetime.now(timezone.utc) - _cache_timestamps[key]).total_seconds()
-        if age < ttl_seconds:
-            return _cache[key]
-        else:
-            # Expired, remove from cache
-            del _cache[key]
-            del _cache_timestamps[key]
-    return None
-
-def set_in_cache(key: str, value: Any) -> None:
-    """
-    Store value in cache with current timestamp
-
-    Args:
-        key: Cache key
-        value: Value to cache
-    """
-    _cache[key] = value
-    _cache_timestamps[key] = datetime.now(timezone.utc)
-
-def invalidate_cache(pattern: Optional[str] = None) -> None:
-    """
-    Invalidate cache entries
-
-    Args:
-        pattern: If provided, only invalidate keys containing this pattern.
-                If None, clear entire cache.
-    """
-    global _cache, _cache_timestamps
-    if pattern is None:
-        _cache.clear()
-        _cache_timestamps.clear()
-    else:
-        keys_to_delete = [k for k in _cache.keys() if pattern in k]
-        for key in keys_to_delete:
-            del _cache[key]
-            del _cache_timestamps[key]
+# (Cache functions now imported from utils.py)
 
 async def _get_engagement_settings_cached():
     """Get engagement threshold settings from database (cached for 10 minutes) - internal helper"""
@@ -1402,64 +776,7 @@ async def calculate_engagement_status_async(last_contact: Optional[datetime]) ->
     else:
         return EngagementStatus.DISCONNECTED, days_since
 
-def calculate_engagement_status(last_contact: Optional[datetime], at_risk_days: int = ENGAGEMENT_AT_RISK_DAYS_DEFAULT, disconnected_days: int = ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT) -> tuple[EngagementStatus, int]:
-    """Calculate engagement status and days since last contact (with configurable thresholds)"""
-    if not last_contact:
-        return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
-
-    # Handle string dates
-    if isinstance(last_contact, str):
-        try:
-            last_contact = datetime.fromisoformat(last_contact)
-        except ValueError:
-            return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
-    
-    # Make timezone-aware if needed
-    if last_contact.tzinfo is None:
-        last_contact = last_contact.replace(tzinfo=timezone.utc)
-    
-    now = datetime.now(timezone.utc)
-    days_since = (now - last_contact).days
-    
-    if days_since < at_risk_days:
-        return EngagementStatus.ACTIVE, days_since
-    elif days_since < disconnected_days:
-        return EngagementStatus.AT_RISK, days_since
-    else:
-        return EngagementStatus.DISCONNECTED, days_since
-
-
-def normalize_phone_number(phone: str, default_country_code: str = "+62") -> str:
-    """
-    Normalize phone number to international format.
-    Handles Indonesian phone numbers starting with 0.
-    
-    Examples:
-        081234567890 -> +6281234567890
-        62812345678 -> +62812345678
-        +6281234567890 -> +6281234567890
-    """
-    if not phone:
-        return phone
-    
-    # Remove whitespace and common separators
-    phone = phone.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-    
-    # Already has + prefix
-    if phone.startswith("+"):
-        return phone
-    
-    # Starts with country code without +
-    if phone.startswith("62"):
-        return f"+{phone}"
-    
-    # Starts with 0 (local Indonesian format)
-    if phone.startswith("0"):
-        return f"{default_country_code}{phone[1:]}"
-    
-    # No recognizable prefix - assume it needs country code
-    return f"{default_country_code}{phone}"
-
+# calculate_engagement_status (sync) and normalize_phone_number now imported from utils.py
 
 async def log_activity(
     campus_id: str,
@@ -9918,6 +9235,393 @@ async def on_shutdown() -> None:
     client.close()
 
 
+
+# ==================== PASTORAL NOTES ENDPOINTS ====================
+
+@post("/pastoral-notes")
+async def create_pastoral_note(data: PastoralNoteCreate, request: Request) -> dict:
+    """Create a new pastoral note for a member"""
+    current_user = await get_current_user(request)
+
+    # Verify member exists
+    member = await get_member_or_404(data.member_id)
+
+    # Check campus access
+    if current_user["role"] != "full_admin" and current_user.get("campus_id") != member.get("campus_id"):
+        raise PermissionDeniedException("You don't have access to this member's records")
+
+    # Validate category if provided
+    if data.category and data.category not in [c.value for c in NoteCategory]:
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=f"Invalid category. Must be one of: {[c.value for c in NoteCategory]}")
+
+    # Validate follow_up_date format if provided
+    if data.follow_up_date:
+        try:
+            datetime.strptime(data.follow_up_date, '%Y-%m-%d')
+        except ValueError:
+            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid follow_up_date format. Use YYYY-MM-DD")
+
+    now = datetime.now(timezone.utc)
+    note_id = generate_uuid()
+
+    note_doc = {
+        "id": note_id,
+        "member_id": data.member_id,
+        "campus_id": member.get("campus_id"),
+        "title": data.title,
+        "content": data.content,
+        "category": data.category,
+        "is_private": data.is_private,
+        "created_by": current_user["id"],
+        "created_by_name": current_user["name"],
+        "created_at": now,
+        "updated_at": None,
+        "follow_up_date": data.follow_up_date,
+        "follow_up_notes": data.follow_up_notes,
+        "follow_up_completed": False,
+        "edit_history": []
+    }
+
+    await db.pastoral_notes.insert_one(note_doc)
+
+    # Log activity
+    await log_activity(
+        campus_id=member.get("campus_id"),
+        user_id=current_user["id"],
+        user_name=current_user["name"],
+        action_type=ActivityActionType.CREATE_PASTORAL_NOTE,
+        member_id=data.member_id,
+        member_name=member["name"],
+        notes=f"Created pastoral note: {data.title}"
+    )
+
+    note_doc.pop("_id", None)
+    return note_doc
+
+
+@get("/pastoral-notes")
+async def list_pastoral_notes(
+    request: Request,
+    member_id: str | None = None,
+    category: str | None = None,
+    include_private: bool = False,
+    follow_up_due: bool = False,
+    page: int = 1,
+    limit: int = 50
+) -> dict:
+    """List pastoral notes with filtering options"""
+    current_user = await get_current_user(request)
+
+    # Build query
+    query: Dict[str, Any] = {}
+
+    # Campus filtering
+    if current_user["role"] != "full_admin":
+        query["campus_id"] = current_user.get("campus_id")
+
+    # Member filtering
+    if member_id:
+        query["member_id"] = member_id
+
+    # Category filtering
+    if category:
+        query["category"] = category
+
+    # Privacy filtering - only show private notes to their creators
+    if not include_private:
+        query["$or"] = [
+            {"is_private": False},
+            {"is_private": {"$exists": False}},
+            {"created_by": current_user["id"]}  # Creator can always see their own
+        ]
+    else:
+        # Even with include_private=True, non-creators can't see others' private notes
+        query["$or"] = [
+            {"is_private": False},
+            {"is_private": {"$exists": False}},
+            {"created_by": current_user["id"]}
+        ]
+
+    # Follow-up due filtering (overdue or due today)
+    if follow_up_due:
+        today = get_jakarta_date_str()
+        query["follow_up_date"] = {"$lte": today}
+        query["follow_up_completed"] = False
+
+    # Pagination
+    skip = (page - 1) * limit
+
+    # Get total count
+    total = await db.pastoral_notes.count_documents(query)
+
+    # Get notes
+    notes = await db.pastoral_notes.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    # Enrich with member names
+    for note in notes:
+        member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1})
+        note["member_name"] = member["name"] if member else "Unknown"
+
+    return {
+        "items": notes,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit
+    }
+
+
+@get("/pastoral-notes/{note_id:str}")
+async def get_pastoral_note(note_id: str, request: Request) -> dict:
+    """Get a single pastoral note with full details including edit history"""
+    current_user = await get_current_user(request)
+
+    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
+
+    # Check campus access
+    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
+        raise PermissionDeniedException("You don't have access to this note")
+
+    # Check private note access
+    if note.get("is_private") and note.get("created_by") != current_user["id"]:
+        raise PermissionDeniedException("This is a private note")
+
+    # Enrich with member name
+    member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1})
+    note["member_name"] = member["name"] if member else "Unknown"
+
+    return note
+
+
+@put("/pastoral-notes/{note_id:str}")
+async def update_pastoral_note(note_id: str, data: PastoralNoteUpdate, request: Request) -> dict:
+    """Update a pastoral note (saves edit history)"""
+    current_user = await get_current_user(request)
+
+    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
+
+    # Check campus access
+    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
+        raise PermissionDeniedException("You don't have access to this note")
+
+    # Check private note access - only creator can edit private notes
+    if note.get("is_private") and note.get("created_by") != current_user["id"]:
+        raise PermissionDeniedException("Only the creator can edit a private note")
+
+    # Validate category if provided
+    if data.category is not None and data.category not in [c.value for c in NoteCategory] and data.category != "":
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=f"Invalid category")
+
+    # Validate follow_up_date format if provided
+    if data.follow_up_date:
+        try:
+            datetime.strptime(data.follow_up_date, '%Y-%m-%d')
+        except ValueError:
+            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid follow_up_date format. Use YYYY-MM-DD")
+
+    now = datetime.now(timezone.utc)
+
+    # Create history entry before updating
+    history_entry = {
+        "edited_at": now,
+        "edited_by": current_user["id"],
+        "edited_by_name": current_user["name"],
+        "previous_title": note.get("title"),
+        "previous_content": note.get("content"),
+        "previous_category": note.get("category"),
+        "previous_is_private": note.get("is_private", False),
+        "previous_follow_up_date": note.get("follow_up_date"),
+        "previous_follow_up_notes": note.get("follow_up_notes")
+    }
+
+    # Build update
+    update_fields = {"updated_at": now}
+
+    if data.title is not None:
+        update_fields["title"] = data.title
+    if data.content is not None:
+        update_fields["content"] = data.content
+    if data.category is not None:
+        update_fields["category"] = data.category if data.category else None
+    if data.is_private is not None:
+        update_fields["is_private"] = data.is_private
+    if data.follow_up_date is not None:
+        update_fields["follow_up_date"] = data.follow_up_date if data.follow_up_date else None
+    if data.follow_up_notes is not None:
+        update_fields["follow_up_notes"] = data.follow_up_notes if data.follow_up_notes else None
+    if data.follow_up_completed is not None:
+        update_fields["follow_up_completed"] = data.follow_up_completed
+
+    # Update with history
+    await db.pastoral_notes.update_one(
+        {"id": note_id},
+        {
+            "$set": update_fields,
+            "$push": {"edit_history": history_entry}
+        }
+    )
+
+    # Get updated note
+    updated_note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+
+    # Log activity
+    member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1})
+    await log_activity(
+        campus_id=note.get("campus_id"),
+        user_id=current_user["id"],
+        user_name=current_user["name"],
+        action_type=ActivityActionType.UPDATE_PASTORAL_NOTE,
+        member_id=note["member_id"],
+        member_name=member["name"] if member else "Unknown",
+        notes=f"Updated pastoral note: {updated_note.get('title')}"
+    )
+
+    return updated_note
+
+
+@delete("/pastoral-notes/{note_id:str}", status_code=200)
+async def delete_pastoral_note(note_id: str, request: Request) -> dict:
+    """Delete a pastoral note"""
+    current_user = await get_current_user(request)
+
+    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
+
+    # Check campus access
+    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
+        raise PermissionDeniedException("You don't have access to this note")
+
+    # Check private note access - only creator or admin can delete
+    if note.get("is_private") and note.get("created_by") != current_user["id"] and current_user["role"] not in ["full_admin", "campus_admin"]:
+        raise PermissionDeniedException("Only the creator or admin can delete a private note")
+
+    await db.pastoral_notes.delete_one({"id": note_id})
+
+    # Log activity
+    member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1})
+    await log_activity(
+        campus_id=note.get("campus_id"),
+        user_id=current_user["id"],
+        user_name=current_user["name"],
+        action_type=ActivityActionType.DELETE_PASTORAL_NOTE,
+        member_id=note["member_id"],
+        member_name=member["name"] if member else "Unknown",
+        notes=f"Deleted pastoral note: {note.get('title')}"
+    )
+
+    return {"message": "Pastoral note deleted successfully"}
+
+
+@post("/pastoral-notes/{note_id:str}/complete-followup")
+async def complete_note_followup(note_id: str, request: Request) -> dict:
+    """Mark a pastoral note's follow-up as completed"""
+    current_user = await get_current_user(request)
+
+    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
+
+    # Check campus access
+    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
+        raise PermissionDeniedException("You don't have access to this note")
+
+    if not note.get("follow_up_date"):
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="This note has no follow-up scheduled")
+
+    await db.pastoral_notes.update_one(
+        {"id": note_id},
+        {"$set": {"follow_up_completed": True, "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    return {"message": "Follow-up marked as completed"}
+
+
+@get("/pastoral-notes/member/{member_id:str}")
+async def get_member_pastoral_notes(member_id: str, request: Request) -> list:
+    """Get all pastoral notes for a specific member"""
+    current_user = await get_current_user(request)
+
+    # Verify member exists
+    member = await get_member_or_404(member_id)
+
+    # Check campus access
+    if current_user["role"] != "full_admin" and current_user.get("campus_id") != member.get("campus_id"):
+        raise PermissionDeniedException("You don't have access to this member's records")
+
+    # Query notes - filter private notes
+    query = {
+        "member_id": member_id,
+        "$or": [
+            {"is_private": False},
+            {"is_private": {"$exists": False}},
+            {"created_by": current_user["id"]}
+        ]
+    }
+
+    notes = await db.pastoral_notes.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+
+    return notes
+
+
+@get("/pastoral-notes/followup-due")
+async def get_notes_with_followup_due(request: Request) -> list:
+    """Get all notes with overdue or due today follow-ups"""
+    current_user = await get_current_user(request)
+
+    today = get_jakarta_date_str()
+
+    query = {
+        "follow_up_date": {"$lte": today},
+        "follow_up_completed": False,
+        "$or": [
+            {"is_private": False},
+            {"is_private": {"$exists": False}},
+            {"created_by": current_user["id"]}
+        ]
+    }
+
+    # Campus filtering
+    if current_user["role"] != "full_admin":
+        query["campus_id"] = current_user.get("campus_id")
+
+    notes = await db.pastoral_notes.find(query, {"_id": 0}).sort("follow_up_date", 1).to_list(200)
+
+    # Enrich with member names
+    for note in notes:
+        member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1, "phone": 1})
+        if member:
+            note["member_name"] = member["name"]
+            note["member_phone"] = member.get("phone")
+
+    return notes
+
+
+@get("/config/note-categories")
+async def get_note_categories() -> list:
+    """Get available pastoral note categories"""
+    return [
+        {"value": "special_needs", "label": "Kebutuhan Khusus", "label_en": "Special Needs"},
+        {"value": "health", "label": "Kesehatan", "label_en": "Health"},
+        {"value": "financial", "label": "Keuangan", "label_en": "Financial"},
+        {"value": "spiritual", "label": "Rohani", "label_en": "Spiritual"},
+        {"value": "family", "label": "Keluarga", "label_en": "Family"},
+        {"value": "work", "label": "Pekerjaan", "label_en": "Work"},
+        {"value": "other", "label": "Lainnya", "label_en": "Other"},
+    ]
+
+
+
 # All route handlers - must be explicitly listed for Litestar
 route_handlers = [
     # Health checks
@@ -10069,6 +9773,17 @@ route_handlers = [
     # Activity log endpoints
     get_activity_logs,
     get_activity_summary,
+    # Pastoral notes endpoints
+    create_pastoral_note,
+    list_pastoral_notes,
+    get_pastoral_note,
+    update_pastoral_note,
+    delete_pastoral_note,
+    complete_note_followup,
+    get_member_pastoral_notes,
+    get_notes_with_followup_due,
+    get_note_categories,
+
     # Real-time SSE stream
     stream_activity,
     stream_test,
