@@ -297,20 +297,14 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     birthdays_today.append({**base_data, "date": today_date})
                 elif this_year_birthday < today:
                     days_overdue = (today - this_year_birthday).days
-                    # For completed/ignored, show only for 2 days after birthday (not forever)
-                    # For incomplete, apply normal writeoff
-                    completed_grace_period = 2  # Days to show completed birthdays
-                    if is_completed or is_ignored:
-                        if days_overdue <= completed_grace_period:
+                    # Only show INCOMPLETE overdue birthdays (completed ones don't need attention)
+                    # Today's birthdays show completed status so staff can see who was contacted
+                    if not is_completed and not is_ignored:
+                        if birthday_writeoff == 0 or days_overdue <= birthday_writeoff:
                             overdue_birthdays.append({
                                 **base_data, "date": this_year_birthday.isoformat(),
                                 "days_overdue": days_overdue
                             })
-                    elif birthday_writeoff == 0 or days_overdue <= birthday_writeoff:
-                        overdue_birthdays.append({
-                            **base_data, "date": this_year_birthday.isoformat(),
-                            "days_overdue": days_overdue
-                        })
                 elif tomorrow <= this_year_birthday <= week_ahead:
                     upcoming_birthdays.append({
                         **base_data, "date": this_year_birthday.isoformat(),
