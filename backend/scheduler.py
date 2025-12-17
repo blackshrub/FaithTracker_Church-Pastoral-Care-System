@@ -18,6 +18,8 @@ import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from utils import normalize_phone_number
+
 logger = logging.getLogger(__name__)
 
 # Jakarta timezone
@@ -589,9 +591,10 @@ async def send_daily_digest_to_pastoral_team():
                     logger.info(f"  Skipping {user['name']} (user already received digest)")
                     continue
 
-                # Normalize phone for deduplication
-                user_phone = user.get('phone', '').replace('@s.whatsapp.net', '')
-                if user_phone in sent_to_phones:
+                # Normalize phone for deduplication - use consistent format to catch duplicates
+                raw_phone = user.get('phone', '').replace('@s.whatsapp.net', '')
+                user_phone = normalize_phone_number(raw_phone) if raw_phone else ''
+                if user_phone and user_phone in sent_to_phones:
                     logger.info(f"  Skipping {user['name']} (phone {user_phone} already received digest)")
                     sent_to_users.add(user['id'])  # Mark user as processed
                     continue
@@ -607,7 +610,8 @@ async def send_daily_digest_to_pastoral_team():
                         })
 
                     sent_to_users.add(user['id'])
-                    sent_to_phones.add(user_phone)
+                    if user_phone:
+                        sent_to_phones.add(user_phone)
                     if result.get("success"):
                         total_sent += 1
                         logger.info(f"  Sent digest to {user['name']} ({user['phone']})")
@@ -651,9 +655,10 @@ async def send_daily_digest_to_pastoral_team():
                         logger.info(f"  Skipping {admin['name']} (user already received digest)")
                         continue
 
-                    # Normalize phone for deduplication
-                    admin_phone = admin.get('phone', '').replace('@s.whatsapp.net', '')
-                    if admin_phone in sent_to_phones:
+                    # Normalize phone for deduplication - use consistent format to catch duplicates
+                    raw_admin_phone = admin.get('phone', '').replace('@s.whatsapp.net', '')
+                    admin_phone = normalize_phone_number(raw_admin_phone) if raw_admin_phone else ''
+                    if admin_phone and admin_phone in sent_to_phones:
                         logger.info(f"  Skipping {admin['name']} (phone {admin_phone} already received digest)")
                         sent_to_users.add(admin['id'])  # Mark user as processed
                         continue
@@ -669,7 +674,8 @@ async def send_daily_digest_to_pastoral_team():
                             })
 
                         sent_to_users.add(admin['id'])
-                        sent_to_phones.add(admin_phone)
+                        if admin_phone:
+                            sent_to_phones.add(admin_phone)
                         if result.get("success"):
                             total_sent += 1
                             logger.info(f"  Sent digest to full_admin {admin['name']} ({admin['phone']})")

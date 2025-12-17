@@ -20,10 +20,10 @@ export const getInitials = (name) => {
 /**
  * Format phone number for WhatsApp link
  * @param {string} phone - Phone number
- * @returns {string} Formatted phone for WhatsApp (digits only, with country code)
+ * @returns {string} Full WhatsApp URL (https://wa.me/62xxx)
  */
 export const formatPhoneForWhatsApp = (phone) => {
-  if (!phone) return '';
+  if (!phone) return '#';
   // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, '');
   // Remove leading + for WhatsApp
@@ -34,7 +34,7 @@ export const formatPhoneForWhatsApp = (phone) => {
   if (cleaned.startsWith('0')) {
     cleaned = '62' + cleaned.substring(1);
   }
-  return cleaned;
+  return `https://wa.me/${cleaned}`;
 };
 
 /**
