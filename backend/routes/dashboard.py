@@ -77,28 +77,55 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
             {"_id": 0, "id": 1, "member_id": 1, "campus_id": 1, "aid_amount": 1,
              "frequency": 1, "next_occurrence": 1, "is_active": 1, "notes": 1}
         ).to_list(MAX_TASKS_LIST)
-        # Fetch completed/ignored birthday events for this year to filter out from dashboard
-        # Birthday events are stored with the original birth date (e.g., "1990-05-15")
-        # but we check completed_at to see if it was completed this year
+        # Fetch ALL birthday events to:
+        # 1. Filter out completed/ignored ones from dashboard
+        # 2. Include event IDs for incomplete ones (needed for Complete button to work)
         year_start = f"{today.year}-01-01"
         birthday_events_task = db.care_events.find(
-            {
-                "campus_id": campus_id,
-                "event_type": "birthday",
-                "$or": [
-                    {"completed": True, "completed_at": {"$gte": datetime.strptime(year_start, '%Y-%m-%d')}},
-                    {"ignored": True, "ignored_at": {"$gte": datetime.strptime(year_start, '%Y-%m-%d')}}
-                ]
-            },
-            {"_id": 0, "member_id": 1}
+            {"campus_id": campus_id, "event_type": "birthday"},
+            {"_id": 0, "id": 1, "member_id": 1, "completed": 1, "completed_at": 1, "ignored": 1, "ignored_at": 1}
         ).to_list(MAX_TASKS_LIST)
 
-        writeoff_settings, members, grief_stages, accident_followups, aid_schedules, completed_birthday_events = await asyncio.gather(
+        writeoff_settings, members, grief_stages, accident_followups, aid_schedules, birthday_events = await asyncio.gather(
             writeoff_task, members_task, grief_task, accident_task, aid_task, birthday_events_task
         )
 
-        # Build set of member_ids with completed/ignored birthdays this year
-        completed_birthday_member_ids = {e["member_id"] for e in completed_birthday_events}
+        # Build maps for birthday events:
+        # 1. Set of member_ids with completed/ignored birthdays this year (to filter out)
+        # 2. Map of member_id -> event_id for incomplete birthdays (to include in response)
+        year_start_dt = datetime.strptime(year_start, '%Y-%m-%d')
+        completed_birthday_member_ids = set()
+        birthday_event_id_map = {}  # member_id -> care_event_id
+
+        for e in birthday_events:
+            member_id = e["member_id"]
+            # Check if completed/ignored this year
+            completed_at = e.get("completed_at")
+            ignored_at = e.get("ignored_at")
+
+            if e.get("completed") and completed_at:
+                # Handle both datetime and string formats
+                if isinstance(completed_at, str):
+                    try:
+                        completed_at = datetime.strptime(completed_at[:10], '%Y-%m-%d')
+                    except ValueError:
+                        completed_at = None
+                if completed_at and completed_at >= year_start_dt:
+                    completed_birthday_member_ids.add(member_id)
+                    continue
+
+            if e.get("ignored") and ignored_at:
+                if isinstance(ignored_at, str):
+                    try:
+                        ignored_at = datetime.strptime(ignored_at[:10], '%Y-%m-%d')
+                    except ValueError:
+                        ignored_at = None
+                if ignored_at and ignored_at >= year_start_dt:
+                    completed_birthday_member_ids.add(member_id)
+                    continue
+
+            # Not completed/ignored this year - store event ID for use in dashboard
+            birthday_event_id_map[member_id] = e["id"]
 
         logger.info(f"Found {len(members)} members for campus {campus_id}")
         
@@ -239,18 +266,24 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         # Process birthdays (skip members whose birthdays were already completed/ignored this year)
         birthday_writeoff = writeoff_settings.get("birthday", 7)
         for member in members:
+            member_id = member["id"]
             # Skip if birthday already completed/ignored this year
-            if member["id"] in completed_birthday_member_ids:
+            if member_id in completed_birthday_member_ids:
                 continue
             birth_date_str = member.get("birth_date")
             if not birth_date_str:
+                continue
+            # Skip if no birthday care_event exists for this member (can't complete without event ID)
+            event_id = birthday_event_id_map.get(member_id)
+            if not event_id:
                 continue
             try:
                 birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
                 this_year_birthday = birth_date.replace(year=today.year)
                 if this_year_birthday == today:
                     birthdays_today.append({
-                        "type": "birthday", "date": today_date, "member_id": member["id"],
+                        "id": event_id,  # Care event ID for Complete button
+                        "type": "birthday", "date": today_date, "member_id": member_id,
                         "member_name": member.get("name"), "member_phone": member.get("phone"),
                         "member_photo_url": member.get("photo_url"), "member_age": member.get("age"),
                         "days_since_last_contact": member.get("days_since_last_contact"),
@@ -260,15 +293,17 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                     days_overdue = (today - this_year_birthday).days
                     if birthday_writeoff == 0 or days_overdue <= birthday_writeoff:
                         overdue_birthdays.append({
+                            "id": event_id,  # Care event ID for Complete button
                             "type": "birthday", "date": this_year_birthday.isoformat(),
-                            "member_id": member["id"], "member_name": member.get("name"),
+                            "member_id": member_id, "member_name": member.get("name"),
                             "member_phone": member.get("phone"), "member_photo_url": member.get("photo_url"),
                             "member_age": member.get("age"), "days_overdue": days_overdue, "data": member
                         })
                 elif tomorrow <= this_year_birthday <= week_ahead:
                     upcoming_birthdays.append({
+                        "id": event_id,  # Care event ID for Complete button
                         "type": "birthday", "date": this_year_birthday.isoformat(),
-                        "member_id": member["id"], "member_name": member.get("name"),
+                        "member_id": member_id, "member_name": member.get("name"),
                         "member_phone": member.get("phone"), "member_photo_url": member.get("photo_url"),
                         "member_age": member.get("age"), "days_until": (this_year_birthday - today).days, "data": member
                     })
