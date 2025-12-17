@@ -523,3 +523,42 @@ class SyncLog(Struct):
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None
     duration_seconds: float | None = None
+
+
+# ==================== SERIALIZATION HELPERS ====================
+
+def to_mongo_doc(obj, _original_obj=None) -> dict:
+    """Convert msgspec Struct to MongoDB-ready dict preserving datetime as native types."""
+    from enum import Enum as PyEnum
+    
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            if v is UNSET:
+                continue
+            elif isinstance(v, datetime):
+                result[k] = v
+            elif isinstance(v, date) and not isinstance(v, datetime):
+                result[k] = v.isoformat()
+            elif isinstance(v, str) and _original_obj is not None:
+                orig_val = getattr(_original_obj, k, None)
+                if isinstance(orig_val, datetime):
+                    result[k] = orig_val
+                else:
+                    result[k] = v
+            elif isinstance(v, PyEnum):
+                result[k] = v.value
+            elif isinstance(v, dict):
+                result[k] = to_mongo_doc(v)
+            elif isinstance(v, list):
+                result[k] = [to_mongo_doc(item) if isinstance(item, (dict, Struct)) else
+                            item if isinstance(item, datetime) else
+                            item.isoformat() if isinstance(item, date) else
+                            item.value if isinstance(item, PyEnum) else item
+                            for item in v]
+            else:
+                result[k] = v
+        return result
+
+    raw = msgspec.to_builtins(obj, str_keys=True)
+    return to_mongo_doc(raw, _original_obj=obj)
