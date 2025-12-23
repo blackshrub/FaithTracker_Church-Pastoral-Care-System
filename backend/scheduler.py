@@ -33,6 +33,23 @@ def today_jakarta():
     """Get current date in Jakarta timezone"""
     return now_jakarta().date()
 
+
+def safe_parse_date(date_str: str) -> date | None:
+    """Safely parse a date string in ISO format.
+
+    Returns:
+        date object if valid, None if invalid/empty/null
+    """
+    if not date_str or not isinstance(date_str, str):
+        return None
+    # Check minimum length for YYYY-MM-DD format
+    if len(date_str) < 10:
+        return None
+    try:
+        return date.fromisoformat(date_str[:10])
+    except (ValueError, TypeError):
+        return None
+
 # MongoDB connection
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
@@ -285,8 +302,11 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         for stage in overdue_grief:
             member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0})
             if member and member.get('phone'):
+                scheduled_date = safe_parse_date(stage.get("scheduled_date"))
+                if not scheduled_date:
+                    continue  # Skip if date is invalid
                 stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
-                days_overdue = (today - date.fromisoformat(stage["scheduled_date"])).days
+                days_overdue = (today - scheduled_date).days
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
                 overdue_grief_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
 
@@ -325,8 +345,11 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         for followup in overdue_hospital:
             member = await db.members.find_one({"id": followup["member_id"]}, {"_id": 0})
             if member and member.get('phone'):
+                scheduled_date = safe_parse_date(followup.get("scheduled_date"))
+                if not scheduled_date:
+                    continue  # Skip if date is invalid
                 stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
-                days_overdue = (today - date.fromisoformat(followup["scheduled_date"])).days
+                days_overdue = (today - scheduled_date).days
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
                 overdue_hospital_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
 
@@ -362,16 +385,24 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         for aid in overdue_financial_aid:
             member = await db.members.find_one({"id": aid["member_id"]}, {"_id": 0})
             if member and member.get('phone'):
+                next_occurrence = safe_parse_date(aid.get("next_occurrence"))
+                if not next_occurrence:
+                    continue  # Skip if date is invalid
                 aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
-                days_overdue = (today - date.fromisoformat(aid["next_occurrence"])).days
+                days_overdue = (today - next_occurrence).days
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
                 overdue_financial_members.append(f"  - {member['name']} ({aid_type}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
 
 
         # 7. Pastoral Notes with overdue follow-ups (due today or past due)
+        # Exclude empty/null follow_up_date and ensure it's a valid date string
         overdue_notes_query = {
             "campus_id": campus_id,
-            "follow_up_date": {"$lte": today.isoformat()},
+            "follow_up_date": {
+                "$lte": today.isoformat(),
+                "$nin": [None, ""],  # Exclude null and empty string
+                "$regex": r"^\d{4}-\d{2}-\d{2}"  # Must start with YYYY-MM-DD format
+            },
             "follow_up_completed": False,
             "is_private": {"$ne": True}  # Don't include private notes in digest
         }
@@ -398,7 +429,9 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1, "phone": 1})
             if member and member.get('phone'):
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                note_date = date.fromisoformat(note["follow_up_date"])
+                note_date = safe_parse_date(note.get("follow_up_date"))
+                if not note_date:
+                    continue  # Skip if date is invalid
 
                 category_display = category_names.get(note.get("category"), "")
                 category_str = f" [{category_display}]" if category_display else ""
@@ -428,10 +461,23 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             last_contact = member.get('last_contact_date')
             if last_contact:
                 if isinstance(last_contact, str):
-                    last_contact = datetime.fromisoformat(last_contact)
-                if last_contact.tzinfo is None:
-                    last_contact = last_contact.replace(tzinfo=timezone.utc)
-                days = (datetime.now(timezone.utc) - last_contact).days
+                    # Handle empty string safely
+                    if not last_contact.strip():
+                        days = 999
+                    else:
+                        try:
+                            last_contact = datetime.fromisoformat(last_contact)
+                            if last_contact.tzinfo is None:
+                                last_contact = last_contact.replace(tzinfo=timezone.utc)
+                            days = (datetime.now(timezone.utc) - last_contact).days
+                        except (ValueError, TypeError):
+                            days = 999
+                elif hasattr(last_contact, 'tzinfo'):
+                    if last_contact.tzinfo is None:
+                        last_contact = last_contact.replace(tzinfo=timezone.utc)
+                    days = (datetime.now(timezone.utc) - last_contact).days
+                else:
+                    days = 999
             else:
                 days = 999
 
