@@ -968,8 +968,14 @@ async def acquire_job_lock(job_name: str, ttl_seconds: int = 300):
             return False
 
     except Exception as e:
-        # If there's an error, assume we didn't get the lock
-        logger.error(f"Error acquiring lock for {job_name}: {str(e)}")
+        # E11000 duplicate key error is expected when another worker gets the lock first
+        # This is normal behavior in distributed locking, not an error
+        error_str = str(e)
+        if "E11000" in error_str or "duplicate key" in error_str.lower():
+            logger.info(f"Lock for {job_name} already acquired by another worker - skipping")
+            return False
+        # Only log as error if it's a different kind of failure
+        logger.error(f"Error acquiring lock for {job_name}: {error_str}")
         return False
 
 async def release_job_lock(job_name: str):
