@@ -1042,7 +1042,7 @@ def schedule_daily_digest(hour: int, minute: int):
             id='daily_reminders',
             name='Daily Pastoral Care Digest',
             replace_existing=True,
-            misfire_grace_time=7200,  # 2 hours in seconds
+            misfire_grace_time=21600,  # 6 hours - matches reconciliation grace period
             coalesce=True
         )
         logger.info(f"Daily digest scheduled for {hour:02d}:{minute:02d} Asia/Jakarta")
@@ -1063,6 +1063,53 @@ async def init_daily_digest_schedule():
     """Initialize daily digest schedule from database on startup"""
     await asyncio.sleep(2)  # Wait for DB connection to be ready
     await reschedule_daily_digest()
+
+
+async def check_missed_digest():
+    """
+    Check if daily digest was missed and run it if needed.
+    This handles cases where the container restarts after the scheduled digest time
+    and the misfire_grace_time has also expired.
+    """
+    await asyncio.sleep(4)  # Wait for DB connection + digest schedule init
+
+    try:
+        logger.info("Checking for missed daily digest...")
+
+        # Get configured digest time
+        digest_time = await get_digest_time_from_db()
+        hour, minute = map(int, digest_time.split(":"))
+
+        # Check if we're past the scheduled digest time today
+        now = now_jakarta()
+        scheduled_today = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+        if now < scheduled_today:
+            logger.info(f"Digest not due yet (scheduled {digest_time}, now {now.strftime('%H:%M')})")
+            return
+
+        # Check if digest was already sent today by looking at notification_logs
+        today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        today_digest_count = await db.notification_logs.count_documents({
+            "pastoral_team_user_id": {"$exists": True},
+            "status": "sent",
+            "created_at": {"$gte": today_start}
+        })
+
+        if today_digest_count > 0:
+            logger.info(f"Digest already sent today ({today_digest_count} messages found)")
+            return
+
+        hours_since_scheduled = (now - scheduled_today).total_seconds() / 3600
+        logger.warning(
+            f"Daily digest was missed! Scheduled at {digest_time}, "
+            f"now {now.strftime('%H:%M')} ({hours_since_scheduled:.1f}h late). "
+            "Running catch-up digest..."
+        )
+        await daily_reminder_job()
+
+    except Exception as e:
+        logger.error(f"Error checking missed digest: {str(e)}")
 
 
 async def check_missed_reconciliation():
@@ -1162,7 +1209,7 @@ def start_scheduler():
             id='daily_reminders',
             name='Daily Pastoral Care Digest',
             replace_existing=True,
-            misfire_grace_time=7200,  # 2 hours in seconds
+            misfire_grace_time=21600,  # 6 hours - matches reconciliation grace period
             coalesce=True
         )
 
@@ -1187,11 +1234,23 @@ def start_scheduler():
             replace_existing=True
         )
 
+        # Check for missed daily digest on startup
+        # This catches cases where container was down during scheduled digest time
+        # AND the misfire_grace_time has also expired
+        scheduler.add_job(
+            check_missed_digest,
+            'date',  # Run once on startup
+            id='check_missed_digest',
+            name='Check Missed Digest on Startup',
+            replace_existing=True
+        )
+
         logger.info("Scheduler started successfully")
         logger.info("  - Midnight cache refresh: 00:00 Asia/Jakarta (misfire: 1h)")
-        logger.info("  - Daily digest: 08:00 Asia/Jakarta (loading from DB...)")
+        logger.info("  - Daily digest: 08:00 Asia/Jakarta (loading from DB..., misfire: 6h)")
         logger.info("  - Member reconciliation: 03:00 Asia/Jakarta (misfire: 6h)")
         logger.info("  - Startup reconciliation check: enabled")
+        logger.info("  - Startup missed digest check: enabled")
     except Exception as e:
         logger.error(f"Error starting scheduler: {str(e)}")
 
