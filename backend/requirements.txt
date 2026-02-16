@@ -29,7 +29,7 @@ mdurl==0.1.2
 motor>=3.7.0  # Updated for MongoDB 8.0 support
 mypy==1.18.2
 mypy_extensions==1.1.0
-numpy==2.3.4
+numpy==2.3.5
 oauthlib==3.3.1
 packaging==25.0
 pandas==2.3.3
