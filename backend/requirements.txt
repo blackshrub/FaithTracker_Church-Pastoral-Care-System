@@ -73,7 +73,7 @@ typing_extensions==4.15.0
 tzdata==2025.2
 tzlocal==5.3.1
 urllib3==2.6.0  # Fixed CVE-2025-66418, CVE-2025-66471
-uvicorn==0.25.0
+uvicorn==0.38.0
 granian==1.7.6
 msgspec==0.19.0
 redis[hiredis]==5.2.1
