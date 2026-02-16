@@ -2134,10 +2134,10 @@ babel-plugin-polyfill-regenerator@^0.6.5:
   dependencies:
     "@babel/helper-define-polyfill-provider" "^0.6.5"
 
-babel-plugin-react-compiler@19.0.0-beta-e552027-20250112:
-  version "19.0.0-beta-e552027-20250112"
-  resolved "https://registry.yarnpkg.com/babel-plugin-react-compiler/-/babel-plugin-react-compiler-19.0.0-beta-e552027-20250112.tgz#f06f0436420bd09df5abf37337ecd8fb43b0d847"
-  integrity sha512-pUTT0mAZ4XLewC6bvqVeX015nVRLVultcSQlkzGdC10G6YV6K2h4E7cwGlLAuLKWTj3Z08mTO9uTnPP/opUBsg==
+babel-plugin-react-compiler@19.0.0-beta-714736e-20250131:
+  version "19.0.0-beta-714736e-20250131"
+  resolved "https://registry.yarnpkg.com/babel-plugin-react-compiler/-/babel-plugin-react-compiler-19.0.0-beta-714736e-20250131.tgz#8efad3433e56701e19015713741f493e228c700f"
+  integrity sha512-frj2l6fRWVi26iw9WthFKyFyE4u5ZSHH3KdKiscOOwpz210seTtwnp0QbJmi8Zoa5HK7Fk2fH40JffN2y8GvLg==
   dependencies:
     "@babel/types" "^7.19.0"
 
