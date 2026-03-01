@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.yarn/berry/cache \
 # ===================
 # Stage 2: Build
 # ===================
-FROM node:20-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 
