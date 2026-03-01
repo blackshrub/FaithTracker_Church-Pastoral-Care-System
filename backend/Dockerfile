@@ -5,7 +5,7 @@
 # PERFORMANCE: Uses BuildKit cache mounts for faster rebuilds
 # Build command: DOCKER_BUILDKIT=1 docker compose build backend
 
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
