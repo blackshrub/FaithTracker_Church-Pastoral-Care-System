@@ -10,25 +10,30 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    let cancelled = false;
 
-  const checkAuth = async () => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      try {
-        setAuthToken(storedToken);
-        const response = await api.get('/auth/me');
-        setUser(response.data);
-        setToken(storedToken);
-      } catch (_error) {
-        localStorage.removeItem('token');
-        clearAuthToken();
-        setToken(null);
+    const checkAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        try {
+          setAuthToken(storedToken);
+          const response = await api.get('/auth/me');
+          if (!cancelled) {
+            setUser(response.data);
+            setToken(storedToken);
+          }
+        } catch (_error) {
+          localStorage.removeItem('token');
+          clearAuthToken();
+          if (!cancelled) setToken(null);
+        }
       }
-    }
-    setLoading(false);
-  };
+      if (!cancelled) setLoading(false);
+    };
+
+    checkAuth();
+    return () => { cancelled = true; };
+  }, []);
 
   const login = async (email, password, campusId = null) => {
     const response = await api.post('/auth/login', {

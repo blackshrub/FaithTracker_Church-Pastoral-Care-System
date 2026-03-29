@@ -105,15 +105,25 @@ api.interceptors.response.use(
       return api(config);
     }
 
-    // Handle 401 Unauthorized or 403 Forbidden - clear auth and redirect
-    // Note: FastAPI's HTTPBearer returns 403 when no valid token is provided
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // Handle 401 Unauthorized - always clear auth and redirect
+    if (error.response?.status === 401) {
       localStorage.removeItem('token');
       delete api.defaults.headers.common['Authorization'];
-      // Don't redirect if already on login page
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
+    }
+    // Handle 403 Forbidden - only redirect if it's an auth/token issue, not a role-based denial
+    if (error.response?.status === 403) {
+      const detail = (error.response?.data?.detail || '').toLowerCase();
+      if (detail.includes('token') || detail.includes('not authenticated') || detail.includes('credentials')) {
+        localStorage.removeItem('token');
+        delete api.defaults.headers.common['Authorization'];
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+      // Otherwise let the 403 propagate to the calling code for role-based permission errors
     }
 
     return Promise.reject(error);

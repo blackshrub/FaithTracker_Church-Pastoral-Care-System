@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, Filter, User, Activity } from 'lucide-react';
 
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -104,16 +105,15 @@ const ActivityLog = () => {
       };
     }
   };
-  // Load campus timezone
+  const { user: authUser } = useAuth();
+
+  // Load campus timezone using auth context (avoids redundant /auth/me call)
   useEffect(() => {
     const loadCampusTimezone = async () => {
       try {
-        const userResponse = await api.get('/auth/me');
-
-        const campusId = userResponse.data.campus_id;
+        const campusId = authUser?.campus_id;
         if (campusId && campusId !== 'campus_id') {
           const campusResponse = await api.get(`/campuses/${campusId}`);
-          // Use campus timezone if available, else env var, else browser timezone
           const timezone = campusResponse.data.timezone ||
             import.meta.env.VITE_TIMEZONE ||
             Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -125,7 +125,7 @@ const ActivityLog = () => {
     };
 
     loadCampusTimezone();
-  }, []);
+  }, [authUser?.campus_id]);
   // Get default start date (30 days ago)
   function getDefaultStartDate() {
     const date = new Date();

@@ -23,7 +23,7 @@
  * });
  */
 
-import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -53,6 +53,7 @@ export function useOfflineSync() {
   const queryClient = useQueryClient();
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const isSyncingRef = useRef(false);
   const [stats, setStats] = useState({ pending: 0, failed: 0, completed: 0 });
 
   // Subscribe to network status
@@ -75,7 +76,7 @@ export function useOfflineSync() {
     if (isOnline && pendingCount > 0) {
       sync();
     }
-  }, [isOnline]);
+  }, [isOnline, pendingCount, sync]);
 
   /**
    * Queue an operation for offline sync
@@ -114,8 +115,9 @@ export function useOfflineSync() {
    * Sync all pending operations
    */
   const sync = useCallback(async () => {
-    if (!isOnline || isSyncing) return;
+    if (!isOnline || isSyncingRef.current) return;
 
+    isSyncingRef.current = true;
     setIsSyncing(true);
     try {
       const executor = async (operation) => {
@@ -143,9 +145,10 @@ export function useOfflineSync() {
     } catch (error) {
       toast.error('Sync failed');
     } finally {
+      isSyncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [isOnline, isSyncing, queryClient]);
+  }, [isOnline, queryClient]);
 
   /**
    * Get pending operations

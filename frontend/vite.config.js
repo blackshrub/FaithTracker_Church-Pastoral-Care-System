@@ -118,7 +118,7 @@ export default defineConfig({
     // Use multiple CPU cores for faster builds
     minify: 'esbuild',
     // Optimize chunk splitting for better caching
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks: {
           // React core - smallest possible chunk

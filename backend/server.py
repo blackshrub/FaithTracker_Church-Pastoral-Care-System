@@ -1363,10 +1363,15 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 last_contact_dt = last_contact_dt.replace(tzinfo=timezone.utc)
             
             days_since = (datetime.now(timezone.utc) - last_contact_dt).days
-            
-            if days_since < 60:
+
+            # Use configurable engagement thresholds (not hardcoded)
+            eng_settings = await _get_engagement_settings_cached()
+            at_risk_days = eng_settings.get("atRiskDays", ENGAGEMENT_AT_RISK_DAYS_DEFAULT)
+            disconnected_days = eng_settings.get("disconnectedDays", ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT)
+
+            if days_since < at_risk_days:
                 engagement_status = "active"
-            elif days_since < 90:
+            elif days_since < disconnected_days:
                 engagement_status = "at_risk"
             else:
                 engagement_status = "disconnected"
@@ -1585,7 +1590,13 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
                 errors.append(f"Row error: {str(e)}")
 
         # Log the import activity
-        await log_activity(current_user["id"], "import", None, f"Imported {imported_count} members from CSV")
+        await log_activity(
+            campus_id=campus_id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
+            action_type=ActivityActionType.CREATE_MEMBER,
+            notes=f"Imported {imported_count} members from CSV"
+        )
 
         return {
             "success": True,
@@ -1627,7 +1638,13 @@ async def import_members_json(data: List[Dict[str, Any]] = Body(), request: Requ
                 errors.append(f"Member error: {str(e)}")
 
         # Log the import activity
-        await log_activity(current_user["id"], "import", None, f"Imported {imported_count} members from JSON")
+        await log_activity(
+            campus_id=campus_id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
+            action_type=ActivityActionType.CREATE_MEMBER,
+            notes=f"Imported {imported_count} members from JSON"
+        )
 
         return {
             "success": True,
@@ -1691,16 +1708,18 @@ async def export_members_csv(request: Request) -> Response:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @get("/export/care-events/csv")
-async def export_care_events_csv() -> Response:
+async def export_care_events_csv(request: Request) -> Response:
     """Export care events to CSV file - optimized with field projection (75% less data transfer)"""
+    current_user = await get_current_user(request)
     try:
+        campus_filter = get_campus_filter(current_user)
         # Only fetch fields needed for export (reduces data transfer by ~75%)
         projection = {
             "_id": 0, "id": 1, "member_id": 1, "event_type": 1, "event_date": 1,
             "title": 1, "description": 1, "completed": 1, "aid_type": 1,
             "aid_amount": 1, "hospital_name": 1
         }
-        events = await db.care_events.find({}, projection).to_list(10000)
+        events = await db.care_events.find(campus_filter, projection).to_list(10000)
         
         output = io.StringIO()
         if events:
@@ -1739,8 +1758,11 @@ class WhatsAppTestResponse(Struct):
     details: dict | None = None
 
 @post("/integrations/ping/whatsapp")
-async def test_whatsapp_integration(data: WhatsAppTestRequest) -> dict:
+async def test_whatsapp_integration(data: WhatsAppTestRequest, request: Request) -> dict:
     """Test WhatsApp gateway integration by sending a test message"""
+    current_user = await get_current_user(request)
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Only administrators can test integrations")
     try:
         result = await send_whatsapp_message(data.phone, data.message, member_id="test")
 
@@ -3162,17 +3184,19 @@ async def get_all_config() -> dict:
 @post("/admin/recalculate-engagement")
 async def recalculate_all_engagement_status(request: Request) -> dict:
     """Recalculate engagement status for all members (admin only)"""
+    current_user = await get_current_user(request)
     try:
-        if user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
+        if current_user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
             raise HTTPException(status_code=403, detail="Only admins can recalculate engagement")
-        
+
         # Get engagement settings
         settings = await _get_engagement_settings_cached()
         at_risk_days = settings.get("atRiskDays", 60)
         disconnected_days = settings.get("disconnectedDays", 90)
-        
-        # Get all members
-        members = await db.members.find({}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(None)
+
+        # Get members scoped to user's campus for multi-tenancy
+        campus_filter = get_campus_filter(current_user)
+        members = await db.members.find({**campus_filter}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(None)
         
         updated_count = 0
         stats = {"active": 0, "at_risk": 0, "disconnected": 0}
@@ -3218,8 +3242,9 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @get("/settings/engagement")
-async def get_engagement_settings() -> dict:
+async def get_engagement_settings(request: Request) -> dict:
     """Get engagement threshold settings"""
+    await get_current_user(request)
     try:
         settings = await db.settings.find_one({"type": "engagement"}, {"_id": 0})
         if not settings:
@@ -3260,6 +3285,7 @@ async def update_engagement_settings(data: EngagementSettingsUpdate, request: Re
 @get("/settings/automation")
 async def get_automation_settings(request: Request) -> dict:
     """Get automation settings (daily digest time, WhatsApp gateway)"""
+    await get_current_user(request)
     try:
         settings = await db.settings.find_one({"type": "automation"}, {"_id": 0})
         if not settings:
@@ -3367,8 +3393,9 @@ async def update_overdue_writeoff_settings(data: OverdueWriteoffSettingsUpdate, 
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @get("/settings/grief-stages")
-async def get_grief_stages() -> dict:
+async def get_grief_stages(request: Request) -> dict:
     """Get grief support stage configuration"""
+    await get_current_user(request)
     try:
         settings = await db.settings.find_one({"type": "grief_stages"}, {"_id": 0})
         if not settings:
@@ -3407,8 +3434,9 @@ async def update_grief_stages(data: list = Body(), request: Request = None) -> d
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @get("/settings/accident-followup")
-async def get_accident_followup() -> dict:
+async def get_accident_followup(request: Request) -> dict:
     """Get accident follow-up configuration"""
+    await get_current_user(request)
     try:
         settings = await db.settings.find_one({"type": "accident_followup"}, {"_id": 0})
         if not settings:
@@ -3444,8 +3472,11 @@ async def update_accident_followup(data: list = Body(), request: Request = None)
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @get("/settings/user-preferences/{user_id:str}")
-async def get_user_preferences(user_id: str) -> dict:
+async def get_user_preferences(user_id: str, request: Request) -> dict:
     """Get user preferences (language, etc.)"""
+    current_user = await get_current_user(request)
+    if current_user["id"] != user_id and current_user.get("role") != UserRole.FULL_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         prefs = await db.user_preferences.find_one({"user_id": user_id}, {"_id": 0})
         if not prefs:
@@ -3456,8 +3487,11 @@ async def get_user_preferences(user_id: str) -> dict:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 @put("/settings/user-preferences/{user_id:str}")
-async def update_user_preferences(user_id: str, data: UserPreferencesUpdate) -> dict:
+async def update_user_preferences(user_id: str, data: UserPreferencesUpdate, request: Request) -> dict:
     """Update user preferences"""
+    current_user = await get_current_user(request)
+    if current_user["id"] != user_id and current_user.get("role") != UserRole.FULL_ADMIN.value:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         await db.user_preferences.update_one(
             {"user_id": user_id},
@@ -3594,21 +3628,10 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
             )
         else:
             # Create new with generated webhook secret
-            sync_config = SyncConfig(
-                campus_id=campus_id,
-                sync_method=config.sync_method,
-                api_base_url=config.api_base_url.rstrip('/'),
-                api_path_prefix=api_path_prefix,
-                api_email=config.api_email,
-                api_password=config.api_password,
-                polling_interval_hours=config.polling_interval_hours,
-                reconciliation_enabled=config.reconciliation_enabled,
-                reconciliation_time=config.reconciliation_time,
-                filter_mode=config.filter_mode,
-                filter_rules=config.filter_rules or [],
-                is_enabled=config.is_enabled
-            )
-            await db.sync_configs.insert_one(to_mongo_doc(sync_config))
+            sync_config_data["id"] = generate_uuid()
+            sync_config_data["webhook_secret"] = secrets.token_hex(32)
+            sync_config_data["created_at"] = datetime.now(timezone.utc)
+            await db.sync_configs.insert_one(sync_config_data)
 
         return {"success": True, "message": "Sync configuration saved"}
     
@@ -4462,7 +4485,7 @@ async def setup_first_admin(request: SetupAdminRequest) -> dict:
 
         # Check if a non-default (church) admin already exists
         church_admin_count = await db.users.count_documents({
-            "role": UserRole.FULL_ADMIN,
+            "role": UserRole.FULL_ADMIN.value,
             "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
         })
 
@@ -4495,8 +4518,13 @@ async def setup_first_admin(request: SetupAdminRequest) -> dict:
 
 @post("/setup/campus")
 async def setup_first_campus(request: SetupCampusRequest) -> dict:
-    """Create first campus (setup wizard)"""
+    """Create first campus (setup wizard) - only allowed when no campuses exist"""
     try:
+        # Guard: only allow campus creation during initial setup
+        campus_count = await db.campuses.count_documents({})
+        if campus_count > 0:
+            raise HTTPException(status_code=403, detail="Setup already complete. Use authenticated endpoint to add campuses.")
+
         campus = Campus(
             campus_name=request.campus_name,
             location=request.location,
@@ -4510,6 +4538,8 @@ async def setup_first_campus(request: SetupCampusRequest) -> dict:
 
         return {"success": True, "message": "Campus created", "campus_id": campus.id}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating first campus: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -4523,7 +4553,7 @@ async def check_setup_status() -> dict:
 
         # Check for church admin (non-default admin)
         church_admin_count = await db.users.count_documents({
-            "role": UserRole.FULL_ADMIN,
+            "role": UserRole.FULL_ADMIN.value,
             "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
         })
         campus_count = await db.campuses.count_documents({})
@@ -4679,9 +4709,9 @@ async def receive_sync_webhook(request: Request) -> dict:
 
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     if event_type == "member.deleted":
-                        # Archive the member
+                        # Archive the member (scoped by campus_id for multi-tenancy)
                         await db.members.update_one(
-                            {"external_member_id": member_id},
+                            {"external_member_id": member_id, "campus_id": config["campus_id"]},
                             {"$set": {
                                 "is_archived": True,
                                 "archived_at": datetime.now(timezone.utc),
@@ -4792,35 +4822,36 @@ async def receive_sync_webhook(request: Request) -> dict:
 
 
 @get("/reminders/stats")
-async def get_reminder_stats() -> dict:
+async def get_reminder_stats(request: Request) -> dict:
     """Get reminder statistics for today"""
+    current_user = await get_current_user(request)
     try:
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        
+        campus_filter = get_campus_filter(current_user)
+        today_start = datetime.now(JAKARTA_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+
         # Count notifications sent today
         # Use datetime object for comparison since created_at is stored as ISODate
-        logs = await db.notification_logs.find({
-            "created_at": {"$gte": today_start}
-        }, {"_id": 0}).to_list(1000)
-        
+        log_query = {**campus_filter, "created_at": {"$gte": today_start}}
+        logs = await db.notification_logs.find(log_query, {"_id": 0}).to_list(1000)
+
         sent_count = sum(1 for log in logs if log.get('status') == 'sent')
         failed_count = sum(1 for log in logs if log.get('status') == 'failed')
-        
+
         # Count pending grief stages due today
         today = date.today()
-        grief_due = await db.grief_support.count_documents({
-            "scheduled_date": today.isoformat(),
-            "completed": False
-        })
-        
+        grief_query = {**campus_filter, "scheduled_date": today.isoformat(), "completed": False}
+        grief_due = await db.grief_support.count_documents(grief_query)
+
         # Count birthdays in next 7 days
         future_date = today + timedelta(days=7)
-        birthdays_upcoming = await db.care_events.count_documents({
+        birthday_query = {
+            **campus_filter,
             "event_type": "birthday",
             "event_date": {"$gte": today.isoformat(), "$lte": future_date.isoformat()},
             "completed": False
-        })
-        
+        }
+        birthdays_upcoming = await db.care_events.count_documents(birthday_query)
+
         return {
             "reminders_sent_today": sent_count,
             "reminders_failed_today": failed_count,
@@ -4926,6 +4957,8 @@ async def global_search(q: str, request: Request) -> dict:
             "care_events": care_events
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in global search: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))

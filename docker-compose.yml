@@ -21,12 +21,13 @@ services:
   # DragonflyDB Cache (Redis-compatible, 25x faster)
   # ===================
   dragonfly:
-    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.37.0
     container_name: faithtracker-dragonfly
-    restart: unless-stopped
+    restart: always
     # Use Unix socket for better performance within Docker network
     command: >
       --logtostderr
+      --force_epoll
       --cache_mode=true
       --maxmemory=512mb
       --hz=100
@@ -49,7 +50,7 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "echo PING | nc -w1 localhost 6379 | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -61,7 +62,7 @@ services:
   mongo:
     image: mongo:8.0
     container_name: faithtracker-mongo
-    restart: unless-stopped
+    restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -100,7 +101,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: faithtracker-backend
-    restart: unless-stopped
+    restart: always
     ports:
       - "127.0.0.1:8001:8001"
     environment:
@@ -159,43 +160,25 @@ services:
       start_period: 15s
 
   # ===================
-  # Frontend - React (Nginx)
+  # Frontend - React (served directly by host-level Angie)
   # ===================
-  frontend:
+  # DISABLED: Frontend static files are served directly from
+  # /srv/faithtracker/frontend/build by host-level Angie.
+  # To rebuild: docker compose run --rm frontend-builder
+  # ===================
+  frontend-builder:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: builder
       args:
         VITE_BACKEND_URL: https://api.${DOMAIN}
-    container_name: faithtracker-frontend
-    restart: unless-stopped
-    # Expose to localhost only (Angie will proxy)
-    ports:
-      - "127.0.0.1:8080:80"
-    networks:
-      - faithtracker-network
-    depends_on:
-      - backend
-    # Resource limits to prevent runaway memory/CPU usage
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 64M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    container_name: faithtracker-frontend-builder
+    volumes:
+      - /srv/faithtracker/frontend/build:/output
+    entrypoint: ["sh", "-c", "cp -r /app/build/* /output/ && echo 'Frontend build copied to /srv/faithtracker/frontend/build'"]
+    profiles:
+      - build
 
 # ===================
 # Networks

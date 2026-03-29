@@ -8,8 +8,8 @@
 # ===================
 # Stage 1: Dependencies
 # ===================
-# Try to use pre-built base image, fall back to node:20-alpine
-ARG BASE_IMAGE=node:20-alpine
+# Try to use pre-built base image, fall back to node:22-alpine
+ARG BASE_IMAGE=node:22-alpine
 FROM ${BASE_IMAGE} AS deps
 
 WORKDIR /app
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.yarn/berry/cache \
 # ===================
 # Stage 2: Build
 # ===================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 

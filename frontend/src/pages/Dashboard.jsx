@@ -127,11 +127,11 @@ const _markBirthdayComplete = async (eventId, queryClient, t) => {
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
     // Refetch to get accurate data
-    await queryClient.invalidateQueries(['dashboard']);
+    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   } catch (_error) {
     toast.error(t('toasts.failed_complete'));
     // Revert optimistic update on error
-    queryClient.invalidateQueries(['dashboard']);
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }
 };
 
@@ -150,10 +150,10 @@ const markGriefStageComplete = async (stageId, queryClient, t) => {
     
     await api.post(`/grief-support/${stageId}/complete`);
     toast.success(t('toasts.grief_completed'));
-    await queryClient.invalidateQueries(['dashboard']);
+    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   } catch (_error) {
     toast.error(t('toasts.failed_complete'));
-    queryClient.invalidateQueries(['dashboard']);
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }
 };
 
@@ -162,7 +162,7 @@ const markAccidentComplete = async (eventId, queryClient, t) => {
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.accident_completed'));
     // Invalidate and refetch dashboard data
-    await queryClient.invalidateQueries(['dashboard']);
+    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   } catch (_error) {
     toast.error(t('toasts.failed_complete'));
   }
@@ -192,7 +192,7 @@ const markMemberContacted = async (memberId, memberName, user, queryClient, t) =
     
     toast.success(t('toasts.member_contacted', {name: memberName}));
     // Invalidate and refetch dashboard data
-    await queryClient.invalidateQueries(['dashboard']);
+    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   } catch (_error) {
     toast.error('Failed to mark as contacted');
   }
@@ -446,11 +446,20 @@ export const Dashboard = () => {
         grief_relationship: '',
         hospital_name: '',
         schedule_frequency: 'one_time',
-        payment_date: new Date().toISOString().split('T')[0]
+        payment_date: new Date().toISOString().split('T')[0],
+        schedule_start_date: new Date().toISOString().split('T')[0],
+        schedule_end_date: '',
+        day_of_week: 'monday',
+        day_of_month: 1,
+        month_of_year: 1,
+        start_month: new Date().getMonth() + 1,
+        start_year: new Date().getFullYear(),
+        end_month: null,
+        end_year: null,
       });
       // Refresh dashboard to show new tasks - Invalidate React Query cache
-      queryClient.invalidateQueries(['dashboard']);
-      queryClient.invalidateQueries(['members']);
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['members'] });
     } catch (_error) {
       toast.error('Failed to add events');
     }
@@ -1097,7 +1106,7 @@ export const Dashboard = () => {
                                     try {
                                       await api.post(`/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                       toast.success(t('toasts.payment_distributed'));
-                                      await queryClient.invalidateQueries(['dashboard']);
+                                      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                     } catch (_error) {
                                       toast.error(t('toasts.failed_mark_distributed'));
                                     }
@@ -1116,7 +1125,7 @@ export const Dashboard = () => {
                                         try {
                                           await api.post(`/financial-aid-schedules/${task.data.id}/ignore`);
                                           toast.success(t('toasts.financial_aid_ignored'));
-                                          await queryClient.invalidateQueries(['dashboard']);
+                                          await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                         } catch (_error) {
                                           toast.error(t('toasts.failed_ignore'));
                                         }
@@ -1129,7 +1138,7 @@ export const Dashboard = () => {
                                           try {
                                             await api.post(`/financial-aid-schedules/${task.data.id}/stop`);
                                             toast.success(t('toasts.schedule_stopped'));
-                                            await queryClient.invalidateQueries(['dashboard']);
+                                            await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                           } catch (_error) {
                                             toast.error(t('toasts.failed_stop'));
                                           }
@@ -1151,7 +1160,7 @@ export const Dashboard = () => {
                                       } else if (task.type === 'accident_followup') {
                                         await api.post(`/accident-followup/${task.data.id}/complete`);
                                         toast.success(t('toasts.followup_completed'));
-                                        await queryClient.invalidateQueries(['dashboard']);
+                                        await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                       }
                                     } catch (_error) {
                                       toast.error(t('toasts.failed_mark_completed'));
@@ -1176,7 +1185,7 @@ export const Dashboard = () => {
                                             await api.post(`/accident-followup/${task.data.id}/ignore`);
                                             toast.success(t('toasts.accident_ignored'));
                                           }
-                                          await queryClient.invalidateQueries(['dashboard']);
+                                          await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                         } catch (_error) {
                                       toast.error('Failed to ignore');
                                     }
@@ -1313,7 +1322,7 @@ export const Dashboard = () => {
                               try {
                                 await api.post(`/care-events/${event.id}/complete`);
                                 toast.success(t('toasts.birthday_marked_completed'));
-                                await queryClient.invalidateQueries(['dashboard']);
+                                await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                               } catch (_error) {
                                 toast.error(t('toasts.failed_mark_completed'));
                               }
@@ -1332,7 +1341,7 @@ export const Dashboard = () => {
                                   try {
                                     await api.post(`/care-events/${event.id}/ignore`);
                                     toast.success(t('toasts.birthday_ignored'));
-                                    await queryClient.invalidateQueries(['dashboard']);
+                                    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                   } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
@@ -1464,7 +1473,7 @@ export const Dashboard = () => {
                               try {
                                 await api.post(`/accident-followup/${followup.id}/complete`);
                                 toast.success(t('toasts.accident_completed'));
-                                await queryClient.invalidateQueries(['dashboard']);
+                                await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                               } catch (_error) {
                                 toast.error(t('toasts.failed_complete'));
                               }
@@ -1483,7 +1492,7 @@ export const Dashboard = () => {
                                   try {
                                     await api.post(`/accident-followup/${followup.id}/ignore`);
                                     toast.success(t('toasts.accident_ignored'));
-                                    await queryClient.invalidateQueries(['dashboard']);
+                                    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                   } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
@@ -1564,7 +1573,7 @@ export const Dashboard = () => {
                                   try {
                                     await api.post(`/grief-support/${stage.id}/ignore`);
                                     toast.success(t('toasts.grief_ignored'));
-                                    await queryClient.invalidateQueries(['dashboard']);
+                                    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                   } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
@@ -1670,7 +1679,7 @@ export const Dashboard = () => {
                                     try {
                                       await api.post(`/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                       toast.success(t('toasts.payment_distributed_advanced'));
-                                      await queryClient.invalidateQueries(['dashboard']);
+                                      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                       closeConfirm();
                                     } catch (_error) {
                                       toast.error('Failed to mark as distributed');
@@ -1695,7 +1704,7 @@ export const Dashboard = () => {
                                   try {
                                     await api.post(`/financial-aid-schedules/${schedule.id}/ignore`);
                                     toast.success(t('toasts.financial_aid_schedule_ignored'));
-                                    await queryClient.invalidateQueries(['dashboard']);
+                                    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                   } catch (_error) {
                                     toast.error('Failed to ignore');
                                   }
@@ -1712,7 +1721,7 @@ export const Dashboard = () => {
                                         try {
                                           await api.post(`/financial-aid-schedules/${schedule.id}/stop`);
                                           toast.success(t('toasts.schedule_stopped'));
-                                          await queryClient.invalidateQueries(['dashboard']);
+                                          await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                           closeConfirm();
                                         } catch (_error) {
                                           toast.error(t('toasts.failed_stop_schedule'));
@@ -1955,7 +1964,7 @@ export const Dashboard = () => {
                               try {
                                 await api.post(`/financial-aid-schedules/${task.data.id}/mark-distributed`);
                                 toast.success(t('toasts.payment_distributed'));
-                                await queryClient.invalidateQueries(['dashboard']);
+                                await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                               } catch (_error) {
                                 toast.error(t('toasts.failed'));
                               }
@@ -1977,7 +1986,7 @@ export const Dashboard = () => {
                                 if (endpoint) {
                                   await api.post(endpoint.replace(API, ''));
                                   toast.success(t('toasts.completed'));
-                                  await queryClient.invalidateQueries(['dashboard']);
+                                  await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                 }
                               } catch (_error) {
                                 toast.error(t('toasts.failed'));
@@ -2007,7 +2016,7 @@ export const Dashboard = () => {
                                   if (endpoint) {
                                     await api.post(endpoint.replace(API, ''));
                                     toast.success(t('toasts.ignored'));
-                                    await queryClient.invalidateQueries(['dashboard']);
+                                    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                   }
                                 } catch (_error) {
                                   toast.error(t('toasts.failed'));

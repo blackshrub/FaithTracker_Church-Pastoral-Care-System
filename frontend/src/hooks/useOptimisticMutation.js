@@ -30,8 +30,11 @@ export function useCompleteEventOptimistic() {
       await queryClient.cancelQueries({ queryKey: ['dashboard'] });
 
       // Snapshot previous values for rollback
+      // Use getQueriesData with prefix match since dashboard key includes campus_id
       const previousEvents = queryClient.getQueryData(['careEvents', memberId]);
-      const previousDashboard = queryClient.getQueryData(['dashboard', 'reminders']);
+      const dashboardEntries = queryClient.getQueriesData({ queryKey: ['dashboard', 'reminders'] });
+      const dashboardKey = dashboardEntries[0]?.[0];
+      const previousDashboard = dashboardEntries[0]?.[1];
 
       // Optimistically update care events
       queryClient.setQueryData(['careEvents', memberId], (old) => {
@@ -44,17 +47,19 @@ export function useCompleteEventOptimistic() {
         );
       });
 
-      // Optimistically update dashboard
-      queryClient.setQueryData(['dashboard', 'reminders'], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          today_tasks: old.today_tasks?.filter(t => t.id !== eventId) || [],
-          overdue_tasks: old.overdue_tasks?.filter(t => t.id !== eventId) || [],
-        };
-      });
+      // Optimistically update dashboard (using actual key with campus_id)
+      if (dashboardKey) {
+        queryClient.setQueryData(dashboardKey, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            today_tasks: old.today_tasks?.filter(t => t.id !== eventId) || [],
+            overdue_tasks: old.overdue_tasks?.filter(t => t.id !== eventId) || [],
+          };
+        });
+      }
 
-      return { previousEvents, previousDashboard };
+      return { previousEvents, previousDashboard, dashboardKey };
     },
 
     // Rollback on error
@@ -62,8 +67,8 @@ export function useCompleteEventOptimistic() {
       if (context?.previousEvents) {
         queryClient.setQueryData(['careEvents', variables.memberId], context.previousEvents);
       }
-      if (context?.previousDashboard) {
-        queryClient.setQueryData(['dashboard', 'reminders'], context.previousDashboard);
+      if (context?.previousDashboard && context?.dashboardKey) {
+        queryClient.setQueryData(context.dashboardKey, context.previousDashboard);
       }
       toast.error('Failed to complete task. Please try again.');
     },
@@ -91,7 +96,9 @@ export function useIgnoreEventOptimistic() {
       await queryClient.cancelQueries({ queryKey: ['dashboard'] });
 
       const previousEvents = queryClient.getQueryData(['careEvents', memberId]);
-      const previousDashboard = queryClient.getQueryData(['dashboard', 'reminders']);
+      const dashboardEntries = queryClient.getQueriesData({ queryKey: ['dashboard', 'reminders'] });
+      const dashboardKey = dashboardEntries[0]?.[0];
+      const previousDashboard = dashboardEntries[0]?.[1];
 
       // Optimistically mark as ignored
       queryClient.setQueryData(['careEvents', memberId], (old) => {
@@ -104,25 +111,27 @@ export function useIgnoreEventOptimistic() {
         );
       });
 
-      // Remove from dashboard
-      queryClient.setQueryData(['dashboard', 'reminders'], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          today_tasks: old.today_tasks?.filter(t => t.id !== eventId) || [],
-          overdue_tasks: old.overdue_tasks?.filter(t => t.id !== eventId) || [],
-        };
-      });
+      // Remove from dashboard (using actual key with campus_id)
+      if (dashboardKey) {
+        queryClient.setQueryData(dashboardKey, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            today_tasks: old.today_tasks?.filter(t => t.id !== eventId) || [],
+            overdue_tasks: old.overdue_tasks?.filter(t => t.id !== eventId) || [],
+          };
+        });
+      }
 
-      return { previousEvents, previousDashboard };
+      return { previousEvents, previousDashboard, dashboardKey };
     },
 
     onError: (err, variables, context) => {
       if (context?.previousEvents) {
         queryClient.setQueryData(['careEvents', variables.memberId], context.previousEvents);
       }
-      if (context?.previousDashboard) {
-        queryClient.setQueryData(['dashboard', 'reminders'], context.previousDashboard);
+      if (context?.previousDashboard && context?.dashboardKey) {
+        queryClient.setQueryData(context.dashboardKey, context.previousDashboard);
       }
       toast.error('Failed to ignore task. Please try again.');
     },

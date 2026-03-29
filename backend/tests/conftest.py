@@ -29,9 +29,9 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def test_db_client():
-    """MongoDB client for tests"""
+    """MongoDB client for tests (function-scoped for pytest-asyncio compatibility)"""
     client = AsyncIOMotorClient(MONGO_URL)
     yield client
     client.close()

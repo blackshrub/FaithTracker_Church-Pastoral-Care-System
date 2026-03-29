@@ -1089,7 +1089,8 @@ async def check_missed_digest():
             return
 
         # Check if digest was already sent today by looking at notification_logs
-        today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        # Use Jakarta midnight (not UTC) since digests run on Jakarta time
+        today_start = datetime(now.year, now.month, now.day, tzinfo=JAKARTA_TZ)
         today_digest_count = await db.notification_logs.count_documents({
             "pastoral_team_user_id": {"$exists": True},
             "status": "sent",

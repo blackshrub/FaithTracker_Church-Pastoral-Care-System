@@ -43,12 +43,16 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
   const eventSourceRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
+  const connectRef = useRef(null);
 
   /**
    * Connect to SSE endpoint
    */
   const connect = useCallback(() => {
     if (!token || !enabled) return;
+
+    // Keep ref in sync so reconnect timer always calls latest version
+    connectRef.current = connect;
 
     // Close existing connection
     if (eventSourceRef.current) {
@@ -76,10 +80,10 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
         setIsConnected(false);
         eventSource.close();
 
-        // Schedule reconnect with exponential backoff
+        // Schedule reconnect with exponential backoff using stable ref
         const delay = reconnectDelayRef.current;
         reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_DELAY);
-        reconnectTimeoutRef.current = setTimeout(connect, delay);
+        reconnectTimeoutRef.current = setTimeout(() => connectRef.current?.(), delay);
       };
 
       // Handle heartbeat (keep-alive)

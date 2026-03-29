@@ -40,8 +40,9 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     # HTTP/3 (QUIC) - Angie built-in support
-    listen 443 quic reuseport;
-    listen [::]:443 quic reuseport;
+    # Note: reuseport must only appear on ONE server block per port
+    listen 443 quic;
+    listen [::]:443 quic;
 
     server_name ${DOMAIN};
 
@@ -49,6 +50,7 @@ server {
     include /etc/angie/conf.d/ssl.conf;
     ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${DOMAIN}/chain.pem;
 
     # HTTP/3 Alt-Svc header
     add_header Alt-Svc 'h3=":443"; ma=86400' always;
@@ -57,7 +59,7 @@ server {
     include /etc/angie/conf.d/security-headers.conf;
 
     # Frontend-specific CSP (more permissive for React app)
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
 
     # Rate Limiting
     limit_req zone=frontend burst=50 nodelay;
@@ -112,6 +114,7 @@ server {
     include /etc/angie/conf.d/ssl.conf;
     ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/${DOMAIN}/chain.pem;
 
     # HTTP/3 Alt-Svc header
     add_header Alt-Svc 'h3=":443"; ma=86400' always;

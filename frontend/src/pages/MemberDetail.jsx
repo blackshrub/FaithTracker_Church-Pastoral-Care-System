@@ -51,58 +51,7 @@ export const MemberDetail = () => {
   const { id } = useParams();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  // Pastoral Notes handlers
-  const handleSaveNote = async () => {
-    if (!noteForm.title || !noteForm.content) return;
 
-    setSaving(true);
-    try {
-      if (editingNote) {
-        await api.put(`/pastoral-notes/${editingNote.id}`, {
-          ...noteForm,
-          category: noteForm.category || null
-        });
-        toast.success('Note updated successfully');
-      } else {
-        await api.post('/pastoral-notes', {
-          member_id: id,
-          ...noteForm,
-          category: noteForm.category || null
-        });
-        toast.success('Note created successfully');
-      }
-      setNoteModalOpen(false);
-      queryClient.invalidateQueries(['member', id]);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save note');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteNote = async (noteId) => {
-    try {
-      await api.delete(`/pastoral-notes/${noteId}`);
-      toast.success('Note deleted');
-      setNoteToDelete(null);
-      queryClient.invalidateQueries(['member', id]);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to delete note');
-    }
-  };
-
-  const handleCompleteNoteFollowup = async (noteId) => {
-    try {
-      await api.post(`/pastoral-notes/${noteId}/complete-followup`);
-      toast.success('Follow-up marked as completed');
-      queryClient.invalidateQueries(['member', id]);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to complete follow-up');
-    }
-  };
-
-
-  
   // React Query for member data with caching
   const { data: memberData, isLoading } = useQuery({
     queryKey: ['member', id],
@@ -170,6 +119,56 @@ export const MemberDetail = () => {
   const [noteToDelete, setNoteToDelete] = useState(null);
   const [notesExpanded, setNotesExpanded] = useState(true);
   const [endDateOpen, setEndDateOpen] = useState(false);
+
+  // Pastoral Notes handlers (must be after state declarations)
+  const handleSaveNote = async () => {
+    if (!noteForm.title || !noteForm.content) return;
+
+    setSaving(true);
+    try {
+      if (editingNote) {
+        await api.put(`/pastoral-notes/${editingNote.id}`, {
+          ...noteForm,
+          category: noteForm.category || null
+        });
+        toast.success('Note updated successfully');
+      } else {
+        await api.post('/pastoral-notes', {
+          member_id: id,
+          ...noteForm,
+          category: noteForm.category || null
+        });
+        toast.success('Note created successfully');
+      }
+      setNoteModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save note');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    try {
+      await api.delete(`/pastoral-notes/${noteId}`);
+      toast.success('Note deleted');
+      setNoteToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete note');
+    }
+  };
+
+  const handleCompleteNoteFollowup = async (noteId) => {
+    try {
+      await api.post(`/pastoral-notes/${noteId}/complete-followup`);
+      toast.success('Follow-up marked as completed');
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to complete follow-up');
+    }
+  };
   const [_editingEvent, _setEditingEvent] = useState(null);
   
   const [newEvent, setNewEvent] = useState({
@@ -222,7 +221,7 @@ export const MemberDetail = () => {
         visit_type: 'Phone Call',
         notes: ''
       });
-      queryClient.invalidateQueries(['member', id]);
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
     } catch (error) {
       const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
       toast.error('Failed to log visit: ' + errorMsg);
@@ -390,7 +389,7 @@ export const MemberDetail = () => {
         end_month: null,
         end_year: null
       });
-      queryClient.invalidateQueries(['member', id]);
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
     } finally {
@@ -406,7 +405,7 @@ export const MemberDetail = () => {
         try {
           await api.delete(`/care-events/${eventId}`);
           toast.success(t('toasts.event_deleted'));
-          queryClient.invalidateQueries(['member', id]);
+          queryClient.invalidateQueries({ queryKey: ['member', id] });
           closeConfirm();
         } catch (error) {
           toast.error(t('toasts.failed_delete'));
@@ -433,9 +432,8 @@ export const MemberDetail = () => {
     try {
       await api.post(`/care-events/${eventId}/complete`);
       toast.success(t('toasts.birthday_marked_completed'));
-      queryClient.invalidateQueries(['member', id]);
-      // Trigger dashboard cache refresh by making a call
-      api.get(`/dashboard/reminders`).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (error) {
       toast.error(t('toasts.failed_mark_birthday'));
     }
@@ -445,7 +443,7 @@ export const MemberDetail = () => {
     try {
       await api.post(`/grief-support/${stageId}/complete`);
       toast.success(t('success_messages.stage_completed'));
-      queryClient.invalidateQueries(['member', id]);
+      queryClient.invalidateQueries({ queryKey: ['member', id] });
     } catch (error) {
       toast.error(t('error_messages.failed_to_save'));
     }
@@ -1244,7 +1242,7 @@ export const MemberDetail = () => {
                                   try {
                                     await api.post(`/grief-support/${stage.id}/complete`);
                                     toast.success(t('success_messages.stage_completed'));
-                                    queryClient.invalidateQueries(['member', id]);
+                                    queryClient.invalidateQueries({ queryKey: ['member', id] });
                                   } catch (error) {
                                     toast.error(t('toasts.failed'));
                                   }
@@ -1266,7 +1264,7 @@ export const MemberDetail = () => {
                                       try {
                                         await api.post(`/grief-support/${stage.id}/undo`);
                                         toast.success(t('toasts.action_undone'));
-                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
                                       } catch (error) {
                                         toast.error(t('toasts.failed_undo'));
                                       }
@@ -1289,7 +1287,7 @@ export const MemberDetail = () => {
                                       try {
                                         await api.post(`/grief-support/${stage.id}/ignore`);
                                         toast.success('Grief stage ignored');
-                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
                                       } catch (error) {
                                         toast.error('Failed to ignore');
                                       }
@@ -1346,7 +1344,7 @@ export const MemberDetail = () => {
                                       try {
                                         await api.delete(`/care-events/${visit.id}`);
                                         toast.success('Visit deleted');
-                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
                                         closeConfirm();
                                       } catch (error) {
                                         toast.error('Failed to delete');
@@ -1512,7 +1510,7 @@ export const MemberDetail = () => {
                                   try {
                                     await api.post(`/accident-followup/${stage.id}/complete`);
                                     toast.success('Follow-up completed');
-                                    queryClient.invalidateQueries(['member', id]);
+                                    queryClient.invalidateQueries({ queryKey: ['member', id] });
                                   } catch (error) {
                                     toast.error(t('toasts.failed'));
                                   }
@@ -1534,7 +1532,7 @@ export const MemberDetail = () => {
                                       try {
                                         await api.post(`/accident-followup/${stage.id}/undo`);
                                         toast.success(t('toasts.action_undone'));
-                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
                                       } catch (error) {
                                         toast.error(t('toasts.failed_undo'));
                                       }
@@ -1557,7 +1555,7 @@ export const MemberDetail = () => {
                                       try {
                                         await api.post(`/accident-followup/${stage.id}/ignore`);
                                         toast.success('Follow-up ignored');
-                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
                                       } catch (error) {
                                         toast.error('Failed to ignore');
                                       }
@@ -1611,7 +1609,7 @@ export const MemberDetail = () => {
                                       try {
                                         await api.delete(`/care-events/${visit.id}`);
                                         toast.success('Visit deleted');
-                                        queryClient.invalidateQueries(['member', id]);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
                                         closeConfirm();
                                       } catch (error) {
                                         toast.error('Failed to delete');
@@ -1850,8 +1848,8 @@ export const MemberDetail = () => {
                                       try {
                                         await api.post(`/financial-aid-schedules/${schedule.id}/mark-distributed`);
                                         toast.success('Payment distributed! Schedule advanced to next occurrence.');
-                                        queryClient.invalidateQueries(['member', id]);
-                                        queryClient.invalidateQueries(['dashboard']);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
+                                        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                         closeConfirm();
                                       } catch (error) {
                                         toast.error('Failed to mark payment');
@@ -1871,8 +1869,8 @@ export const MemberDetail = () => {
                                       try {
                                         await api.post(`/financial-aid-schedules/${schedule.id}/stop`);
                                         toast.success('Schedule stopped');
-                                        queryClient.invalidateQueries(['member', id]);
-                                        queryClient.invalidateQueries(['dashboard']);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
+                                        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                         closeConfirm();
                                       } catch (error) {
                                         toast.error('Failed to stop schedule');
@@ -1888,8 +1886,8 @@ export const MemberDetail = () => {
                                     try {
                                       const response = await api.post(`/financial-aid-schedules/${schedule.id}/ignore`);
                                       toast.success(`Payment ignored! Next payment: ${response.data.next_occurrence}`);
-                                      queryClient.invalidateQueries(['member', id]);
-                                      queryClient.invalidateQueries(['dashboard']);
+                                      queryClient.invalidateQueries({ queryKey: ['member', id] });
+                                      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                     } catch (error) {
                                       toast.error('Failed to ignore');
                                     }
@@ -1935,7 +1933,7 @@ export const MemberDetail = () => {
                                             try {
                                               await api.delete(`/financial-aid-schedules/${schedule.id}/ignored-occurrence/${date}`);
                                               toast.success('Ignored occurrence removed');
-                                              queryClient.invalidateQueries(['member', id]);
+                                              queryClient.invalidateQueries({ queryKey: ['member', id] });
                                               closeConfirm();
                                             } catch (error) {
                                               toast.error('Failed to remove');
@@ -1967,8 +1965,8 @@ export const MemberDetail = () => {
                                         // Use new endpoint to clear ignored occurrences
                                         await api.post(`/financial-aid-schedules/${schedule.id}/clear-ignored`);
                                         toast.success('All ignored payments cleared');
-                                        queryClient.invalidateQueries(['member', id]);
-                                        queryClient.invalidateQueries(['dashboard']);
+                                        queryClient.invalidateQueries({ queryKey: ['member', id] });
+                                        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
                                         closeConfirm();
                                       } catch (error) {
                                         toast.error(t('toasts.failed_delete'));

@@ -247,35 +247,38 @@ class OfflineQueue {
     }
 
     this.syncInProgress = true;
-    const pending = await this.getPending();
     let synced = 0;
     let failed = 0;
 
-    for (const operation of pending) {
-      try {
-        if (executor) {
-          await executor(operation);
-        } else {
-          await this.executeOperation(operation);
-        }
-        await this.updateStatus(operation.id, 'completed');
-        synced++;
-      } catch (error) {
-        await this.updateStatus(operation.id, 'failed', error.message);
+    try {
+      const pending = await this.getPending();
 
-        // If max retries exceeded, mark as permanently failed
-        if (operation.retryCount >= 3) {
-          await this.updateStatus(operation.id, 'permanently_failed', error.message);
+      for (const operation of pending) {
+        try {
+          if (executor) {
+            await executor(operation);
+          } else {
+            await this.executeOperation(operation);
+          }
+          await this.updateStatus(operation.id, 'completed');
+          synced++;
+        } catch (error) {
+          await this.updateStatus(operation.id, 'failed', error.message);
+
+          // If max retries exceeded, mark as permanently failed
+          if (operation.retryCount >= 3) {
+            await this.updateStatus(operation.id, 'permanently_failed', error.message);
+          }
+          failed++;
         }
-        failed++;
       }
+
+      // Clean up old completed operations
+      await this.cleanup();
+    } finally {
+      this.syncInProgress = false;
+      this.notify();
     }
-
-    this.syncInProgress = false;
-    this.notify();
-
-    // Clean up old completed operations
-    await this.cleanup();
 
     return { synced, failed };
   }
