@@ -71,6 +71,45 @@ export function useOfflineSync() {
     return offlineQueue.subscribe(updateStats);
   }, []);
 
+  /**
+   * Sync all pending operations
+   */
+  const sync = useCallback(async () => {
+    if (!isOnline || isSyncingRef.current) return;
+
+    isSyncingRef.current = true;
+    setIsSyncing(true);
+    try {
+      const executor = async (operation) => {
+        const response = await api({
+          url: operation.endpoint,
+          method: operation.method,
+          data: operation.payload,
+        });
+        return response.data;
+      };
+
+      const result = await offlineQueue.sync(executor);
+
+      if (result.synced > 0) {
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries();
+        toast.success(`Synced ${result.synced} pending operations`);
+      }
+
+      if (result.failed > 0) {
+        toast.warning(`${result.failed} operations failed to sync`);
+      }
+
+      return result;
+    } catch (error) {
+      toast.error('Sync failed');
+    } finally {
+      isSyncingRef.current = false;
+      setIsSyncing(false);
+    }
+  }, [isOnline, queryClient]);
+
   // Auto-sync when coming back online
   useEffect(() => {
     if (isOnline && pendingCount > 0) {
@@ -110,45 +149,6 @@ export function useOfflineSync() {
     },
     [isOnline]
   );
-
-  /**
-   * Sync all pending operations
-   */
-  const sync = useCallback(async () => {
-    if (!isOnline || isSyncingRef.current) return;
-
-    isSyncingRef.current = true;
-    setIsSyncing(true);
-    try {
-      const executor = async (operation) => {
-        const response = await api({
-          url: operation.endpoint,
-          method: operation.method,
-          data: operation.payload,
-        });
-        return response.data;
-      };
-
-      const result = await offlineQueue.sync(executor);
-
-      if (result.synced > 0) {
-        // Invalidate queries to refresh data
-        queryClient.invalidateQueries();
-        toast.success(`Synced ${result.synced} pending operations`);
-      }
-
-      if (result.failed > 0) {
-        toast.warning(`${result.failed} operations failed to sync`);
-      }
-
-      return result;
-    } catch (error) {
-      toast.error('Sync failed');
-    } finally {
-      isSyncingRef.current = false;
-      setIsSyncing(false);
-    }
-  }, [isOnline, queryClient]);
 
   /**
    * Get pending operations

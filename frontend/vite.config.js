@@ -163,6 +163,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     css: false,
+    // Only run unit tests in src/, exclude Playwright e2e tests
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    exclude: ['e2e/**', 'node_modules/**'],
     // Resolve @ alias in tests
     alias: {
       '@': path.resolve(__dirname, './src'),

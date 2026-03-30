@@ -3,7 +3,7 @@
  *
  * Tests the member profile header display, interactions, and responsive behavior
  */
-import { describe, it, expect, vi, beforeEach, test } from 'vitest';
+import { describe, expect, vi, beforeEach, test } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 
@@ -14,12 +14,12 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key) => {
       const translations = {
-        'last_contact': 'Last Contact',
-        'add_care_event': 'Add Care Event'
+        last_contact: 'Last Contact',
+        add_care_event: 'Add Care Event',
       };
       return translations[key] || key;
-    }
-  })
+    },
+  }),
 }));
 
 // Mock date formatting
@@ -27,7 +27,7 @@ vi.mock('date-fns/format', () => ({
   format: vi.fn((date, formatStr) => {
     if (formatStr === 'dd MMM yyyy') return '15 Jan 2024';
     return date.toString();
-  })
+  }),
 }));
 
 // Mock child components
@@ -36,7 +36,7 @@ vi.mock('@/components/MemberAvatar', () => ({
     <div data-testid="member-avatar" data-size={size} className={className}>
       {member.name}
     </div>
-  )
+  ),
 }));
 
 vi.mock('@/components/EngagementBadge', () => ({
@@ -44,7 +44,7 @@ vi.mock('@/components/EngagementBadge', () => ({
     <div data-testid="engagement-badge" data-status={status} data-days={days}>
       {status}
     </div>
-  )
+  ),
 }));
 
 // Wrapper for router context
@@ -61,7 +61,7 @@ describe('MemberProfileHeader', () => {
     email: 'john@test.com',
     engagement_status: 'active',
     days_since_last_contact: 5,
-    last_contact_date: '2024-01-15'
+    last_contact_date: '2024-01-15',
   };
 
   const mockOnAddCareEvent = vi.fn();
@@ -75,7 +75,7 @@ describe('MemberProfileHeader', () => {
       <MemberProfileHeader member={mockMember} onAddCareEvent={mockOnAddCareEvent} />
     );
 
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /John Doe/i })).toBeInTheDocument();
   });
 
   test('renders member phone number with tel link', () => {
@@ -91,7 +91,7 @@ describe('MemberProfileHeader', () => {
   test('hides phone number when not provided', () => {
     const memberWithoutPhone = {
       ...mockMember,
-      phone: null
+      phone: null,
     };
 
     renderWithRouter(
@@ -134,7 +134,7 @@ describe('MemberProfileHeader', () => {
   test('hides last contact date when not available', () => {
     const memberWithoutLastContact = {
       ...mockMember,
-      last_contact_date: null
+      last_contact_date: null,
     };
 
     renderWithRouter(
@@ -209,14 +209,14 @@ describe('MemberProfileHeader', () => {
   test('handles member with minimal data', () => {
     const minimalMember = {
       id: 'member-2',
-      name: 'Jane Smith'
+      name: 'Jane Smith',
     };
 
     renderWithRouter(
       <MemberProfileHeader member={minimalMember} onAddCareEvent={mockOnAddCareEvent} />
     );
 
-    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Jane Smith/i })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /tel:/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Last Contact:/)).not.toBeInTheDocument();
   });
