@@ -1403,9 +1403,10 @@ class TestConfig:
 
     def test_get_all_config(self, client, db):
         """Get all config returns combined config data."""
+        _setup_auth(db)
         db.settings.find_one = AsyncMock(return_value=None)
 
-        response = client.get("/config/all")
+        response = client.get("/config/all", headers=_auth_headers())
         assert response.status_code == 200
         data = response.json()
         assert "aid_types" in data
@@ -2086,7 +2087,8 @@ class TestIntegrations:
 
     def test_email_integration_pending(self, client, db):
         """Email integration returns pending status."""
-        response = client.get("/integrations/ping/email")
+        _setup_auth(db)
+        response = client.get("/integrations/ping/email", headers=_auth_headers())
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is False
