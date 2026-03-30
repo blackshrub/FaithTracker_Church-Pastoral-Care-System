@@ -93,7 +93,7 @@ const SearchBar = () => {
   const performSearch = async (searchQuery: string) => {
     setIsLoading(true);
     try {
-      const response = await api.get(`/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await api.get(`/search/advanced?q=${encodeURIComponent(searchQuery)}`);
       setResults(response.data);
       setIsOpen(true);
     } catch (_error) {
