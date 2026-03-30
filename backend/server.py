@@ -113,6 +113,7 @@ from routes.grief_support import route_handlers as grief_support_route_handlers,
 from routes.accident_followup import route_handlers as accident_followup_route_handlers, init_accident_followup_routes
 from routes.financial_aid import route_handlers as financial_aid_route_handlers, init_financial_aid_routes
 from routes.dashboard import route_handlers as dashboard_route_handlers, init_dashboard_routes
+from services.search import get_search_service
 
 
 # Custom msgspec response class for proper BSON/MongoDB type serialization
@@ -405,6 +406,42 @@ class SecurityHeadersMiddleware(AbstractMiddleware):
                     message = {**message, "headers": existing_headers}
                 await send(message)
             await self.app(scope, receive, send_with_security_headers)
+        else:
+            await self.app(scope, receive, send)
+
+# Request ID + Response Time middleware - adds tracing and performance headers
+class RequestTraceMiddleware(AbstractMiddleware):
+    """Add X-Request-ID and X-Response-Time headers to all responses.
+
+    X-Request-ID: Unique identifier for each request, propagated through logs.
+                  Accepts client-provided X-Request-ID or generates a new one.
+    X-Response-Time: Time taken to process the request in milliseconds.
+    """
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            import time
+            start_time = time.perf_counter()
+
+            # Extract or generate request ID
+            request_headers = dict(scope.get("headers", []))
+            client_request_id = request_headers.get(b"x-request-id", b"").decode()
+            request_id = client_request_id if client_request_id else str(uuid.uuid4())
+
+            # Store request_id in scope state for logging
+            scope.setdefault("state", {})["request_id"] = request_id
+
+            async def send_with_trace_headers(message):
+                if message["type"] == "http.response.start":
+                    elapsed_ms = f"{(time.perf_counter() - start_time) * 1000:.1f}ms"
+                    trace_headers = [
+                        (b"x-request-id", request_id.encode()),
+                        (b"x-response-time", elapsed_ms.encode()),
+                    ]
+                    existing_headers = list(message.get("headers", []))
+                    existing_headers.extend(trace_headers)
+                    message = {**message, "headers": existing_headers}
+                await send(message)
+            await self.app(scope, receive, send_with_trace_headers)
         else:
             await self.app(scope, receive, send)
 
@@ -741,26 +778,33 @@ async def log_activity(
         await db.activity_logs.insert_one(to_mongo_doc(activity))
         logger.info(f"Activity logged: {user_name} - {action_type} - {member_name}")
 
-        # Broadcast to SSE subscribers for real-time updates
-        # Import here to avoid circular import at module level
+        # Broadcast to SSE subscribers for real-time updates.
+        # When MongoDB change streams are active, the ChangeStreamWatcher
+        # automatically detects the insert above and broadcasts via DragonflyDB
+        # pub/sub, so manual broadcast is skipped to avoid duplicate events.
+        # When change streams are NOT available (standalone MongoDB), we fall
+        # back to the manual broadcast path.
         try:
-            activity_data = {
-                "id": activity.id,
-                "campus_id": campus_id,
-                "user_id": user_id,
-                "user_name": user_name,
-                "user_photo_url": user_photo_url,
-                "action_type": action_type.value if hasattr(action_type, 'value') else action_type,
-                "member_id": member_id,
-                "member_name": member_name,
-                "care_event_id": care_event_id,
-                "event_type": event_type.value if event_type and hasattr(event_type, 'value') else event_type,
-                "notes": notes,
-                "timestamp": activity.created_at.isoformat() if activity.created_at else datetime.now(JAKARTA_TZ).isoformat()
-            }
-            # Schedule broadcast without blocking (fire and forget)
-            import asyncio
-            asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
+            from services.change_stream import is_change_stream_active
+            if not is_change_stream_active():
+                activity_data = {
+                    "id": activity.id,
+                    "campus_id": campus_id,
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "user_photo_url": user_photo_url,
+                    "action_type": action_type.value if hasattr(action_type, 'value') else action_type,
+                    "member_id": member_id,
+                    "member_name": member_name,
+                    "care_event_id": care_event_id,
+                    "event_type": event_type.value if event_type and hasattr(event_type, 'value') else event_type,
+                    "notes": notes,
+                    "timestamp": activity.created_at.isoformat() if activity.created_at else datetime.now(JAKARTA_TZ).isoformat()
+                }
+                # Schedule broadcast without blocking (fire and forget)
+                asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
+            else:
+                logger.debug("SSE broadcast delegated to change stream watcher")
         except Exception as broadcast_err:
             logger.debug(f"SSE broadcast skipped: {str(broadcast_err)}")
 
@@ -772,7 +816,12 @@ async def log_activity(
 async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
     """Broadcast activity via DragonflyDB pub/sub for cross-worker delivery.
 
-    Falls back to in-memory broadcast if DragonflyDB is unavailable.
+    This is the FALLBACK broadcast path, used only when MongoDB change streams
+    are not available (standalone MongoDB without replica set). When change
+    streams ARE active, the ChangeStreamWatcher handles broadcasting and this
+    function is not called.
+
+    Falls back to in-memory broadcast if DragonflyDB is also unavailable.
     """
     import json as _json
 
@@ -1109,9 +1158,17 @@ async def ignore_care_event(event_id: str, request: Request) -> dict:
         
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(event["campus_id"])
-        
+
+        # Update Meilisearch index for ignored event (fire-and-forget)
+        try:
+            ignored_event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+            if ignored_event:
+                get_search_service().index_care_event(ignored_event, member_name=member_name)
+        except Exception:
+            pass
+
         return {"success": True, "message": "Care event ignored"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1315,7 +1372,13 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
         
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(event["campus_id"])
-        
+
+        # Remove from Meilisearch (fire-and-forget)
+        try:
+            get_search_service().remove_care_event(event_id)
+        except Exception:
+            pass
+
         return {"success": True, "message": "Care event deleted successfully"}
     except HTTPException:
         raise
@@ -4884,6 +4947,135 @@ async def global_search(q: str, request: Request) -> dict:
         logger.error(f"Error in global search: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
+@get("/search/advanced")
+async def advanced_search(
+    request: Request,
+    q: str = Parameter(default=""),
+    index: str = Parameter(default="all"),
+    limit: int = Parameter(default=20, ge=1, le=100),
+) -> dict:
+    """
+    Advanced search using Meilisearch for typo-tolerant, fast full-text search.
+    Falls back to MongoDB regex search if Meilisearch is unavailable.
+
+    Parameters:
+        q: Search query string (min 1 character)
+        index: Which index to search - "members", "care_events", or "all" (default)
+        limit: Maximum results per index (default 20, max 100)
+
+    Returns:
+        members: list of matching members
+        care_events: list of matching care events
+        query: the original query
+        processing_time_ms: search processing time
+        source: "meilisearch" or "mongodb_fallback"
+    """
+    try:
+        current_user = await get_current_user(request)
+        if not q or len(q) < 1:
+            return {"members": [], "care_events": [], "query": q, "processing_time_ms": 0, "source": "none"}
+
+        campus_id = current_user.get("campus_id")
+        is_full_admin = current_user.get("role") == UserRole.FULL_ADMIN.value
+
+        search_svc = get_search_service()
+
+        # Try Meilisearch first
+        if search_svc.is_available():
+            start_time = asyncio.get_event_loop().time()
+
+            if index == "all":
+                # For full_admin with no campus, search all campuses
+                result = search_svc.multi_search(
+                    q,
+                    campus_id=None if is_full_admin else campus_id,
+                    limit=limit,
+                )
+                members = result.get("members", [])
+                care_events = result.get("care_events", [])
+                meili_time = result.get("processing_time_ms", 0)
+            elif index == "members":
+                if is_full_admin:
+                    result = search_svc.search_all_campuses(q, index="members", limit=limit)
+                else:
+                    result = search_svc.search(q, campus_id, index="members", limit=limit)
+                members = result.get("hits", [])
+                care_events = []
+                meili_time = result.get("processingTimeMs", 0)
+            elif index == "care_events":
+                if is_full_admin:
+                    result = search_svc.search_all_campuses(q, index="care_events", limit=limit)
+                else:
+                    result = search_svc.search(q, campus_id, index="care_events", limit=limit)
+                members = []
+                care_events = result.get("hits", [])
+                meili_time = result.get("processingTimeMs", 0)
+            else:
+                raise HTTPException(status_code=400, detail="Invalid index. Use 'members', 'care_events', or 'all'")
+
+            elapsed = (asyncio.get_event_loop().time() - start_time) * 1000
+
+            return {
+                "members": members,
+                "care_events": care_events,
+                "query": q,
+                "processing_time_ms": round(meili_time or elapsed, 2),
+                "source": "meilisearch",
+            }
+
+        # Fallback to MongoDB regex search (same as /search endpoint)
+        logger.info("Meilisearch unavailable, falling back to MongoDB search")
+        safe_query = escape_regex(q)
+
+        search_filter = {}
+        if not is_full_admin:
+            search_filter["campus_id"] = campus_id
+
+        members = []
+        care_events = []
+
+        if index in ("all", "members"):
+            member_query = {
+                **search_filter,
+                "$or": [
+                    {"name": {"$regex": safe_query, "$options": "i"}},
+                    {"phone": {"$regex": safe_query, "$options": "i"}},
+                ],
+            }
+            members = await db.members.find(member_query, {"_id": 0}).limit(limit).to_list(limit)
+
+        if index in ("all", "care_events"):
+            care_event_query = {
+                **search_filter,
+                "$or": [
+                    {"title": {"$regex": safe_query, "$options": "i"}},
+                    {"description": {"$regex": safe_query, "$options": "i"}},
+                ],
+            }
+            care_events = await db.care_events.find(care_event_query, {"_id": 0}).limit(limit).to_list(limit)
+
+            # Enrich care events with member names
+            for event in care_events:
+                if event.get("member_id"):
+                    member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0, "name": 1})
+                    event["member_name"] = member["name"] if member else "Unknown"
+
+        return {
+            "members": members,
+            "care_events": care_events,
+            "query": q,
+            "processing_time_ms": 0,
+            "source": "mongodb_fallback",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in advanced search: {str(e)}")
+        raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+
 # ==================== ACTIVITY LOG ENDPOINTS ====================
 
 @get("/activity-logs")
@@ -5341,7 +5533,52 @@ async def on_startup() -> None:
         get_campus_timezone, get_date_in_timezone,
         get_writeoff_settings
     )
-    
+
+    # Initialize Meilisearch search service
+    try:
+        search_svc = get_search_service()
+        search_svc.set_db(db)
+        meili_ok = await search_svc.init_indexes()
+        if meili_ok:
+            logger.info("Meilisearch indexes initialized")
+            # Background task: bulk-index existing data (skip if already done)
+            async def _background_index():
+                try:
+                    from services.cache import get_redis_client
+                    redis_client = get_redis_client()
+                    already_indexed = False
+                    if redis_client:
+                        try:
+                            flag = await redis_client.get("ft:meilisearch:indexed")
+                            already_indexed = flag == "1"
+                        except Exception:
+                            pass
+
+                    if not already_indexed:
+                        logger.info("Starting initial Meilisearch bulk indexing...")
+                        members_count = await search_svc.bulk_index_members()
+                        events_count = await search_svc.bulk_index_care_events()
+                        logger.info(
+                            f"Meilisearch bulk indexing complete: "
+                            f"{members_count} members, {events_count} care events"
+                        )
+                        # Set flag to avoid re-indexing on subsequent restarts
+                        if redis_client:
+                            try:
+                                await redis_client.set("ft:meilisearch:indexed", "1")
+                            except Exception:
+                                pass
+                    else:
+                        logger.info("Meilisearch already indexed (skipping bulk index)")
+                except Exception as e:
+                    logger.warning(f"Background Meilisearch indexing failed: {e}")
+
+            asyncio.create_task(_background_index())
+        else:
+            logger.warning("Meilisearch unavailable - search will use MongoDB fallback")
+    except Exception as e:
+        logger.warning(f"Meilisearch initialization failed: {e}")
+
     try:
         admin_count = await db.users.count_documents({"role": UserRole.FULL_ADMIN.value})
         if admin_count == 0:
@@ -5377,6 +5614,22 @@ async def on_startup() -> None:
     except Exception as e:
         logger.error(f"Error in startup: {str(e)}")
 
+    # Start MongoDB Change Stream watcher for real-time SSE broadcasting.
+    # This watches the activity_logs collection for new inserts and publishes
+    # to DragonflyDB pub/sub, decoupling SSE broadcasting from business logic.
+    # If MongoDB is standalone (no replica set), the watcher gracefully falls
+    # back to no-op and the manual broadcast in log_activity() remains active.
+    try:
+        from services.change_stream import start_change_stream_watcher
+        from services.cache import get_redis_client as _get_redis_for_cs
+        watcher = await start_change_stream_watcher(db, _get_redis_for_cs())
+        if watcher and watcher.is_running:
+            logger.info("MongoDB Change Stream watcher active - SSE broadcast via change streams")
+        else:
+            logger.info("MongoDB Change Stream watcher inactive - SSE broadcast via manual path")
+    except Exception as e:
+        logger.warning(f"Change stream watcher startup failed (manual broadcast will be used): {e}")
+
 
 async def on_shutdown() -> None:
     """Cleanup on shutdown"""
@@ -5384,6 +5637,13 @@ async def on_shutdown() -> None:
     from services.http_client import close_http_client
 
     stop_scheduler()
+
+    # Stop change stream watcher before closing database/cache connections
+    try:
+        from services.change_stream import stop_change_stream_watcher
+        await stop_change_stream_watcher()
+    except Exception as e:
+        logger.warning(f"Error stopping change stream watcher: {e}")
 
     try:
         await close_http_client()
@@ -5888,8 +6148,9 @@ route_handlers = [
     # File serving endpoints
     get_uploaded_file,
     get_user_photo,
-    # Search endpoint
+    # Search endpoints
     global_search,
+    advanced_search,
     # Activity log endpoints
     get_activity_logs,
     get_activity_summary,
@@ -5922,10 +6183,11 @@ app = Litestar(
     on_startup=[on_startup],
     on_shutdown=[on_shutdown],
     middleware=[
-        DefineMiddleware(SecurityHeadersMiddleware),  # Security headers (XSS, clickjacking protection)
+        DefineMiddleware(RequestTraceMiddleware),      # X-Request-ID + X-Response-Time headers
+        DefineMiddleware(SecurityHeadersMiddleware),    # Security headers (XSS, clickjacking protection)
         # Note: Compression handled by Angie at edge (Brotli/gzip)
-        DefineMiddleware(RequestSizeLimitMiddleware),  # Limit request body size
-        rate_limit_config.middleware,  # Rate limiting
+        DefineMiddleware(RequestSizeLimitMiddleware),   # Limit request body size
+        rate_limit_config.middleware,                   # Rate limiting
     ],
     openapi_config=OpenAPIConfig(
         title="FaithTracker API",

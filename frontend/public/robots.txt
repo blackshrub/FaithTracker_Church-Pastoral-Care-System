@@ -1,0 +1,8 @@
+# FaithTracker - Private pastoral care application
+# No public indexing desired
+User-agent: *
+Disallow: /
+
+# Allow well-known directory for security.txt
+User-agent: *
+Allow: /.well-known/

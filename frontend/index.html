@@ -6,29 +6,8 @@
         <meta name="theme-color" content="#14b8a6" />
         <meta name="description" content="FaithTracker Pastoral Care System - Multi-campus pastoral care management with complete accountability, API sync, and performance optimization" />
 
-        <!-- Suppress ResizeObserver error globally -->
-        <script>
-            // Suppress ResizeObserver loop limit exceeded error
-            window.addEventListener('error', function(e) {
-                if (e.message === 'ResizeObserver loop limit exceeded' ||
-                    e.message === 'ResizeObserver loop completed with undelivered notifications.') {
-                    e.stopImmediatePropagation();
-                    e.stopPropagation();
-                    e.preventDefault();
-                }
-            });
-
-            // Override console.error to filter ResizeObserver warnings
-            const _error = console.error;
-            console.error = function() {
-                const args = Array.from(arguments);
-                if (args.length > 0 && typeof args[0] === 'string' &&
-                    args[0].includes('ResizeObserver')) {
-                    return;
-                }
-                _error.apply(console, args);
-            };
-        </script>
+        <!-- Suppress ResizeObserver error globally (external for CSP compliance) -->
+        <script src="/resize-observer-fix.js"></script>
 
         <!-- Resource Hints for Faster Initial Load -->
         <!-- DNS prefetch and preconnect for API backend (50-100ms faster first API request) -->

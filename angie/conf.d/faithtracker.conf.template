@@ -58,8 +58,10 @@ server {
     # Security Headers
     include /etc/angie/conf.d/security-headers.conf;
 
-    # Frontend-specific CSP (more permissive for React app)
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    # Frontend-specific CSP (strict - no unsafe-inline for scripts)
+    # All inline scripts have been moved to external files for CSP compliance.
+    # 'unsafe-inline' is kept for style-src only (required by Tailwind/Radix runtime styles).
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.${DOMAIN} wss://api.${DOMAIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
 
     # Rate Limiting
     limit_req zone=frontend burst=50 nodelay;

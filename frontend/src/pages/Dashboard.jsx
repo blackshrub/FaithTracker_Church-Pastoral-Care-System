@@ -26,7 +26,12 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { useConfirmDialog } from '@/hooks';
+import {
+  useConfirmDialog,
+  useCompleteEventOptimistic,
+  useIgnoreEventOptimistic,
+  useCreateEventOptimistic,
+} from '@/hooks';
 import LazyImage from '@/components/LazyImage';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { MemberLink, LinkWithPrefetch } from '@/components/LinkWithPrefetch';
@@ -75,7 +80,6 @@ import { ErrorState } from '@/components/ErrorState';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 // Use centralized date formatting with Jakarta timezone
 const formatDate = (dateStr, style = 'short') => {
@@ -194,42 +198,8 @@ const markGriefStageComplete = async (stageId, queryClient, t) => {
   }
 };
 
-const markAccidentComplete = async (eventId, queryClient, t) => {
-  try {
-    await api.post(`/care-events/${eventId}/complete`);
-    toast.success(t('toasts.accident_completed'));
-    // Invalidate and refetch dashboard data
-    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-  } catch (_error) {
-    toast.error(t('toasts.failed_complete'));
-  }
-};
-
-const markMemberContacted = async (memberId, memberName, user, queryClient, t) => {
-  try {
-    if (!user?.campus_id) {
-      toast.error(t('errors.no_campus_assigned') || 'No campus assigned to your account');
-      return;
-    }
-    // Create a regular contact event which updates last_contact_date
-    // Backend auto-completes regular_contact events, so no separate /complete call needed
-    await api.post(`/care-events`, {
-      member_id: memberId,
-      campus_id: user.campus_id,
-      event_type: 'regular_contact',
-      event_date: new Date().toISOString().split('T')[0],
-      title: `Contact with ${memberName}`,
-      description: 'Contacted member - marked from dashboard',
-      completed: true,
-    });
-
-    toast.success(t('toasts.member_contacted', { name: memberName }));
-    // Invalidate and refetch dashboard data
-    await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-  } catch (_error) {
-    toast.error('Failed to mark as contacted');
-  }
-};
+// markAccidentComplete and markMemberContacted replaced by optimistic mutation hooks
+// (useCompleteEventOptimistic and useCreateEventOptimistic) inside the Dashboard component
 
 export const Dashboard = () => {
   const { t } = useTranslation();
@@ -239,6 +209,11 @@ export const Dashboard = () => {
 
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Optimistic mutation hooks for instant UI feedback
+  const completeEventMutation = useCompleteEventOptimistic();
+  const ignoreEventMutation = useIgnoreEventOptimistic();
+  const createEventMutation = useCreateEventOptimistic();
 
   // React Query for dashboard data
   const {
@@ -408,7 +383,7 @@ export const Dashboard = () => {
         if (quickEvent.event_type === 'financial_aid') {
           if (quickEvent.schedule_frequency === 'one_time') {
             // One-time aid: Create care event
-            await api.post(`/care-events`, {
+            await createEventMutation.mutateAsync({
               member_id: memberId,
               campus_id: member.campus_id,
               event_type: 'financial_aid',
@@ -457,7 +432,7 @@ export const Dashboard = () => {
           }
         } else {
           // Other events: Create normal care event with auto title
-          await api.post(`/care-events`, {
+          await createEventMutation.mutateAsync({
             member_id: memberId,
             campus_id: member.campus_id,
             event_type: quickEvent.event_type,
@@ -1790,17 +1765,13 @@ export const Dashboard = () => {
                               <Button
                                 size="default"
                                 variant="outline"
-                                onClick={async () => {
+                                onClick={() => {
                                   triggerHaptic();
-                                  try {
-                                    await api.post(`/care-events/${event.id}/complete`);
-                                    toast.success(t('toasts.birthday_marked_completed'));
-                                    await queryClient.invalidateQueries({
-                                      queryKey: ['dashboard'],
-                                    });
-                                  } catch (_error) {
-                                    toast.error(t('toasts.failed_mark_completed'));
-                                  }
+                                  completeEventMutation.mutate({
+                                    eventId: event.id,
+                                    memberId: event.member_id,
+                                  });
+                                  toast.success(t('toasts.birthday_marked_completed'));
                                 }}
                                 className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50"
                               >
@@ -1819,16 +1790,12 @@ export const Dashboard = () => {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-32">
                                   <DropdownMenuItem
-                                    onClick={async () => {
-                                      try {
-                                        await api.post(`/care-events/${event.id}/ignore`);
-                                        toast.success(t('toasts.birthday_ignored'));
-                                        await queryClient.invalidateQueries({
-                                          queryKey: ['dashboard'],
-                                        });
-                                      } catch (_error) {
-                                        toast.error('Failed to ignore');
-                                      }
+                                    onClick={() => {
+                                      ignoreEventMutation.mutate({
+                                        eventId: event.id,
+                                        memberId: event.member_id,
+                                      });
+                                      toast.success(t('toasts.birthday_ignored'));
                                     }}
                                   >
                                     {t('ignore')}
@@ -1935,7 +1902,11 @@ export const Dashboard = () => {
                                 variant="outline"
                                 onClick={() => {
                                   triggerHaptic();
-                                  markAccidentComplete(event.id, queryClient, t);
+                                  completeEventMutation.mutate({
+                                    eventId: event.id,
+                                    memberId: event.member_id,
+                                  });
+                                  toast.success(t('toasts.accident_completed'));
                                 }}
                                 className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50"
                               >
@@ -2526,7 +2497,25 @@ export const Dashboard = () => {
                                 variant="outline"
                                 onClick={() => {
                                   triggerHaptic();
-                                  markMemberContacted(member.id, member.name, user, queryClient, t);
+                                  if (!user?.campus_id) {
+                                    toast.error(
+                                      t('errors.no_campus_assigned') ||
+                                        'No campus assigned to your account'
+                                    );
+                                    return;
+                                  }
+                                  createEventMutation.mutate({
+                                    member_id: member.id,
+                                    campus_id: user.campus_id,
+                                    event_type: 'regular_contact',
+                                    event_date: new Date().toISOString().split('T')[0],
+                                    title: `Contact with ${member.name}`,
+                                    description: 'Contacted member - marked from dashboard',
+                                    completed: true,
+                                  });
+                                  toast.success(
+                                    t('toasts.member_contacted', { name: member.name })
+                                  );
                                 }}
                                 className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50"
                               >
@@ -2622,7 +2611,25 @@ export const Dashboard = () => {
                                 variant="outline"
                                 onClick={() => {
                                   triggerHaptic();
-                                  markMemberContacted(member.id, member.name, user, queryClient, t);
+                                  if (!user?.campus_id) {
+                                    toast.error(
+                                      t('errors.no_campus_assigned') ||
+                                        'No campus assigned to your account'
+                                    );
+                                    return;
+                                  }
+                                  createEventMutation.mutate({
+                                    member_id: member.id,
+                                    campus_id: user.campus_id,
+                                    event_type: 'regular_contact',
+                                    event_date: new Date().toISOString().split('T')[0],
+                                    title: `Contact with ${member.name}`,
+                                    description: 'Contacted member - marked from dashboard',
+                                    completed: true,
+                                  });
+                                  toast.success(
+                                    t('toasts.member_contacted', { name: member.name })
+                                  );
                                 }}
                                 className="h-11 flex-1 min-w-0 bg-white hover:bg-gray-50"
                               >
@@ -2848,23 +2855,28 @@ export const Dashboard = () => {
                                 onClick={async () => {
                                   triggerHaptic();
                                   try {
-                                    let endpoint;
-                                    if (task.type === 'grief_support') {
-                                      endpoint = `${API}/grief-support/${task.data.id}/complete`;
-                                    } else if (task.type === 'accident_followup') {
-                                      endpoint = `${API}/accident-followup/${task.data.id}/complete`;
-                                    } else if (task.type === 'birthday') {
-                                      endpoint = `${API}/care-events/${task.data.id}/complete`;
-                                    }
-
-                                    // Debug: console.log('Upcoming complete:', task.type, endpoint, task.data);
-
-                                    if (endpoint) {
-                                      await api.post(endpoint.replace(API, ''));
-                                      toast.success(t('toasts.completed'));
-                                      await queryClient.invalidateQueries({
-                                        queryKey: ['dashboard'],
+                                    if (task.type === 'birthday') {
+                                      // Use optimistic mutation for instant UI
+                                      completeEventMutation.mutate({
+                                        eventId: task.data.id,
+                                        memberId: task.member_id,
                                       });
+                                      toast.success(t('toasts.completed'));
+                                    } else {
+                                      let endpoint;
+                                      if (task.type === 'grief_support') {
+                                        endpoint = `/grief-support/${task.data.id}/complete`;
+                                      } else if (task.type === 'accident_followup') {
+                                        endpoint = `/accident-followup/${task.data.id}/complete`;
+                                      }
+
+                                      if (endpoint) {
+                                        await api.post(endpoint);
+                                        toast.success(t('toasts.completed'));
+                                        await queryClient.invalidateQueries({
+                                          queryKey: ['dashboard'],
+                                        });
+                                      }
                                     }
                                   } catch (_error) {
                                     toast.error(t('toasts.failed'));
@@ -2892,23 +2904,30 @@ export const Dashboard = () => {
                                 <DropdownMenuItem
                                   onClick={async () => {
                                     try {
-                                      let endpoint;
-                                      if (task.type === 'grief_support') {
-                                        endpoint = `${API}/grief-support/${task.data.id}/ignore`;
-                                      } else if (task.type === 'accident_followup') {
-                                        endpoint = `${API}/accident-followup/${task.data.id}/ignore`;
-                                      } else if (task.type === 'financial_aid') {
-                                        endpoint = `${API}/financial-aid-schedules/${task.data.id}/ignore`;
-                                      } else if (task.type === 'birthday') {
-                                        endpoint = `${API}/care-events/${task.data.id}/ignore`;
-                                      }
-
-                                      if (endpoint) {
-                                        await api.post(endpoint.replace(API, ''));
-                                        toast.success(t('toasts.ignored'));
-                                        await queryClient.invalidateQueries({
-                                          queryKey: ['dashboard'],
+                                      if (task.type === 'birthday') {
+                                        // Use optimistic mutation for instant UI
+                                        ignoreEventMutation.mutate({
+                                          eventId: task.data.id,
+                                          memberId: task.member_id,
                                         });
+                                        toast.success(t('toasts.ignored'));
+                                      } else {
+                                        let endpoint;
+                                        if (task.type === 'grief_support') {
+                                          endpoint = `/grief-support/${task.data.id}/ignore`;
+                                        } else if (task.type === 'accident_followup') {
+                                          endpoint = `/accident-followup/${task.data.id}/ignore`;
+                                        } else if (task.type === 'financial_aid') {
+                                          endpoint = `/financial-aid-schedules/${task.data.id}/ignore`;
+                                        }
+
+                                        if (endpoint) {
+                                          await api.post(endpoint);
+                                          toast.success(t('toasts.ignored'));
+                                          await queryClient.invalidateQueries({
+                                            queryKey: ['dashboard'],
+                                          });
+                                        }
                                       }
                                     } catch (_error) {
                                       toast.error(t('toasts.failed'));

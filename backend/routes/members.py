@@ -30,6 +30,7 @@ from utils import (
 from dependencies import (
     get_db, get_current_user, get_campus_filter, safe_error_detail
 )
+from services.search import get_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,12 @@ async def create_member(data: MemberCreate, request: Request) -> dict:
         # Invalidate dashboard cache since member count changed
         if _invalidate_dashboard_cache:
             await _invalidate_dashboard_cache(campus_id)
+
+        # Index in Meilisearch (fire-and-forget)
+        try:
+            get_search_service().index_member(member_dict)
+        except Exception:
+            pass
 
         return {"id": member_obj.id, "name": member_obj.name, "campus_id": member_obj.campus_id}
     except Exception as e:
@@ -334,6 +341,12 @@ async def update_member(member_id: str, data: MemberUpdate, request: Request) ->
         if _invalidate_dashboard_cache:
             await _invalidate_dashboard_cache(updated_member.get("campus_id"))
 
+        # Re-index in Meilisearch (fire-and-forget)
+        try:
+            get_search_service().index_member(updated_member)
+        except Exception:
+            pass
+
         return updated_member
     except HTTPException:
         raise
@@ -389,6 +402,12 @@ async def delete_member(member_id: str, request: Request) -> dict:
         # Invalidate dashboard cache since member count changed
         if _invalidate_dashboard_cache:
             await _invalidate_dashboard_cache(member.get("campus_id") or current_user.get("campus_id"))
+
+        # Remove from Meilisearch (fire-and-forget)
+        try:
+            get_search_service().remove_member(member_id)
+        except Exception:
+            pass
 
         return {"success": True, "message": "Member deleted successfully"}
     except HTTPException:

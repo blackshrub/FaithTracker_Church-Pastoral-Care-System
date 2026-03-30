@@ -1,0 +1,7 @@
+# FaithTracker Security Policy
+# https://securitytxt.org/
+
+Contact: mailto:security@gkbj.org
+Preferred-Languages: en, id
+Canonical: https://pastoral.gkbj.org/.well-known/security.txt
+Expires: 2027-03-30T00:00:00.000Z

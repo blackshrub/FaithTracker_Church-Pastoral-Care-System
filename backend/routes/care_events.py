@@ -22,6 +22,7 @@ from models import (
 from dependencies import (
     get_db, get_current_user, get_campus_filter, safe_error_detail
 )
+from services.search import get_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -224,9 +225,15 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
         # Invalidate dashboard cache
         if _invalidate_dashboard_cache:
             await _invalidate_dashboard_cache(campus_id)
-        
+
+        # Index in Meilisearch (fire-and-forget)
+        try:
+            get_search_service().index_care_event(event_dict, member_name=member_name)
+        except Exception:
+            pass
+
         return care_event
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -370,6 +377,13 @@ async def update_care_event(event_id: str, data: CareEventUpdate, request: Reque
 
         # Return updated event
         updated_event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+
+        # Re-index in Meilisearch (fire-and-forget)
+        try:
+            get_search_service().index_care_event(updated_event)
+        except Exception:
+            pass
+
         return updated_event
     except HTTPException:
         raise
@@ -613,7 +627,15 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
         # Invalidate dashboard cache after completing event
         if _invalidate_dashboard_cache:
             await _invalidate_dashboard_cache(event["campus_id"])
-        
+
+        # Update Meilisearch index for completed event (fire-and-forget)
+        try:
+            completed_event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+            if completed_event:
+                get_search_service().index_care_event(completed_event, member_name=member_name)
+        except Exception:
+            pass
+
         return {"success": True, "message": "Care event marked as completed"}
     except HTTPException:
         raise
@@ -911,6 +933,15 @@ async def bulk_complete_care_events(request: Request, data: BulkEventIds) -> dic
                 }}
             )
 
+        # Re-index completed events in Meilisearch (fire-and-forget)
+        try:
+            search_svc = get_search_service()
+            for event in events:
+                updated = {**event, "completed": True, "completed_at": now.isoformat()}
+                search_svc.index_care_event(updated)
+        except Exception:
+            pass
+
         logger.info(f"Bulk completed {result.modified_count} care events by {current_user['name']}")
         return {
             "success": True,
@@ -985,6 +1016,15 @@ async def bulk_ignore_care_events(request: Request, data: BulkEventIds) -> dict:
                     user_photo_url=current_user.get("photo_url")
                 )
 
+        # Re-index ignored events in Meilisearch (fire-and-forget)
+        try:
+            search_svc = get_search_service()
+            for event in events:
+                updated = {**event, "ignored": True, "ignored_at": now.isoformat()}
+                search_svc.index_care_event(updated)
+        except Exception:
+            pass
+
         logger.info(f"Bulk ignored {result.modified_count} care events by {current_user['name']}")
         return {
             "success": True,
@@ -1052,6 +1092,14 @@ async def bulk_delete_care_events(request: Request, data: BulkEventIds) -> dict:
                     notes=f"Bulk deleted {event.get('event_type', 'care')} event",
                     user_photo_url=current_user.get("photo_url")
                 )
+
+        # Remove deleted events from Meilisearch (fire-and-forget)
+        try:
+            search_svc = get_search_service()
+            for event in events:
+                search_svc.remove_care_event(event["id"])
+        except Exception:
+            pass
 
         logger.info(f"Bulk deleted {result.deleted_count} care events by {current_user['name']}")
         return {

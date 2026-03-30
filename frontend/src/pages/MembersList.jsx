@@ -5,38 +5,58 @@ import { toast } from 'sonner';
 import { Plus, Search, Loader2 } from 'lucide-react';
 
 import { MemberLink } from '@/components/LinkWithPrefetch';
+import { useUpdateMemberOptimistic } from '@/hooks';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { MembersListSkeleton } from '@/components/skeletons';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { MemberAvatar } from '@/components/MemberAvatar';
 import { EngagementBadge } from '@/components/EngagementBadge';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyMembers, EmptySearch } from '@/components/EmptyState';
 
-
 export const MembersList = () => {
   const { t } = useTranslation();
+  const updateMemberMutation = useUpdateMemberOptimistic();
   const [members, setMembers] = useState([]);
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     title: '',
     description: '',
-    onConfirm: () => {}
+    onConfirm: () => {},
   });
-  
+
   const showConfirm = (title, description, onConfirm) => {
     setConfirmDialog({ open: true, title, description, onConfirm });
   };
-  
+
   const closeConfirm = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
@@ -54,7 +74,7 @@ export const MembersList = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  
+
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter' && search.length >= 1) {
       setCurrentPage(1);
@@ -77,17 +97,17 @@ export const MembersList = () => {
     blood_type: { label: 'Blood Type', field: 'blood_type' },
     address: { label: 'Address', field: 'address' },
     birth_date: { label: 'Birth Date', field: 'birth_date' },
-    engagement: { label: 'Engagement', field: 'engagement_status' }
+    engagement: { label: 'Engagement', field: 'engagement_status' },
   };
 
   // Track which columns have data (at least one member has this field)
   const [availableColumns, setAvailableColumns] = useState([]);
   const [visibleColumns, setVisibleColumns] = useState({});
-  
+
   const [newMember, setNewMember] = useState({
     name: '',
     phone: '',
-    notes: ''
+    notes: '',
   });
 
   useEffect(() => {
@@ -98,7 +118,7 @@ export const MembersList = () => {
     // Reset to page 1 when search/filter changes
     setCurrentPage(1);
   }, [debouncedSearch, filterStatus]);
-  
+
   const loadMembers = async (page = 1, searchQuery = null) => {
     try {
       setLoadError(null); // Clear any previous errors
@@ -108,20 +128,20 @@ export const MembersList = () => {
       } else {
         setLoading(true);
       }
-      
+
       // Use provided search query or debounced search
       const activeSearch = searchQuery !== null ? searchQuery : debouncedSearch;
-      
+
       // Build query parameters properly
       const params = new URLSearchParams();
       params.append('page', page.toString());
       params.append('limit', pageSize.toString());
-      
+
       // Allow single character search (minimum 1 character)
       if (activeSearch && activeSearch.trim().length >= 1) {
         params.append('search', activeSearch.trim());
       }
-      
+
       if (filterStatus && filterStatus !== 'all') {
         // Only add engagement_status if it's a valid value
         const validStatuses = ['active', 'at_risk', 'disconnected'];
@@ -129,12 +149,12 @@ export const MembersList = () => {
           params.append('engagement_status', filterStatus);
         }
       }
-      
+
       // Add archived filter
       if (showArchived) {
         params.append('show_archived', 'true');
       }
-      
+
       const response = await api.get(`/members?${params.toString()}`);
       const membersData = response.data || [];
       setMembers(membersData);
@@ -147,7 +167,7 @@ export const MembersList = () => {
 
         Object.entries(allPossibleColumns).forEach(([key, config]) => {
           // Check if any member has this field with a non-empty value
-          const hasData = membersData.some(m => {
+          const hasData = membersData.some((m) => {
             const value = m[config.field];
             return value !== null && value !== undefined && value !== '';
           });
@@ -182,12 +202,12 @@ export const MembersList = () => {
       loadMembers(newPage);
     }
   };
-  
+
   const handleAddMember = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post(`/members`, {...newMember, campus_id: 'auto'});
+      await api.post(`/members`, { ...newMember, campus_id: 'auto' });
       toast.success(t('success_messages.member_created'));
       setAddModalOpen(false);
       setNewMember({ name: '', phone: '', notes: '' });
@@ -203,7 +223,7 @@ export const MembersList = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.put(`/members/${editingMember.id}`, editingMember);
+      await updateMemberMutation.mutateAsync({ memberId: editingMember.id, data: editingMember });
       toast.success('Member updated!');
       setEditModalOpen(false);
       setEditingMember(null);
@@ -214,7 +234,7 @@ export const MembersList = () => {
       setSaving(false);
     }
   };
-  
+
   const handleDeleteMember = async (id, name) => {
     showConfirm(
       'Delete Member',
@@ -232,7 +252,7 @@ export const MembersList = () => {
       }
     );
   };
-  
+
   const handleBulkDelete = async () => {
     if (selectedMembers.length === 0) return;
     showConfirm(
@@ -240,7 +260,7 @@ export const MembersList = () => {
       `Delete ${selectedMembers.length} members? This will delete all their care events and history.`,
       async () => {
         try {
-          await Promise.all(selectedMembers.map(id => api.delete(`/members/${id}`)));
+          await Promise.all(selectedMembers.map((id) => api.delete(`/members/${id}`)));
           toast.success(`Deleted ${selectedMembers.length} members`);
           setSelectedMembers([]);
           loadMembers();
@@ -252,28 +272,28 @@ export const MembersList = () => {
       }
     );
   };
-  
+
   const toggleSelectMember = (id) => {
-    setSelectedMembers(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    setSelectedMembers((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
-  
+
   const toggleSelectAll = () => {
     if (selectedMembers.length === filteredMembers.length) {
       setSelectedMembers([]);
     } else {
-      setSelectedMembers(filteredMembers.map(m => m.id));
+      setSelectedMembers(filteredMembers.map((m) => m.id));
     }
   };
-  
-  const filteredMembers = members.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(search.toLowerCase()) ||
-                         member.phone.includes(search);
+
+  const filteredMembers = members.filter((member) => {
+    const matchesSearch =
+      member.name.toLowerCase().includes(search.toLowerCase()) || member.phone.includes(search);
     const matchesStatus = filterStatus === 'all' || member.engagement_status === filterStatus;
     return matchesSearch && matchesStatus;
   });
-  
+
   if (loading) {
     return <MembersListSkeleton />;
   }
@@ -293,10 +313,13 @@ export const MembersList = () => {
           <h1 className="text-3xl font-playfair font-bold text-foreground">{t('members')}</h1>
           <p className="text-muted-foreground mt-1">{totalMembers} total members</p>
         </div>
-        
+
         <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-teal-500 hover:bg-teal-600 text-white h-12 min-w-0" data-testid="open-add-member-modal">
+            <Button
+              className="bg-teal-500 hover:bg-teal-600 text-white h-12 min-w-0"
+              data-testid="open-add-member-modal"
+            >
               <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
               <span className="truncate">{t('add_member')}</span>
             </Button>
@@ -311,7 +334,7 @@ export const MembersList = () => {
                 <Input
                   id="name"
                   value={newMember.name}
-                  onChange={(e) => setNewMember({...newMember, name: e.target.value})}
+                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
                   required
                   data-testid="member-name-input"
                 />
@@ -321,7 +344,7 @@ export const MembersList = () => {
                 <Input
                   id="phone"
                   value={newMember.phone}
-                  onChange={(e) => setNewMember({...newMember, phone: e.target.value})}
+                  onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
                   placeholder="628123456789"
                   required
                   data-testid="member-phone-input"
@@ -332,15 +355,25 @@ export const MembersList = () => {
                 <Input
                   id="notes"
                   value={newMember.notes}
-                  onChange={(e) => setNewMember({...newMember, notes: e.target.value})}
+                  onChange={(e) => setNewMember({ ...newMember, notes: e.target.value })}
                   data-testid="member-notes-input"
                 />
               </div>
               <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)} disabled={saving}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAddModalOpen(false)}
+                  disabled={saving}
+                >
                   {t('cancel')}
                 </Button>
-                <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white" loading={saving} data-testid="save-member-button">
+                <Button
+                  type="submit"
+                  className="bg-teal-500 hover:bg-teal-600 text-white"
+                  loading={saving}
+                  data-testid="save-member-button"
+                >
                   {t('save')}
                 </Button>
               </div>
@@ -361,7 +394,7 @@ export const MembersList = () => {
                   <Input
                     id="edit_name"
                     value={editingMember.name}
-                    onChange={(e) => setEditingMember({...editingMember, name: e.target.value})}
+                    onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
                     required
                   />
                 </div>
@@ -370,7 +403,7 @@ export const MembersList = () => {
                   <Input
                     id="edit_phone"
                     value={editingMember.phone}
-                    onChange={(e) => setEditingMember({...editingMember, phone: e.target.value})}
+                    onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
                     required
                   />
                 </div>
@@ -379,11 +412,16 @@ export const MembersList = () => {
                   <Input
                     id="edit_notes"
                     value={editingMember.notes || ''}
-                    onChange={(e) => setEditingMember({...editingMember, notes: e.target.value})}
+                    onChange={(e) => setEditingMember({ ...editingMember, notes: e.target.value })}
                   />
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={() => setEditModalOpen(false)} disabled={saving}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditModalOpen(false)}
+                    disabled={saving}
+                  >
                     {t('cancel')}
                   </Button>
                   <Button type="submit" className="bg-teal-500 hover:bg-teal-600" loading={saving}>
@@ -395,7 +433,7 @@ export const MembersList = () => {
           </DialogContent>
         </Dialog>
       </div>
-      
+
       {/* Filters and Column Visibility */}
       <Card className="border-border max-w-full">
         <CardContent className="p-4">
@@ -435,8 +473,8 @@ export const MembersList = () => {
                     <SelectItem value="disconnected">{t('disconnected')}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  variant={showArchived ? "default" : "outline"}
+                <Button
+                  variant={showArchived ? 'default' : 'outline'}
                   onClick={() => {
                     setShowArchived(!showArchived);
                     setCurrentPage(1);
@@ -447,7 +485,7 @@ export const MembersList = () => {
                 </Button>
               </div>
             </div>
-            
+
             {/* Column Visibility Toggles - Only show columns that have data */}
             {availableColumns.length > 0 && (
               <div className="border-t pt-4">
@@ -458,10 +496,14 @@ export const MembersList = () => {
                       <input
                         type="checkbox"
                         checked={visibleColumns[key] || false}
-                        onChange={(e) => setVisibleColumns({...visibleColumns, [key]: e.target.checked})}
+                        onChange={(e) =>
+                          setVisibleColumns({ ...visibleColumns, [key]: e.target.checked })
+                        }
                         className="w-4 h-4 flex-shrink-0"
                       />
-                      <span className="text-sm truncate">{allPossibleColumns[key]?.label || key}</span>
+                      <span className="text-sm truncate">
+                        {allPossibleColumns[key]?.label || key}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -470,15 +512,19 @@ export const MembersList = () => {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Members Table */}
       <Card className="border-border shadow-sm">
         {selectedMembers.length > 0 && (
           <div className="p-4 bg-amber-50 border-b flex items-center justify-between">
             <span className="font-semibold">{selectedMembers.length} members selected</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>{t('members_list.clear_selection')}</Button>
-              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>{t('members_list.delete_selected')}</Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedMembers([])}>
+                {t('members_list.clear_selection')}
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                {t('members_list.delete_selected')}
+              </Button>
             </div>
           </div>
         )}
@@ -496,31 +542,49 @@ export const MembersList = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12 hidden sm:table-cell">
-                    <input type="checkbox" checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0} onChange={toggleSelectAll} className="w-4 h-4" />
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedMembers.length === filteredMembers.length &&
+                        filteredMembers.length > 0
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4"
+                    />
                   </TableHead>
                   <TableHead>{t('members_list.name')}</TableHead>
                   {/* Dynamic columns based on visibility settings */}
-                  {availableColumns.filter(col => visibleColumns[col]).map(col => (
-                    <TableHead key={col} className="hidden md:table-cell">
-                      {allPossibleColumns[col]?.label || col}
-                    </TableHead>
-                  ))}
+                  {availableColumns
+                    .filter((col) => visibleColumns[col])
+                    .map((col) => (
+                      <TableHead key={col} className="hidden md:table-cell">
+                        {allPossibleColumns[col]?.label || col}
+                      </TableHead>
+                    ))}
                   <TableHead className="text-right">{t('members_list.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tableLoading || (search && search !== debouncedSearch) ? (
                   <TableRow>
-                    <TableCell colSpan={3 + availableColumns.filter(col => visibleColumns[col]).length} className="text-center py-8">
+                    <TableCell
+                      colSpan={3 + availableColumns.filter((col) => visibleColumns[col]).length}
+                      className="text-center py-8"
+                    >
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
-                        <span className="text-muted-foreground">{t('members_list.searching_members')}</span>
+                        <span className="text-muted-foreground">
+                          {t('members_list.searching_members')}
+                        </span>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredMembers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3 + availableColumns.filter(col => visibleColumns[col]).length} className="py-0">
+                    <TableCell
+                      colSpan={3 + availableColumns.filter((col) => visibleColumns[col]).length}
+                      className="py-0"
+                    >
                       {search ? (
                         <EmptySearch searchTerm={search} />
                       ) : (
@@ -532,7 +596,12 @@ export const MembersList = () => {
                   filteredMembers.map((member) => (
                     <TableRow key={member.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="hidden sm:table-cell">
-                        <input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={() => toggleSelectMember(member.id)} className="w-4 h-4" />
+                        <input
+                          type="checkbox"
+                          checked={selectedMembers.includes(member.id)}
+                          onChange={() => toggleSelectMember(member.id)}
+                          className="w-4 h-4"
+                        />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -546,35 +615,59 @@ export const MembersList = () => {
                         </div>
                       </TableCell>
                       {/* Dynamic column cells based on visibility settings */}
-                      {availableColumns.filter(col => visibleColumns[col]).map(col => {
-                        const field = allPossibleColumns[col]?.field || col;
-                        let value = member[field];
+                      {availableColumns
+                        .filter((col) => visibleColumns[col])
+                        .map((col) => {
+                          const field = allPossibleColumns[col]?.field || col;
+                          let value = member[field];
 
-                        // Special rendering for certain columns
-                        if (col === 'engagement') {
+                          // Special rendering for certain columns
+                          if (col === 'engagement') {
+                            return (
+                              <TableCell key={col} className="hidden md:table-cell">
+                                <EngagementBadge
+                                  status={member.engagement_status}
+                                  days={member.days_since_last_contact}
+                                />
+                              </TableCell>
+                            );
+                          }
+                          if (col === 'birth_date' && value) {
+                            value = formatDate(value);
+                          }
+
                           return (
                             <TableCell key={col} className="hidden md:table-cell">
-                              <EngagementBadge status={member.engagement_status} days={member.days_since_last_contact} />
+                              {value || '-'}
                             </TableCell>
                           );
-                        }
-                        if (col === 'birth_date' && value) {
-                          value = formatDate(value);
-                        }
-
-                        return (
-                          <TableCell key={col} className="hidden md:table-cell">
-                            {value || '-'}
-                          </TableCell>
-                        );
-                      })}
+                        })}
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
                           <MemberLink memberId={member.id}>
-                            <Button size="sm" variant="outline">{t('view')}</Button>
+                            <Button size="sm" variant="outline">
+                              {t('view')}
+                            </Button>
                           </MemberLink>
-                          <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => { setEditingMember(member); setEditModalOpen(true); }}>{t('edit')}</Button>
-                          <Button size="sm" variant="ghost" className="text-red-600 hidden sm:inline-flex" onClick={() => handleDeleteMember(member.id, member.name)}>{t('delete')}</Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="hidden sm:inline-flex"
+                            onClick={() => {
+                              setEditingMember(member);
+                              setEditModalOpen(true);
+                            }}
+                          >
+                            {t('edit')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hidden sm:inline-flex"
+                            onClick={() => handleDeleteMember(member.id, member.name)}
+                          >
+                            {t('delete')}
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -585,22 +678,23 @@ export const MembersList = () => {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Industry-Standard Pagination Controls */}
       <div className="flex items-center justify-between mt-6">
         <div className="text-sm text-muted-foreground">
-          Showing {totalMembers > 0 ? ((currentPage - 1) * pageSize) + 1 : 0}-{Math.min(currentPage * pageSize, totalMembers)} of {totalMembers} members
+          Showing {totalMembers > 0 ? (currentPage - 1) * pageSize + 1 : 0}-
+          {Math.min(currentPage * pageSize, totalMembers)} of {totalMembers} members
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage <= 1}
           >
             Previous
           </Button>
-          
+
           {/* Page Numbers */}
           <div className="flex gap-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -609,9 +703,9 @@ export const MembersList = () => {
               return (
                 <Button
                   key={page}
-                  variant={currentPage === page ? "default" : "outline"}
+                  variant={currentPage === page ? 'default' : 'outline'}
                   size="sm"
-                  className={currentPage === page ? "bg-teal-500 text-white" : ""}
+                  className={currentPage === page ? 'bg-teal-500 text-white' : ''}
                   onClick={() => handlePageChange(page)}
                 >
                   {page}
@@ -619,9 +713,9 @@ export const MembersList = () => {
               );
             })}
           </div>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage >= totalPages}

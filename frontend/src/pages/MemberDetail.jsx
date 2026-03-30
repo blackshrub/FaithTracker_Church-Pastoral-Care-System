@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/select';
 import { MemberProfileHeader, TimelineEventCard } from '@/components/member';
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary';
+import { useCompleteEventOptimistic, useCreateEventOptimistic } from '@/hooks';
 import { formatDate, getTodayLocal } from '@/lib/dateUtils';
 // Aid type icon helper
 const getAidTypeIcon = (aidType) => {
@@ -77,6 +78,10 @@ export const MemberDetail = () => {
   const { id } = useParams();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  // Optimistic mutation hooks for instant UI feedback
+  const completeEventMutation = useCompleteEventOptimistic();
+  const createEventMutation = useCreateEventOptimistic();
 
   // React Query for member data with caching
   const { data: memberData, isLoading } = useQuery({
@@ -318,7 +323,7 @@ export const MemberDetail = () => {
             aid_type: newEvent.aid_type,
             aid_amount: aidAmount,
           };
-          await api.post(`/care-events`, eventData);
+          await createEventMutation.mutateAsync(eventData);
           toast.success(t('toasts.financial_aid_recorded'));
         } else {
           // Scheduled aid: Create schedule (future payments)
@@ -386,7 +391,7 @@ export const MemberDetail = () => {
           title: autoTitle,
           aid_amount: newEvent.aid_amount ? parseFloat(newEvent.aid_amount) : null,
         };
-        await api.post(`/care-events`, eventData);
+        await createEventMutation.mutateAsync(eventData);
 
         if (newEvent.event_type === 'grief_loss' && newEvent.mourning_service_date) {
           toast.success(t('success_messages.grief_timeline_generated'));
@@ -458,15 +463,9 @@ export const MemberDetail = () => {
     }
   };
 
-  const handleCompleteBirthday = async (eventId) => {
-    try {
-      await api.post(`/care-events/${eventId}/complete`);
-      toast.success(t('toasts.birthday_marked_completed'));
-      queryClient.invalidateQueries({ queryKey: ['member', id] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    } catch (error) {
-      toast.error(t('toasts.failed_mark_birthday'));
-    }
+  const handleCompleteBirthday = (eventId) => {
+    completeEventMutation.mutate({ eventId, memberId: id });
+    toast.success(t('toasts.birthday_marked_completed'));
   };
 
   const _completeGriefStage = async (stageId) => {
