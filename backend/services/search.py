@@ -249,7 +249,7 @@ class SearchService:
         Bulk index all members (optionally filtered by campus_id).
         Returns number of documents indexed.
         """
-        if not self._available or not self._client or not self._db:
+        if not self._available or self._client is None or self._db is None:
             return 0
 
         try:
@@ -292,7 +292,7 @@ class SearchService:
         Enriches events with member names.
         Returns number of documents indexed.
         """
-        if not self._available or not self._client or not self._db:
+        if not self._available or self._client is None or self._db is None:
             return 0
 
         try:
