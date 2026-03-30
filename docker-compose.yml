@@ -60,7 +60,7 @@ services:
   # Meilisearch - Full-text Search Engine
   # ===================
   meilisearch:
-    image: getmeili/meilisearch:v1.12
+    image: getmeili/meilisearch:v1.41
     container_name: faithtracker-meilisearch
     restart: always
     environment:
