@@ -362,6 +362,32 @@ export const Settings = () => {
   };
 
   
+  // Load engagement, grief, and accident settings from backend on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const [engRes, griefRes, accidentRes] = await Promise.allSettled([
+          api.get('/settings/engagement'),
+          api.get('/settings/grief-stages'),
+          api.get('/settings/accident-followup'),
+        ]);
+        if (engRes.status === 'fulfilled' && engRes.value.data) {
+          setAtRiskDays(engRes.value.data.atRiskDays ?? 60);
+          setInactiveDays(engRes.value.data.disconnectedDays ?? engRes.value.data.inactiveDays ?? 90);
+        }
+        if (griefRes.status === 'fulfilled' && Array.isArray(griefRes.value.data) && griefRes.value.data.length > 0) {
+          setGriefStages(griefRes.value.data);
+        }
+        if (accidentRes.status === 'fulfilled' && Array.isArray(accidentRes.value.data) && accidentRes.value.data.length > 0) {
+          setAccidentFollowUp(accidentRes.value.data);
+        }
+      } catch (_error) {
+        // Use defaults on failure
+      }
+    };
+    loadSettings();
+  }, []);
+
   useEffect(() => {
     loadCampusCount();
   }, []);
@@ -435,21 +461,31 @@ export const Settings = () => {
     }
   };
   
-  const saveEngagementSettings = () => {
-    // Would save to backend/database in production
-    localStorage.setItem('engagement_settings', JSON.stringify({ atRiskDays, inactiveDays }));
-    toast.success(t('toasts.engagement_saved'));
+  const saveEngagementSettings = async () => {
+    try {
+      await api.put('/settings/engagement', { atRiskDays, disconnectedDays: inactiveDays });
+      toast.success(t('toasts.engagement_saved'));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save engagement settings');
+    }
   };
-  
-  const saveGriefStages = () => {
-    // Would save to backend/database in production
-    localStorage.setItem('grief_stages', JSON.stringify(griefStages));
-    toast.success(t('toasts.grief_stages_saved'));
+
+  const saveGriefStages = async () => {
+    try {
+      await api.put('/settings/grief-stages', griefStages);
+      toast.success(t('toasts.grief_stages_saved'));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save grief stages');
+    }
   };
-  
-  const saveAccidentFollowUp = () => {
-    localStorage.setItem('accident_followup', JSON.stringify(accidentFollowUp));
-    toast.success(t('toasts.accident_config_saved'));
+
+  const saveAccidentFollowUp = async () => {
+    try {
+      await api.put('/settings/accident-followup', accidentFollowUp);
+      toast.success(t('toasts.accident_config_saved'));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save accident follow-up settings');
+    }
   };
   
   return (

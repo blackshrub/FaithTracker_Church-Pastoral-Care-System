@@ -3,13 +3,14 @@
  *
  * Tests the timeline event card display logic and interactions
  */
+import { describe, it, expect, vi, beforeEach, test } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { TimelineEventCard } from '../../components/member/TimelineEventCard';
 
 // Mock date formatting
-jest.mock('date-fns/format', () => ({
-  format: jest.fn((date, formatStr) => {
+vi.mock('date-fns/format', () => ({
+  format: vi.fn((date, formatStr) => {
     if (formatStr === 'dd') return '15';
     if (formatStr === 'MMM') return 'Jan';
     if (formatStr === 'dd MMM yyyy') return '15 Jan 2024';
@@ -28,7 +29,7 @@ describe('TimelineEventCard', () => {
     ignored: false
   };
 
-  const mockOnDelete = jest.fn();
+  const mockOnDelete = vi.fn();
 
   beforeEach(() => {
     mockOnDelete.mockClear();

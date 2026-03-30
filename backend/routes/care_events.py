@@ -1024,7 +1024,7 @@ async def bulk_delete_care_events(request: Request, data: BulkEventIds) -> dict:
                     campus_id=event["campus_id"],
                     user_id=current_user["id"],
                     user_name=current_user["name"],
-                    action_type=ActivityActionType.DELETE_EVENT,
+                    action_type=ActivityActionType.DELETE_CARE_EVENT,
                     member_id=event["member_id"],
                     member_name=member_name,
                     care_event_id=event["id"],

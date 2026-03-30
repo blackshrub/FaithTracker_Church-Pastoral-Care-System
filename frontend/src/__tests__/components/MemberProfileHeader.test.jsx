@@ -3,13 +3,14 @@
  *
  * Tests the member profile header display, interactions, and responsive behavior
  */
+import { describe, it, expect, vi, beforeEach, test } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 
 import { MemberProfileHeader } from '../../components/member/MemberProfileHeader';
 
 // Mock react-i18next
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key) => {
       const translations = {
@@ -22,15 +23,15 @@ jest.mock('react-i18next', () => ({
 }));
 
 // Mock date formatting
-jest.mock('date-fns/format', () => ({
-  format: jest.fn((date, formatStr) => {
+vi.mock('date-fns/format', () => ({
+  format: vi.fn((date, formatStr) => {
     if (formatStr === 'dd MMM yyyy') return '15 Jan 2024';
     return date.toString();
   })
 }));
 
 // Mock child components
-jest.mock('@/components/MemberAvatar', () => ({
+vi.mock('@/components/MemberAvatar', () => ({
   MemberAvatar: ({ member, size, className }) => (
     <div data-testid="member-avatar" data-size={size} className={className}>
       {member.name}
@@ -38,7 +39,7 @@ jest.mock('@/components/MemberAvatar', () => ({
   )
 }));
 
-jest.mock('@/components/EngagementBadge', () => ({
+vi.mock('@/components/EngagementBadge', () => ({
   EngagementBadge: ({ status, days }) => (
     <div data-testid="engagement-badge" data-status={status} data-days={days}>
       {status}
@@ -63,7 +64,7 @@ describe('MemberProfileHeader', () => {
     last_contact_date: '2024-01-15'
   };
 
-  const mockOnAddCareEvent = jest.fn();
+  const mockOnAddCareEvent = vi.fn();
 
   beforeEach(() => {
     mockOnAddCareEvent.mockClear();

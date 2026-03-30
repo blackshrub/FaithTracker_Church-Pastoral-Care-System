@@ -1787,8 +1787,11 @@ async def test_whatsapp_integration(data: WhatsAppTestRequest, request: Request)
         )
 
 @get("/integrations/ping/email")
-async def test_email_integration() -> dict:
+async def test_email_integration(request: Request) -> dict:
     """Email integration test - currently pending provider configuration"""
+    current_user = await get_current_user(request)
+    if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
+        raise HTTPException(status_code=403, detail="Only administrators can test integrations")
     return {
         "success": False,
         "message": "📧 Email integration pending provider configuration. Currently WhatsApp-only mode.",
@@ -3096,8 +3099,9 @@ async def get_membership_statuses(request: Request) -> dict:
     ], request)
 
 @get("/config/all")
-async def get_all_config() -> dict:
+async def get_all_config(request: Request) -> dict:
     """Get all configuration data for mobile app"""
+    await get_current_user(request)
     try:
         # Use cached data directly instead of calling route handlers
         # Get settings from database for dynamic config

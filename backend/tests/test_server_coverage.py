@@ -1979,7 +1979,9 @@ class TestConfigEndpoints:
     @pytest.mark.asyncio
     async def test_get_all_config(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
-        result = await setup_server.get_all_config.fn()
+        admin = {"id": "u1", "role": "full_admin", "campus_id": "c1"}
+        mock_db.users.find_one = AsyncMock(return_value=admin)
+        result = await setup_server.get_all_config.fn(request=_mock_request(admin))
         assert "aid_types" in result
         assert "event_types" in result
         assert "user_roles" in result
@@ -2491,8 +2493,10 @@ class TestEmailIntegration:
     """Test email integration placeholder."""
 
     @pytest.mark.asyncio
-    async def test_email_pending(self, setup_server):
-        result = await setup_server.test_email_integration.fn()
+    async def test_email_pending(self, setup_server, mock_db):
+        admin = {"id": "u1", "role": "full_admin", "campus_id": "c1"}
+        mock_db.users.find_one = AsyncMock(return_value=admin)
+        result = await setup_server.test_email_integration.fn(request=_mock_request(admin))
         assert result["success"] is False
         assert result["pending_provider"] is True
 

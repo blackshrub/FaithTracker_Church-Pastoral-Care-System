@@ -4,18 +4,19 @@
  * Critical for preventing excessive API calls during user input
  */
 
+import { describe, it, expect, beforeEach, afterEach, test } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 import { useDebounce } from '../../hooks/useDebounce';
 
 describe('useDebounce', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
   });
 
   test('returns initial value immediately', () => {
@@ -39,7 +40,7 @@ describe('useDebounce', () => {
 
     // Fast-forward time
     act(() => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
 
     // Now should be updated
@@ -54,10 +55,10 @@ describe('useDebounce', () => {
 
     // Rapid changes
     rerender({ value: 'second' });
-    act(() => jest.advanceTimersByTime(100));
+    act(() => vi.advanceTimersByTime(100));
 
     rerender({ value: 'third' });
-    act(() => jest.advanceTimersByTime(100));
+    act(() => vi.advanceTimersByTime(100));
 
     rerender({ value: 'fourth' });
 
@@ -66,7 +67,7 @@ describe('useDebounce', () => {
 
     // Complete the debounce
     act(() => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
 
     // Should be the last value only
@@ -83,13 +84,13 @@ describe('useDebounce', () => {
 
     // After 300ms, should still be old value
     act(() => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
     expect(result.current).toBe('initial');
 
     // After full 500ms, should be updated
     act(() => {
-      jest.advanceTimersByTime(200);
+      vi.advanceTimersByTime(200);
     });
     expect(result.current).toBe('updated');
   });
@@ -104,7 +105,7 @@ describe('useDebounce', () => {
 
     // Default is 300ms
     act(() => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
 
     expect(result.current).toBe('updated');
@@ -121,7 +122,7 @@ describe('useDebounce', () => {
     rerender({ value: 'text' });
 
     act(() => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
 
     expect(result.current).toBe('text');
@@ -138,7 +139,7 @@ describe('useDebounce', () => {
     rerender({ value: 42 });
 
     act(() => {
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
     });
 
     expect(result.current).toBe(42);

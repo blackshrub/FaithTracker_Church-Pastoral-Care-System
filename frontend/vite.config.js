@@ -157,6 +157,18 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
 
+  // Test configuration (Vitest)
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    css: false,
+    // Resolve @ alias in tests
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+
   // CSS configuration
   css: {
     postcss: './postcss.config.js',

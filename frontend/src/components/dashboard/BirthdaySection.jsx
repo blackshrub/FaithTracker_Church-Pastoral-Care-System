@@ -59,11 +59,11 @@ export const BirthdaySection = ({
       await api.post(`/care-events/birthday/member/${memberId}/complete`);
       toast.success(t('toasts.birthday_completed'));
       // Refetch to get accurate data
-      await queryClient.invalidateQueries(['dashboard']);
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (_error) {
       toast.error(t('toasts.failed_complete'));
       // Revert optimistic update on error
-      queryClient.invalidateQueries(['dashboard']);
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } finally {
       // Remove from loading state
       setLoadingIds(prev => {
