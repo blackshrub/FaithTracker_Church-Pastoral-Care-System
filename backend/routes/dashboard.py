@@ -7,6 +7,7 @@ from litestar import get, Request
 from litestar.exceptions import HTTPException
 import logging
 import asyncio
+import re
 from datetime import datetime, timezone, date, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional, Callable, Awaitable
@@ -28,6 +29,22 @@ _get_date_in_timezone: Optional[Callable[[str], str]] = None
 _get_writeoff_settings: Optional[Callable[[], Awaitable[dict]]] = None
 
 
+def _assert_initialized():
+    """Verify all callbacks have been set. Call at the start of handlers using callbacks."""
+    missing = [
+        name for name, val in [
+            ("_get_campus_timezone", _get_campus_timezone),
+            ("_get_date_in_timezone", _get_date_in_timezone),
+            ("_get_writeoff_settings", _get_writeoff_settings),
+        ] if val is None
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Dashboard routes not initialized. Missing callbacks: {', '.join(missing)}. "
+            "Call init_dashboard_routes() during app startup."
+        )
+
+
 def init_dashboard_routes(
     get_campus_timezone: Callable[[str], Awaitable[str]],
     get_date_in_timezone: Callable[[str], str],
@@ -35,7 +52,7 @@ def init_dashboard_routes(
 ):
     """Initialize dashboard routes with callbacks to server.py functions"""
     global _get_campus_timezone, _get_date_in_timezone, _get_writeoff_settings
-    
+
     _get_campus_timezone = get_campus_timezone
     _get_date_in_timezone = get_date_in_timezone
     _get_writeoff_settings = get_writeoff_settings
@@ -45,6 +62,7 @@ def init_dashboard_routes(
 
 async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: str):
     """Calculate all dashboard reminder data - optimized query with parallel fetching"""
+    _assert_initialized()
     db = get_db()
     try:
         logger.info(f"Calculating dashboard reminders for campus {campus_id}, date {today_date}")
@@ -57,6 +75,28 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
         writeoff_task = _get_writeoff_settings()
         MAX_MEMBERS_LIST = 10000
         MAX_TASKS_LIST = 5000
+
+        # Build regex to match birth_date strings for the birthday window
+        # Covers: 30 days back (max writeoff) + 7 days ahead (upcoming)
+        # This filters birthdays in MongoDB instead of loading all 10k members
+        BIRTHDAY_LOOKBACK_DAYS = 30  # generous max for overdue writeoff
+        BIRTHDAY_LOOKAHEAD_DAYS = 7
+        birthday_mm_dd_set = set()
+        for offset in range(-BIRTHDAY_LOOKBACK_DAYS, BIRTHDAY_LOOKAHEAD_DAYS + 1):
+            d = today + timedelta(days=offset)
+            birthday_mm_dd_set.add(f"-{d.month:02d}-{d.day:02d}")
+        # Build regex alternation: matches birth_date ending with any of these MM-DD values
+        birthday_regex = f"({'|'.join(re.escape(s) for s in sorted(birthday_mm_dd_set))})$"
+
+        birthday_members_task = db.members.find(
+            {
+                "campus_id": campus_id,
+                "is_archived": {"$ne": True},
+                "birth_date": {"$regex": birthday_regex}
+            },
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "photo_url": 1, "birth_date": 1,
+             "engagement_status": 1, "days_since_last_contact": 1}
+        ).to_list(MAX_TASKS_LIST)
 
         members_task = db.members.find(
             {"campus_id": campus_id, "is_archived": {"$ne": True}},
@@ -87,8 +127,8 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
              "completed_by_user_name": 1, "ignored_by_name": 1}
         ).to_list(MAX_TASKS_LIST)
 
-        writeoff_settings, members, grief_stages, accident_followups, aid_schedules, birthday_events = await asyncio.gather(
-            writeoff_task, members_task, grief_task, accident_task, aid_task, birthday_events_task
+        writeoff_settings, birthday_members, members, grief_stages, accident_followups, aid_schedules, birthday_events = await asyncio.gather(
+            writeoff_task, birthday_members_task, members_task, grief_task, accident_task, aid_task, birthday_events_task
         )
 
         # Build map of member_ids with completed/ignored birthdays this year
@@ -264,13 +304,15 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
                 continue
 
         # Process birthdays - include completed ones so other staff can see them
-        # Note: Frontend uses member_id-based endpoint which creates events on-the-fly
+        # Uses birthday_members (pre-filtered by MongoDB regex) instead of iterating all members
         birthday_writeoff = writeoff_settings.get("birthday", 7)
-        for member in members:
-            member_id = member["id"]
-            birth_date_str = member.get("birth_date")
+        for bday_member in birthday_members:
+            member_id = bday_member["id"]
+            birth_date_str = bday_member.get("birth_date")
             if not birth_date_str:
                 continue
+            # Use member_map data (has computed age) if available
+            member = member_map.get(member_id, bday_member)
 
             # Check if this birthday was completed/ignored this year
             completion_info = completed_birthday_info.get(member_id, {})
@@ -389,6 +431,7 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
 @get("/dashboard/reminders")
 async def get_dashboard_reminders(request: Request) -> dict:
     """Get pre-calculated dashboard reminders - optimized for fast loading"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:

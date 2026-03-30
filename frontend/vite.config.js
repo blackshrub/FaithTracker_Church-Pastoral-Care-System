@@ -117,39 +117,34 @@ export default defineConfig({
     sourcemap: false,
     // Use multiple CPU cores for faster builds
     minify: 'esbuild',
+    // Use esbuild for CSS minification (LightningCSS doesn't support view-transition pseudo-elements)
+    cssMinify: 'esbuild',
     // Optimize chunk splitting for better caching
-    rolldownOptions: {
+    rollupOptions: {
       output: {
-        manualChunks: {
-          // React core - smallest possible chunk
-          'react-vendor': ['react', 'react-dom'],
-          // Router separate for route-based code splitting
-          'router-vendor': ['react-router-dom'],
-          // UI libraries - only used components
-          'ui-vendor': [
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-select',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-tabs',
-            'lucide-react',
-            'sonner',
-          ],
-          // Charts - lazy loaded, separate chunk
-          'charts-vendor': ['chart.js', 'react-chartjs-2'],
-          // Data fetching
-          'query-vendor': ['@tanstack/react-query'],
-          // Utilities
-          'utils-vendor': ['axios', 'date-fns', 'clsx', 'tailwind-merge', 'zod'],
-          // i18n
-          'i18n-vendor': ['i18next', 'react-i18next'],
+        // Vite 8 (Rolldown) requires manualChunks as a function
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'react-vendor';
+          }
+          if (id.includes('node_modules/react-router')) {
+            return 'router-vendor';
+          }
+          if (id.includes('node_modules/@radix-ui') || id.includes('node_modules/lucide-react') || id.includes('node_modules/sonner')) {
+            return 'ui-vendor';
+          }
+          if (id.includes('node_modules/chart.js') || id.includes('node_modules/react-chartjs')) {
+            return 'charts-vendor';
+          }
+          if (id.includes('node_modules/@tanstack')) {
+            return 'query-vendor';
+          }
+          if (id.includes('node_modules/axios') || id.includes('node_modules/date-fns') || id.includes('node_modules/clsx') || id.includes('node_modules/tailwind-merge') || id.includes('node_modules/zod')) {
+            return 'utils-vendor';
+          }
+          if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next')) {
+            return 'i18n-vendor';
+          }
         },
       },
     },

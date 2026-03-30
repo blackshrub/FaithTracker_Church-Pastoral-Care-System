@@ -28,6 +28,22 @@ _log_activity: Optional[Callable[..., Awaitable[None]]] = None
 _get_engagement_settings_cached: Optional[Callable[[], Awaitable[dict]]] = None
 
 
+def _assert_initialized():
+    """Verify all callbacks have been set. Call at the start of mutating handlers."""
+    missing = [
+        name for name, val in [
+            ("_invalidate_dashboard_cache", _invalidate_dashboard_cache),
+            ("_log_activity", _log_activity),
+            ("_get_engagement_settings_cached", _get_engagement_settings_cached),
+        ] if val is None
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Financial aid routes not initialized. Missing callbacks: {', '.join(missing)}. "
+            "Call init_financial_aid_routes() during app startup."
+        )
+
+
 def init_financial_aid_routes(
     invalidate_dashboard_cache: Callable[[str], Awaitable[None]],
     log_activity: Callable[..., Awaitable[None]],
@@ -35,7 +51,7 @@ def init_financial_aid_routes(
 ):
     """Initialize financial aid routes with callbacks to server.py functions"""
     global _invalidate_dashboard_cache, _log_activity, _get_engagement_settings_cached
-    
+
     _invalidate_dashboard_cache = invalidate_dashboard_cache
     _log_activity = log_activity
     _get_engagement_settings_cached = get_engagement_settings_cached
@@ -46,6 +62,7 @@ def init_financial_aid_routes(
 @post("/financial-aid-schedules")
 async def create_aid_schedule(data: FinancialAidScheduleCreate, request: Request) -> dict:
     """Create a financial aid schedule"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     # Convert Struct to dict for existing code compatibility
@@ -181,6 +198,7 @@ async def list_aid_schedules(
 @delete("/financial-aid-schedules/{schedule_id:str}/ignored-occurrence/{occurrence_date:str}", status_code=200)
 async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str, request: Request) -> dict:
     """Remove a specific ignored occurrence from the schedule and its activity log"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -229,6 +247,7 @@ async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str, requ
 @post("/financial-aid-schedules/{schedule_id:str}/clear-ignored")
 async def clear_all_ignored_occurrences(schedule_id: str, request: Request) -> dict:
     """Clear all ignored occurrences for a schedule"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -275,6 +294,7 @@ async def clear_all_ignored_occurrences(schedule_id: str, request: Request) -> d
 @delete("/financial-aid-schedules/{schedule_id:str}", status_code=200)
 async def delete_aid_schedule(schedule_id: str, request: Request) -> dict:
     """Delete a financial aid schedule and related activity logs"""
+    _assert_initialized()
     db = get_db()
     try:
         # Get schedule details before deleting
@@ -310,6 +330,7 @@ async def delete_aid_schedule(schedule_id: str, request: Request) -> dict:
 @post("/financial-aid-schedules/{schedule_id:str}/stop")
 async def stop_aid_schedule(schedule_id: str, request: Request) -> dict:
     """Manually stop a financial aid schedule"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -371,7 +392,7 @@ async def get_member_aid_schedules(member_id: str, request: Request) -> dict:
         schedules = await db.financial_aid_schedules.find(
             {"member_id": member_id},
             {"_id": 0}
-        ).sort("next_occurrence", 1).to_list(None)  # None = no limit
+        ).sort("next_occurrence", 1).to_list(MAX_LIMIT)
         
         # Log all schedule IDs found
         logger.info(f"[GET AID SCHEDULES] Found {len(schedules)} schedule IDs for member")
@@ -433,6 +454,7 @@ async def get_aid_due_today(request: Request) -> dict:
 @post("/financial-aid-schedules/{schedule_id:str}/mark-distributed")
 async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
     """Mark scheduled aid as distributed and advance to next occurrence"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -566,6 +588,7 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
 @post("/financial-aid-schedules/{schedule_id:str}/ignore")
 async def ignore_financial_aid_schedule(schedule_id: str, request: Request) -> dict:
     """Mark a specific financial aid occurrence as ignored (not the entire schedule)"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:

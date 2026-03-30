@@ -53,12 +53,13 @@ class CareEventService:
         if is_completed is not None:
             query["is_completed"] = is_completed
         
-        cursor = self._db.care_events.find(query, {"_id": 0})
-        cursor = cursor.sort("event_date", -1).skip(skip).limit(min(limit, MAX_PAGE_SIZE))
-        
-        events = await cursor.to_list(length=limit)
-        total = await self._db.care_events.count_documents(query)
-        
+        from services.db_utils import paginated_query
+        capped_limit = min(limit, MAX_PAGE_SIZE)
+        events, total = await paginated_query(
+            self._db.care_events, query, sort=[("event_date", -1)],
+            skip=skip, limit=capped_limit, projection={"_id": 0}
+        )
+
         return events, total
     
     async def get_pending_tasks(

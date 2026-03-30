@@ -784,16 +784,13 @@ class TestSendWhatsappMessage:
         })
         mock_db.notification_logs.insert_one = AsyncMock(return_value=_make_insert_result())
 
-        import httpx
         mock_response = MagicMock()
         mock_response.json.return_value = {"code": "SUCCESS", "results": {"message_id": "msg-1"}}
 
-        with patch('httpx.AsyncClient') as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
 
+        with patch('services.http_client.get_http_client', new_callable=AsyncMock, return_value=mock_client):
             result = await setup_server.send_whatsapp_message(
                 "+6281234567890", "Hello", member_id="mem-1"
             )
@@ -950,68 +947,104 @@ class TestTimezoneHelpers:
 # ==================== 21. Login rate limiting TESTS ====================
 
 class TestLoginRateLimiting:
-    """Test brute force protection."""
+    """Test brute force protection (DragonflyDB-backed)."""
 
-    def test_first_attempt_allowed(self, setup_server):
-        setup_server._login_attempts.clear()
-        allowed, msg = setup_server._check_login_rate_limit("127.0.0.1", "test@test.com")
+    @pytest.mark.asyncio
+    async def test_first_attempt_allowed(self, setup_server):
+        from dependencies import check_login_rate_limit, init_redis
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        init_redis(mock_redis)
+        allowed, msg = await check_login_rate_limit("127.0.0.1", "test@test.com")
+        assert allowed is True
+        assert msg is None
+        init_redis(None)
+
+    @pytest.mark.asyncio
+    async def test_record_failed_login(self, setup_server):
+        from dependencies import record_failed_login, init_redis
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
+        init_redis(mock_redis)
+        await record_failed_login("127.0.0.1", "test@test.com")
+        mock_redis.set.assert_called_once()
+        # Verify the stored data contains attempts=1
+        stored = json.loads(mock_redis.set.call_args[0][1])
+        assert stored["attempts"] == 1
+        init_redis(None)
+
+    @pytest.mark.asyncio
+    async def test_lockout_after_max_attempts(self, setup_server):
+        from dependencies import check_login_rate_limit, init_redis, LOGIN_MAX_ATTEMPTS
+        now = datetime.now(timezone.utc)
+        record = json.dumps({
+            "attempts": LOGIN_MAX_ATTEMPTS,
+            "last_attempt": now.isoformat(),
+            "locked_until": None
+        })
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=record)
+        mock_redis.set = AsyncMock()
+        init_redis(mock_redis)
+        allowed, msg = await check_login_rate_limit("127.0.0.1", "lock@test.com")
+        assert allowed is False
+        assert "locked" in msg.lower() or "Too many" in msg
+        init_redis(None)
+
+    @pytest.mark.asyncio
+    async def test_clear_login_attempts(self, setup_server):
+        from dependencies import clear_login_attempts, init_redis
+        mock_redis = AsyncMock()
+        mock_redis.delete = AsyncMock()
+        init_redis(mock_redis)
+        await clear_login_attempts("127.0.0.1", "clear@test.com")
+        mock_redis.delete.assert_called_once()
+        init_redis(None)
+
+    @pytest.mark.asyncio
+    async def test_no_redis_fails_open(self, setup_server):
+        """When redis is unavailable, rate limiting is skipped (fail open)."""
+        from dependencies import check_login_rate_limit, init_redis
+        init_redis(None)
+        allowed, msg = await check_login_rate_limit("127.0.0.1", "test@test.com")
         assert allowed is True
         assert msg is None
 
-    def test_record_failed_login(self, setup_server):
-        setup_server._login_attempts.clear()
-        setup_server._record_failed_login("127.0.0.1", "test@test.com")
-        key = "127.0.0.1:test@test.com"
-        assert key in setup_server._login_attempts
-        assert setup_server._login_attempts[key]["attempts"] == 1
-
-    def test_lockout_after_max_attempts(self, setup_server):
-        setup_server._login_attempts.clear()
-        for _ in range(5):
-            setup_server._record_failed_login("127.0.0.1", "lock@test.com")
-        allowed, msg = setup_server._check_login_rate_limit("127.0.0.1", "lock@test.com")
-        assert allowed is False
-        assert "locked" in msg.lower() or "Too many" in msg
-
-    def test_clear_login_attempts(self, setup_server):
-        setup_server._login_attempts.clear()
-        setup_server._record_failed_login("127.0.0.1", "clear@test.com")
-        setup_server._clear_login_attempts("127.0.0.1", "clear@test.com")
-        key = "127.0.0.1:clear@test.com"
-        assert key not in setup_server._login_attempts
-
-    def test_cleanup_old_attempts(self, setup_server):
-        setup_server._login_attempts.clear()
-        old_time = datetime.now(timezone.utc) - timedelta(hours=1)
-        setup_server._login_attempts["old:old@test.com"] = {
-            "attempts": 1,
-            "last_attempt": old_time,
-            "locked_until": None
-        }
-        setup_server._cleanup_old_login_attempts()
-        assert "old:old@test.com" not in setup_server._login_attempts
-
-    def test_lockout_expired_allows_access(self, setup_server):
-        setup_server._login_attempts.clear()
-        expired_lockout = datetime.now(timezone.utc) - timedelta(minutes=1)
-        setup_server._login_attempts["127.0.0.1:expired@test.com"] = {
+    @pytest.mark.asyncio
+    async def test_lockout_expired_allows_access(self, setup_server):
+        from dependencies import check_login_rate_limit, init_redis
+        expired_lockout = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        record = json.dumps({
             "attempts": 5,
-            "last_attempt": datetime.now(timezone.utc) - timedelta(minutes=20),
+            "last_attempt": (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat(),
             "locked_until": expired_lockout
-        }
-        allowed, msg = setup_server._check_login_rate_limit("127.0.0.1", "expired@test.com")
+        })
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=record)
+        mock_redis.delete = AsyncMock()
+        init_redis(mock_redis)
+        allowed, msg = await check_login_rate_limit("127.0.0.1", "expired@test.com")
         assert allowed is True
+        init_redis(None)
 
-    def test_record_failed_resets_outside_window(self, setup_server):
-        setup_server._login_attempts.clear()
-        old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
-        setup_server._login_attempts["127.0.0.1:reset@test.com"] = {
+    @pytest.mark.asyncio
+    async def test_record_failed_resets_outside_window(self, setup_server):
+        from dependencies import record_failed_login, init_redis
+        old_time = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        existing = json.dumps({
             "attempts": 3,
             "last_attempt": old_time,
             "locked_until": None
-        }
-        setup_server._record_failed_login("127.0.0.1", "reset@test.com")
-        assert setup_server._login_attempts["127.0.0.1:reset@test.com"]["attempts"] == 1
+        })
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=existing)
+        mock_redis.set = AsyncMock()
+        init_redis(mock_redis)
+        await record_failed_login("127.0.0.1", "reset@test.com")
+        stored = json.loads(mock_redis.set.call_args[0][1])
+        assert stored["attempts"] == 1
+        init_redis(None)
 
 
 # ==================== 22. _get_client_ip TESTS ====================
@@ -1020,31 +1053,35 @@ class TestGetClientIp:
     """Test client IP extraction from request."""
 
     def test_from_x_forwarded_for(self, setup_server):
+        from dependencies import get_client_ip
         req = MagicMock()
         req.headers = {"x-forwarded-for": "203.0.113.50, 70.41.3.18"}
         req.scope = {}
-        result = setup_server._get_client_ip(req)
+        result = get_client_ip(req)
         assert result == "203.0.113.50"
 
     def test_from_x_real_ip(self, setup_server):
+        from dependencies import get_client_ip
         req = MagicMock()
         req.headers = {"x-real-ip": "10.0.0.1"}
         req.scope = {}
-        result = setup_server._get_client_ip(req)
+        result = get_client_ip(req)
         assert result == "10.0.0.1"
 
     def test_from_scope_client(self, setup_server):
+        from dependencies import get_client_ip
         req = MagicMock()
         req.headers = {}
         req.scope = {"client": ("192.168.1.1", 12345)}
-        result = setup_server._get_client_ip(req)
+        result = get_client_ip(req)
         assert result == "192.168.1.1"
 
     def test_unknown_when_no_client(self, setup_server):
+        from dependencies import get_client_ip
         req = MagicMock()
         req.headers = {}
         req.scope = {}
-        result = setup_server._get_client_ip(req)
+        result = get_client_ip(req)
         assert result == "unknown"
 
 
@@ -1457,12 +1494,10 @@ class TestHttpRequestWithRetry:
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 200
 
-        with patch('httpx.AsyncClient') as mock_cls:
-            mock_client = AsyncMock()
-            mock_client.request = AsyncMock(return_value=mock_response)
-            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(return_value=mock_response)
 
+        with patch('services.http_client.get_http_client', new_callable=AsyncMock, return_value=mock_client):
             result = await setup_server.http_request_with_retry("GET", "http://example.com")
             assert result.status_code == 200
 
@@ -1480,12 +1515,10 @@ class TestHttpRequestWithRetry:
                 raise httpx.TimeoutException("timeout")
             return mock_response
 
-        with patch('httpx.AsyncClient') as mock_cls:
-            mock_client = AsyncMock()
-            mock_client.request = AsyncMock(side_effect=side_effect)
-            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(side_effect=side_effect)
 
+        with patch('services.http_client.get_http_client', new_callable=AsyncMock, return_value=mock_client):
             result = await setup_server.http_request_with_retry(
                 "GET", "http://example.com",
                 max_retries=3, retry_delays=[0, 0, 0], timeout=1.0
@@ -2038,8 +2071,10 @@ class TestSyncConfig:
         logs = [{"id": "log-1", "status": "success"}]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
-        mock_db.sync_logs.count_documents = AsyncMock(return_value=1)
-        mock_db.sync_logs.find = MagicMock(return_value=_make_mock_cursor(logs))
+        facet_result = [{"data": logs, "total": [{"count": len(logs)}]}]
+        mock_db.sync_logs.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor(facet_result)
+        )
 
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
@@ -2977,8 +3012,10 @@ class TestPastoralNotes:
         notes = [{"id": "note-1", "member_id": TEST_MEMBER_ID, "title": "Test"}]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
-        mock_db.pastoral_notes.count_documents = AsyncMock(return_value=1)
-        mock_db.pastoral_notes.find = MagicMock(return_value=_make_mock_cursor(notes))
+        facet_result = [{"data": notes, "total": [{"count": len(notes)}]}]
+        mock_db.pastoral_notes.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor(facet_result)
+        )
         mock_db.members.find_one = AsyncMock(return_value=_make_member())
 
         req = MagicMock()

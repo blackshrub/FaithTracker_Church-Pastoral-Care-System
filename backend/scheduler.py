@@ -122,35 +122,36 @@ async def send_whatsapp(phone: str, message: str, log_context: dict):
     # Retry loop with exponential backoff
     for attempt in range(WHATSAPP_MAX_RETRIES):
         try:
-            async with httpx.AsyncClient(timeout=30.0) as http_client:
-                response = await http_client.post(
-                    f"{whatsapp_url}/send/message",
-                    json={"phone": phone_formatted, "message": message}
-                )
-                result = response.json()
+            from services.http_client import get_http_client
+            http_client = await get_http_client()
+            response = await http_client.post(
+                f"{whatsapp_url}/send/message",
+                json={"phone": phone_formatted, "message": message}
+            )
+            result = response.json()
 
-                # Check if successful
-                if result.get('code') == 'SUCCESS':
-                    # Log successful notification
-                    await db.notification_logs.insert_one({
-                        **log_context,
-                        "channel": "whatsapp",
-                        "recipient": phone_formatted,
-                        "message": message,
-                        "status": "sent",
-                        "response_data": result,
-                        "attempts": attempt + 1,
-                        "created_at": datetime.now(timezone.utc)
-                    })
-                    return {"success": True, "result": result, "attempts": attempt + 1}
+            # Check if successful
+            if result.get('code') == 'SUCCESS':
+                # Log successful notification
+                await db.notification_logs.insert_one({
+                    **log_context,
+                    "channel": "whatsapp",
+                    "recipient": phone_formatted,
+                    "message": message,
+                    "status": "sent",
+                    "response_data": result,
+                    "attempts": attempt + 1,
+                    "created_at": datetime.now(timezone.utc)
+                })
+                return {"success": True, "result": result, "attempts": attempt + 1}
 
-                # Not successful but got a response - check if retryable
-                error_code = result.get('code', 'UNKNOWN')
-                last_error = f"Gateway returned: {error_code}"
+            # Not successful but got a response - check if retryable
+            error_code = result.get('code', 'UNKNOWN')
+            last_error = f"Gateway returned: {error_code}"
 
-                # Don't retry for non-recoverable errors
-                if error_code in ['INVALID_PHONE', 'NOT_REGISTERED']:
-                    break
+            # Don't retry for non-recoverable errors
+            if error_code in ['INVALID_PHONE', 'NOT_REGISTERED']:
+                break
 
         except httpx.ConnectError as e:
             last_error = f"Connection error: {str(e)}"
@@ -794,7 +795,7 @@ async def member_reconciliation_job():
         sync_configs = await db.sync_configs.find({
             "is_enabled": True,
             "reconciliation_enabled": True
-        }, {"_id": 0}).to_list(None)
+        }, {"_id": 0}).to_list(200)
 
         if not sync_configs:
             logger.info("No campuses configured for reconciliation")
@@ -881,7 +882,7 @@ async def refresh_all_dashboard_caches():
         init_dashboard_routes(get_campus_timezone, get_date_in_timezone, get_writeoff_settings)
 
         # Get all active campuses
-        campuses = await db.campuses.find({"is_active": True}, {"_id": 0, "id": 1, "campus_name": 1, "timezone": 1}).to_list(None)
+        campuses = await db.campuses.find({"is_active": True}, {"_id": 0, "id": 1, "campus_name": 1, "timezone": 1}).to_list(200)
 
         logger.info(f"Refreshing dashboard cache for {len(campuses)} campuses...")
 
@@ -1127,7 +1128,7 @@ async def check_missed_reconciliation():
         sync_configs = await db.sync_configs.find({
             "is_enabled": True,
             "reconciliation_enabled": True
-        }).to_list(None)
+        }).to_list(200)
         
         if not sync_configs:
             logger.info("No campuses configured for reconciliation")

@@ -70,13 +70,14 @@ class MemberService:
                 "membership_status": 1,
             }
         projection["_id"] = 0
-        
-        cursor = self._db.members.find(query, projection)
-        cursor = cursor.sort("name", 1).skip(skip).limit(min(limit, MAX_PAGE_SIZE))
-        
-        members = await cursor.to_list(length=limit)
-        total = await self._db.members.count_documents(query)
-        
+
+        from services.db_utils import paginated_query
+        capped_limit = min(limit, MAX_PAGE_SIZE)
+        members, total = await paginated_query(
+            self._db.members, query, sort=[("name", 1)],
+            skip=skip, limit=capped_limit, projection=projection
+        )
+
         return members, total
     
     async def create(

@@ -35,6 +35,26 @@ _get_campus_timezone: Optional[Callable[[str], Awaitable[str]]] = None
 _get_date_in_timezone: Optional[Callable[[str], str]] = None
 
 
+def _assert_initialized():
+    """Verify all callbacks have been set. Call at the start of mutating handlers."""
+    missing = [
+        name for name, val in [
+            ("_invalidate_dashboard_cache", _invalidate_dashboard_cache),
+            ("_log_activity", _log_activity),
+            ("_send_whatsapp_message", _send_whatsapp_message),
+            ("_generate_grief_timeline", _generate_grief_timeline),
+            ("_generate_accident_followup_timeline", _generate_accident_followup_timeline),
+            ("_get_campus_timezone", _get_campus_timezone),
+            ("_get_date_in_timezone", _get_date_in_timezone),
+        ] if val is None
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Care event routes not initialized. Missing callbacks: {', '.join(missing)}. "
+            "Call init_care_event_routes() during app startup."
+        )
+
+
 def init_care_event_routes(
     invalidate_dashboard_cache: Callable[[str], Awaitable[None]],
     log_activity: Callable[..., Awaitable[None]],
@@ -48,7 +68,7 @@ def init_care_event_routes(
     global _invalidate_dashboard_cache, _log_activity, _send_whatsapp_message
     global _generate_grief_timeline, _generate_accident_followup_timeline
     global _get_campus_timezone, _get_date_in_timezone
-    
+
     _invalidate_dashboard_cache = invalidate_dashboard_cache
     _log_activity = log_activity
     _send_whatsapp_message = send_whatsapp_message
@@ -845,7 +865,7 @@ async def bulk_complete_care_events(request: Request, data: BulkEventIds) -> dic
             query.update(campus_filter)
 
         # Get events to process (for logging)
-        events = await db.care_events.find(query, {"_id": 0}).to_list(None)
+        events = await db.care_events.find(query, {"_id": 0}).to_list(MAX_LIMIT)
         if not events:
             return {"success": True, "completed_count": 0, "message": "No pending events found"}
 
@@ -930,7 +950,7 @@ async def bulk_ignore_care_events(request: Request, data: BulkEventIds) -> dict:
             query.update(campus_filter)
 
         # Get events to process (for logging)
-        events = await db.care_events.find(query, {"_id": 0}).to_list(None)
+        events = await db.care_events.find(query, {"_id": 0}).to_list(MAX_LIMIT)
         if not events:
             return {"success": True, "ignored_count": 0, "message": "No pending events found"}
 
@@ -1004,7 +1024,7 @@ async def bulk_delete_care_events(request: Request, data: BulkEventIds) -> dict:
             query.update(campus_filter)
 
         # Get events to process (for logging and cleanup)
-        events = await db.care_events.find(query, {"_id": 0}).to_list(None)
+        events = await db.care_events.find(query, {"_id": 0}).to_list(MAX_LIMIT)
         if not events:
             return {"success": True, "deleted_count": 0, "message": "No events found"}
 

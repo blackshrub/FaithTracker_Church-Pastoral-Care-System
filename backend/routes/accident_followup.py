@@ -25,6 +25,23 @@ _get_campus_timezone: Optional[Callable] = None
 _get_date_in_timezone: Optional[Callable] = None
 
 
+def _assert_initialized():
+    """Verify all callbacks have been set. Call at the start of mutating handlers."""
+    missing = [
+        name for name, val in [
+            ("_invalidate_dashboard_cache", _invalidate_dashboard_cache),
+            ("_log_activity", _log_activity),
+            ("_get_campus_timezone", _get_campus_timezone),
+            ("_get_date_in_timezone", _get_date_in_timezone),
+        ] if val is None
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Accident followup routes not initialized. Missing callbacks: {', '.join(missing)}. "
+            "Call init_accident_followup_routes() during app startup."
+        )
+
+
 def init_accident_followup_routes(
     invalidate_dashboard_cache: Callable,
     log_activity: Callable,
@@ -88,6 +105,7 @@ async def get_member_accident_timeline(member_id: str, request: Request) -> dict
 @post("/accident-followup/{stage_id:str}/complete")
 async def complete_accident_stage(stage_id: str, request: Request, notes: Optional[str] = None) -> dict:
     """Mark accident follow-up stage as completed"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -177,6 +195,7 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: Option
 @post("/accident-followup/{stage_id:str}/undo")
 async def undo_accident_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of accident followup stage"""
+    _assert_initialized()
     db = get_db()
     try:
         stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
@@ -220,6 +239,7 @@ async def undo_accident_stage(stage_id: str, request: Request) -> dict:
 @post("/accident-followup/{stage_id:str}/ignore")
 async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
     """Mark an accident followup stage as ignored/dismissed"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:

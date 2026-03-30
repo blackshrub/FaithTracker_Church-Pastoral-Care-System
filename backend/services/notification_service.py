@@ -74,25 +74,27 @@ class NotificationService:
                     {"$inc": {"attempts": 1}}
                 )
                 
-                async with httpx.AsyncClient(timeout=API_RETRY_TIMEOUT) as client:
-                    response = await client.post(
-                        f"{self._whatsapp_url}/send/message",
-                        json={"phone": phone, "message": message}
+                from services.http_client import get_http_client
+                client = await get_http_client()
+                response = await client.post(
+                    f"{self._whatsapp_url}/send/message",
+                    json={"phone": phone, "message": message},
+                    timeout=API_RETRY_TIMEOUT,
+                )
+
+                if response.status_code in (200, 201):
+                    await self._db.notification_logs.update_one(
+                        {"id": notification_id},
+                        {"$set": {
+                            "status": NotificationStatus.SENT.value,
+                            "sent_at": datetime.now(timezone.utc),
+                            "response": response.json() if response.text else None
+                        }}
                     )
-                    
-                    if response.status_code in (200, 201):
-                        await self._db.notification_logs.update_one(
-                            {"id": notification_id},
-                            {"$set": {
-                                "status": NotificationStatus.SENT.value,
-                                "sent_at": datetime.now(timezone.utc),
-                                "response": response.json() if response.text else None
-                            }}
-                        )
-                        logger.info(f"WhatsApp sent to {phone}")
-                        return
-                    
-                    last_error = f"HTTP {response.status_code}: {response.text[:200]}"
+                    logger.info(f"WhatsApp sent to {phone}")
+                    return
+
+                last_error = f"HTTP {response.status_code}: {response.text[:200]}"
                     
             except httpx.TimeoutException as e:
                 last_error = f"Timeout: {str(e)}"

@@ -28,6 +28,24 @@ _get_campus_timezone: Optional[Callable[[str], Awaitable[str]]] = None
 _get_date_in_timezone: Optional[Callable[[str], str]] = None
 
 
+def _assert_initialized():
+    """Verify all callbacks have been set. Call at the start of mutating handlers."""
+    missing = [
+        name for name, val in [
+            ("_invalidate_dashboard_cache", _invalidate_dashboard_cache),
+            ("_log_activity", _log_activity),
+            ("_send_whatsapp_message", _send_whatsapp_message),
+            ("_get_campus_timezone", _get_campus_timezone),
+            ("_get_date_in_timezone", _get_date_in_timezone),
+        ] if val is None
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Grief support routes not initialized. Missing callbacks: {', '.join(missing)}. "
+            "Call init_grief_support_routes() during app startup."
+        )
+
+
 def init_grief_support_routes(
     invalidate_dashboard_cache: Callable[[str], Awaitable[None]],
     log_activity: Callable[..., Awaitable[None]],
@@ -38,7 +56,7 @@ def init_grief_support_routes(
     """Initialize grief support routes with callbacks to server.py functions"""
     global _invalidate_dashboard_cache, _log_activity, _send_whatsapp_message
     global _get_campus_timezone, _get_date_in_timezone
-    
+
     _invalidate_dashboard_cache = invalidate_dashboard_cache
     _log_activity = log_activity
     _send_whatsapp_message = send_whatsapp_message
@@ -96,6 +114,7 @@ async def get_member_grief_timeline(member_id: str, request: Request) -> dict:
 @post("/grief-support/{stage_id:str}/complete")
 async def complete_grief_stage(stage_id: str, request: Request, notes: Optional[str] = None) -> dict:
     """Mark grief stage as completed with notes"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -186,6 +205,7 @@ async def complete_grief_stage(stage_id: str, request: Request, notes: Optional[
 @post("/grief-support/{stage_id:str}/ignore")
 async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
     """Mark a grief support stage as ignored/dismissed"""
+    _assert_initialized()
     current_user = await get_current_user(request)
     db = get_db()
     try:
@@ -258,6 +278,7 @@ async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
 @post("/grief-support/{stage_id:str}/undo")
 async def undo_grief_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of grief support stage"""
+    _assert_initialized()
     await get_current_user(request)  # Verify auth
     db = get_db()
     try:
@@ -302,6 +323,7 @@ async def undo_grief_stage(stage_id: str, request: Request) -> dict:
 @post("/grief-support/{stage_id:str}/send-reminder")
 async def send_grief_reminder(stage_id: str) -> dict:
     """Send WhatsApp reminder for grief stage"""
+    _assert_initialized()
     db = get_db()
     try:
         stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})

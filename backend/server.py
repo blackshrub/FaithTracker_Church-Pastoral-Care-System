@@ -313,14 +313,15 @@ async def http_request_with_retry(
 ) -> httpx.Response:
     """
     Make an HTTP request with automatic retry on transient failures.
-    Uses exponential backoff for network errors and timeouts.
+    Uses shared connection pool. Per-request timeout override via timeout parameter.
     """
+    from services.http_client import get_http_client
     last_error = None
     for attempt in range(max_retries):
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.request(method, url, **kwargs)
-                return response
+            client = await get_http_client()
+            response = await client.request(method, url, timeout=timeout, **kwargs)
+            return response
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             last_error = e
             if attempt < max_retries - 1:
@@ -405,114 +406,6 @@ class SecurityHeadersMiddleware(AbstractMiddleware):
             await self.app(scope, receive, send_with_security_headers)
         else:
             await self.app(scope, receive, send)
-
-# ==================== LOGIN RATE LIMITING & ACCOUNT LOCKOUT ====================
-
-# In-memory storage for login attempts (per IP and per account)
-# Format: {"ip:email": {"attempts": int, "last_attempt": datetime, "locked_until": datetime | None}}
-_login_attempts: Dict[str, Dict[str, Any]] = {}
-
-# Security constants for brute force protection
-LOGIN_MAX_ATTEMPTS = 5  # Max failed attempts before lockout
-LOGIN_LOCKOUT_MINUTES = 15  # Account lockout duration
-LOGIN_ATTEMPT_WINDOW_MINUTES = 5  # Time window to count attempts
-
-def _get_client_ip(request: Request) -> str:
-    """Extract client IP from request, handling proxied requests"""
-    # Check X-Forwarded-For header (from Angie/reverse proxy)
-    forwarded_for = request.headers.get("x-forwarded-for", "")
-    if forwarded_for:
-        # Take the first IP (original client)
-        return forwarded_for.split(",")[0].strip()
-    # Check X-Real-IP header
-    real_ip = request.headers.get("x-real-ip", "")
-    if real_ip:
-        return real_ip.strip()
-    # Fallback to direct connection IP
-    client = request.scope.get("client")
-    return client[0] if client else "unknown"
-
-def _check_login_rate_limit(ip: str, email: str) -> tuple[bool, str | None]:
-    """
-    Check if login attempt is allowed.
-    Returns (is_allowed, error_message).
-    """
-    key = f"{ip}:{email.lower()}"
-    now = datetime.now(timezone.utc)
-
-    if key in _login_attempts:
-        record = _login_attempts[key]
-
-        # Check if account is locked
-        if record.get("locked_until"):
-            if now < record["locked_until"]:
-                remaining = int((record["locked_until"] - now).total_seconds() // 60) + 1
-                return False, f"Account temporarily locked. Try again in {remaining} minutes."
-            else:
-                # Lockout expired, reset
-                del _login_attempts[key]
-                return True, None
-
-        # Check if within attempt window
-        window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
-        if record["last_attempt"] > window_start:
-            if record["attempts"] >= LOGIN_MAX_ATTEMPTS:
-                # Lock the account
-                record["locked_until"] = now + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
-                logger.warning(f"Account locked due to too many failed attempts: {email} from {ip}")
-                return False, f"Too many failed attempts. Account locked for {LOGIN_LOCKOUT_MINUTES} minutes."
-
-    return True, None
-
-def _record_failed_login(ip: str, email: str) -> None:
-    """Record a failed login attempt"""
-    key = f"{ip}:{email.lower()}"
-    now = datetime.now(timezone.utc)
-
-    if key in _login_attempts:
-        record = _login_attempts[key]
-        window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
-
-        if record["last_attempt"] > window_start:
-            record["attempts"] += 1
-        else:
-            # Outside window, reset counter
-            record["attempts"] = 1
-        record["last_attempt"] = now
-    else:
-        _login_attempts[key] = {
-            "attempts": 1,
-            "last_attempt": now,
-            "locked_until": None
-        }
-
-    # Log failed attempt
-    attempts = _login_attempts[key]["attempts"]
-    logger.warning(f"Failed login attempt {attempts}/{LOGIN_MAX_ATTEMPTS} for {email} from {ip}")
-
-def _clear_login_attempts(ip: str, email: str) -> None:
-    """Clear login attempts after successful login"""
-    key = f"{ip}:{email.lower()}"
-    if key in _login_attempts:
-        del _login_attempts[key]
-
-# Cleanup old entries periodically (called on each login attempt)
-def _cleanup_old_login_attempts() -> None:
-    """Remove expired login attempt records to prevent memory growth"""
-    now = datetime.now(timezone.utc)
-    expiry = now - timedelta(minutes=LOGIN_LOCKOUT_MINUTES + LOGIN_ATTEMPT_WINDOW_MINUTES)
-
-    keys_to_delete = []
-    for key, record in _login_attempts.items():
-        # Remove if last attempt was long ago and not locked
-        if record["last_attempt"] < expiry and not record.get("locked_until"):
-            keys_to_delete.append(key)
-        # Remove if lockout has expired
-        elif record.get("locked_until") and record["locked_until"] < now:
-            keys_to_delete.append(key)
-
-    for key in keys_to_delete:
-        del _login_attempts[key]
 
 # ==================== SAFE ERROR HANDLING ====================
 
@@ -876,7 +769,24 @@ async def log_activity(
         pass
 
 async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
-    """Safe wrapper for broadcasting that won't fail if broadcast_activity isn't defined yet"""
+    """Broadcast activity via DragonflyDB pub/sub for cross-worker delivery.
+
+    Falls back to in-memory broadcast if DragonflyDB is unavailable.
+    """
+    import json as _json
+
+    # Primary: publish to DragonflyDB for cross-worker delivery
+    try:
+        from services.cache import get_redis_client
+        redis_client = get_redis_client()
+        if redis_client:
+            channel = f"ft:{campus_id}:activity"
+            await redis_client.publish(channel, _json.dumps(activity_data, default=str))
+            return
+    except Exception as e:
+        logger.debug(f"DragonflyDB publish failed, falling back to in-memory: {e}")
+
+    # Fallback: in-memory broadcast (single-worker only)
     try:
         await broadcast_activity(campus_id, activity_data)
     except NameError:
@@ -1028,31 +938,32 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
             "message": message
         }
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(f"{whatsapp_url}/send/message", json=payload)
-            response_data = response.json()
-            
-            # Log notification
-            status = NotificationStatus.SENT if response_data.get('code') == 'SUCCESS' else NotificationStatus.FAILED
-            
-            log_entry = NotificationLog(
-                care_event_id=care_event_id,
-                grief_support_id=grief_support_id,
-                member_id=member_id,
-                channel=NotificationChannel.WHATSAPP,
-                recipient=phone_formatted,
-                message=message,
-                status=status,
-                response_data=response_data
-            )
-            
-            await db.notification_logs.insert_one(to_mongo_doc(log_entry))
-            
-            return {
-                "success": status == NotificationStatus.SENT,
-                "message_id": response_data.get('results', {}).get('message_id'),
-                "response": response_data
-            }
+        from services.http_client import get_http_client
+        client = await get_http_client()
+        response = await client.post(f"{whatsapp_url}/send/message", json=payload)
+        response_data = response.json()
+
+        # Log notification
+        status = NotificationStatus.SENT if response_data.get('code') == 'SUCCESS' else NotificationStatus.FAILED
+
+        log_entry = NotificationLog(
+            care_event_id=care_event_id,
+            grief_support_id=grief_support_id,
+            member_id=member_id,
+            channel=NotificationChannel.WHATSAPP,
+            recipient=phone_formatted,
+            message=message,
+            status=status,
+            response_data=response_data
+        )
+
+        await db.notification_logs.insert_one(to_mongo_doc(log_entry))
+
+        return {
+            "success": status == NotificationStatus.SENT,
+            "message_id": response_data.get('results', {}).get('message_id'),
+            "response": response_data
+        }
     except Exception as e:
         logger.error(f"WhatsApp send error: {str(e)}")
         # Log failed attempt
@@ -1284,7 +1195,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
             grief_stages = await db.grief_support.find(
                 {"care_event_id": event_id},
                 {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
-            ).to_list(None)
+            ).to_list(MAX_LIMIT)
 
             # Get timeline entries created from these stages (to delete their activity logs)
             stage_ids = [s["id"] for s in grief_stages]
@@ -1293,7 +1204,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 timeline_entries = await db.care_events.find(
                     {"grief_stage_id": {"$in": stage_ids}},
                     {"_id": 0, "id": 1}
-                ).to_list(None)
+                ).to_list(MAX_LIMIT)
                 timeline_entry_ids = [e["id"] for e in timeline_entries]
 
                 # Delete activity logs and notification logs for these timeline entries
@@ -1312,7 +1223,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
             accident_stages = await db.accident_followup.find(
                 {"care_event_id": event_id},
                 {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
-            ).to_list(None)
+            ).to_list(MAX_LIMIT)
 
             # Get timeline entries created from these stages (to delete their activity logs)
             stage_ids = [s["id"] for s in accident_stages]
@@ -1321,7 +1232,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 timeline_entries = await db.care_events.find(
                     {"accident_stage_id": {"$in": stage_ids}},
                     {"_id": 0, "id": 1}
-                ).to_list(None)
+                ).to_list(MAX_LIMIT)
                 timeline_entry_ids = [e["id"] for e in timeline_entries]
 
                 # Delete activity logs and notification logs for these timeline entries
@@ -1511,7 +1422,7 @@ async def sync_members_from_external_api(
                 "is_archived": {"$ne": True}
             },
             {"_id": 0, "id": 1, "name": 1, "external_member_id": 1}
-        ).to_list(None)
+        ).to_list(MAX_LIMIT)
         
         for member in existing_external_members:
             if member["external_member_id"] not in external_ids:
@@ -3200,7 +3111,7 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
 
         # Get members scoped to user's campus for multi-tenancy
         campus_filter = get_campus_filter(current_user)
-        members = await db.members.find({**campus_filter}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(None)
+        members = await db.members.find({**campus_filter}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(MAX_LIMIT)
         
         updated_count = 0
         stats = {"active": 0, "at_risk": 0, "disconnected": 0}
@@ -4102,7 +4013,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
             }
 
             # Get existing members
-            existing_members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(None)
+            existing_members = await db.members.find({"campus_id": campus_id}, {"_id": 0}).to_list(MAX_LIMIT)
             existing_map = {m.get("external_member_id"): m for m in existing_members if m.get("external_member_id")}
 
             # Build additional lookup maps for name-based matching
@@ -4458,14 +4369,13 @@ async def get_sync_logs(
         if not campus_id:
             return {"logs": [], "total": 0, "has_more": False}
 
-        # Get total count
-        total = await db.sync_logs.count_documents({"campus_id": campus_id})
-
-        # Get paginated logs
-        logs = await db.sync_logs.find(
-            {"campus_id": campus_id},
-            {"_id": 0}
-        ).sort("started_at", -1).skip(skip).limit(limit).to_list(limit)
+        # Single $facet query for both data and count
+        from services.db_utils import paginated_query
+        logs, total = await paginated_query(
+            db.sync_logs, {"campus_id": campus_id},
+            sort=[("started_at", -1)], skip=skip, limit=limit,
+            projection={"_id": 0}
+        )
 
         return {
             "logs": logs,
@@ -5052,7 +4962,7 @@ async def get_activity_summary(request: Request) -> dict:
             {"$sort": {"count": -1}}
         ]
         
-        users = await db.activity_logs.aggregate(users_pipeline).to_list(None)
+        users = await db.activity_logs.aggregate(users_pipeline).to_list(MAX_LIMIT)
         
         # Count by action type
         actions_pipeline = [
@@ -5061,7 +4971,7 @@ async def get_activity_summary(request: Request) -> dict:
             {"$sort": {"count": -1}}
         ]
         
-        actions = await db.activity_logs.aggregate(actions_pipeline).to_list(None)
+        actions = await db.activity_logs.aggregate(actions_pipeline).to_list(MAX_LIMIT)
         
         return {
             "total_activities": total,
@@ -5076,8 +4986,8 @@ async def get_activity_summary(request: Request) -> dict:
 
 # ==================== SSE REAL-TIME ACTIVITY STREAM ====================
 
-# In-memory event subscribers (keyed by campus_id)
-# Each subscriber is an asyncio.Queue that receives activity events
+# In-memory event subscribers (keyed by campus_id) - used as fallback
+# when DragonflyDB is unavailable
 from asyncio import Queue
 from typing import Dict, Set
 import asyncio
@@ -5086,7 +4996,12 @@ _activity_subscribers: Dict[str, Set[Queue]] = {}
 _subscriber_lock = asyncio.Lock()
 
 async def broadcast_activity(campus_id: str, activity: dict):
-    """Broadcast an activity event to all subscribers for a campus"""
+    """Broadcast an activity event to all in-memory subscribers for a campus.
+
+    This is the fallback path used only when DragonflyDB pub/sub is unavailable.
+    The primary broadcast path is _broadcast_activity_safe() which publishes to
+    DragonflyDB for cross-worker delivery.
+    """
     async with _subscriber_lock:
         if campus_id in _activity_subscribers:
             for queue in _activity_subscribers[campus_id]:
@@ -5100,7 +5015,7 @@ async def broadcast_activity(campus_id: str, activity: dict):
                         pass
 
 async def subscribe_to_activities(campus_id: str) -> Queue:
-    """Subscribe to activity events for a campus"""
+    """Subscribe to activity events for a campus (in-memory fallback)"""
     queue: Queue = Queue(maxsize=100)
     async with _subscriber_lock:
         if campus_id not in _activity_subscribers:
@@ -5109,7 +5024,7 @@ async def subscribe_to_activities(campus_id: str) -> Queue:
     return queue
 
 async def unsubscribe_from_activities(campus_id: str, queue: Queue):
-    """Unsubscribe from activity events"""
+    """Unsubscribe from activity events (in-memory fallback)"""
     async with _subscriber_lock:
         if campus_id in _activity_subscribers:
             _activity_subscribers[campus_id].discard(queue)
@@ -5117,39 +5032,94 @@ async def unsubscribe_from_activities(campus_id: str, queue: Queue):
                 del _activity_subscribers[campus_id]
 
 def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
-    """Generate SSE events for activity stream - sync generator wrapper"""
+    """Generate SSE events using DragonflyDB pub/sub with in-memory fallback.
+
+    Primary path: subscribe to DragonflyDB channel ft:{campus_id}:activity
+    for cross-worker delivery of activity events.
+
+    Fallback path: read from in-memory asyncio.Queue (single-worker only).
+    """
     import json
 
-    async def _inner():
+    async def _dragonfly_stream():
+        """Stream events via DragonflyDB pub/sub (cross-worker)"""
+        from services.cache import get_redis_client
+        redis_client = get_redis_client()
+        if not redis_client:
+            return  # Signal caller to use fallback
+
+        # Create a separate connection for pub/sub (required by redis-py)
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(f"ft:{campus_id}:activity")
         try:
             # Send initial connection event
             yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
 
-            # Send heartbeat every 30 seconds to keep connection alive
-            heartbeat_interval = 30
+            heartbeat_interval = 15
 
             while True:
                 try:
-                    # Wait for event with timeout for heartbeat
-                    try:
-                        activity = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
-
+                    message = await pubsub.get_message(
+                        ignore_subscribe_messages=True,
+                        timeout=heartbeat_interval
+                    )
+                    if message and message["type"] == "message":
+                        data = json.loads(message["data"])
                         # Don't send user's own activities back to them
-                        if activity.get("user_id") != user_id:
-                            event_data = json.dumps(activity, default=str)
+                        if data.get("user_id") != user_id:
+                            event_data = json.dumps(data, default=str)
                             yield f"event: activity\ndata: {event_data}\n\n"
-
-                    except asyncio.TimeoutError:
-                        # Send heartbeat
+                    else:
+                        # Send heartbeat to keep connection alive
                         yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
 
                 except asyncio.CancelledError:
                     break
+        finally:
+            await pubsub.unsubscribe()
+            await pubsub.aclose()
 
+    async def _inmemory_stream():
+        """Stream events via in-memory queue (single-worker fallback)"""
+        try:
+            # Send initial connection event
+            yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
+
+            heartbeat_interval = 30
+
+            while True:
+                try:
+                    try:
+                        activity = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                        if activity.get("user_id") != user_id:
+                            event_data = json.dumps(activity, default=str)
+                            yield f"event: activity\ndata: {event_data}\n\n"
+                    except asyncio.TimeoutError:
+                        yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
+
+                except asyncio.CancelledError:
+                    break
         finally:
             await unsubscribe_from_activities(campus_id, queue)
 
-    return _inner()
+    async def _combined_stream():
+        """Try DragonflyDB pub/sub first, fall back to in-memory."""
+        try:
+            from services.cache import get_redis_client
+            redis_client = get_redis_client()
+            if redis_client:
+                # Test that we can actually connect for pub/sub
+                async for event in _dragonfly_stream():
+                    yield event
+                return
+        except Exception as e:
+            logger.debug(f"DragonflyDB SSE subscription failed, using in-memory fallback: {e}")
+
+        # Fallback to in-memory queue
+        async for event in _inmemory_stream():
+            yield event
+
+    return _combined_stream()
 
 @get("/stream/activity")
 async def stream_activity(request: Request, token: Optional[str] = None) -> Stream:
@@ -5323,14 +5293,20 @@ cors_config = CORSConfig(
 # Lifecycle functions
 async def on_startup() -> None:
     """Initialize dependencies, cache, and create default admin if needed"""
-    from services.cache import init_cache
-    
+    from services.cache import init_cache, get_redis_client
+    from dependencies import init_redis
+
     try:
         await init_cache()
         logger.info("DragonflyDB cache initialized")
+        # Initialize redis client for brute-force login protection (shared across workers)
+        redis_client = get_redis_client()
+        if redis_client:
+            init_redis(redis_client)
+            logger.info("Redis client initialized for login rate limiting")
     except Exception as e:
         logger.warning(f"Cache initialization failed (continuing without cache): {e}")
-    
+
     init_dependencies(db, SECRET_KEY)
     init_member_routes(invalidate_dashboard_cache, log_activity, msgspec_enc_hook, ROOT_DIR)
     init_care_event_routes(
@@ -5394,14 +5370,20 @@ async def on_startup() -> None:
 async def on_shutdown() -> None:
     """Cleanup on shutdown"""
     from services.cache import close_cache
-    
+    from services.http_client import close_http_client
+
     stop_scheduler()
-    
+
+    try:
+        await close_http_client()
+    except Exception as e:
+        logger.warning(f"Error closing HTTP client: {e}")
+
     try:
         await close_cache()
     except Exception as e:
         logger.warning(f"Error closing cache: {e}")
-    
+
     client.close()
 
 
@@ -5521,14 +5503,12 @@ async def list_pastoral_notes(
     # Pagination
     skip = (page - 1) * limit
 
-    # Get total count
-    total = await db.pastoral_notes.count_documents(query)
-
-    # Get notes
-    notes = await db.pastoral_notes.find(
-        query,
-        {"_id": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    # Single $facet query for both data and count
+    from services.db_utils import paginated_query
+    notes, total = await paginated_query(
+        db.pastoral_notes, query, sort=[("created_at", -1)],
+        skip=skip, limit=limit, projection={"_id": 0}
+    )
 
     # Enrich with member names
     for note in notes:

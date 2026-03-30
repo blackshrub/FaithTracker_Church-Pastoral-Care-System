@@ -244,14 +244,13 @@ class TestAuthRoutes:
 
     # ---- LOGIN ----
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.verify_password', return_value=True)
-    @patch('routes.auth.clear_login_attempts')
+    @patch('routes.auth.clear_login_attempts', new_callable=AsyncMock)
     @patch('routes.auth.create_access_token', return_value="test-jwt-token")
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
     async def test_login_success_full_admin(self, mock_ip, mock_token, mock_clear,
-                                             mock_verify, mock_rate, mock_cleanup):
+                                             mock_verify, mock_rate):
         from routes.auth import login
         from models import UserLogin
 
@@ -270,10 +269,9 @@ class TestAuthRoutes:
         assert result.user.email == "admin@test.com"
         assert result.user.campus_name == "Main Campus"
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_user_not_found(self, mock_ip, mock_rate, mock_cleanup):
+    async def test_login_user_not_found(self, mock_ip, mock_rate):
         from routes.auth import login
         from models import UserLogin
         from litestar.exceptions import HTTPException
@@ -287,11 +285,10 @@ class TestAuthRoutes:
             await _fn(login)(data=data, request=req)
         assert exc_info.value.status_code == 401
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.verify_password', return_value=False)
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_wrong_password(self, mock_ip, mock_verify, mock_rate, mock_cleanup):
+    async def test_login_wrong_password(self, mock_ip, mock_verify, mock_rate):
         from routes.auth import login
         from models import UserLogin
         from litestar.exceptions import HTTPException
@@ -306,10 +303,9 @@ class TestAuthRoutes:
             await _fn(login)(data=data, request=req)
         assert exc_info.value.status_code == 401
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(False, "Account temporarily locked. Try again in 15 minutes."))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(False, "Account temporarily locked. Try again in 15 minutes."))
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_rate_limited(self, mock_ip, mock_rate, mock_cleanup):
+    async def test_login_rate_limited(self, mock_ip, mock_rate):
         from routes.auth import login
         from models import UserLogin
         from litestar.exceptions import HTTPException
@@ -321,11 +317,10 @@ class TestAuthRoutes:
             await _fn(login)(data=data, request=req)
         assert exc_info.value.status_code == 429
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.verify_password', return_value=True)
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_disabled_account(self, mock_ip, mock_verify, mock_rate, mock_cleanup):
+    async def test_login_disabled_account(self, mock_ip, mock_verify, mock_rate):
         from routes.auth import login
         from models import UserLogin
         from litestar.exceptions import HTTPException
@@ -341,11 +336,10 @@ class TestAuthRoutes:
             await _fn(login)(data=data, request=req)
         assert exc_info.value.status_code == 403
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.verify_password', return_value=True)
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_full_admin_no_campus_selected(self, mock_ip, mock_verify, mock_rate, mock_cleanup):
+    async def test_login_full_admin_no_campus_selected(self, mock_ip, mock_verify, mock_rate):
         from routes.auth import login
         from models import UserLogin
         from litestar.exceptions import HTTPException
@@ -360,11 +354,10 @@ class TestAuthRoutes:
             await _fn(login)(data=data, request=req)
         assert exc_info.value.status_code == 400
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.verify_password', return_value=True)
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_campus_user_wrong_campus(self, mock_ip, mock_verify, mock_rate, mock_cleanup):
+    async def test_login_campus_user_wrong_campus(self, mock_ip, mock_verify, mock_rate):
         from routes.auth import login
         from models import UserLogin
         from litestar.exceptions import HTTPException
@@ -2938,38 +2931,38 @@ class TestDependencies:
         req.scope = {"client": ("192.168.1.1", 12345)}
         assert get_client_ip(req) == "192.168.1.1"
 
-    def test_check_login_rate_limit_allowed(self):
-        from dependencies import check_login_rate_limit, _login_attempts
-        _login_attempts.clear()
-        allowed, msg = check_login_rate_limit("127.0.0.1", "test@test.com")
+    async def test_check_login_rate_limit_allowed(self):
+        """Brute-force is now DragonflyDB-backed. No redis = fail open."""
+        from dependencies import check_login_rate_limit, init_redis
+        init_redis(None)  # No redis = always allow
+        allowed, msg = await check_login_rate_limit("127.0.0.1", "test@test.com")
         assert allowed is True
         assert msg is None
 
-    def test_record_failed_login(self):
-        from dependencies import record_failed_login, _login_attempts
-        _login_attempts.clear()
-        record_failed_login("127.0.0.1", "test@test.com")
-        key = "127.0.0.1:test@test.com"
-        assert key in _login_attempts
-        assert _login_attempts[key]["attempts"] == 1
+    async def test_record_failed_login(self):
+        from dependencies import record_failed_login, init_redis
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
+        init_redis(mock_redis)
+        await record_failed_login("127.0.0.1", "test@test.com")
+        mock_redis.set.assert_called_once()
+        init_redis(None)
 
-    def test_clear_login_attempts(self):
-        from dependencies import record_failed_login, clear_login_attempts, _login_attempts
-        _login_attempts.clear()
-        record_failed_login("127.0.0.1", "test@test.com")
-        clear_login_attempts("127.0.0.1", "test@test.com")
-        key = "127.0.0.1:test@test.com"
-        assert key not in _login_attempts
+    async def test_clear_login_attempts(self):
+        from dependencies import clear_login_attempts, init_redis
+        mock_redis = AsyncMock()
+        mock_redis.delete = AsyncMock()
+        init_redis(mock_redis)
+        await clear_login_attempts("127.0.0.1", "test@test.com")
+        mock_redis.delete.assert_called_once()
+        init_redis(None)
 
-    def test_cleanup_old_login_attempts(self):
-        from dependencies import cleanup_old_login_attempts, _login_attempts
-        _login_attempts.clear()
-        old_time = NOW - timedelta(hours=1)
-        _login_attempts["old:test@test.com"] = {
-            "attempts": 3, "last_attempt": old_time, "locked_until": None
-        }
-        cleanup_old_login_attempts()
-        assert "old:test@test.com" not in _login_attempts
+    async def test_cleanup_old_login_attempts(self):
+        """cleanup_old_login_attempts was removed - TTL handles expiry automatically."""
+        # This test validates that the function no longer exists
+        import dependencies
+        assert not hasattr(dependencies, 'cleanup_old_login_attempts')
 
     def test_get_db_not_initialized(self):
         from dependencies import get_db
@@ -3046,20 +3039,26 @@ class TestDependencies:
             await get_full_admin(req)
         assert exc_info.value.status_code == 403
 
-    def test_login_lockout_flow(self):
+    async def test_login_lockout_flow(self):
+        """Full lockout flow with DragonflyDB-backed brute force protection."""
         from dependencies import (
-            check_login_rate_limit, record_failed_login, _login_attempts,
+            check_login_rate_limit, record_failed_login, init_redis,
             LOGIN_MAX_ATTEMPTS
         )
-        _login_attempts.clear()
+        redis_store = {}
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(side_effect=lambda k: redis_store.get(k))
+        mock_redis.set = AsyncMock(side_effect=lambda k, v, ex=None: redis_store.update({k: v}))
+        mock_redis.delete = AsyncMock(side_effect=lambda k: redis_store.pop(k, None))
+        init_redis(mock_redis)
+
         ip = "10.0.0.1"
         email = "lockout@test.com"
 
-        # Record max attempts
         for i in range(LOGIN_MAX_ATTEMPTS):
-            record_failed_login(ip, email)
+            await record_failed_login(ip, email)
 
-        # Next check should lock
-        allowed, msg = check_login_rate_limit(ip, email)
+        allowed, msg = await check_login_rate_limit(ip, email)
         assert allowed is False
         assert "locked" in msg.lower() or "Too many" in msg
+        init_redis(None)

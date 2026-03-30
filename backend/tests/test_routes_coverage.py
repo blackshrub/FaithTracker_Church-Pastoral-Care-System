@@ -250,10 +250,9 @@ class TestAuthRoutesCoverage:
 
     # ---- Lines 198-200: login - generic exception -> 500 ----
 
-    @patch('routes.auth.cleanup_old_login_attempts')
-    @patch('routes.auth.check_login_rate_limit', return_value=(True, None))
+    @patch('routes.auth.check_login_rate_limit', new_callable=AsyncMock, return_value=(True, None))
     @patch('routes.auth.get_client_ip', return_value="127.0.0.1")
-    async def test_login_unexpected_exception(self, mock_ip, mock_rate, mock_cleanup):
+    async def test_login_unexpected_exception(self, mock_ip, mock_rate):
         """Covers lines 198-200: unexpected error in login"""
         from routes.auth import login
         from models import UserLogin
@@ -692,7 +691,10 @@ class TestMemberRoutesCoverage:
         from litestar.exceptions import HTTPException
 
         mock_user.return_value = make_admin_user()
-        mock_db.members.count_documents = AsyncMock(side_effect=RuntimeError("DB error"))
+        # paginated_query uses aggregate which should throw
+        mock_cursor = MagicMock()
+        mock_cursor.to_list = AsyncMock(side_effect=RuntimeError("DB error"))
+        mock_db.members.aggregate = MagicMock(return_value=mock_cursor)
 
         req = make_request()
         with pytest.raises(HTTPException) as exc_info:

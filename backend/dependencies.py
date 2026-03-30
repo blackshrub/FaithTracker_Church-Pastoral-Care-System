@@ -8,6 +8,7 @@ from litestar.status_codes import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 import jwt
 import bcrypt
 import os
+import json
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -137,16 +138,22 @@ def safe_error_detail(e: Exception, status_code: int = 500) -> str:
         return str(e)
 
 
-# ==================== BRUTE FORCE PROTECTION ====================
+# ==================== BRUTE FORCE PROTECTION (DragonflyDB-backed) ====================
 
-# In-memory storage for login attempts (per IP and per account)
-# Format: {"ip:email": {"attempts": int, "last_attempt": datetime, "locked_until": datetime | None}}
-_login_attempts: dict = {}
+# Redis client reference (set by server.py on startup via init_redis)
+_redis = None
 
 # Security constants for brute force protection
 LOGIN_MAX_ATTEMPTS = 5  # Max failed attempts before lockout
 LOGIN_LOCKOUT_MINUTES = 15  # Account lockout duration
 LOGIN_ATTEMPT_WINDOW_MINUTES = 5  # Time window to count attempts
+_LOGIN_KEY_TTL_SECONDS = int((LOGIN_LOCKOUT_MINUTES + LOGIN_ATTEMPT_WINDOW_MINUTES) * 60)
+
+
+def init_redis(redis_client):
+    """Initialize redis client for brute force protection (called from server.py on startup)"""
+    global _redis
+    _redis = redis_client
 
 
 def get_client_ip(request: Request) -> str:
@@ -165,86 +172,91 @@ def get_client_ip(request: Request) -> str:
     return client[0] if client else "unknown"
 
 
-def check_login_rate_limit(ip: str, email: str) -> tuple[bool, str | None]:
+async def check_login_rate_limit(ip: str, email: str) -> tuple[bool, str | None]:
     """
-    Check if login attempt is allowed.
+    Check if login attempt is allowed (DragonflyDB-backed, works across workers).
     Returns (is_allowed, error_message).
     """
-    key = f"{ip}:{email.lower()}"
-    now = datetime.now(timezone.utc)
+    if _redis is None:
+        return True, None  # Fail open if redis unavailable
 
-    if key in _login_attempts:
-        record = _login_attempts[key]
+    key = f"ft:login:{ip}:{email.lower()}"
+    try:
+        data = await _redis.get(key)
+        if data:
+            record = json.loads(data)
+            now = datetime.now(timezone.utc)
 
-        # Check if account is locked
-        if record.get("locked_until"):
-            if now < record["locked_until"]:
-                remaining = int((record["locked_until"] - now).total_seconds() // 60) + 1
-                return False, f"Account temporarily locked. Try again in {remaining} minutes."
-            else:
-                # Lockout expired, reset
-                del _login_attempts[key]
-                return True, None
+            # Check if account is locked
+            if record.get("locked_until"):
+                locked_until = datetime.fromisoformat(record["locked_until"])
+                if now < locked_until:
+                    remaining = int((locked_until - now).total_seconds() // 60) + 1
+                    return False, f"Account temporarily locked. Try again in {remaining} minutes."
+                else:
+                    # Lockout expired, remove key
+                    await _redis.delete(key)
+                    return True, None
 
-        # Check if within attempt window
-        window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
-        if record["last_attempt"] > window_start:
+            # Check if attempts exceed max within window
             if record["attempts"] >= LOGIN_MAX_ATTEMPTS:
-                # Lock the account
-                record["locked_until"] = now + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
-                logger.warning(f"Account locked due to too many failed attempts: {email} from {ip}")
-                return False, f"Too many failed attempts. Account locked for {LOGIN_LOCKOUT_MINUTES} minutes."
+                last_attempt = datetime.fromisoformat(record["last_attempt"])
+                window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
+                if last_attempt > window_start:
+                    # Lock the account
+                    record["locked_until"] = (now + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)).isoformat()
+                    await _redis.set(key, json.dumps(record), ex=_LOGIN_KEY_TTL_SECONDS)
+                    logger.warning(f"Account locked due to too many failed attempts: {email} from {ip}")
+                    return False, f"Too many failed attempts. Account locked for {LOGIN_LOCKOUT_MINUTES} minutes."
+    except Exception:
+        return True, None  # Fail open if redis errors
 
     return True, None
 
 
-def record_failed_login(ip: str, email: str) -> None:
-    """Record a failed login attempt"""
-    key = f"{ip}:{email.lower()}"
+async def record_failed_login(ip: str, email: str) -> None:
+    """Record a failed login attempt in DragonflyDB"""
+    if _redis is None:
+        return
+
+    key = f"ft:login:{ip}:{email.lower()}"
     now = datetime.now(timezone.utc)
 
-    if key in _login_attempts:
-        record = _login_attempts[key]
-        window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
+    try:
+        data = await _redis.get(key)
+        if data:
+            record = json.loads(data)
+            last_attempt = datetime.fromisoformat(record["last_attempt"])
+            window_start = now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
 
-        if record["last_attempt"] > window_start:
-            record["attempts"] += 1
+            if last_attempt > window_start:
+                record["attempts"] += 1
+            else:
+                # Outside window, reset counter
+                record["attempts"] = 1
+            record["last_attempt"] = now.isoformat()
         else:
-            # Outside window, reset counter
-            record["attempts"] = 1
-        record["last_attempt"] = now
-    else:
-        _login_attempts[key] = {
-            "attempts": 1,
-            "last_attempt": now,
-            "locked_until": None
-        }
+            record = {
+                "attempts": 1,
+                "last_attempt": now.isoformat(),
+                "locked_until": None
+            }
 
-    # Log failed attempt
-    attempts = _login_attempts[key]["attempts"]
-    logger.warning(f"Failed login attempt {attempts}/{LOGIN_MAX_ATTEMPTS} for {email} from {ip}")
+        await _redis.set(key, json.dumps(record), ex=_LOGIN_KEY_TTL_SECONDS)
+
+        # Log failed attempt
+        logger.warning(f"Failed login attempt {record['attempts']}/{LOGIN_MAX_ATTEMPTS} for {email} from {ip}")
+    except Exception as e:
+        logger.warning(f"Failed to record login attempt in redis: {e}")
 
 
-def clear_login_attempts(ip: str, email: str) -> None:
+async def clear_login_attempts(ip: str, email: str) -> None:
     """Clear login attempts after successful login"""
-    key = f"{ip}:{email.lower()}"
-    if key in _login_attempts:
-        del _login_attempts[key]
+    if _redis is None:
+        return
 
-
-def cleanup_old_login_attempts() -> None:
-    """Remove expired login attempt records to prevent memory growth"""
-    now = datetime.now(timezone.utc)
-    expiry = now - timedelta(minutes=LOGIN_LOCKOUT_MINUTES + LOGIN_ATTEMPT_WINDOW_MINUTES)
-
-    keys_to_delete = []
-    for key, record in _login_attempts.items():
-        # Remove if last attempt was long ago and not locked
-        if record["last_attempt"] < expiry and not record.get("locked_until"):
-            keys_to_delete.append(key)
-        # Remove if lockout has expired
-        elif record.get("locked_until") and record["locked_until"] < now:
-            keys_to_delete.append(key)
-
-    for key in keys_to_delete:
-        del _login_attempts[key]
+    key = f"ft:login:{ip}:{email.lower()}"
+    try:
+        await _redis.delete(key)
+    except Exception as e:
+        logger.warning(f"Failed to clear login attempts in redis: {e}")

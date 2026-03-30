@@ -1711,13 +1711,15 @@ class TestSyncLogs:
         user = _make_campus_admin_user()
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
-        mock_db.sync_logs.count_documents = AsyncMock(return_value=2)
 
         logs = [
             {"id": "sl1", "status": "success", "members_fetched": 50},
             {"id": "sl2", "status": "error", "error_message": "Timeout"},
         ]
-        mock_db.sync_logs.find = MagicMock(return_value=_make_mock_cursor(logs))
+        facet_result = [{"data": logs, "total": [{"count": len(logs)}]}]
+        mock_db.sync_logs.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor(facet_result)
+        )
 
         result = await setup_server.get_sync_logs.fn(request=request)
         assert result["total"] == 2

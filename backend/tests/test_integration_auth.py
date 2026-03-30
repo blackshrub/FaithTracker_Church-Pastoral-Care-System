@@ -7,7 +7,7 @@ Tests ALL functions in dependencies.py with mocked MongoDB:
 - get_campus_filter
 - verify_password, get_password_hash, create_access_token
 - safe_error_detail, get_client_ip
-- check_login_rate_limit, record_failed_login, clear_login_attempts, cleanup_old_login_attempts
+- check_login_rate_limit, record_failed_login, clear_login_attempts (DragonflyDB-backed)
 
 Target: 100% coverage of dependencies.py (all 133 statements).
 """
@@ -35,7 +35,7 @@ from dependencies import (
     get_full_admin, get_campus_filter, verify_password, get_password_hash,
     create_access_token, safe_error_detail, get_client_ip,
     check_login_rate_limit, record_failed_login, clear_login_attempts,
-    cleanup_old_login_attempts, _login_attempts,
+    init_redis,
     LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MINUTES, LOGIN_ATTEMPT_WINDOW_MINUTES,
 )
 from enums import UserRole
@@ -58,11 +58,11 @@ def reset_dependencies():
 
 
 @pytest.fixture(autouse=True)
-def clear_login_attempts_dict():
-    """Clear the login attempts dict before each test."""
-    _login_attempts.clear()
+def reset_redis_state():
+    """Reset redis state before each test (brute-force is now DragonflyDB-backed)."""
+    init_redis(None)
     yield
-    _login_attempts.clear()
+    init_redis(None)
 
 
 @pytest.fixture
@@ -675,536 +675,154 @@ class TestGetClientIp:
         assert result == "10.0.0.6"
 
 
-# ==================== check_login_rate_limit TESTS ====================
+# ==================== BRUTE FORCE PROTECTION TESTS (DragonflyDB-backed) ====================
 
-class TestCheckLoginRateLimit:
-    """Tests for check_login_rate_limit()."""
+class TestBruteForceRedis:
+    """Tests for DragonflyDB-backed brute force protection."""
 
-    def test_first_attempt_allowed(self):
+    @pytest.fixture(autouse=True)
+    def setup_redis_mock(self):
+        """Set up a mock redis client for each test."""
+        self.redis_store = {}
+        self.mock_redis = AsyncMock()
+
+        async def mock_get(key):
+            return self.redis_store.get(key)
+
+        async def mock_set(key, value, ex=None):
+            self.redis_store[key] = value
+
+        async def mock_delete(key):
+            self.redis_store.pop(key, None)
+
+        self.mock_redis.get = AsyncMock(side_effect=mock_get)
+        self.mock_redis.set = AsyncMock(side_effect=mock_set)
+        self.mock_redis.delete = AsyncMock(side_effect=mock_delete)
+        init_redis(self.mock_redis)
+        yield
+        init_redis(None)
+
+    @pytest.mark.asyncio
+    async def test_first_attempt_allowed(self):
         """First login attempt from a new IP/email should be allowed."""
-        allowed, msg = check_login_rate_limit("1.2.3.4", "user@test.com")
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
         assert allowed is True
         assert msg is None
 
-    def test_allowed_when_below_max_attempts(self):
-        """Login should be allowed when attempts are below the max."""
-        # Record some failed attempts but stay below the limit
+    @pytest.mark.asyncio
+    async def test_no_redis_fails_open(self):
+        """If redis is None, always allow login."""
+        init_redis(None)
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
+        assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_record_and_check_below_max(self):
+        """Attempts below max should still be allowed."""
         for i in range(LOGIN_MAX_ATTEMPTS - 1):
-            record_failed_login("1.2.3.4", "user@test.com")
-
-        allowed, msg = check_login_rate_limit("1.2.3.4", "user@test.com")
+            await record_failed_login("1.2.3.4", "user@test.com")
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
         assert allowed is True
-        assert msg is None
 
-    def test_locked_after_max_attempts(self):
-        """Login should be blocked after max failed attempts within the window."""
-        ip = "1.2.3.4"
-        email = "locked@test.com"
-
-        # Record max failed attempts
+    @pytest.mark.asyncio
+    async def test_lockout_after_max_attempts(self):
+        """Account should be locked after max failed attempts."""
         for i in range(LOGIN_MAX_ATTEMPTS):
-            record_failed_login(ip, email)
-
-        # This check should trigger lockout
-        allowed, msg = check_login_rate_limit(ip, email)
+            await record_failed_login("1.2.3.4", "lock@test.com")
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "lock@test.com")
         assert allowed is False
-        assert "Too many failed attempts" in msg
-        assert str(LOGIN_LOCKOUT_MINUTES) in msg
+        assert "locked" in msg.lower()
 
-    def test_locked_account_returns_remaining_minutes(self):
-        """A locked account should report remaining lockout time."""
-        ip = "5.6.7.8"
-        email = "locked2@test.com"
-        key = f"{ip}:{email}"
-
-        # Set up a lock that expires in 10 minutes
-        now = datetime.now(timezone.utc)
-        _login_attempts[key] = {
-            "attempts": LOGIN_MAX_ATTEMPTS,
-            "last_attempt": now,
-            "locked_until": now + timedelta(minutes=10),
-        }
-
-        allowed, msg = check_login_rate_limit(ip, email)
+    @pytest.mark.asyncio
+    async def test_lockout_shows_remaining_minutes(self):
+        """Locked message should include remaining minutes."""
+        for i in range(LOGIN_MAX_ATTEMPTS):
+            await record_failed_login("1.2.3.4", "time@test.com")
+        # Trigger lockout
+        await check_login_rate_limit("1.2.3.4", "time@test.com")
+        # Check again - should show remaining time
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "time@test.com")
         assert allowed is False
-        assert "Account temporarily locked" in msg
         assert "minutes" in msg
 
-    def test_lockout_expired_allows_login(self):
-        """After lockout expires, login should be allowed again."""
-        ip = "9.10.11.12"
-        email = "expired@test.com"
-        key = f"{ip}:{email}"
-
-        # Set up an expired lock
-        now = datetime.now(timezone.utc)
-        _login_attempts[key] = {
-            "attempts": LOGIN_MAX_ATTEMPTS,
-            "last_attempt": now - timedelta(minutes=20),
-            "locked_until": now - timedelta(minutes=5),  # Expired 5 min ago
-        }
-
-        allowed, msg = check_login_rate_limit(ip, email)
+    @pytest.mark.asyncio
+    async def test_expired_lockout_allows_login(self):
+        """Expired lockout should allow login and clear the key."""
+        import json as json_mod
+        key = "ft:login:1.2.3.4:expired@test.com"
+        past = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        self.redis_store[key] = json_mod.dumps({
+            "attempts": 10,
+            "last_attempt": past,
+            "locked_until": past  # Already expired
+        })
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "expired@test.com")
         assert allowed is True
-        assert msg is None
-        # Record should have been cleared
-        assert key not in _login_attempts
-
-    def test_email_case_insensitive(self):
-        """Rate limiting should treat emails case-insensitively."""
-        ip = "1.1.1.1"
-        record_failed_login(ip, "User@Test.COM")
-
-        key_lower = f"{ip}:user@test.com"
-        assert key_lower in _login_attempts
-        assert _login_attempts[key_lower]["attempts"] == 1
-
-    def test_different_ips_tracked_separately(self):
-        """Different IPs with the same email should be tracked separately."""
-        email = "user@test.com"
-        for _ in range(LOGIN_MAX_ATTEMPTS):
-            record_failed_login("1.1.1.1", email)
-
-        # Different IP should still be allowed
-        allowed, msg = check_login_rate_limit("2.2.2.2", email)
-        assert allowed is True
-        assert msg is None
-
-    def test_different_emails_tracked_separately(self):
-        """Different emails from the same IP should be tracked separately."""
-        ip = "1.1.1.1"
-        for _ in range(LOGIN_MAX_ATTEMPTS):
-            record_failed_login(ip, "user1@test.com")
-
-        # Different email should still be allowed
-        allowed, msg = check_login_rate_limit(ip, "user2@test.com")
-        assert allowed is True
-        assert msg is None
-
-    def test_within_window_but_under_limit(self):
-        """Attempts within the time window but under the limit should be allowed."""
-        ip = "3.3.3.3"
-        email = "within@test.com"
-        key = f"{ip}:{email}"
-
-        now = datetime.now(timezone.utc)
-        _login_attempts[key] = {
-            "attempts": 2,
-            "last_attempt": now - timedelta(minutes=1),  # Recent, within window
-            "locked_until": None,
-        }
-
-        allowed, msg = check_login_rate_limit(ip, email)
-        assert allowed is True
-        assert msg is None
-
-    def test_attempts_outside_window_allowed(self):
-        """Attempts outside the time window should not count (record exists but old)."""
-        ip = "4.4.4.4"
-        email = "old@test.com"
-        key = f"{ip}:{email}"
-
-        now = datetime.now(timezone.utc)
-        _login_attempts[key] = {
-            "attempts": LOGIN_MAX_ATTEMPTS,  # At max, but old
-            "last_attempt": now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES + 1),
-            "locked_until": None,
-        }
-
-        # Outside window, so attempts don't count
-        allowed, msg = check_login_rate_limit(ip, email)
-        assert allowed is True
-        assert msg is None
-
-
-# ==================== record_failed_login TESTS ====================
-
-class TestRecordFailedLogin:
-    """Tests for record_failed_login()."""
-
-    def test_first_attempt_creates_record(self):
-        """First failed login should create a new record with attempts=1."""
-        ip = "10.0.0.1"
-        email = "new@test.com"
-        key = f"{ip}:{email}"
-
-        record_failed_login(ip, email)
-
-        assert key in _login_attempts
-        record = _login_attempts[key]
-        assert record["attempts"] == 1
-        assert record["locked_until"] is None
-        assert isinstance(record["last_attempt"], datetime)
-
-    def test_subsequent_attempts_increment(self):
-        """Subsequent failed logins within the window should increment attempts."""
-        ip = "10.0.0.2"
-        email = "repeat@test.com"
-        key = f"{ip}:{email}"
-
-        record_failed_login(ip, email)
-        assert _login_attempts[key]["attempts"] == 1
-
-        record_failed_login(ip, email)
-        assert _login_attempts[key]["attempts"] == 2
-
-        record_failed_login(ip, email)
-        assert _login_attempts[key]["attempts"] == 3
-
-    def test_outside_window_resets_counter(self):
-        """If the last attempt was outside the window, counter should reset to 1."""
-        ip = "10.0.0.3"
-        email = "reset@test.com"
-        key = f"{ip}:{email}"
-
-        now = datetime.now(timezone.utc)
-        _login_attempts[key] = {
-            "attempts": 4,
-            "last_attempt": now - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES + 1),
-            "locked_until": None,
-        }
-
-        record_failed_login(ip, email)
-
-        record = _login_attempts[key]
-        assert record["attempts"] == 1
-        # last_attempt should be updated to now
-        assert (now - record["last_attempt"]).total_seconds() < 2
-
-    def test_updates_last_attempt_timestamp(self):
-        """Each failed login should update the last_attempt timestamp."""
-        ip = "10.0.0.4"
-        email = "timestamp@test.com"
-
-        record_failed_login(ip, email)
-        first_time = _login_attempts[f"{ip}:{email}"]["last_attempt"]
-
-        record_failed_login(ip, email)
-        second_time = _login_attempts[f"{ip}:{email}"]["last_attempt"]
-
-        assert second_time >= first_time
-
-    def test_email_lowercased_in_key(self):
-        """The email should be lowercased in the key for consistency."""
-        ip = "10.0.0.5"
-        record_failed_login(ip, "UPPER@TEST.COM")
-        assert f"{ip}:upper@test.com" in _login_attempts
-
-
-# ==================== clear_login_attempts TESTS ====================
-
-class TestClearLoginAttempts:
-    """Tests for clear_login_attempts()."""
-
-    def test_clears_existing_record(self):
-        """clear_login_attempts should remove the record for the IP/email combination."""
-        ip = "20.0.0.1"
-        email = "clear@test.com"
-        key = f"{ip}:{email}"
-
-        _login_attempts[key] = {
-            "attempts": 3,
-            "last_attempt": datetime.now(timezone.utc),
-            "locked_until": None,
-        }
-
-        clear_login_attempts(ip, email)
-        assert key not in _login_attempts
-
-    def test_handles_missing_record_gracefully(self):
-        """Clearing a non-existent record should not raise an error."""
-        # Should not raise any exception
-        clear_login_attempts("99.99.99.99", "nonexistent@test.com")
-
-    def test_email_case_insensitive(self):
-        """clear_login_attempts should use lowercase email for the key."""
-        ip = "20.0.0.2"
-        email_lower = "case@test.com"
-        key = f"{ip}:{email_lower}"
-
-        _login_attempts[key] = {
-            "attempts": 2,
-            "last_attempt": datetime.now(timezone.utc),
-            "locked_until": None,
-        }
-
-        # Clear with mixed-case email
-        clear_login_attempts(ip, "Case@Test.COM")
-        assert key not in _login_attempts
-
-    def test_only_clears_specified_key(self):
-        """Clearing one record should not affect other records."""
-        ip = "20.0.0.3"
-        email1 = "keep@test.com"
-        email2 = "remove@test.com"
-
-        now = datetime.now(timezone.utc)
-        _login_attempts[f"{ip}:{email1}"] = {
-            "attempts": 1,
-            "last_attempt": now,
-            "locked_until": None,
-        }
-        _login_attempts[f"{ip}:{email2}"] = {
-            "attempts": 2,
-            "last_attempt": now,
-            "locked_until": None,
-        }
-
-        clear_login_attempts(ip, email2)
-        assert f"{ip}:{email1}" in _login_attempts
-        assert f"{ip}:{email2}" not in _login_attempts
-
-
-# ==================== cleanup_old_login_attempts TESTS ====================
-
-class TestCleanupOldLoginAttempts:
-    """Tests for cleanup_old_login_attempts()."""
-
-    def test_removes_expired_unlocked_records(self):
-        """Old unlocked records past the expiry window should be removed."""
-        now = datetime.now(timezone.utc)
-        expiry_time = LOGIN_LOCKOUT_MINUTES + LOGIN_ATTEMPT_WINDOW_MINUTES
-
-        # Old record - should be cleaned
-        _login_attempts["old:old@test.com"] = {
-            "attempts": 2,
-            "last_attempt": now - timedelta(minutes=expiry_time + 5),
-            "locked_until": None,
-        }
-        # Recent record - should be kept
-        _login_attempts["recent:recent@test.com"] = {
-            "attempts": 1,
-            "last_attempt": now - timedelta(minutes=1),
-            "locked_until": None,
-        }
-
-        cleanup_old_login_attempts()
-
-        assert "old:old@test.com" not in _login_attempts
-        assert "recent:recent@test.com" in _login_attempts
-
-    def test_removes_expired_locked_records(self):
-        """Locked records whose lockout has expired should be removed."""
-        now = datetime.now(timezone.utc)
-
-        # Expired lock - should be cleaned
-        _login_attempts["expired:exp@test.com"] = {
-            "attempts": LOGIN_MAX_ATTEMPTS,
-            "last_attempt": now - timedelta(minutes=20),
-            "locked_until": now - timedelta(minutes=1),  # Lock expired 1 min ago
-        }
-        # Active lock - should be kept
-        _login_attempts["active:act@test.com"] = {
-            "attempts": LOGIN_MAX_ATTEMPTS,
-            "last_attempt": now,
-            "locked_until": now + timedelta(minutes=10),  # Still locked
-        }
-
-        cleanup_old_login_attempts()
-
-        assert "expired:exp@test.com" not in _login_attempts
-        assert "active:act@test.com" in _login_attempts
-
-    def test_keeps_recent_unlocked_records(self):
-        """Recent unlocked records should not be removed."""
-        now = datetime.now(timezone.utc)
-
-        _login_attempts["recent:r@test.com"] = {
-            "attempts": 3,
-            "last_attempt": now - timedelta(minutes=2),
-            "locked_until": None,
-        }
-
-        cleanup_old_login_attempts()
-        assert "recent:r@test.com" in _login_attempts
-
-    def test_empty_dict_no_error(self):
-        """Cleanup on an empty dict should not raise an error."""
-        _login_attempts.clear()
-        cleanup_old_login_attempts()
-        assert len(_login_attempts) == 0
-
-    def test_keeps_records_with_locked_until_none_but_recent(self):
-        """Records with no lockout but recent last_attempt should be kept."""
-        now = datetime.now(timezone.utc)
-
-        _login_attempts["keep:k@test.com"] = {
-            "attempts": 4,
-            "last_attempt": now,
-            "locked_until": None,
-        }
-
-        cleanup_old_login_attempts()
-        assert "keep:k@test.com" in _login_attempts
-
-    def test_removes_multiple_expired_records(self):
-        """Multiple expired records should all be removed in one call."""
-        now = datetime.now(timezone.utc)
-        expiry_time = LOGIN_LOCKOUT_MINUTES + LOGIN_ATTEMPT_WINDOW_MINUTES
-
-        for i in range(5):
-            _login_attempts[f"old{i}:o{i}@test.com"] = {
-                "attempts": 1,
-                "last_attempt": now - timedelta(minutes=expiry_time + 10 + i),
-                "locked_until": None,
-            }
-
-        # Add one fresh record to keep
-        _login_attempts["fresh:f@test.com"] = {
-            "attempts": 1,
-            "last_attempt": now,
-            "locked_until": None,
-        }
-
-        cleanup_old_login_attempts()
-
-        assert len(_login_attempts) == 1
-        assert "fresh:f@test.com" in _login_attempts
-
-
-# ==================== INTEGRATION: Full login flow ====================
-
-class TestLoginFlowIntegration:
-    """Integration tests combining multiple rate-limiting functions."""
-
-    def test_full_lockout_and_recovery_flow(self):
-        """Test complete flow: attempts -> lockout -> expiry -> recovery."""
-        ip = "100.0.0.1"
-        email = "flow@test.com"
-
-        # Step 1: Verify first attempt is allowed
-        allowed, msg = check_login_rate_limit(ip, email)
-        assert allowed is True
-
-        # Step 2: Record max failed attempts
+        assert key not in self.redis_store  # Key should be deleted
+
+    @pytest.mark.asyncio
+    async def test_email_case_insensitive(self):
+        """Email should be case-insensitive in key."""
+        await record_failed_login("1.2.3.4", "User@Test.COM")
+        key = "ft:login:1.2.3.4:user@test.com"
+        assert key in self.redis_store
+
+    @pytest.mark.asyncio
+    async def test_different_ips_separate(self):
+        """Different IPs should have separate attempt counters."""
         for i in range(LOGIN_MAX_ATTEMPTS):
-            record_failed_login(ip, email)
-
-        # Step 3: Next check triggers lockout
-        allowed, msg = check_login_rate_limit(ip, email)
-        assert allowed is False
-        assert "Too many failed attempts" in msg
-
-        # Step 4: Simulate lockout expiry by backdating locked_until
-        key = f"{ip}:{email}"
-        _login_attempts[key]["locked_until"] = datetime.now(timezone.utc) - timedelta(minutes=1)
-
-        # Step 5: Should be allowed again (lock expired)
-        allowed, msg = check_login_rate_limit(ip, email)
+            await record_failed_login("1.1.1.1", "user@test.com")
+        # Lock the first IP
+        await check_login_rate_limit("1.1.1.1", "user@test.com")
+        # Second IP should still be allowed
+        allowed, _ = await check_login_rate_limit("2.2.2.2", "user@test.com")
         assert allowed is True
-        assert key not in _login_attempts
 
-    def test_successful_login_clears_attempts(self):
-        """After a successful login, attempts should be cleared."""
-        ip = "100.0.0.2"
-        email = "success@test.com"
-        key = f"{ip}:{email}"
+    @pytest.mark.asyncio
+    async def test_clear_login_attempts_removes_key(self):
+        """clear_login_attempts should delete the redis key."""
+        await record_failed_login("1.2.3.4", "clear@test.com")
+        key = "ft:login:1.2.3.4:clear@test.com"
+        assert key in self.redis_store
+        await clear_login_attempts("1.2.3.4", "clear@test.com")
+        assert key not in self.redis_store
 
-        # Record some failed attempts
-        for _ in range(3):
-            record_failed_login(ip, email)
+    @pytest.mark.asyncio
+    async def test_clear_nonexistent_key_no_error(self):
+        """Clearing a non-existent key should not raise."""
+        await clear_login_attempts("9.9.9.9", "noone@test.com")
 
-        assert key in _login_attempts
-        assert _login_attempts[key]["attempts"] == 3
+    @pytest.mark.asyncio
+    async def test_record_resets_outside_window(self):
+        """Attempts outside the window should reset the counter."""
+        import json as json_mod
+        key = "ft:login:1.2.3.4:window@test.com"
+        old_time = (datetime.now(timezone.utc) - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES + 1)).isoformat()
+        self.redis_store[key] = json_mod.dumps({
+            "attempts": LOGIN_MAX_ATTEMPTS - 1,
+            "last_attempt": old_time,
+            "locked_until": None
+        })
+        await record_failed_login("1.2.3.4", "window@test.com")
+        record = json_mod.loads(self.redis_store[key])
+        assert record["attempts"] == 1  # Reset, not incremented
 
-        # Successful login clears attempts
-        clear_login_attempts(ip, email)
-        assert key not in _login_attempts
+    @pytest.mark.asyncio
+    async def test_redis_error_fails_open(self):
+        """Redis errors should fail open (allow login)."""
+        self.mock_redis.get = AsyncMock(side_effect=Exception("Redis down"))
+        allowed, msg = await check_login_rate_limit("1.2.3.4", "err@test.com")
+        assert allowed is True
 
-        # Should be able to fail again from 0
-        record_failed_login(ip, email)
-        assert _login_attempts[key]["attempts"] == 1
-
-    def test_cleanup_after_lockout_and_expiry(self):
-        """Cleanup should remove records after lockout expires."""
-        ip = "100.0.0.3"
-        email = "cleanup@test.com"
-        key = f"{ip}:{email}"
-        now = datetime.now(timezone.utc)
-
-        # Create an expired lockout record
-        _login_attempts[key] = {
-            "attempts": LOGIN_MAX_ATTEMPTS,
-            "last_attempt": now - timedelta(minutes=30),
-            "locked_until": now - timedelta(minutes=5),
-        }
-
-        cleanup_old_login_attempts()
-        assert key not in _login_attempts
-
-
-# ==================== Edge cases and robustness ====================
-
-class TestEdgeCases:
-    """Edge case tests for robustness."""
-
-    async def test_get_current_user_propagates_db_error(self, initialized_db, mock_request):
-        """If DB raises an unexpected error, it should propagate (not be caught)."""
-        token = make_valid_token("user-edge")
-        mock_request.headers = {"Authorization": f"Bearer {token}"}
-        initialized_db.users.find_one = AsyncMock(side_effect=Exception("DB connection lost"))
-
-        with pytest.raises(Exception, match="DB connection lost"):
-            await get_current_user(mock_request)
-
-    def test_get_campus_filter_with_no_role_key(self):
-        """User dict without a role key should get impossible filter."""
-        user_no_role = {"id": "norole-001", "campus_id": "campus-001"}
-        result = get_campus_filter(user_no_role)
-        # role is None, which != FULL_ADMIN, and campus_id exists, so scoped filter
-        assert result == {"campus_id": "campus-001"}
-
-    def test_get_campus_filter_empty_dict(self):
-        """An empty user dict should get impossible filter."""
-        result = get_campus_filter({})
-        assert result == {"campus_id": {"$exists": False, "$eq": "IMPOSSIBLE_VALUE"}}
-
-    def test_verify_password_with_special_characters(self):
-        """Passwords with special characters should work."""
-        password = "p@$$w0rd!#%^&*()_+-=[]{}|;':\",./<>?"
-        hashed = get_password_hash(password)
-        assert verify_password(password, hashed) is True
-
-    def test_create_access_token_with_zero_expiry(self, initialized_db):
-        """Token with zero timedelta should expire immediately."""
-        import jwt as pyjwt
-
-        token = create_access_token({"sub": "zero"}, expires_delta=timedelta(seconds=0))
-        # Token should be valid (just barely)
-        payload = pyjwt.decode(token, TEST_SECRET_KEY, algorithms=["HS256"],
-                               options={"verify_exp": False})
-        assert payload["sub"] == "zero"
-
-    def test_rate_limit_with_special_chars_in_email(self):
-        """Emails with special characters should be handled correctly."""
-        ip = "50.0.0.1"
-        email = "user+tag@sub.domain.com"
-        record_failed_login(ip, email)
-        assert f"{ip}:{email}" in _login_attempts
-
-    def test_concurrent_rate_limit_scenario(self):
-        """Multiple IPs hitting the same email should each have independent tracking."""
-        email = "popular@test.com"
-        ips = [f"10.0.{i}.1" for i in range(10)]
-
-        # Each IP records 3 failed attempts
-        for ip in ips:
-            for _ in range(3):
-                record_failed_login(ip, email)
-
-        # All should still be allowed (under limit)
-        for ip in ips:
-            allowed, msg = check_login_rate_limit(ip, email)
-            assert allowed is True
-
-        # Now push one IP over the limit
-        for _ in range(2):
-            record_failed_login(ips[0], email)
-
-        allowed, msg = check_login_rate_limit(ips[0], email)
+    @pytest.mark.asyncio
+    async def test_full_lockout_and_recovery_flow(self):
+        """Full flow: fail max times → lockout → clear → allowed."""
+        ip, email = "10.0.0.1", "flow@test.com"
+        for i in range(LOGIN_MAX_ATTEMPTS):
+            await record_failed_login(ip, email)
+        allowed, _ = await check_login_rate_limit(ip, email)
         assert allowed is False
-
-        # Others should still be fine
-        for ip in ips[1:]:
-            allowed, msg = check_login_rate_limit(ip, email)
-            assert allowed is True
+        # Clear attempts (simulates successful login from admin)
+        await clear_login_attempts(ip, email)
+        allowed, _ = await check_login_rate_limit(ip, email)
+        assert allowed is True

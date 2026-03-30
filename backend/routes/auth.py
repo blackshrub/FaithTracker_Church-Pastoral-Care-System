@@ -19,7 +19,7 @@ from dependencies import (
     get_db, get_current_user, get_current_admin,
     verify_password, get_password_hash, create_access_token, safe_error_detail,
     get_client_ip, check_login_rate_limit, record_failed_login,
-    clear_login_attempts, cleanup_old_login_attempts
+    clear_login_attempts
 )
 from models import (
     UserCreate, UserUpdate, UserLogin, User, UserResponse, TokenResponse,
@@ -106,11 +106,8 @@ async def login(data: UserLogin, request: Request) -> dict:
     db = get_db()
     client_ip = get_client_ip(request)
 
-    # Cleanup old entries periodically
-    cleanup_old_login_attempts()
-
-    # Check rate limit BEFORE processing login
-    is_allowed, error_msg = check_login_rate_limit(client_ip, data.email)
+    # Check rate limit BEFORE processing login (DragonflyDB-backed, TTL handles cleanup)
+    is_allowed, error_msg = await check_login_rate_limit(client_ip, data.email)
     if not is_allowed:
         raise HTTPException(
             status_code=HTTP_429_TOO_MANY_REQUESTS,
@@ -121,7 +118,7 @@ async def login(data: UserLogin, request: Request) -> dict:
         user = await db.users.find_one({"email": data.email}, {"_id": 0})
         if not user:
             # Record failed attempt (user not found)
-            record_failed_login(client_ip, data.email)
+            await record_failed_login(client_ip, data.email)
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
@@ -129,7 +126,7 @@ async def login(data: UserLogin, request: Request) -> dict:
 
         if not verify_password(data.password, user["hashed_password"]):
             # Record failed attempt (wrong password)
-            record_failed_login(client_ip, data.email)
+            await record_failed_login(client_ip, data.email)
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
@@ -167,7 +164,7 @@ async def login(data: UserLogin, request: Request) -> dict:
                 )
 
         # Clear failed attempts on successful login
-        clear_login_attempts(client_ip, data.email)
+        await clear_login_attempts(client_ip, data.email)
 
         access_token = create_access_token(data={"sub": user["id"]})
 

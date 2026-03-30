@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from enums import (
     EngagementStatus, EventType, GriefStage, ActivityActionType,
-    NotificationChannel, NotificationStatus
+    NotificationChannel, NotificationStatus,
 )
 from constants import (
     GRIEF_ONE_WEEK_DAYS, GRIEF_TWO_WEEKS_DAYS, GRIEF_ONE_MONTH_DAYS,
@@ -44,6 +44,16 @@ from constants import (
 
 CHURCH_ID = "church-test-001"
 CAMPUS_ID = "campus-test-001"
+
+
+def mock_facet_result(data, total=None):
+    """Create a mock $facet aggregation result for paginated_query tests."""
+    if total is None:
+        total = len(data)
+    facet_result = [{"data": data, "total": [{"count": total}] if total > 0 else []}]
+    cursor = MagicMock()
+    cursor.to_list = AsyncMock(return_value=facet_result)
+    return cursor
 MEMBER_ID = "member-test-001"
 USER_ID = "user-test-001"
 USER_NAME = "Test Pastor"
@@ -618,9 +628,7 @@ class TestMemberServiceGetMany:
             {"id": "m1", "name": "Alice"},
             {"id": "m2", "name": "Bob"},
         ]
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = members_list
-        mock_db.members.count_documents.return_value = 2
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result(members_list))
 
         members, total = await member_service.get_many(CHURCH_ID)
         assert len(members) == 2
@@ -630,51 +638,49 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_filters_by_campus_id(self, member_service, mock_db):
         """Should add campus_id to query when provided."""
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.members.count_documents.return_value = 0
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, campus_id=CAMPUS_ID)
-        query = mock_db.members.find.call_args[0][0]
-        assert query["campus_id"] == CAMPUS_ID
+        pipeline = mock_db.members.aggregate.call_args[0][0]
+        match_stage = pipeline[0]["$match"]
+        assert match_stage["campus_id"] == CAMPUS_ID
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_get_many_filters_by_search(self, member_service, mock_db):
         """Should add search regex to query when provided."""
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.members.count_documents.return_value = 0
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, search="John")
-        query = mock_db.members.find.call_args[0][0]
-        assert "$or" in query
-        assert len(query["$or"]) == 3  # name, phone, email
+        pipeline = mock_db.members.aggregate.call_args[0][0]
+        match_stage = pipeline[0]["$match"]
+        assert "$or" in match_stage
+        assert len(match_stage["$or"]) == 3  # name, phone, email
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_get_many_filters_by_engagement_status(self, member_service, mock_db):
         """Should add engagement_status filter when provided."""
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.members.count_documents.return_value = 0
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(
             CHURCH_ID, engagement_status=EngagementStatus.AT_RISK.value
         )
-        query = mock_db.members.find.call_args[0][0]
-        assert query["engagement_status"] == "at_risk"
+        pipeline = mock_db.members.aggregate.call_args[0][0]
+        match_stage = pipeline[0]["$match"]
+        assert match_stage["engagement_status"] == "at_risk"
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_get_many_respects_max_page_size(self, member_service, mock_db):
         """Limit should be capped at MAX_PAGE_SIZE."""
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.members.count_documents.return_value = 0
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, limit=MAX_PAGE_SIZE + 500)
-        cursor.limit.assert_called_with(MAX_PAGE_SIZE)
+        pipeline = mock_db.members.aggregate.call_args[0][0]
+        facet_data = pipeline[-1]["$facet"]["data"]
+        limit_stage = [s for s in facet_data if "$limit" in s][0]
+        assert limit_stage["$limit"] == MAX_PAGE_SIZE
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -682,14 +688,12 @@ class TestMemberServiceGetMany:
         self, member_service, mock_db
     ):
         """Search text with regex special chars should be escaped."""
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.members.count_documents.return_value = 0
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, search="John.Doe+")
-        query = mock_db.members.find.call_args[0][0]
-        # Verify the regex pattern has escaped special chars
-        name_regex = query["$or"][0]["name"]["$regex"]
+        pipeline = mock_db.members.aggregate.call_args[0][0]
+        match_stage = pipeline[0]["$match"]
+        name_regex = match_stage["$or"][0]["name"]["$regex"]
         assert "\\." in name_regex
         assert "\\+" in name_regex
 
@@ -697,9 +701,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_empty_result(self, member_service, mock_db):
         """Should return empty list and zero count when no members."""
-        cursor = mock_db.members.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.members.count_documents.return_value = 0
+        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         members, total = await member_service.get_many(CHURCH_ID)
         assert members == []
@@ -1128,9 +1130,7 @@ class TestCareEventServiceGetForMember:
     async def test_get_for_member_basic(self, care_event_service, mock_db):
         """Should return events for a member."""
         events = [{"id": "e1"}, {"id": "e2"}]
-        cursor = mock_db.care_events.find.return_value
-        cursor.to_list.return_value = events
-        mock_db.care_events.count_documents.return_value = 2
+        mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result(events))
 
         result, total = await care_event_service.get_for_member(MEMBER_ID, CHURCH_ID)
         assert len(result) == 2
@@ -1142,15 +1142,14 @@ class TestCareEventServiceGetForMember:
         self, care_event_service, mock_db
     ):
         """Should filter by event_type when provided."""
-        cursor = mock_db.care_events.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.care_events.count_documents.return_value = 0
+        mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await care_event_service.get_for_member(
             MEMBER_ID, CHURCH_ID, event_type="birthday"
         )
-        query = mock_db.care_events.find.call_args[0][0]
-        assert query["event_type"] == "birthday"
+        pipeline = mock_db.care_events.aggregate.call_args[0][0]
+        match_stage = pipeline[0]["$match"]
+        assert match_stage["event_type"] == "birthday"
 
     @pytest.mark.unit
     @pytest.mark.asyncio
@@ -1158,15 +1157,14 @@ class TestCareEventServiceGetForMember:
         self, care_event_service, mock_db
     ):
         """Should filter by is_completed when provided."""
-        cursor = mock_db.care_events.find.return_value
-        cursor.to_list.return_value = []
-        mock_db.care_events.count_documents.return_value = 0
+        mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result([]))
 
         await care_event_service.get_for_member(
             MEMBER_ID, CHURCH_ID, is_completed=False
         )
-        query = mock_db.care_events.find.call_args[0][0]
-        assert query["is_completed"] is False
+        pipeline = mock_db.care_events.aggregate.call_args[0][0]
+        match_stage = pipeline[0]["$match"]
+        assert match_stage["is_completed"] is False
 
 
 class TestCareEventServiceGetPendingTasks:
@@ -1844,13 +1842,9 @@ class TestNotificationServiceSendWhatsAppBackground:
         mock_response.text = '{"id": "msg-123"}'
         mock_response.json.return_value = {"id": "msg-123"}
 
-        with patch("httpx.AsyncClient") as MockClient:
-            mock_client = AsyncMock()
-            mock_client.post.return_value = mock_response
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client
-
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
             await notification_service_with_wa._send_whatsapp_background(
                 "notif-123", "+6281234567890", "Hello!", retry=False
             )
@@ -1870,13 +1864,9 @@ class TestNotificationServiceSendWhatsAppBackground:
         """Failed background send should update status to FAILED after retries."""
         import httpx
 
-        with patch("httpx.AsyncClient") as MockClient:
-            mock_client = AsyncMock()
-            mock_client.post.side_effect = httpx.ConnectError("Connection refused")
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client
-
+        mock_client = AsyncMock()
+        mock_client.post.side_effect = httpx.ConnectError("Connection refused")
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
             await notification_service_with_wa._send_whatsapp_background(
                 "notif-123", "+6281234567890", "Hello!", retry=False
             )
@@ -1898,13 +1888,9 @@ class TestNotificationServiceSendWhatsAppBackground:
         mock_response.status_code = 500
         mock_response.text = "Internal Server Error"
 
-        with patch("httpx.AsyncClient") as MockClient:
-            mock_client = AsyncMock()
-            mock_client.post.return_value = mock_response
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client
-
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
             await notification_service_with_wa._send_whatsapp_background(
                 "notif-123", "+6281234567890", "Hello!", retry=False
             )
@@ -1922,13 +1908,9 @@ class TestNotificationServiceSendWhatsAppBackground:
         """Timeout should be handled gracefully."""
         import httpx
 
-        with patch("httpx.AsyncClient") as MockClient:
-            mock_client = AsyncMock()
-            mock_client.post.side_effect = httpx.TimeoutException("Request timed out")
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client
-
+        mock_client = AsyncMock()
+        mock_client.post.side_effect = httpx.TimeoutException("Request timed out")
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
             await notification_service_with_wa._send_whatsapp_background(
                 "notif-123", "+6281234567890", "Hello!", retry=False
             )

@@ -192,3 +192,8 @@ def get_cache() -> Optional[CacheService]:
     if _redis_client:
         return CacheService(_redis_client)
     return None
+
+
+def get_redis_client() -> Optional[redis.Redis]:
+    """Get the raw redis client for direct operations (e.g., login rate limiting)"""
+    return _redis_client

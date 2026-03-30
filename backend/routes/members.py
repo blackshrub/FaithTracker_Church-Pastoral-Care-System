@@ -40,6 +40,23 @@ _msgspec_enc_hook: Optional[Callable] = None
 _root_dir: Optional[str] = None
 
 
+def _assert_initialized():
+    """Verify all callbacks have been set. Call at the start of mutating handlers."""
+    missing = [
+        name for name, val in [
+            ("_invalidate_dashboard_cache", _invalidate_dashboard_cache),
+            ("_log_activity", _log_activity),
+            ("_msgspec_enc_hook", _msgspec_enc_hook),
+            ("_root_dir", _root_dir),
+        ] if val is None
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Member routes not initialized. Missing callbacks: {', '.join(missing)}. "
+            "Call init_member_routes() during app startup."
+        )
+
+
 def init_member_routes(
     invalidate_dashboard_cache: Callable[[str], Awaitable[None]],
     log_activity: Callable[..., Awaitable[None]],
@@ -132,9 +149,6 @@ async def list_members(
         # Calculate skip for pagination
         skip = (page - 1) * limit
 
-        # Get total count for pagination metadata
-        total = await db.members.count_documents(query)
-
         # Build projection based on fields parameter or use default
         if fields:
             # Parse comma-separated fields and build projection
@@ -171,8 +185,12 @@ async def list_members(
                 # Exclude: notes, address, archived_at, archived_reason, etc.
             }
 
-        # Get paginated members with projection
-        members = await db.members.find(query, projection).skip(skip).limit(limit).to_list(limit)
+        # Single $facet query for both data and count (replaces separate count_documents + find)
+        from services.db_utils import paginated_query
+        members, total = await paginated_query(
+            db.members, query, sort=[("name", 1)],
+            skip=skip, limit=limit, projection=projection
+        )
         
         # Update engagement status for each member
         for member in members:
