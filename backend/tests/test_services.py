@@ -11,32 +11,39 @@ Tests cover:
 All tests use mocked dependencies (Redis, MongoDB, httpx, PIL) for isolation.
 """
 
-import pytest
-import json
 import io
-import uuid
-import asyncio
-import sys
+import json
 import os
-from datetime import datetime, timezone, timedelta, date
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+import sys
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from enums import (
-    EngagementStatus, EventType, GriefStage, ActivityActionType,
-    NotificationChannel, NotificationStatus,
-)
 from constants import (
-    GRIEF_ONE_WEEK_DAYS, GRIEF_TWO_WEEKS_DAYS, GRIEF_ONE_MONTH_DAYS,
-    GRIEF_THREE_MONTHS_DAYS, GRIEF_SIX_MONTHS_DAYS, GRIEF_ONE_YEAR_DAYS,
-    ACCIDENT_FIRST_FOLLOWUP_DAYS, ACCIDENT_SECOND_FOLLOWUP_DAYS,
-    ACCIDENT_FINAL_FOLLOWUP_DAYS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE,
-    API_MAX_RETRIES, API_RETRY_DELAYS
+    ACCIDENT_FINAL_FOLLOWUP_DAYS,
+    ACCIDENT_FIRST_FOLLOWUP_DAYS,
+    ACCIDENT_SECOND_FOLLOWUP_DAYS,
+    GRIEF_ONE_MONTH_DAYS,
+    GRIEF_ONE_WEEK_DAYS,
+    GRIEF_ONE_YEAR_DAYS,
+    GRIEF_SIX_MONTHS_DAYS,
+    GRIEF_THREE_MONTHS_DAYS,
+    GRIEF_TWO_WEEKS_DAYS,
+    MAX_PAGE_SIZE,
 )
-
+from enums import (
+    ActivityActionType,
+    EngagementStatus,
+    EventType,
+    GriefStage,
+    NotificationChannel,
+    NotificationStatus,
+)
 
 # ===================================================================
 # Fixtures
@@ -54,6 +61,8 @@ def mock_facet_result(data, total=None):
     cursor = MagicMock()
     cursor.to_list = AsyncMock(return_value=facet_result)
     return cursor
+
+
 MEMBER_ID = "member-test-001"
 USER_ID = "user-test-001"
 USER_NAME = "Test Pastor"
@@ -82,6 +91,7 @@ def mock_redis():
 def cache_service(mock_redis):
     """Create CacheService with mocked Redis client."""
     from services.cache import CacheService
+
     return CacheService(mock_redis)
 
 
@@ -98,6 +108,7 @@ def mock_db():
         # Simulate MongoDB insert_one adding _id to the document
         async def _insert_one_side_effect(doc):
             from bson import ObjectId
+
             doc["_id"] = ObjectId()
             return MagicMock(inserted_id=doc["_id"])
 
@@ -135,6 +146,7 @@ def mock_db():
 def member_service(mock_db):
     """Create MemberService with mocked database."""
     from services.member_service import MemberService
+
     return MemberService(mock_db)
 
 
@@ -142,6 +154,7 @@ def member_service(mock_db):
 def care_event_service(mock_db):
     """Create CareEventService with mocked database."""
     from services.care_event_service import CareEventService
+
     return CareEventService(mock_db)
 
 
@@ -149,6 +162,7 @@ def care_event_service(mock_db):
 def notification_service(mock_db):
     """Create NotificationService with mocked database and no WhatsApp URL."""
     from services.notification_service import NotificationService
+
     return NotificationService(mock_db)
 
 
@@ -156,6 +170,7 @@ def notification_service(mock_db):
 def notification_service_with_wa(mock_db):
     """Create NotificationService with mocked database and WhatsApp URL."""
     from services.notification_service import NotificationService
+
     return NotificationService(mock_db, whatsapp_gateway_url="http://wa-gateway:3000")
 
 
@@ -198,7 +213,7 @@ def _make_care_event_data(**overrides):
     """Helper to create a mock CareEventCreate-like object."""
     defaults = {
         "event_type": EventType.REGULAR_CONTACT.value,
-        "event_date": datetime.now(timezone.utc),
+        "event_date": datetime.now(UTC),
         "description": "Regular pastoral visit",
         "notes": "Member is doing well",
         "grief_stage": None,
@@ -212,6 +227,7 @@ def _make_care_event_data(**overrides):
 # ===================================================================
 # CacheService Tests
 # ===================================================================
+
 
 class TestCacheServiceMakeKey:
     """Test CacheService._make_key() key generation."""
@@ -276,6 +292,7 @@ class TestCacheServiceGet:
     async def test_get_redis_error_returns_none(self, cache_service, mock_redis):
         """Redis errors should be handled gracefully and return None."""
         import redis.asyncio as redis
+
         mock_redis.get.side_effect = redis.RedisError("Connection refused")
         result = await cache_service.get("dashboard:stats")
         assert result is None
@@ -324,7 +341,7 @@ class TestCacheServiceSet:
     @pytest.mark.asyncio
     async def test_set_handles_datetime_serialization(self, cache_service, mock_redis):
         """set() should handle datetime objects via default=str."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         test_data = {"timestamp": now}
         result = await cache_service.set("mykey", test_data)
         assert result is True
@@ -334,6 +351,7 @@ class TestCacheServiceSet:
     async def test_set_redis_error_returns_false(self, cache_service, mock_redis):
         """Redis errors on set should return False."""
         import redis.asyncio as redis
+
         mock_redis.setex.side_effect = redis.RedisError("Write error")
         result = await cache_service.set("mykey", {"value": 1})
         assert result is False
@@ -376,6 +394,7 @@ class TestCacheServiceDelete:
     async def test_delete_redis_error_returns_false(self, cache_service, mock_redis):
         """Redis errors on delete should return False."""
         import redis.asyncio as redis
+
         mock_redis.delete.side_effect = redis.RedisError("Delete error")
         result = await cache_service.delete("mykey")
         assert result is False
@@ -411,6 +430,7 @@ class TestCacheServiceInvalidatePattern:
     async def test_invalidate_pattern_redis_error_returns_zero(self, cache_service, mock_redis):
         """Redis errors during pattern invalidation should return 0."""
         import redis.asyncio as redis
+
         mock_redis.scan.side_effect = redis.RedisError("Scan error")
         deleted = await cache_service.invalidate_pattern("dashboard:*")
         assert deleted == 0
@@ -527,6 +547,7 @@ class TestCacheServiceRateLimit:
     async def test_incr_rate_limit_redis_error_returns_zero(self, cache_service, mock_redis):
         """Redis errors should return 0 (fail open)."""
         import redis.asyncio as redis
+
         pipe = mock_redis.pipeline.return_value
         pipe.execute.side_effect = redis.RedisError("Pipeline error")
         count = await cache_service.incr_rate_limit("login:user@test.com")
@@ -549,6 +570,7 @@ class TestCacheServiceHealthCheck:
     async def test_health_check_unhealthy(self, cache_service, mock_redis):
         """Unhealthy Redis should return False."""
         import redis.asyncio as redis
+
         mock_redis.ping.side_effect = redis.RedisError("Connection refused")
         result = await cache_service.health_check()
         assert result is False
@@ -557,6 +579,7 @@ class TestCacheServiceHealthCheck:
 # ===================================================================
 # MemberService Tests
 # ===================================================================
+
 
 class TestMemberServiceGetById:
     """Test MemberService.get_by_id()."""
@@ -596,9 +619,7 @@ class TestMemberServiceGetById:
     async def test_get_by_id_with_projection(self, member_service, mock_db):
         """Should pass projection to MongoDB and always exclude _id."""
         mock_db.members.find_one.return_value = None
-        await member_service.get_by_id(
-            MEMBER_ID, CHURCH_ID, projection={"name": 1, "phone": 1}
-        )
+        await member_service.get_by_id(MEMBER_ID, CHURCH_ID, projection={"name": 1, "phone": 1})
         call_args = mock_db.members.find_one.call_args
         projection = call_args[0][1]
         assert projection["_id"] == 0
@@ -606,9 +627,7 @@ class TestMemberServiceGetById:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_by_id_without_projection_excludes_mongo_id(
-        self, member_service, mock_db
-    ):
+    async def test_get_by_id_without_projection_excludes_mongo_id(self, member_service, mock_db):
         """Default projection should exclude _id."""
         mock_db.members.find_one.return_value = None
         await member_service.get_by_id(MEMBER_ID, CHURCH_ID)
@@ -663,9 +682,7 @@ class TestMemberServiceGetMany:
         """Should add engagement_status filter when provided."""
         mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
-        await member_service.get_many(
-            CHURCH_ID, engagement_status=EngagementStatus.AT_RISK.value
-        )
+        await member_service.get_many(CHURCH_ID, engagement_status=EngagementStatus.AT_RISK.value)
         pipeline = mock_db.members.aggregate.call_args[0][0]
         match_stage = pipeline[0]["$match"]
         assert match_stage["engagement_status"] == "at_risk"
@@ -679,14 +696,12 @@ class TestMemberServiceGetMany:
         await member_service.get_many(CHURCH_ID, limit=MAX_PAGE_SIZE + 500)
         pipeline = mock_db.members.aggregate.call_args[0][0]
         facet_data = pipeline[-1]["$facet"]["data"]
-        limit_stage = [s for s in facet_data if "$limit" in s][0]
+        limit_stage = next(s for s in facet_data if "$limit" in s)
         assert limit_stage["$limit"] == MAX_PAGE_SIZE
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_many_search_escapes_regex_special_chars(
-        self, member_service, mock_db
-    ):
+    async def test_get_many_search_escapes_regex_special_chars(self, member_service, mock_db):
         """Search text with regex special chars should be escaped."""
         mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
 
@@ -716,9 +731,7 @@ class TestMemberServiceCreate:
     async def test_create_member_success(self, member_service, mock_db):
         """Should create a member and log activity."""
         data = _make_member_data()
-        result = await member_service.create(
-            data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.create(data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME)
 
         assert result["name"] == "John Doe"
         assert result["church_id"] == CHURCH_ID
@@ -733,9 +746,7 @@ class TestMemberServiceCreate:
     async def test_create_member_normalizes_phone(self, member_service, mock_db):
         """Phone numbers starting with 0 should be normalized to +62."""
         data = _make_member_data(phone="081234567890")
-        result = await member_service.create(
-            data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.create(data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME)
         assert result["phone"] == "+6281234567890"
 
     @pytest.mark.unit
@@ -743,9 +754,7 @@ class TestMemberServiceCreate:
     async def test_create_member_with_no_phone(self, member_service, mock_db):
         """Member with no phone should have None phone."""
         data = _make_member_data(phone=None)
-        result = await member_service.create(
-            data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.create(data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME)
         assert result["phone"] is None
 
     @pytest.mark.unit
@@ -753,9 +762,7 @@ class TestMemberServiceCreate:
     async def test_create_member_generates_uuid(self, member_service, mock_db):
         """Created member should have a valid UUID id."""
         data = _make_member_data()
-        result = await member_service.create(
-            data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.create(data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME)
         assert result["id"] is not None
         assert len(result["id"]) == 36  # UUID format
 
@@ -764,9 +771,7 @@ class TestMemberServiceCreate:
     async def test_create_member_sets_timestamps(self, member_service, mock_db):
         """Created member should have created_at and updated_at timestamps."""
         data = _make_member_data()
-        result = await member_service.create(
-            data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.create(data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME)
         assert result["created_at"] is not None
         assert result["updated_at"] is not None
 
@@ -789,9 +794,7 @@ class TestMemberServiceCreate:
         """Returned member doc should not contain MongoDB _id field."""
         data = _make_member_data()
         # Simulate MongoDB adding _id
-        result = await member_service.create(
-            data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.create(data, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME)
         assert "_id" not in result
 
 
@@ -804,37 +807,28 @@ class TestMemberServiceUpdate:
         """Should return None when member doesn't exist."""
         mock_db.members.find_one.return_value = None
         data = _make_member_update(name="Updated Name")
-        result = await member_service.update(
-            MEMBER_ID, CHURCH_ID, data, USER_ID, USER_NAME
-        )
+        result = await member_service.update(MEMBER_ID, CHURCH_ID, data, USER_ID, USER_NAME)
         assert result is None
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_update_member_success(self, member_service, mock_db):
         """Should update member and return updated document."""
-        existing = {"id": MEMBER_ID, "name": "Old Name", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
-        updated = {"id": MEMBER_ID, "name": "New Name", "church_id": CHURCH_ID,
-                    "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "Old Name", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
+        updated = {"id": MEMBER_ID, "name": "New Name", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.side_effect = [existing, updated]
 
         data = _make_member_update(name="New Name")
-        result = await member_service.update(
-            MEMBER_ID, CHURCH_ID, data, USER_ID, USER_NAME
-        )
+        result = await member_service.update(MEMBER_ID, CHURCH_ID, data, USER_ID, USER_NAME)
 
         mock_db.members.update_one.assert_called_once()
         assert result["name"] == "New Name"
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_update_member_only_sets_provided_fields(
-        self, member_service, mock_db
-    ):
+    async def test_update_member_only_sets_provided_fields(self, member_service, mock_db):
         """Only fields with non-None values should be updated."""
-        existing = {"id": MEMBER_ID, "name": "Old Name", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "Old Name", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.side_effect = [existing, existing]
 
         data = _make_member_update(name="New Name")
@@ -852,8 +846,7 @@ class TestMemberServiceUpdate:
     @pytest.mark.asyncio
     async def test_update_member_normalizes_phone(self, member_service, mock_db):
         """Updated phone numbers should be normalized."""
-        existing = {"id": MEMBER_ID, "name": "Test", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "Test", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.side_effect = [existing, existing]
 
         data = _make_member_update(phone="081234567890")
@@ -867,8 +860,7 @@ class TestMemberServiceUpdate:
     @pytest.mark.asyncio
     async def test_update_member_logs_activity(self, member_service, mock_db):
         """Updating a member should log an UPDATE_MEMBER activity."""
-        existing = {"id": MEMBER_ID, "name": "Old Name", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "Old Name", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.side_effect = [existing, existing]
 
         data = _make_member_update(name="New Name")
@@ -888,22 +880,17 @@ class TestMemberServiceDelete:
     async def test_delete_member_not_found(self, member_service, mock_db):
         """Should return False when member doesn't exist."""
         mock_db.members.find_one.return_value = None
-        result = await member_service.delete(
-            MEMBER_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.delete(MEMBER_ID, CHURCH_ID, USER_ID, USER_NAME)
         assert result is False
 
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_delete_member_success(self, member_service, mock_db):
         """Should delete member, related care events, and log activity."""
-        existing = {"id": MEMBER_ID, "name": "John", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "John", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.return_value = existing
 
-        result = await member_service.delete(
-            MEMBER_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await member_service.delete(MEMBER_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         assert result is True
         mock_db.members.delete_one.assert_called_once()
@@ -914,8 +901,7 @@ class TestMemberServiceDelete:
     @pytest.mark.asyncio
     async def test_delete_member_cascades_care_events(self, member_service, mock_db):
         """Deleting a member should also delete their care events."""
-        existing = {"id": MEMBER_ID, "name": "John", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "John", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.return_value = existing
 
         await member_service.delete(MEMBER_ID, CHURCH_ID, USER_ID, USER_NAME)
@@ -928,8 +914,7 @@ class TestMemberServiceDelete:
     @pytest.mark.asyncio
     async def test_delete_member_logs_activity(self, member_service, mock_db):
         """Deleting a member should log a DELETE_MEMBER activity."""
-        existing = {"id": MEMBER_ID, "name": "John", "church_id": CHURCH_ID,
-                     "campus_id": CAMPUS_ID}
+        existing = {"id": MEMBER_ID, "name": "John", "church_id": CHURCH_ID, "campus_id": CAMPUS_ID}
         mock_db.members.find_one.return_value = existing
 
         await member_service.delete(MEMBER_ID, CHURCH_ID, USER_ID, USER_NAME)
@@ -947,7 +932,7 @@ class TestMemberServiceEngagement:
     @pytest.mark.asyncio
     async def test_update_engagement_active(self, member_service, mock_db):
         """Member contacted recently should be ACTIVE."""
-        recent_date = datetime.now(timezone.utc) - timedelta(days=10)
+        recent_date = datetime.now(UTC) - timedelta(days=10)
         member = {"id": MEMBER_ID, "last_contact_date": recent_date}
         mock_db.members.find_one.return_value = member
 
@@ -961,7 +946,7 @@ class TestMemberServiceEngagement:
     @pytest.mark.asyncio
     async def test_update_engagement_at_risk(self, member_service, mock_db):
         """Member not contacted for 60-89 days should be AT_RISK."""
-        old_date = datetime.now(timezone.utc) - timedelta(days=75)
+        old_date = datetime.now(UTC) - timedelta(days=75)
         member = {"id": MEMBER_ID, "last_contact_date": old_date}
         mock_db.members.find_one.return_value = member
 
@@ -975,7 +960,7 @@ class TestMemberServiceEngagement:
     @pytest.mark.asyncio
     async def test_update_engagement_disconnected(self, member_service, mock_db):
         """Member not contacted for 90+ days should be DISCONNECTED."""
-        old_date = datetime.now(timezone.utc) - timedelta(days=120)
+        old_date = datetime.now(UTC) - timedelta(days=120)
         member = {"id": MEMBER_ID, "last_contact_date": old_date}
         mock_db.members.find_one.return_value = member
 
@@ -1011,13 +996,11 @@ class TestMemberServiceEngagement:
     async def test_update_engagement_custom_thresholds(self, member_service, mock_db):
         """Custom threshold values should override defaults."""
         # 25 days ago - would be ACTIVE with default 60, but AT_RISK with 20
-        contact_date = datetime.now(timezone.utc) - timedelta(days=25)
+        contact_date = datetime.now(UTC) - timedelta(days=25)
         member = {"id": MEMBER_ID, "last_contact_date": contact_date}
         mock_db.members.find_one.return_value = member
 
-        await member_service.update_engagement(
-            MEMBER_ID, CHURCH_ID, at_risk_days=20, disconnected_days=40
-        )
+        await member_service.update_engagement(MEMBER_ID, CHURCH_ID, at_risk_days=20, disconnected_days=40)
 
         update_call = mock_db.members.update_one.call_args
         set_data = update_call[0][1]["$set"]
@@ -1039,10 +1022,8 @@ class TestMemberServiceEngagement:
     @pytest.mark.asyncio
     async def test_update_last_contact_specific_date(self, member_service, mock_db):
         """update_last_contact with specific date should use that date."""
-        specific_date = datetime(2025, 1, 15, tzinfo=timezone.utc)
-        await member_service.update_last_contact(
-            MEMBER_ID, CHURCH_ID, contact_date=specific_date
-        )
+        specific_date = datetime(2025, 1, 15, tzinfo=UTC)
+        await member_service.update_last_contact(MEMBER_ID, CHURCH_ID, contact_date=specific_date)
 
         update_call = mock_db.members.update_one.call_args
         set_data = update_call[0][1]["$set"]
@@ -1073,9 +1054,7 @@ class TestMemberServiceGetAtRisk:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_at_risk_members_with_campus_filter(
-        self, member_service, mock_db
-    ):
+    async def test_get_at_risk_members_with_campus_filter(self, member_service, mock_db):
         """Should filter by campus_id when provided."""
         cursor = mock_db.members.find.return_value
         cursor.to_list.return_value = []
@@ -1098,6 +1077,7 @@ class TestMemberServiceGetAtRisk:
 # ===================================================================
 # CareEventService Tests
 # ===================================================================
+
 
 class TestCareEventServiceGetById:
     """Test CareEventService.get_by_id()."""
@@ -1138,30 +1118,22 @@ class TestCareEventServiceGetForMember:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_for_member_filters_by_event_type(
-        self, care_event_service, mock_db
-    ):
+    async def test_get_for_member_filters_by_event_type(self, care_event_service, mock_db):
         """Should filter by event_type when provided."""
         mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result([]))
 
-        await care_event_service.get_for_member(
-            MEMBER_ID, CHURCH_ID, event_type="birthday"
-        )
+        await care_event_service.get_for_member(MEMBER_ID, CHURCH_ID, event_type="birthday")
         pipeline = mock_db.care_events.aggregate.call_args[0][0]
         match_stage = pipeline[0]["$match"]
         assert match_stage["event_type"] == "birthday"
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_for_member_filters_by_completion(
-        self, care_event_service, mock_db
-    ):
+    async def test_get_for_member_filters_by_completion(self, care_event_service, mock_db):
         """Should filter by is_completed when provided."""
         mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result([]))
 
-        await care_event_service.get_for_member(
-            MEMBER_ID, CHURCH_ID, is_completed=False
-        )
+        await care_event_service.get_for_member(MEMBER_ID, CHURCH_ID, is_completed=False)
         pipeline = mock_db.care_events.aggregate.call_args[0][0]
         match_stage = pipeline[0]["$match"]
         assert match_stage["is_completed"] is False
@@ -1187,9 +1159,7 @@ class TestCareEventServiceGetPendingTasks:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_pending_tasks_with_campus_filter(
-        self, care_event_service, mock_db
-    ):
+    async def test_get_pending_tasks_with_campus_filter(self, care_event_service, mock_db):
         """Should filter by campus_id when provided."""
         agg_cursor = mock_db.care_events.aggregate.return_value
         agg_cursor.to_list.return_value = []
@@ -1201,30 +1171,24 @@ class TestCareEventServiceGetPendingTasks:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_pending_tasks_with_event_types(
-        self, care_event_service, mock_db
-    ):
+    async def test_get_pending_tasks_with_event_types(self, care_event_service, mock_db):
         """Should filter by event_types when provided."""
         agg_cursor = mock_db.care_events.aggregate.return_value
         agg_cursor.to_list.return_value = []
 
-        await care_event_service.get_pending_tasks(
-            CHURCH_ID, event_types=["birthday", "grief_loss"]
-        )
+        await care_event_service.get_pending_tasks(CHURCH_ID, event_types=["birthday", "grief_loss"])
         pipeline = mock_db.care_events.aggregate.call_args[0][0]
         match_stage = pipeline[0]["$match"]
         assert match_stage["event_type"] == {"$in": ["birthday", "grief_loss"]}
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_pending_tasks_with_due_before(
-        self, care_event_service, mock_db
-    ):
+    async def test_get_pending_tasks_with_due_before(self, care_event_service, mock_db):
         """Should filter tasks due before the given date."""
         agg_cursor = mock_db.care_events.aggregate.return_value
         agg_cursor.to_list.return_value = []
 
-        due_date = datetime.now(timezone.utc)
+        due_date = datetime.now(UTC)
         await care_event_service.get_pending_tasks(CHURCH_ID, due_before=due_date)
         pipeline = mock_db.care_events.aggregate.call_args[0][0]
         match_stage = pipeline[0]["$match"]
@@ -1239,9 +1203,7 @@ class TestCareEventServiceCreate:
     async def test_create_regular_event(self, care_event_service, mock_db):
         """Should create a regular care event and log activity."""
         data = _make_care_event_data()
-        result = await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        result = await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
 
         assert result["member_id"] == MEMBER_ID
         assert result["church_id"] == CHURCH_ID
@@ -1255,63 +1217,49 @@ class TestCareEventServiceCreate:
     async def test_create_event_generates_uuid(self, care_event_service, mock_db):
         """Created event should have a valid UUID."""
         data = _make_care_event_data()
-        result = await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        result = await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
         assert result["id"] is not None
         assert len(result["id"]) == 36
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_create_grief_event_generates_timeline(
-        self, care_event_service, mock_db
-    ):
+    async def test_create_grief_event_generates_timeline(self, care_event_service, mock_db):
         """Creating a grief event should auto-generate 6 follow-up events."""
-        initial_date = datetime.now(timezone.utc)
+        initial_date = datetime.now(UTC)
         data = _make_care_event_data(
             event_type=EventType.GRIEF_LOSS.value,
             event_date=initial_date,
             description="Loss of father",
         )
 
-        await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
 
         # 1 original event + 6 grief timeline events = 7 inserts
         assert mock_db.care_events.insert_one.call_count == 7
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_create_accident_event_generates_followups(
-        self, care_event_service, mock_db
-    ):
+    async def test_create_accident_event_generates_followups(self, care_event_service, mock_db):
         """Creating an accident event should auto-generate 3 follow-up events."""
-        initial_date = datetime.now(timezone.utc)
+        initial_date = datetime.now(UTC)
         data = _make_care_event_data(
             event_type=EventType.ACCIDENT_ILLNESS.value,
             event_date=initial_date,
             description="Car accident",
         )
 
-        await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
 
         # 1 original event + 3 accident followups = 4 inserts
         assert mock_db.care_events.insert_one.call_count == 4
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_create_birthday_event_no_timeline(
-        self, care_event_service, mock_db
-    ):
+    async def test_create_birthday_event_no_timeline(self, care_event_service, mock_db):
         """Creating a birthday event should NOT generate follow-up events."""
         data = _make_care_event_data(event_type=EventType.BIRTHDAY.value)
 
-        await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
 
         # Only 1 original event insert
         assert mock_db.care_events.insert_one.call_count == 1
@@ -1321,9 +1269,7 @@ class TestCareEventServiceCreate:
     async def test_create_event_logs_activity(self, care_event_service, mock_db):
         """Creating an event should log a CREATE_CARE_EVENT activity."""
         data = _make_care_event_data()
-        await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
 
         log_call = mock_db.activity_logs.insert_one.call_args
         log_doc = log_call[0][0]
@@ -1336,9 +1282,7 @@ class TestCareEventServiceCreate:
     async def test_create_event_excludes_mongo_id(self, care_event_service, mock_db):
         """Returned event doc should not contain MongoDB _id field."""
         data = _make_care_event_data()
-        result = await care_event_service.create(
-            data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe"
-        )
+        result = await care_event_service.create(data, MEMBER_ID, CHURCH_ID, CAMPUS_ID, USER_ID, USER_NAME, "John Doe")
         assert "_id" not in result
 
 
@@ -1347,11 +1291,9 @@ class TestCareEventServiceGriefTimeline:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_grief_timeline_generates_6_stages(
-        self, care_event_service, mock_db
-    ):
+    async def test_grief_timeline_generates_6_stages(self, care_event_service, mock_db):
         """Grief timeline should generate exactly 6 follow-up events."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         event_ids = await care_event_service._generate_grief_timeline(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Loss description"
@@ -1364,7 +1306,7 @@ class TestCareEventServiceGriefTimeline:
     @pytest.mark.asyncio
     async def test_grief_timeline_correct_dates(self, care_event_service, mock_db):
         """Each grief follow-up should be scheduled at the correct offset."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_grief_timeline(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Loss"
@@ -1389,11 +1331,9 @@ class TestCareEventServiceGriefTimeline:
     @pytest.mark.asyncio
     async def test_grief_timeline_correct_stages(self, care_event_service, mock_db):
         """Each grief follow-up should have the correct grief_stage."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
-        await care_event_service._generate_grief_timeline(
-            MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, None
-        )
+        await care_event_service._generate_grief_timeline(MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, None)
 
         expected_stages = [
             GriefStage.ONE_WEEK.value,
@@ -1411,11 +1351,9 @@ class TestCareEventServiceGriefTimeline:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_grief_timeline_event_type_is_grief(
-        self, care_event_service, mock_db
-    ):
+    async def test_grief_timeline_event_type_is_grief(self, care_event_service, mock_db):
         """All timeline events should have grief_loss event type."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_grief_timeline(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Loss"
@@ -1429,7 +1367,7 @@ class TestCareEventServiceGriefTimeline:
     @pytest.mark.asyncio
     async def test_grief_timeline_all_uncompleted(self, care_event_service, mock_db):
         """All generated timeline events should be uncompleted."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_grief_timeline(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Loss"
@@ -1442,11 +1380,9 @@ class TestCareEventServiceGriefTimeline:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_grief_timeline_description_includes_stage(
-        self, care_event_service, mock_db
-    ):
+    async def test_grief_timeline_description_includes_stage(self, care_event_service, mock_db):
         """Timeline event descriptions should include the stage description."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_grief_timeline(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Father passed"
@@ -1458,15 +1394,11 @@ class TestCareEventServiceGriefTimeline:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_grief_timeline_none_description(
-        self, care_event_service, mock_db
-    ):
+    async def test_grief_timeline_none_description(self, care_event_service, mock_db):
         """When description is None, should use 'Grief support' as fallback."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
-        await care_event_service._generate_grief_timeline(
-            MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, None
-        )
+        await care_event_service._generate_grief_timeline(MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, None)
 
         first_event = mock_db.care_events.insert_one.call_args_list[0][0][0]
         assert "Grief support" in first_event["description"]
@@ -1477,11 +1409,9 @@ class TestCareEventServiceAccidentFollowups:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_accident_followups_generates_3_events(
-        self, care_event_service, mock_db
-    ):
+    async def test_accident_followups_generates_3_events(self, care_event_service, mock_db):
         """Accident followups should generate exactly 3 events."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         event_ids = await care_event_service._generate_accident_followups(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Car accident"
@@ -1492,11 +1422,9 @@ class TestCareEventServiceAccidentFollowups:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_accident_followups_correct_dates(
-        self, care_event_service, mock_db
-    ):
+    async def test_accident_followups_correct_dates(self, care_event_service, mock_db):
         """Each followup should be scheduled at the correct offset (3, 7, 14 days)."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_accident_followups(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Accident"
@@ -1518,7 +1446,7 @@ class TestCareEventServiceAccidentFollowups:
     @pytest.mark.asyncio
     async def test_accident_followups_event_type(self, care_event_service, mock_db):
         """All followup events should have accident_illness type."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_accident_followups(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, "Accident"
@@ -1530,11 +1458,9 @@ class TestCareEventServiceAccidentFollowups:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_accident_followups_none_description(
-        self, care_event_service, mock_db
-    ):
+    async def test_accident_followups_none_description(self, care_event_service, mock_db):
         """When description is None, should use 'Accident/Illness' as fallback."""
-        initial_date = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        initial_date = datetime(2025, 6, 1, tzinfo=UTC)
 
         await care_event_service._generate_accident_followups(
             MEMBER_ID, CHURCH_ID, CAMPUS_ID, initial_date, USER_ID, None
@@ -1552,9 +1478,7 @@ class TestCareEventServiceComplete:
     async def test_complete_event_not_found(self, care_event_service, mock_db):
         """Should return None when event not found."""
         mock_db.care_events.find_one.return_value = None
-        result = await care_event_service.complete(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await care_event_service.complete(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
         assert result is None
 
     @pytest.mark.unit
@@ -1562,8 +1486,10 @@ class TestCareEventServiceComplete:
     async def test_complete_event_success(self, care_event_service, mock_db):
         """Should mark event as completed and update member last_contact_date."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         completed_event = {**event, "is_completed": True}
@@ -1572,9 +1498,7 @@ class TestCareEventServiceComplete:
         mock_db.care_events.find_one.side_effect = [event, completed_event]
         mock_db.members.find_one.return_value = member
 
-        result = await care_event_service.complete(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await care_event_service.complete(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         assert result is not None
         # Should update care event
@@ -1592,8 +1516,10 @@ class TestCareEventServiceComplete:
     async def test_complete_event_with_notes(self, care_event_service, mock_db):
         """Completion notes should be saved."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         mock_db.care_events.find_one.side_effect = [event, event]
@@ -1612,16 +1538,16 @@ class TestCareEventServiceComplete:
     async def test_complete_event_logs_activity(self, care_event_service, mock_db):
         """Completing an event should log a COMPLETE_TASK activity."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         mock_db.care_events.find_one.side_effect = [event, event]
         mock_db.members.find_one.return_value = {"id": MEMBER_ID, "name": "John"}
 
-        await care_event_service.complete(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        await care_event_service.complete(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         log_call = mock_db.activity_logs.insert_one.call_args
         log_doc = log_call[0][0]
@@ -1636,9 +1562,7 @@ class TestCareEventServiceIgnore:
     async def test_ignore_event_not_found(self, care_event_service, mock_db):
         """Should return None when event not found."""
         mock_db.care_events.find_one.return_value = None
-        result = await care_event_service.ignore(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await care_event_service.ignore(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
         assert result is None
 
     @pytest.mark.unit
@@ -1646,8 +1570,10 @@ class TestCareEventServiceIgnore:
     async def test_ignore_event_success(self, care_event_service, mock_db):
         """Should mark event as ignored."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         ignored_event = {**event, "is_ignored": True}
@@ -1656,9 +1582,7 @@ class TestCareEventServiceIgnore:
         mock_db.care_events.find_one.side_effect = [event, ignored_event]
         mock_db.members.find_one.return_value = member
 
-        result = await care_event_service.ignore(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await care_event_service.ignore(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         assert result is not None
         update_args = mock_db.care_events.update_one.call_args
@@ -1671,16 +1595,16 @@ class TestCareEventServiceIgnore:
     async def test_ignore_event_with_reason(self, care_event_service, mock_db):
         """Ignore reason should be saved."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         mock_db.care_events.find_one.side_effect = [event, event]
         mock_db.members.find_one.return_value = {"id": MEMBER_ID, "name": "John"}
 
-        await care_event_service.ignore(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME, reason="Member relocated"
-        )
+        await care_event_service.ignore(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME, reason="Member relocated")
 
         update_args = mock_db.care_events.update_one.call_args
         set_data = update_args[0][1]["$set"]
@@ -1691,16 +1615,16 @@ class TestCareEventServiceIgnore:
     async def test_ignore_event_logs_activity(self, care_event_service, mock_db):
         """Ignoring an event should log an IGNORE_TASK activity."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         mock_db.care_events.find_one.side_effect = [event, event]
         mock_db.members.find_one.return_value = {"id": MEMBER_ID, "name": "John"}
 
-        await care_event_service.ignore(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        await care_event_service.ignore(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         log_call = mock_db.activity_logs.insert_one.call_args
         log_doc = log_call[0][0]
@@ -1715,9 +1639,7 @@ class TestCareEventServiceDelete:
     async def test_delete_event_not_found(self, care_event_service, mock_db):
         """Should return False when event not found."""
         mock_db.care_events.find_one.return_value = None
-        result = await care_event_service.delete(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await care_event_service.delete(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
         assert result is False
 
     @pytest.mark.unit
@@ -1725,16 +1647,16 @@ class TestCareEventServiceDelete:
     async def test_delete_event_success(self, care_event_service, mock_db):
         """Should delete event and log activity."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "birthday", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "birthday",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         mock_db.care_events.find_one.return_value = event
         mock_db.members.find_one.return_value = {"id": MEMBER_ID, "name": "John"}
 
-        result = await care_event_service.delete(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        result = await care_event_service.delete(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         assert result is True
         mock_db.care_events.delete_one.assert_called_once()
@@ -1744,16 +1666,16 @@ class TestCareEventServiceDelete:
     async def test_delete_event_logs_activity(self, care_event_service, mock_db):
         """Deleting an event should log a DELETE_CARE_EVENT activity."""
         event = {
-            "id": EVENT_ID, "member_id": MEMBER_ID,
-            "event_type": "grief_loss", "church_id": CHURCH_ID,
+            "id": EVENT_ID,
+            "member_id": MEMBER_ID,
+            "event_type": "grief_loss",
+            "church_id": CHURCH_ID,
             "campus_id": CAMPUS_ID,
         }
         mock_db.care_events.find_one.return_value = event
         mock_db.members.find_one.return_value = {"id": MEMBER_ID, "name": "John"}
 
-        await care_event_service.delete(
-            EVENT_ID, CHURCH_ID, USER_ID, USER_NAME
-        )
+        await care_event_service.delete(EVENT_ID, CHURCH_ID, USER_ID, USER_NAME)
 
         log_call = mock_db.activity_logs.insert_one.call_args
         log_doc = log_call[0][0]
@@ -1765,18 +1687,15 @@ class TestCareEventServiceDelete:
 # NotificationService Tests
 # ===================================================================
 
+
 class TestNotificationServiceSendWhatsApp:
     """Test NotificationService.send_whatsapp()."""
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_send_whatsapp_no_gateway_configured(
-        self, notification_service, mock_db
-    ):
+    async def test_send_whatsapp_no_gateway_configured(self, notification_service, mock_db):
         """Should return error when WhatsApp gateway is not configured."""
-        result = await notification_service.send_whatsapp(
-            "+6281234567890", "Hello!", CHURCH_ID
-        )
+        result = await notification_service.send_whatsapp("+6281234567890", "Hello!", CHURCH_ID)
         assert result["success"] is False
         assert "not configured" in result["error"]
 
@@ -1784,9 +1703,7 @@ class TestNotificationServiceSendWhatsApp:
     @pytest.mark.asyncio
     async def test_send_whatsapp_success(self, notification_service_with_wa, mock_db):
         """Should create notification log and return success."""
-        result = await notification_service_with_wa.send_whatsapp(
-            "+6281234567890", "Hello!", CHURCH_ID
-        )
+        result = await notification_service_with_wa.send_whatsapp("+6281234567890", "Hello!", CHURCH_ID)
 
         assert result["success"] is True
         assert "notification_id" in result
@@ -1794,14 +1711,10 @@ class TestNotificationServiceSendWhatsApp:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_send_whatsapp_truncates_long_message(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_send_whatsapp_truncates_long_message(self, notification_service_with_wa, mock_db):
         """Message in notification log should be truncated to 500 chars."""
         long_message = "x" * 1000
-        await notification_service_with_wa.send_whatsapp(
-            "+6281234567890", long_message, CHURCH_ID
-        )
+        await notification_service_with_wa.send_whatsapp("+6281234567890", long_message, CHURCH_ID)
 
         log_call = mock_db.notification_logs.insert_one.call_args
         log_doc = log_call[0][0]
@@ -1809,13 +1722,10 @@ class TestNotificationServiceSendWhatsApp:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_send_whatsapp_logs_correct_fields(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_send_whatsapp_logs_correct_fields(self, notification_service_with_wa, mock_db):
         """Notification log should contain correct fields."""
         await notification_service_with_wa.send_whatsapp(
-            "+6281234567890", "Hello!", CHURCH_ID,
-            member_id=MEMBER_ID, event_id=EVENT_ID
+            "+6281234567890", "Hello!", CHURCH_ID, member_id=MEMBER_ID, event_id=EVENT_ID
         )
 
         log_call = mock_db.notification_logs.insert_one.call_args
@@ -1833,9 +1743,7 @@ class TestNotificationServiceSendWhatsAppBackground:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_background_send_success(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_background_send_success(self, notification_service_with_wa, mock_db):
         """Successful background send should update status to SENT."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -1858,9 +1766,7 @@ class TestNotificationServiceSendWhatsAppBackground:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_background_send_failure(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_background_send_failure(self, notification_service_with_wa, mock_db):
         """Failed background send should update status to FAILED after retries."""
         import httpx
 
@@ -1880,9 +1786,7 @@ class TestNotificationServiceSendWhatsAppBackground:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_background_send_http_error_status(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_background_send_http_error_status(self, notification_service_with_wa, mock_db):
         """Non-200/201 HTTP status should be treated as failure."""
         mock_response = MagicMock()
         mock_response.status_code = 500
@@ -1902,9 +1806,7 @@ class TestNotificationServiceSendWhatsAppBackground:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_background_send_timeout(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_background_send_timeout(self, notification_service_with_wa, mock_db):
         """Timeout should be handled gracefully."""
         import httpx
 
@@ -1940,18 +1842,14 @@ class TestNotificationServiceBulkWhatsApp:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_send_bulk_whatsapp_success(
-        self, notification_service_with_wa, mock_db
-    ):
+    async def test_send_bulk_whatsapp_success(self, notification_service_with_wa, mock_db):
         """With gateway configured, sends should return notification IDs."""
         recipients = [
             {"phone": "+6281234567890", "message": "Hello 1"},
             {"phone": "+6281234567891", "message": "Hello 2"},
         ]
 
-        result = await notification_service_with_wa.send_bulk_whatsapp(
-            recipients, CHURCH_ID, delay_between=0
-        )
+        result = await notification_service_with_wa.send_bulk_whatsapp(recipients, CHURCH_ID, delay_between=0)
         assert result["sent"] == 2
         assert result["failed"] == 0
         assert len(result["notification_ids"]) == 2
@@ -1962,29 +1860,21 @@ class TestNotificationServiceGetStatus:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_notification_status_found(
-        self, notification_service, mock_db
-    ):
+    async def test_get_notification_status_found(self, notification_service, mock_db):
         """Should return notification log when found."""
         log = {"id": "notif-123", "status": "sent", "church_id": CHURCH_ID}
         mock_db.notification_logs.find_one.return_value = log
 
-        result = await notification_service.get_notification_status(
-            "notif-123", CHURCH_ID
-        )
+        result = await notification_service.get_notification_status("notif-123", CHURCH_ID)
         assert result is not None
         assert result["status"] == "sent"
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_notification_status_not_found(
-        self, notification_service, mock_db
-    ):
+    async def test_get_notification_status_not_found(self, notification_service, mock_db):
         """Should return None when notification not found."""
         mock_db.notification_logs.find_one.return_value = None
-        result = await notification_service.get_notification_status(
-            "nonexistent", CHURCH_ID
-        )
+        result = await notification_service.get_notification_status("nonexistent", CHURCH_ID)
         assert result is None
 
 
@@ -1993,9 +1883,7 @@ class TestNotificationServiceGetRecent:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_recent_notifications_basic(
-        self, notification_service, mock_db
-    ):
+    async def test_get_recent_notifications_basic(self, notification_service, mock_db):
         """Should return recent notifications for church."""
         notifications = [{"id": "n1"}, {"id": "n2"}]
         cursor = mock_db.notification_logs.find.return_value
@@ -2006,16 +1894,12 @@ class TestNotificationServiceGetRecent:
 
     @pytest.mark.unit
     @pytest.mark.asyncio
-    async def test_get_recent_notifications_with_member_filter(
-        self, notification_service, mock_db
-    ):
+    async def test_get_recent_notifications_with_member_filter(self, notification_service, mock_db):
         """Should filter by member_id when provided."""
         cursor = mock_db.notification_logs.find.return_value
         cursor.to_list.return_value = []
 
-        await notification_service.get_recent_notifications(
-            CHURCH_ID, member_id=MEMBER_ID
-        )
+        await notification_service.get_recent_notifications(CHURCH_ID, member_id=MEMBER_ID)
         query = mock_db.notification_logs.find.call_args[0][0]
         assert query["member_id"] == MEMBER_ID
 
@@ -2024,13 +1908,14 @@ class TestNotificationServiceGetRecent:
 # ImageService Tests
 # ===================================================================
 
+
 class TestImageServiceProcessSync:
     """Test ImageService._process_image_sync() for image resizing."""
 
     @pytest.mark.unit
     def test_process_image_sync_creates_all_sizes(self, tmp_path):
         """Should create one file for each size in the sizes dict."""
-        from services.image_service import ImageService, MEMBER_PHOTO_SIZES
+        from services.image_service import MEMBER_PHOTO_SIZES, ImageService
 
         # Create a test image in memory
         img = Image.new("RGB", (800, 600), color="red")
@@ -2041,9 +1926,7 @@ class TestImageServiceProcessSync:
         output_base = tmp_path / "test_member"
 
         with patch("services.image_service.UPLOAD_DIR", tmp_path):
-            results = ImageService._process_image_sync(
-                image_bytes, MEMBER_PHOTO_SIZES, output_base
-            )
+            results = ImageService._process_image_sync(image_bytes, MEMBER_PHOTO_SIZES, output_base)
 
         assert "thumbnail" in results
         assert "medium" in results
@@ -2145,7 +2028,7 @@ class TestImageServiceProcessSingle:
     @pytest.mark.unit
     def test_process_single_image_sync(self, tmp_path):
         """Should create a single resized image."""
-        from services.image_service import ImageService, USER_PHOTO_SIZE
+        from services.image_service import USER_PHOTO_SIZE, ImageService
 
         img = Image.new("RGB", (800, 800), color="blue")
         buf = io.BytesIO()
@@ -2155,9 +2038,7 @@ class TestImageServiceProcessSingle:
         output_path = tmp_path / "user_photo.jpg"
 
         with patch("services.image_service.UPLOAD_DIR", tmp_path):
-            result = ImageService._process_single_image_sync(
-                image_bytes, USER_PHOTO_SIZE, output_path
-            )
+            ImageService._process_single_image_sync(image_bytes, USER_PHOTO_SIZE, output_path)
 
         assert output_path.exists()
         resized = Image.open(output_path)
@@ -2177,9 +2058,7 @@ class TestImageServiceProcessSingle:
         output_path = tmp_path / "user_rgba.jpg"
 
         with patch("services.image_service.UPLOAD_DIR", tmp_path):
-            ImageService._process_single_image_sync(
-                image_bytes, (400, 400), output_path
-            )
+            ImageService._process_single_image_sync(image_bytes, (400, 400), output_path)
 
         resized = Image.open(output_path)
         assert resized.mode == "RGB"
@@ -2192,7 +2071,7 @@ class TestImageServiceProcessMemberPhoto:
     @pytest.mark.asyncio
     async def test_process_member_photo(self, tmp_path):
         """Should generate all size variants for a member photo."""
-        from services.image_service import ImageService, MEMBER_PHOTO_SIZES
+        from services.image_service import ImageService
 
         img = Image.new("RGB", (800, 800), color="red")
         buf = io.BytesIO()
@@ -2200,9 +2079,7 @@ class TestImageServiceProcessMemberPhoto:
         image_bytes = buf.getvalue()
 
         with patch("services.image_service.UPLOAD_DIR", tmp_path):
-            results = await ImageService.process_member_photo(
-                image_bytes, MEMBER_ID, CHURCH_ID
-            )
+            results = await ImageService.process_member_photo(image_bytes, MEMBER_ID, CHURCH_ID)
 
         assert "thumbnail" in results
         assert "medium" in results
@@ -2245,9 +2122,7 @@ class TestImageServiceBackgroundProcessing:
         image_bytes = buf.getvalue()
 
         with patch("services.image_service.UPLOAD_DIR", tmp_path):
-            await ImageService.process_member_photo_background(
-                image_bytes, MEMBER_ID, CHURCH_ID, mock_db
-            )
+            await ImageService.process_member_photo_background(image_bytes, MEMBER_ID, CHURCH_ID, mock_db)
 
         # Should update the member's photo_url in the database
         mock_db.members.update_one.assert_called_once()
@@ -2266,9 +2141,7 @@ class TestImageServiceBackgroundProcessing:
         # Pass invalid image bytes
         with patch("services.image_service.UPLOAD_DIR", MagicMock()):
             # This should not raise an exception
-            await ImageService.process_member_photo_background(
-                b"not-an-image", MEMBER_ID, CHURCH_ID, mock_db
-            )
+            await ImageService.process_member_photo_background(b"not-an-image", MEMBER_ID, CHURCH_ID, mock_db)
 
         # Member update should NOT have been called
         mock_db.members.update_one.assert_not_called()
@@ -2285,9 +2158,7 @@ class TestImageServiceBackgroundProcessing:
         image_bytes = buf.getvalue()
 
         with patch("services.image_service.UPLOAD_DIR", tmp_path):
-            await ImageService.process_user_photo_background(
-                image_bytes, USER_ID, mock_db
-            )
+            await ImageService.process_user_photo_background(image_bytes, USER_ID, mock_db)
 
         mock_db.users.update_one.assert_called_once()
         update_args = mock_db.users.update_one.call_args
@@ -2302,9 +2173,7 @@ class TestImageServiceBackgroundProcessing:
         from services.image_service import ImageService
 
         with patch("services.image_service.UPLOAD_DIR", MagicMock()):
-            await ImageService.process_user_photo_background(
-                b"not-an-image", USER_ID, mock_db
-            )
+            await ImageService.process_user_photo_background(b"not-an-image", USER_ID, mock_db)
 
         mock_db.users.update_one.assert_not_called()
 
@@ -2315,7 +2184,7 @@ class TestImageServiceDeletePhotos:
     @pytest.mark.unit
     def test_delete_member_photos_existing(self, tmp_path):
         """Should delete all size variants of member photos."""
-        from services.image_service import ImageService, MEMBER_PHOTO_SIZES
+        from services.image_service import MEMBER_PHOTO_SIZES, ImageService
 
         # Create fake photo files
         member_dir = tmp_path / "members" / CHURCH_ID
@@ -2380,6 +2249,7 @@ class TestImageServiceConstants:
     def test_member_photo_sizes(self):
         """Member photo sizes should have thumbnail, medium, and large."""
         from services.image_service import MEMBER_PHOTO_SIZES
+
         assert "thumbnail" in MEMBER_PHOTO_SIZES
         assert "medium" in MEMBER_PHOTO_SIZES
         assert "large" in MEMBER_PHOTO_SIZES
@@ -2391,12 +2261,14 @@ class TestImageServiceConstants:
     def test_user_photo_size(self):
         """User photo size should be 400x400."""
         from services.image_service import USER_PHOTO_SIZE
+
         assert USER_PHOTO_SIZE == (400, 400)
 
     @pytest.mark.unit
     def test_jpeg_quality(self):
         """JPEG quality should be 85."""
         from services.image_service import JPEG_QUALITY
+
         assert JPEG_QUALITY == 85
 
 

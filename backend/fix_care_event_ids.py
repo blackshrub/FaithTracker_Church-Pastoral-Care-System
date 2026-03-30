@@ -5,13 +5,15 @@ This script regenerates valid UUID strings for all care events with corrupted ID
 """
 
 import asyncio
-import uuid
-import re
 import os
+import re
+import uuid
+
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # Valid UUID pattern
-UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$')
+UUID_PATTERN = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+
 
 def is_valid_uuid(value):
     """Check if a string is a valid UUID format."""
@@ -19,10 +21,13 @@ def is_valid_uuid(value):
         return False
     return bool(UUID_PATTERN.match(value))
 
+
 async def fix_care_event_ids():
     """Fix all care events with corrupted IDs."""
     # Connect to MongoDB - use 'mongo' hostname for container networking
-    mongo_uri = os.environ.get("MONGODB_URI", "mongodb://admin:fefb33c5e0eee893f2ee752a480cacc6@mongo:27017/faithtracker?authSource=admin")
+    mongo_uri = os.environ.get(
+        "MONGODB_URI", "mongodb://admin:fefb33c5e0eee893f2ee752a480cacc6@mongo:27017/faithtracker?authSource=admin"
+    )
     client = AsyncIOMotorClient(mongo_uri)
     db = client.faithtracker
 
@@ -46,17 +51,14 @@ async def fix_care_event_ids():
             new_id = str(uuid.uuid4())
 
             # Update the event with new ID
-            result = await db.care_events.update_one(
-                {"_id": mongo_id},
-                {"$set": {"id": new_id}}
-            )
+            result = await db.care_events.update_one({"_id": mongo_id}, {"$set": {"id": new_id}})
 
             if result.modified_count > 0:
                 fixed_count += 1
                 if fixed_count <= 10:  # Print first 10 fixes
                     print(f"  Fixed event {mongo_id}: '{event_id[:20] if event_id else 'None'}...' -> '{new_id}'")
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Total events: {total}")
     print(f"  Corrupted IDs found: {corrupted_count}")
     print(f"  IDs fixed: {fixed_count}")
@@ -76,6 +78,7 @@ async def fix_care_event_ids():
         print(f"\n⚠️ Warning: {remaining} events still have invalid IDs")
 
     client.close()
+
 
 if __name__ == "__main__":
     asyncio.run(fix_care_event_ids())

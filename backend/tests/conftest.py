@@ -8,17 +8,17 @@ Provides:
 - Async test support
 """
 
-import pytest
 import asyncio
 import os
-from datetime import datetime, timezone
-from motor.motor_asyncio import AsyncIOMotorClient
 import uuid
-from typing import AsyncGenerator
+from datetime import UTC, datetime
+
+import pytest
+from motor.motor_asyncio import AsyncIOMotorClient
 
 # Test database configuration
-TEST_DB_NAME = 'faithtracker_test'
-MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+TEST_DB_NAME = "faithtracker_test"
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 
 
 @pytest.fixture(scope="session")
@@ -65,7 +65,7 @@ async def test_campus(test_db):
         "location": "Test Location",
         "is_active": True,
         "timezone": "Asia/Jakarta",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.campuses.insert_one(campus)
     return campus
@@ -81,7 +81,7 @@ async def second_campus(test_db):
         "location": "Another Location",
         "is_active": True,
         "timezone": "Asia/Jakarta",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.campuses.insert_one(campus)
     return campus
@@ -93,7 +93,7 @@ async def test_admin_user(test_db, test_campus):
     import bcrypt
 
     def hash_password(password: str) -> str:
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     user_id = str(uuid.uuid4())
 
@@ -106,7 +106,7 @@ async def test_admin_user(test_db, test_campus):
         "campus_id": test_campus["id"],
         "role": "full_admin",
         "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.users.insert_one(user)
     return user
@@ -118,7 +118,7 @@ async def test_pastor_user(test_db, test_campus):
     import bcrypt
 
     def hash_password(password: str) -> str:
-        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
     user_id = str(uuid.uuid4())
 
@@ -131,7 +131,7 @@ async def test_pastor_user(test_db, test_campus):
         "campus_id": test_campus["id"],
         "role": "pastor",
         "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.users.insert_one(user)
     return user
@@ -149,9 +149,9 @@ async def test_member(test_db, test_campus):
         "email": "john.doe@test.com",
         "engagement_status": "active",
         "days_since_last_contact": 5,
-        "last_contact_date": datetime.now(timezone.utc).isoformat(),
+        "last_contact_date": datetime.now(UTC).isoformat(),
         "is_archived": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.members.insert_one(member)
     return member
@@ -169,9 +169,9 @@ async def test_member_second_campus(test_db, second_campus):
         "email": "jane.smith@test.com",
         "engagement_status": "active",
         "days_since_last_contact": 3,
-        "last_contact_date": datetime.now(timezone.utc).isoformat(),
+        "last_contact_date": datetime.now(UTC).isoformat(),
         "is_archived": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.members.insert_one(member)
     return member
@@ -186,12 +186,12 @@ async def test_care_event(test_db, test_campus, test_member):
         "campus_id": test_campus["id"],
         "member_id": test_member["id"],
         "event_type": "birthday",
-        "event_date": datetime.now(timezone.utc).date().isoformat(),
+        "event_date": datetime.now(UTC).date().isoformat(),
         "title": "Birthday Celebration",
         "description": "Send birthday wishes",
         "completed": False,
         "ignored": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.care_events.insert_one(event)
     return event
@@ -204,7 +204,7 @@ def create_test_member_data(campus_id: str, **overrides):
         "name": "Test Member",
         "phone": f"+628{uuid.uuid4().hex[:10]}",
         "email": f"test{uuid.uuid4().hex[:8]}@example.com",
-        "campus_id": campus_id
+        "campus_id": campus_id,
     }
     data.update(overrides)
     return data
@@ -216,9 +216,9 @@ def create_test_care_event_data(campus_id: str, member_id: str, **overrides):
         "campus_id": campus_id,
         "member_id": member_id,
         "event_type": "regular_contact",
-        "event_date": datetime.now(timezone.utc).date().isoformat(),
+        "event_date": datetime.now(UTC).date().isoformat(),
         "title": "Test Event",
-        "description": "Test Description"
+        "description": "Test Description",
     }
     data.update(overrides)
     return data

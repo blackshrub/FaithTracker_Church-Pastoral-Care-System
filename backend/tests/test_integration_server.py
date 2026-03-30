@@ -8,28 +8,30 @@ validation, serialization, and business logic.
 Coverage target: ~70-80% of server.py's 2508 statements.
 """
 
-import pytest
+import hashlib
+import hmac
+import json
 import os
 import sys
 import uuid
-import json
-import io
-import hashlib
-import hmac
-from datetime import datetime, timezone, timedelta, date
-from unittest.mock import MagicMock, AsyncMock, patch, PropertyMock
+from datetime import UTC, date, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Set env vars BEFORE any imports that read them
-os.environ.update({
-    'MONGO_URL': 'mongodb://mock:27017',
-    'DB_NAME': 'faithtracker_test',
-    'JWT_SECRET_KEY': 'test-secret-key-1234567890abcdef1234567890abcdef',
-    'ENCRYPTION_KEY': 'cc7F8DmC4HF2hXLZxWIwZPitOgPS9Ybza0pl2_U0luQ=',
-    'DRAGONFLY_URL': 'redis://mock:6379',
-    'FRONTEND_URL': 'http://localhost:3000',
-    'ALLOWED_ORIGINS': 'http://localhost:3000',
-    'ENVIRONMENT': 'development',
-})
+os.environ.update(
+    {
+        "MONGO_URL": "mongodb://mock:27017",
+        "DB_NAME": "faithtracker_test",
+        "JWT_SECRET_KEY": "test-secret-key-1234567890abcdef1234567890abcdef",
+        "ENCRYPTION_KEY": "cc7F8DmC4HF2hXLZxWIwZPitOgPS9Ybza0pl2_U0luQ=",
+        "DRAGONFLY_URL": "redis://mock:6379",
+        "FRONTEND_URL": "http://localhost:3000",
+        "ALLOWED_ORIGINS": "http://localhost:3000",
+        "ENVIRONMENT": "development",
+    }
+)
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -37,10 +39,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bcrypt
 import jwt as pyjwt
 
-
 # ==================== TEST CONSTANTS ====================
 
-TEST_SECRET = os.environ['JWT_SECRET_KEY']
+TEST_SECRET = os.environ["JWT_SECRET_KEY"]
 TEST_CAMPUS_ID = str(uuid.uuid4())
 TEST_CAMPUS_ID_2 = str(uuid.uuid4())
 TEST_USER_ID = str(uuid.uuid4())
@@ -53,9 +54,10 @@ TEST_GRIEF_STAGE_ID = str(uuid.uuid4())
 TEST_ACCIDENT_STAGE_ID = str(uuid.uuid4())
 TEST_SCHEDULE_ID = str(uuid.uuid4())
 
-HASHED_PASSWORD = bcrypt.hashpw(b"TestPassword123!", bcrypt.gensalt()).decode('utf-8')
+HASHED_PASSWORD = bcrypt.hashpw(b"TestPassword123!", bcrypt.gensalt()).decode("utf-8")
 
 # ==================== TEST DATA FIXTURES ====================
+
 
 def _make_admin_user(**overrides):
     """Create a test admin user dict."""
@@ -68,8 +70,8 @@ def _make_admin_user(**overrides):
         "phone": "+6281234567890",
         "hashed_password": HASHED_PASSWORD,
         "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     data.update(overrides)
     return data
@@ -86,8 +88,8 @@ def _make_pastor_user(**overrides):
         "phone": "+6281234567891",
         "hashed_password": HASHED_PASSWORD,
         "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     data.update(overrides)
     return data
@@ -102,10 +104,10 @@ def _make_member(**overrides):
         "campus_id": TEST_CAMPUS_ID,
         "engagement_status": "active",
         "days_since_last_contact": 5,
-        "last_contact_date": datetime.now(timezone.utc).isoformat(),
+        "last_contact_date": datetime.now(UTC).isoformat(),
         "is_archived": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "birth_date": "1990-05-15",
         "age": 35,
     }
@@ -125,8 +127,8 @@ def _make_care_event(**overrides):
         "description": "Send birthday wishes",
         "completed": False,
         "ignored": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     data.update(overrides)
     return data
@@ -140,8 +142,8 @@ def _make_campus(**overrides):
         "location": "Test Location",
         "timezone": "Asia/Jakarta",
         "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     data.update(overrides)
     return data
@@ -151,7 +153,7 @@ def _make_token(user_id=TEST_USER_ID, secret=TEST_SECRET, **extra):
     """Create a valid JWT token."""
     payload = {
         "sub": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        "exp": datetime.now(UTC) + timedelta(hours=24),
         **extra,
     }
     return pyjwt.encode(payload, secret, algorithm="HS256")
@@ -163,6 +165,7 @@ def _auth_headers(user_id=TEST_USER_ID, **extra):
 
 
 # ==================== MOCK HELPERS ====================
+
 
 def _make_mock_cursor(data=None):
     """Create a mock MongoDB cursor that supports chaining."""
@@ -205,10 +208,12 @@ def _make_insert_result(inserted_id="mock_id"):
 
 # ==================== FIXTURES ====================
 
+
 @pytest.fixture(autouse=True)
 def _reset_caches():
     """Reset all module-level caches before each test."""
     from utils import invalidate_cache
+
     invalidate_cache()
     yield
 
@@ -220,11 +225,22 @@ def mock_db():
 
     # Set up collection attributes that auto-create sub-attributes
     for collection_name in [
-        'users', 'members', 'campuses', 'care_events', 'settings',
-        'activity_logs', 'notification_logs', 'grief_support',
-        'accident_followup', 'financial_aid_schedules', 'sync_configs',
-        'sync_logs', 'webhook_logs', 'user_preferences', 'dashboard_cache',
-        'pastoral_notes',
+        "users",
+        "members",
+        "campuses",
+        "care_events",
+        "settings",
+        "activity_logs",
+        "notification_logs",
+        "grief_support",
+        "accident_followup",
+        "financial_aid_schedules",
+        "sync_configs",
+        "sync_logs",
+        "webhook_logs",
+        "user_preferences",
+        "dashboard_cache",
+        "pastoral_notes",
     ]:
         coll = MagicMock()
         coll.find_one = AsyncMock(return_value=None)
@@ -244,44 +260,43 @@ def mock_db():
 @pytest.fixture
 def app_client(mock_db):
     """Create a Litestar TestClient with mocked database."""
-    from litestar.testing import TestClient
     from litestar import Litestar
-    from litestar.config.cors import CORSConfig
+    from litestar.testing import TestClient
 
     # Patch the db module-level variable and client admin command
     # Also patch the scheduler to avoid background jobs
-    with patch('server.db', mock_db), \
-         patch('server.client') as mock_client, \
-         patch('server.start_scheduler'), \
-         patch('server.stop_scheduler'), \
-         patch('server.daily_reminder_job', new_callable=AsyncMock), \
-         patch('services.cache.init_cache', new_callable=AsyncMock), \
-         patch('services.cache.close_cache', new_callable=AsyncMock), \
-         patch('services.cache.get_cache', return_value=None):
-
+    with (
+        patch("server.db", mock_db),
+        patch("server.client") as mock_client,
+        patch("server.start_scheduler"),
+        patch("server.stop_scheduler"),
+        patch("server.daily_reminder_job", new_callable=AsyncMock),
+        patch("services.cache.init_cache", new_callable=AsyncMock),
+        patch("services.cache.close_cache", new_callable=AsyncMock),
+        patch("services.cache.get_cache", return_value=None),
+    ):
         mock_client.admin.command = AsyncMock(return_value={"ok": 1})
 
         # Import the app AFTER patching
         import server
+
         server.db = mock_db
 
         # Initialize dependencies
         from dependencies import init_dependencies
+
         init_dependencies(mock_db, TEST_SECRET)
 
         # Initialize route modules
-        from routes.members import init_member_routes
-        from routes.care_events import init_care_event_routes
-        from routes.grief_support import init_grief_support_routes
         from routes.accident_followup import init_accident_followup_routes
-        from routes.financial_aid import init_financial_aid_routes
+        from routes.care_events import init_care_event_routes
         from routes.dashboard import init_dashboard_routes
+        from routes.financial_aid import init_financial_aid_routes
+        from routes.grief_support import init_grief_support_routes
+        from routes.members import init_member_routes
 
         init_member_routes(
-            server.invalidate_dashboard_cache,
-            server.log_activity,
-            server.msgspec_enc_hook,
-            server.ROOT_DIR
+            server.invalidate_dashboard_cache, server.log_activity, server.msgspec_enc_hook, server.ROOT_DIR
         )
         init_care_event_routes(
             server.invalidate_dashboard_cache,
@@ -363,13 +378,15 @@ def _setup_auth(mock_db, user=None):
 
 # ==================== HEALTH CHECK TESTS ====================
 
+
 class TestHealthCheck:
     """Tests for /health and /ready endpoints."""
 
     def test_health_check_success(self, client, db):
         """Health check should return healthy when DB is connected."""
         import server
-        with patch.object(server, 'client') as mock_client:
+
+        with patch.object(server, "client") as mock_client:
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             response = client.get("/health")
             assert response.status_code == 200
@@ -380,7 +397,8 @@ class TestHealthCheck:
     def test_readiness_check_success(self, client, db):
         """Readiness check should return ready when DB is connected."""
         import server
-        with patch.object(server, 'client') as mock_client:
+
+        with patch.object(server, "client") as mock_client:
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             response = client.get("/ready")
             assert response.status_code == 200
@@ -390,7 +408,8 @@ class TestHealthCheck:
     def test_health_check_db_down(self, client, db):
         """Health check should return error when DB is down."""
         import server
-        with patch.object(server, 'client') as mock_client:
+
+        with patch.object(server, "client") as mock_client:
             mock_client.admin.command = AsyncMock(side_effect=Exception("Connection refused"))
             response = client.get("/health")
             # The endpoint tries to raise 503, but datetime in the detail dict
@@ -400,13 +419,15 @@ class TestHealthCheck:
     def test_readiness_check_db_down(self, client, db):
         """Readiness check should return error when DB is down."""
         import server
-        with patch.object(server, 'client') as mock_client:
+
+        with patch.object(server, "client") as mock_client:
             mock_client.admin.command = AsyncMock(side_effect=Exception("DB down"))
             response = client.get("/ready")
             assert response.status_code in [500, 503]
 
 
 # ==================== AUTH TESTS ====================
+
 
 class TestAuth:
     """Tests for /auth/* endpoints."""
@@ -419,11 +440,14 @@ class TestAuth:
         db.campuses.find_one = AsyncMock(return_value=campus)
         db.users.update_one = AsyncMock(return_value=_make_update_result())
 
-        response = client.post("/auth/login", json={
-            "email": "admin@test.com",
-            "password": "TestPassword123!",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": "admin@test.com",
+                "password": "TestPassword123!",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code in [200, 201]
         data = response.json()
         assert "access_token" in data
@@ -435,22 +459,28 @@ class TestAuth:
         user = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=user)
 
-        response = client.post("/auth/login", json={
-            "email": "admin@test.com",
-            "password": "WrongPassword999!",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": "admin@test.com",
+                "password": "WrongPassword999!",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code == 401
 
     def test_login_nonexistent_user(self, client, db):
         """Login with unknown email returns 401."""
         db.users.find_one = AsyncMock(return_value=None)
 
-        response = client.post("/auth/login", json={
-            "email": "nobody@test.com",
-            "password": "SomePass123!",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": "nobody@test.com",
+                "password": "SomePass123!",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code == 401
 
     def test_login_disabled_user(self, client, db):
@@ -458,11 +488,14 @@ class TestAuth:
         user = _make_admin_user(is_active=False)
         db.users.find_one = AsyncMock(return_value=user)
 
-        response = client.post("/auth/login", json={
-            "email": "admin@test.com",
-            "password": "TestPassword123!",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": "admin@test.com",
+                "password": "TestPassword123!",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code == 403
 
     def test_login_full_admin_no_campus(self, client, db):
@@ -470,10 +503,13 @@ class TestAuth:
         user = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=user)
 
-        response = client.post("/auth/login", json={
-            "email": "admin@test.com",
-            "password": "TestPassword123!",
-        })
+        response = client.post(
+            "/auth/login",
+            json={
+                "email": "admin@test.com",
+                "password": "TestPassword123!",
+            },
+        )
         assert response.status_code == 400
 
     def test_get_me_authenticated(self, client, db):
@@ -506,14 +542,18 @@ class TestAuth:
     def test_change_password_success(self, client, db):
         """Changing password with correct current password succeeds."""
         user = _make_admin_user()
-        new_hash = bcrypt.hashpw(b"NewPassword456!", bcrypt.gensalt()).decode('utf-8')
+        bcrypt.hashpw(b"NewPassword456!", bcrypt.gensalt()).decode("utf-8")
         db.users.find_one = AsyncMock(return_value=user)
         db.users.update_one = AsyncMock(return_value=_make_update_result())
 
-        response = client.post("/auth/change-password", json={
-            "current_password": "TestPassword123!",
-            "new_password": "NewPassword456!",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/auth/change-password",
+            json={
+                "current_password": "TestPassword123!",
+                "new_password": "NewPassword456!",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_change_password_wrong_current(self, client, db):
@@ -521,10 +561,14 @@ class TestAuth:
         user = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=user)
 
-        response = client.post("/auth/change-password", json={
-            "current_password": "WrongCurrent999!",
-            "new_password": "NewPassword456!",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/auth/change-password",
+            json={
+                "current_password": "WrongCurrent999!",
+                "new_password": "NewPassword456!",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 400
 
     def test_change_password_same_as_current(self, client, db):
@@ -532,10 +576,14 @@ class TestAuth:
         user = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=user)
 
-        response = client.post("/auth/change-password", json={
-            "current_password": "TestPassword123!",
-            "new_password": "TestPassword123!",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/auth/change-password",
+            json={
+                "current_password": "TestPassword123!",
+                "new_password": "TestPassword123!",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 400
 
     def test_register_user(self, client, db):
@@ -543,32 +591,37 @@ class TestAuth:
         db.users.find_one = AsyncMock(return_value=None)  # email not exists
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.post("/auth/register", json={
-            "email": "newuser@test.com",
-            "password": "StrongPassword123!",
-            "name": "New User",
-            "phone": "+6281234567899",
-            "role": "pastor",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/auth/register",
+            json={
+                "email": "newuser@test.com",
+                "password": "StrongPassword123!",
+                "name": "New User",
+                "phone": "+6281234567899",
+                "role": "pastor",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code in [200, 201]
 
     def test_register_duplicate_email(self, client, db):
         """Register with existing email fails."""
-        db.users.find_one = AsyncMock(
-            return_value={"id": "existing", "email": "existing@test.com"}
-        )
+        db.users.find_one = AsyncMock(return_value={"id": "existing", "email": "existing@test.com"})
 
-        response = client.post("/auth/register", json={
-            "email": "existing@test.com",
-            "password": "StrongPassword123!",
-            "name": "Dup User",
-            "phone": "+6281234567899",
-        })
+        response = client.post(
+            "/auth/register",
+            json={
+                "email": "existing@test.com",
+                "password": "StrongPassword123!",
+                "name": "Dup User",
+                "phone": "+6281234567899",
+            },
+        )
         assert response.status_code == 400
 
 
 # ==================== USER MANAGEMENT TESTS ====================
+
 
 class TestUserManagement:
     """Tests for /users/* endpoints."""
@@ -577,15 +630,21 @@ class TestUserManagement:
         """Admin can list users."""
         admin = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=admin)
-        db.users.aggregate = MagicMock(return_value=_make_mock_agg_cursor([{
-            "id": TEST_USER_ID,
-            "email": "admin@test.com",
-            "name": "Test Admin",
-            "role": "full_admin",
-            "phone": "+6281234567890",
-            "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }]))
+        db.users.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor(
+                [
+                    {
+                        "id": TEST_USER_ID,
+                        "email": "admin@test.com",
+                        "name": "Test Admin",
+                        "role": "full_admin",
+                        "phone": "+6281234567890",
+                        "is_active": True,
+                        "created_at": datetime.now(UTC).isoformat(),
+                    }
+                ]
+            )
+        )
 
         response = client.get("/users", headers=_auth_headers())
         assert response.status_code == 200
@@ -598,16 +657,22 @@ class TestUserManagement:
     def test_update_user(self, client, db):
         """Full admin can update a user."""
         admin = _make_admin_user()
-        db.users.find_one = AsyncMock(side_effect=[
-            admin,  # auth
-            admin,  # updated user
-        ])
+        db.users.find_one = AsyncMock(
+            side_effect=[
+                admin,  # auth
+                admin,  # updated user
+            ]
+        )
         db.users.update_one = AsyncMock(return_value=_make_update_result())
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.put(f"/users/{TEST_USER_ID}", json={
-            "name": "Updated Name",
-        }, headers=_auth_headers())
+        response = client.put(
+            f"/users/{TEST_USER_ID}",
+            json={
+                "name": "Updated Name",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
     def test_update_user_not_admin(self, client, db):
@@ -615,9 +680,13 @@ class TestUserManagement:
         pastor = _make_pastor_user()
         db.users.find_one = AsyncMock(return_value=pastor)
 
-        response = client.put(f"/users/{TEST_USER_ID}", json={
-            "name": "Updated",
-        }, headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.put(
+            f"/users/{TEST_USER_ID}",
+            json={
+                "name": "Updated",
+            },
+            headers=_auth_headers(TEST_PASTOR_ID),
+        )
         assert response.status_code == 403
 
     def test_delete_user(self, client, db):
@@ -644,11 +713,12 @@ class TestUserManagement:
         db.users.find_one = AsyncMock(return_value=admin)
         db.users.delete_one = AsyncMock(return_value=_make_delete_result(0))
 
-        response = client.delete(f"/users/{str(uuid.uuid4())}", headers=_auth_headers())
+        response = client.delete(f"/users/{uuid.uuid4()!s}", headers=_auth_headers())
         assert response.status_code == 404
 
 
 # ==================== CAMPUS TESTS ====================
+
 
 class TestCampus:
     """Tests for /campuses/* endpoints."""
@@ -664,20 +734,28 @@ class TestCampus:
         """Full admin can create a campus."""
         _setup_auth(db)
 
-        response = client.post("/campuses", json={
-            "campus_name": "New Campus",
-            "location": "New Location",
-            "timezone": "Asia/Jakarta",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/campuses",
+            json={
+                "campus_name": "New Campus",
+                "location": "New Location",
+                "timezone": "Asia/Jakarta",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_create_campus_not_admin(self, client, db):
         """Pastor cannot create a campus."""
         _setup_auth(db, _make_pastor_user())
 
-        response = client.post("/campuses", json={
-            "campus_name": "New Campus",
-        }, headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.post(
+            "/campuses",
+            json={
+                "campus_name": "New Campus",
+            },
+            headers=_auth_headers(TEST_PASTOR_ID),
+        )
         assert response.status_code == 403
 
     def test_get_campus_by_id(self, client, db):
@@ -691,7 +769,7 @@ class TestCampus:
         """Get nonexistent campus returns 404."""
         db.campuses.find_one = AsyncMock(return_value=None)
 
-        response = client.get(f"/campuses/{str(uuid.uuid4())}")
+        response = client.get(f"/campuses/{uuid.uuid4()!s}")
         assert response.status_code == 404
 
     def test_update_campus(self, client, db):
@@ -700,11 +778,15 @@ class TestCampus:
         db.campuses.update_one = AsyncMock(return_value=_make_update_result())
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.put(f"/campuses/{TEST_CAMPUS_ID}", json={
-            "campus_name": "Updated Campus",
-            "location": "Updated Location",
-            "timezone": "Asia/Jakarta",
-        }, headers=_auth_headers())
+        response = client.put(
+            f"/campuses/{TEST_CAMPUS_ID}",
+            json={
+                "campus_name": "Updated Campus",
+                "location": "Updated Location",
+                "timezone": "Asia/Jakarta",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
     def test_update_campus_not_found(self, client, db):
@@ -712,13 +794,18 @@ class TestCampus:
         _setup_auth(db)
         db.campuses.update_one = AsyncMock(return_value=_make_update_result(matched=0))
 
-        response = client.put(f"/campuses/{str(uuid.uuid4())}", json={
-            "campus_name": "Nope",
-        }, headers=_auth_headers())
+        response = client.put(
+            f"/campuses/{uuid.uuid4()!s}",
+            json={
+                "campus_name": "Nope",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 404
 
 
 # ==================== MEMBER TESTS ====================
+
 
 class TestMembers:
     """Tests for /members/* endpoints."""
@@ -769,19 +856,26 @@ class TestMembers:
         """Create a new member."""
         _setup_auth(db)
 
-        response = client.post("/members", json={
-            "name": "Jane Smith",
-            "campus_id": TEST_CAMPUS_ID,
-            "phone": "+6281234567895",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/members",
+            json={
+                "name": "Jane Smith",
+                "campus_id": TEST_CAMPUS_ID,
+                "phone": "+6281234567895",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_create_member_no_auth(self, client, db):
         """Create member without auth returns 401."""
-        response = client.post("/members", json={
-            "name": "Jane Smith",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/members",
+            json={
+                "name": "Jane Smith",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code == 401
 
     def test_get_member_by_id(self, client, db):
@@ -797,7 +891,7 @@ class TestMembers:
         _setup_auth(db)
         db.members.find_one = AsyncMock(return_value=None)
 
-        response = client.get(f"/members/{str(uuid.uuid4())}", headers=_auth_headers())
+        response = client.get(f"/members/{uuid.uuid4()!s}", headers=_auth_headers())
         assert response.status_code == 404
 
     def test_update_member(self, client, db):
@@ -809,9 +903,13 @@ class TestMembers:
         db.members.find_one_and_update = AsyncMock(return_value={**member, "name": "Updated Name"})
         db.members.update_one = AsyncMock(return_value=_make_update_result())
 
-        response = client.put(f"/members/{TEST_MEMBER_ID}", json={
-            "name": "Updated Name",
-        }, headers=_auth_headers())
+        response = client.put(
+            f"/members/{TEST_MEMBER_ID}",
+            json={
+                "name": "Updated Name",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
     def test_delete_member(self, client, db):
@@ -835,53 +933,69 @@ class TestMembers:
 
 # ==================== CARE EVENT TESTS ====================
 
+
 class TestCareEvents:
     """Tests for /care-events/* endpoints."""
 
     def test_create_care_event(self, client, db):
         """Create a care event."""
         _setup_auth(db)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            _make_member(),  # member lookup
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                _make_member(),  # member lookup
+            ]
+        )
 
-        response = client.post("/care-events", json={
-            "member_id": TEST_MEMBER_ID,
-            "campus_id": TEST_CAMPUS_ID,
-            "event_type": "regular_contact",
-            "event_date": date.today().isoformat(),
-            "title": "Regular Contact",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/care-events",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "campus_id": TEST_CAMPUS_ID,
+                "event_type": "regular_contact",
+                "event_date": date.today().isoformat(),
+                "title": "Regular Contact",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_create_care_event_no_auth(self, client, db):
         """Create care event without auth returns 401."""
-        response = client.post("/care-events", json={
-            "member_id": TEST_MEMBER_ID,
-            "campus_id": TEST_CAMPUS_ID,
-            "event_type": "birthday",
-            "event_date": date.today().isoformat(),
-            "title": "Birthday",
-        })
+        response = client.post(
+            "/care-events",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "campus_id": TEST_CAMPUS_ID,
+                "event_type": "birthday",
+                "event_date": date.today().isoformat(),
+                "title": "Birthday",
+            },
+        )
         assert response.status_code == 401
 
     def test_create_grief_event_generates_timeline(self, client, db):
         """Creating a grief event auto-generates grief timeline."""
         _setup_auth(db)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            _make_member(),  # member lookup
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                _make_member(),  # member lookup
+            ]
+        )
 
-        response = client.post("/care-events", json={
-            "member_id": TEST_MEMBER_ID,
-            "campus_id": TEST_CAMPUS_ID,
-            "event_type": "grief_loss",
-            "event_date": date.today().isoformat(),
-            "title": "Grief Support",
-            "grief_relationship": "parent",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/care-events",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "campus_id": TEST_CAMPUS_ID,
+                "event_type": "grief_loss",
+                "event_date": date.today().isoformat(),
+                "title": "Grief Support",
+                "grief_relationship": "parent",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
         # Grief timeline should have been inserted
         db.grief_support.insert_many.assert_called_once()
@@ -889,19 +1003,25 @@ class TestCareEvents:
     def test_create_accident_event_generates_followup(self, client, db):
         """Creating an accident event auto-generates followup timeline."""
         _setup_auth(db)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            _make_member(),  # member lookup
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                _make_member(),  # member lookup
+            ]
+        )
 
-        response = client.post("/care-events", json={
-            "member_id": TEST_MEMBER_ID,
-            "campus_id": TEST_CAMPUS_ID,
-            "event_type": "accident_illness",
-            "event_date": date.today().isoformat(),
-            "title": "Hospital Visit",
-            "hospital_name": "RS Test",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/care-events",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "campus_id": TEST_CAMPUS_ID,
+                "event_type": "accident_illness",
+                "event_date": date.today().isoformat(),
+                "title": "Hospital Visit",
+                "hospital_name": "RS Test",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
         db.accident_followup.insert_many.assert_called_once()
 
@@ -909,34 +1029,44 @@ class TestCareEvents:
         """Financial aid event without aid_type returns 400."""
         _setup_auth(db)
 
-        response = client.post("/care-events", json={
-            "member_id": TEST_MEMBER_ID,
-            "campus_id": TEST_CAMPUS_ID,
-            "event_type": "financial_aid",
-            "event_date": date.today().isoformat(),
-            "title": "Financial Aid",
-            "aid_amount": 100000,
-            # Missing aid_type
-        }, headers=_auth_headers())
+        response = client.post(
+            "/care-events",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "campus_id": TEST_CAMPUS_ID,
+                "event_type": "financial_aid",
+                "event_date": date.today().isoformat(),
+                "title": "Financial Aid",
+                "aid_amount": 100000,
+                # Missing aid_type
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 400
 
     def test_create_financial_aid_event_success(self, client, db):
         """Financial aid event with all fields succeeds."""
         _setup_auth(db)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            _make_member(),  # member lookup
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                _make_member(),  # member lookup
+            ]
+        )
 
-        response = client.post("/care-events", json={
-            "member_id": TEST_MEMBER_ID,
-            "campus_id": TEST_CAMPUS_ID,
-            "event_type": "financial_aid",
-            "event_date": date.today().isoformat(),
-            "title": "Financial Aid",
-            "aid_type": "education",
-            "aid_amount": 100000,
-        }, headers=_auth_headers())
+        response = client.post(
+            "/care-events",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "campus_id": TEST_CAMPUS_ID,
+                "event_type": "financial_aid",
+                "event_date": date.today().isoformat(),
+                "title": "Financial Aid",
+                "aid_type": "education",
+                "aid_amount": 100000,
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_list_care_events(self, client, db):
@@ -959,14 +1089,15 @@ class TestCareEvents:
         event = _make_care_event()
         member = _make_member()
         db.care_events.find_one = AsyncMock(return_value=event)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            member,  # member for logging
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                member,  # member for logging
+            ]
+        )
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.post(f"/care-events/{TEST_EVENT_ID}/ignore",
-                               headers=_auth_headers())
+        response = client.post(f"/care-events/{TEST_EVENT_ID}/ignore", headers=_auth_headers())
         assert response.status_code in [200, 201]
         data = response.json()
         assert data["success"] is True
@@ -976,8 +1107,7 @@ class TestCareEvents:
         _setup_auth(db)
         db.care_events.find_one = AsyncMock(return_value=None)
 
-        response = client.post(f"/care-events/{str(uuid.uuid4())}/ignore",
-                               headers=_auth_headers())
+        response = client.post(f"/care-events/{uuid.uuid4()!s}/ignore", headers=_auth_headers())
         assert response.status_code == 404
 
     def test_delete_care_event(self, client, db):
@@ -990,8 +1120,7 @@ class TestCareEvents:
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
         db.settings.find_one = AsyncMock(return_value=None)
 
-        response = client.delete(f"/care-events/{TEST_EVENT_ID}",
-                                 headers=_auth_headers())
+        response = client.delete(f"/care-events/{TEST_EVENT_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_delete_care_event_not_found(self, client, db):
@@ -999,8 +1128,7 @@ class TestCareEvents:
         _setup_auth(db)
         db.care_events.find_one = AsyncMock(return_value=None)
 
-        response = client.delete(f"/care-events/{str(uuid.uuid4())}",
-                                 headers=_auth_headers())
+        response = client.delete(f"/care-events/{uuid.uuid4()!s}", headers=_auth_headers())
         assert response.status_code == 404
 
     def test_delete_grief_event_cascades(self, client, db):
@@ -1010,9 +1138,11 @@ class TestCareEvents:
         db.care_events.find_one = AsyncMock(return_value=event)
         db.care_events.delete_one = AsyncMock(return_value=_make_delete_result(1))
         # Grief stages to cascade delete
-        db.grief_support.find = MagicMock(return_value=_make_mock_cursor([
-            {"id": TEST_GRIEF_STAGE_ID, "member_id": TEST_MEMBER_ID, "stage": "1_week"}
-        ]))
+        db.grief_support.find = MagicMock(
+            return_value=_make_mock_cursor(
+                [{"id": TEST_GRIEF_STAGE_ID, "member_id": TEST_MEMBER_ID, "stage": "1_week"}]
+            )
+        )
         # Timeline entries linked to grief stages
         db.care_events.find = MagicMock(return_value=_make_mock_cursor([]))
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
@@ -1025,6 +1155,7 @@ class TestCareEvents:
 
 # ==================== CARE EVENT COMPLETE/BULK TESTS ====================
 
+
 class TestCareEventCompletion:
     """Tests for care event completion and bulk operations."""
 
@@ -1034,14 +1165,15 @@ class TestCareEventCompletion:
         event = _make_care_event()
         member = _make_member()
         db.care_events.find_one = AsyncMock(return_value=event)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            member,  # member for logging
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                member,  # member for logging
+            ]
+        )
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.post(f"/care-events/{TEST_EVENT_ID}/complete",
-                               headers=_auth_headers())
+        response = client.post(f"/care-events/{TEST_EVENT_ID}/complete", headers=_auth_headers())
         assert response.status_code in [200, 201]
 
     def test_complete_care_event_not_found(self, client, db):
@@ -1049,12 +1181,12 @@ class TestCareEventCompletion:
         _setup_auth(db)
         db.care_events.find_one = AsyncMock(return_value=None)
 
-        response = client.post(f"/care-events/{str(uuid.uuid4())}/complete",
-                               headers=_auth_headers())
+        response = client.post(f"/care-events/{uuid.uuid4()!s}/complete", headers=_auth_headers())
         assert response.status_code == 404
 
 
 # ==================== SETTINGS TESTS ====================
+
 
 class TestSettings:
     """Tests for /settings/* endpoints."""
@@ -1073,10 +1205,9 @@ class TestSettings:
     def test_get_engagement_settings_saved(self, client, db):
         """Get engagement settings with saved values."""
         _setup_auth(db)
-        db.settings.find_one = AsyncMock(return_value={
-            "type": "engagement",
-            "data": {"atRiskDays": 45, "inactiveDays": 75}
-        })
+        db.settings.find_one = AsyncMock(
+            return_value={"type": "engagement", "data": {"atRiskDays": 45, "inactiveDays": 75}}
+        )
 
         response = client.get("/settings/engagement", headers=_auth_headers())
         assert response.status_code == 200
@@ -1092,19 +1223,27 @@ class TestSettings:
         """Admin can update engagement settings."""
         _setup_auth(db)
 
-        response = client.put("/settings/engagement", json={
-            "active_days": 45,
-            "at_risk_days": 75,
-        }, headers=_auth_headers())
+        response = client.put(
+            "/settings/engagement",
+            json={
+                "active_days": 45,
+                "at_risk_days": 75,
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
     def test_update_engagement_settings_pastor_denied(self, client, db):
         """Pastor cannot update engagement settings."""
         _setup_auth(db, _make_pastor_user())
 
-        response = client.put("/settings/engagement", json={
-            "active_days": 45,
-        }, headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.put(
+            "/settings/engagement",
+            json={
+                "active_days": 45,
+            },
+            headers=_auth_headers(TEST_PASTOR_ID),
+        )
         assert response.status_code == 403
 
     def test_get_automation_settings_defaults(self, client, db):
@@ -1121,21 +1260,29 @@ class TestSettings:
         """Admin can update automation settings."""
         _setup_auth(db)
 
-        with patch('server.schedule_daily_digest', create=True):
-            response = client.put("/settings/automation", json={
-                "digestTime": "09:00",
-                "whatsappGateway": "http://gateway.example.com",
-                "enabled": True,
-            }, headers=_auth_headers())
+        with patch("server.schedule_daily_digest", create=True):
+            response = client.put(
+                "/settings/automation",
+                json={
+                    "digestTime": "09:00",
+                    "whatsappGateway": "http://gateway.example.com",
+                    "enabled": True,
+                },
+                headers=_auth_headers(),
+            )
         assert response.status_code == 200
 
     def test_update_automation_invalid_time(self, client, db):
         """Invalid digestTime format fails."""
         _setup_auth(db)
 
-        response = client.put("/settings/automation", json={
-            "digestTime": "25:99",
-        }, headers=_auth_headers())
+        response = client.put(
+            "/settings/automation",
+            json={
+                "digestTime": "25:99",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 400
 
     def test_get_grief_stages_defaults(self, client, db):
@@ -1171,8 +1318,7 @@ class TestSettings:
         _setup_auth(db)
         db.user_preferences.find_one = AsyncMock(return_value=None)
 
-        response = client.get(f"/settings/user-preferences/{TEST_USER_ID}",
-                              headers=_auth_headers())
+        response = client.get(f"/settings/user-preferences/{TEST_USER_ID}", headers=_auth_headers())
         assert response.status_code == 200
         data = response.json()
         assert data["language"] == "id"
@@ -1181,21 +1327,25 @@ class TestSettings:
         """Pastor cannot access another user's preferences."""
         _setup_auth(db, _make_pastor_user())
 
-        response = client.get(f"/settings/user-preferences/{TEST_USER_ID}",
-                              headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.get(f"/settings/user-preferences/{TEST_USER_ID}", headers=_auth_headers(TEST_PASTOR_ID))
         assert response.status_code == 403
 
     def test_update_user_preferences(self, client, db):
         """Update own user preferences."""
         _setup_auth(db)
 
-        response = client.put(f"/settings/user-preferences/{TEST_USER_ID}", json={
-            "email_notifications": False,
-        }, headers=_auth_headers())
+        response = client.put(
+            f"/settings/user-preferences/{TEST_USER_ID}",
+            json={
+                "email_notifications": False,
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
 
 # ==================== EXPORT TESTS ====================
+
 
 class TestExport:
     """Tests for /export/* endpoints."""
@@ -1203,7 +1353,7 @@ class TestExport:
     def test_export_members_csv(self, client, db):
         """Export members as CSV."""
         _setup_auth(db)
-        member = _make_member(last_contact_date=datetime.now(timezone.utc))
+        member = _make_member(last_contact_date=datetime.now(UTC))
         db.members.find = MagicMock(return_value=_make_mock_cursor([member]))
 
         response = client.get("/export/members/csv", headers=_auth_headers())
@@ -1235,6 +1385,7 @@ class TestExport:
 
 # ==================== IMPORT TESTS ====================
 
+
 class TestImport:
     """Tests for /import/* endpoints."""
 
@@ -1243,9 +1394,11 @@ class TestImport:
         admin = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=admin)
 
-        response = client.post("/import/members/json",
-                               json=[{"name": "Imported Member", "phone": "+6281111111111"}],
-                               headers=_auth_headers())
+        response = client.post(
+            "/import/members/json",
+            json=[{"name": "Imported Member", "phone": "+6281111111111"}],
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_import_members_json_no_campus(self, client, db):
@@ -1253,13 +1406,12 @@ class TestImport:
         admin = _make_admin_user(campus_id=None)
         db.users.find_one = AsyncMock(return_value=admin)
 
-        response = client.post("/import/members/json",
-                               json=[{"name": "Imported Member"}],
-                               headers=_auth_headers())
+        response = client.post("/import/members/json", json=[{"name": "Imported Member"}], headers=_auth_headers())
         assert response.status_code == 400
 
 
 # ==================== SETUP WIZARD TESTS ====================
+
 
 class TestSetupWizard:
     """Tests for /setup/* endpoints."""
@@ -1294,12 +1446,15 @@ class TestSetupWizard:
         """
         db.users.count_documents = AsyncMock(return_value=0)
 
-        response = client.post("/setup/admin", json={
-            "email": "firstadmin@church.com",
-            "password": "StrongPassword123!",
-            "name": "First Admin",
-            "phone": "+6281234567890",
-        })
+        response = client.post(
+            "/setup/admin",
+            json={
+                "email": "firstadmin@church.com",
+                "password": "StrongPassword123!",
+                "name": "First Admin",
+                "phone": "+6281234567890",
+            },
+        )
         # Due to parameter naming collision (request: SetupAdminRequest vs Request),
         # this endpoint may return 500. Verify it doesn't crash the server.
         assert response.status_code in [200, 201, 500]
@@ -1310,12 +1465,15 @@ class TestSetupWizard:
         """
         db.users.count_documents = AsyncMock(return_value=1)
 
-        response = client.post("/setup/admin", json={
-            "email": "second@church.com",
-            "password": "StrongPassword123!",
-            "name": "Second Admin",
-            "phone": "+6281234567890",
-        })
+        response = client.post(
+            "/setup/admin",
+            json={
+                "email": "second@church.com",
+                "password": "StrongPassword123!",
+                "name": "Second Admin",
+                "phone": "+6281234567890",
+            },
+        )
         assert response.status_code in [400, 500]
 
     def test_setup_create_campus(self, client, db):
@@ -1324,11 +1482,14 @@ class TestSetupWizard:
         """
         db.campuses.count_documents = AsyncMock(return_value=0)
 
-        response = client.post("/setup/campus", json={
-            "campus_name": "Main Campus",
-            "location": "Jakarta",
-            "timezone": "Asia/Jakarta",
-        })
+        response = client.post(
+            "/setup/campus",
+            json={
+                "campus_name": "Main Campus",
+                "location": "Jakarta",
+                "timezone": "Asia/Jakarta",
+            },
+        )
         # Due to parameter naming collision, may return 500
         assert response.status_code in [200, 201, 500]
 
@@ -1338,15 +1499,19 @@ class TestSetupWizard:
         """
         db.campuses.count_documents = AsyncMock(return_value=1)
 
-        response = client.post("/setup/campus", json={
-            "campus_name": "Another",
-            "location": "Somewhere",
-            "timezone": "Asia/Jakarta",
-        })
+        response = client.post(
+            "/setup/campus",
+            json={
+                "campus_name": "Another",
+                "location": "Somewhere",
+                "timezone": "Asia/Jakarta",
+            },
+        )
         assert response.status_code in [403, 500]
 
 
 # ==================== CONFIG TESTS ====================
+
 
 class TestConfig:
     """Tests for /config/* endpoints."""
@@ -1422,12 +1587,12 @@ class TestConfig:
         assert etag is not None
 
         # Second request with If-None-Match
-        response2 = client.get("/config/aid-types",
-                               headers={"If-None-Match": etag})
+        response2 = client.get("/config/aid-types", headers={"If-None-Match": etag})
         assert response2.status_code == 304
 
 
 # ==================== SEARCH TESTS ====================
+
 
 class TestSearch:
     """Tests for /search endpoint."""
@@ -1440,10 +1605,12 @@ class TestSearch:
         db.members.find = MagicMock(return_value=_make_mock_cursor([member]))
         db.care_events.find = MagicMock(return_value=_make_mock_cursor([event]))
         # For enriching care events with member names
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            member,  # enrichment
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                member,  # enrichment
+            ]
+        )
 
         response = client.get("/search?q=John", headers=_auth_headers())
         assert response.status_code == 200
@@ -1469,19 +1636,26 @@ class TestSearch:
 
 # ==================== ACTIVITY LOG TESTS ====================
 
+
 class TestActivityLogs:
     """Tests for /activity-logs endpoints."""
 
     def test_list_activity_logs(self, client, db):
         """List activity logs."""
         _setup_auth(db)
-        db.activity_logs.find = MagicMock(return_value=_make_mock_cursor([{
-            "id": str(uuid.uuid4()),
-            "user_id": TEST_USER_ID,
-            "user_name": "Admin",
-            "action_type": "complete_task",
-            "created_at": datetime.now(timezone.utc),
-        }]))
+        db.activity_logs.find = MagicMock(
+            return_value=_make_mock_cursor(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "user_id": TEST_USER_ID,
+                        "user_name": "Admin",
+                        "action_type": "complete_task",
+                        "created_at": datetime.now(UTC),
+                    }
+                ]
+            )
+        )
 
         response = client.get("/activity-logs", headers=_auth_headers())
         assert response.status_code == 200
@@ -1492,8 +1666,8 @@ class TestActivityLogs:
         db.activity_logs.find = MagicMock(return_value=_make_mock_cursor([]))
 
         response = client.get(
-            f"/activity-logs?user_id={TEST_USER_ID}&action_type=complete_task",
-            headers=_auth_headers())
+            f"/activity-logs?user_id={TEST_USER_ID}&action_type=complete_task", headers=_auth_headers()
+        )
         assert response.status_code == 200
 
     def test_activity_logs_no_auth(self, client, db):
@@ -1505,9 +1679,9 @@ class TestActivityLogs:
         """Get activity summary."""
         _setup_auth(db)
         db.activity_logs.count_documents = AsyncMock(return_value=42)
-        db.activity_logs.aggregate = MagicMock(return_value=_make_mock_agg_cursor([
-            {"_id": TEST_USER_ID, "name": "Admin", "count": 10}
-        ]))
+        db.activity_logs.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor([{"_id": TEST_USER_ID, "name": "Admin", "count": 10}])
+        )
 
         response = client.get("/activity-logs/summary", headers=_auth_headers())
         assert response.status_code == 200
@@ -1516,6 +1690,7 @@ class TestActivityLogs:
 
 
 # ==================== NOTIFICATION LOG TESTS ====================
+
 
 class TestNotificationLogs:
     """Tests for /notification-logs endpoint."""
@@ -1535,6 +1710,7 @@ class TestNotificationLogs:
 
 
 # ==================== REMINDER TESTS ====================
+
 
 class TestReminders:
     """Tests for /reminders/* endpoints."""
@@ -1560,6 +1736,7 @@ class TestReminders:
 
 
 # ==================== SYNC CONFIG TESTS ====================
+
 
 class TestSyncConfig:
     """Tests for /sync/* endpoints."""
@@ -1601,26 +1778,34 @@ class TestSyncConfig:
         _setup_auth(db)
         db.sync_configs.find_one = AsyncMock(return_value=None)
 
-        with patch('server.httpx') as mock_httpx:
-            response = client.post("/sync/config", json={
-                "api_base_url": "https://faithflow.example.com",
-                "api_email": "sync@test.com",
-                "api_password": "SyncPassword123!",
-                "sync_method": "polling",
-                "polling_interval_hours": 6,
-                "is_enabled": True,
-            }, headers=_auth_headers())
+        with patch("server.httpx"):
+            response = client.post(
+                "/sync/config",
+                json={
+                    "api_base_url": "https://faithflow.example.com",
+                    "api_email": "sync@test.com",
+                    "api_password": "SyncPassword123!",
+                    "sync_method": "polling",
+                    "polling_interval_hours": 6,
+                    "is_enabled": True,
+                },
+                headers=_auth_headers(),
+            )
         assert response.status_code in [200, 201]
 
     def test_save_sync_config_pastor_denied(self, client, db):
         """Pastor cannot save sync config."""
         _setup_auth(db, _make_pastor_user())
 
-        response = client.post("/sync/config", json={
-            "api_base_url": "https://faithflow.example.com",
-            "api_email": "sync@test.com",
-            "api_password": "Pass123!",
-        }, headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.post(
+            "/sync/config",
+            json={
+                "api_base_url": "https://faithflow.example.com",
+                "api_email": "sync@test.com",
+                "api_password": "Pass123!",
+            },
+            headers=_auth_headers(TEST_PASTOR_ID),
+        )
         assert response.status_code == 403
 
     def test_get_sync_logs(self, client, db):
@@ -1656,6 +1841,7 @@ class TestSyncConfig:
 
 
 # ==================== REPORT TESTS ====================
+
 
 class TestReports:
     """Tests for /reports/* endpoints."""
@@ -1698,12 +1884,18 @@ class TestReports:
     def test_staff_performance_report(self, client, db):
         """Get staff performance report."""
         _setup_auth(db)
-        db.users.find = MagicMock(return_value=_make_mock_cursor([{
-            "id": TEST_USER_ID,
-            "name": "Test Admin",
-            "email": "admin@test.com",
-            "role": "full_admin",
-        }]))
+        db.users.find = MagicMock(
+            return_value=_make_mock_cursor(
+                [
+                    {
+                        "id": TEST_USER_ID,
+                        "name": "Test Admin",
+                        "email": "admin@test.com",
+                        "role": "full_admin",
+                    }
+                ]
+            )
+        )
         db.activity_logs.find = MagicMock(return_value=_make_mock_cursor([]))
 
         response = client.get("/reports/staff-performance", headers=_auth_headers())
@@ -1727,6 +1919,7 @@ class TestReports:
 
 # ==================== SUGGESTION TESTS ====================
 
+
 class TestSuggestions:
     """Tests for /suggestions/* endpoints."""
 
@@ -1735,8 +1928,7 @@ class TestSuggestions:
         _setup_auth(db)
         # Member with old contact date -> should trigger suggestion
         member = _make_member(
-            days_since_last_contact=100,
-            last_contact_date=(datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
+            days_since_last_contact=100, last_contact_date=(datetime.now(UTC) - timedelta(days=100)).isoformat()
         )
         db.members.find = MagicMock(return_value=_make_mock_cursor([member]))
         db.care_events.find = MagicMock(return_value=_make_mock_cursor([]))
@@ -1756,6 +1948,7 @@ class TestSuggestions:
 
 # ==================== ANALYTICS TESTS ====================
 
+
 class TestAnalytics:
     """Tests for /analytics/* endpoints."""
 
@@ -1764,8 +1957,7 @@ class TestAnalytics:
         _setup_auth(db)
         members = [
             _make_member(age=25, gender="Male", membership_status="Member"),
-            _make_member(id=str(uuid.uuid4()), age=65, gender="Female",
-                         membership_status="Member"),
+            _make_member(id=str(uuid.uuid4()), age=65, gender="Female", membership_status="Member"),
         ]
         events = [_make_care_event()]
         db.members.find = MagicMock(return_value=_make_mock_cursor(members))
@@ -1781,6 +1973,7 @@ class TestAnalytics:
 
 # ==================== PASTORAL NOTES TESTS ====================
 
+
 class TestPastoralNotes:
     """Tests for /pastoral-notes/* endpoints."""
 
@@ -1791,12 +1984,16 @@ class TestPastoralNotes:
         db.users.find_one = AsyncMock(return_value=admin)
         db.members.find_one = AsyncMock(return_value=member)
 
-        response = client.post("/pastoral-notes", json={
-            "member_id": TEST_MEMBER_ID,
-            "title": "Visit Summary",
-            "content": "Met with John for prayer and encouragement.",
-            "category": "spiritual",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/pastoral-notes",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "title": "Visit Summary",
+                "content": "Met with John for prayer and encouragement.",
+                "category": "spiritual",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code in [200, 201]
 
     def test_create_note_invalid_category(self, client, db):
@@ -1806,21 +2003,28 @@ class TestPastoralNotes:
         db.users.find_one = AsyncMock(return_value=admin)
         db.members.find_one = AsyncMock(return_value=member)
 
-        response = client.post("/pastoral-notes", json={
-            "member_id": TEST_MEMBER_ID,
-            "title": "Visit",
-            "content": "Content here.",
-            "category": "invalid_category",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/pastoral-notes",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "title": "Visit",
+                "content": "Content here.",
+                "category": "invalid_category",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 400
 
     def test_create_note_no_auth(self, client, db):
         """Creating note without auth returns 401."""
-        response = client.post("/pastoral-notes", json={
-            "member_id": TEST_MEMBER_ID,
-            "title": "Visit",
-            "content": "Content.",
-        })
+        response = client.post(
+            "/pastoral-notes",
+            json={
+                "member_id": TEST_MEMBER_ID,
+                "title": "Visit",
+                "content": "Content.",
+            },
+        )
         assert response.status_code == 401
 
     def test_list_pastoral_notes(self, client, db):
@@ -1831,15 +2035,17 @@ class TestPastoralNotes:
             "member_id": TEST_MEMBER_ID,
             "title": "Visit",
             "content": "Content",
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "is_private": False,
         }
         db.pastoral_notes.find = MagicMock(return_value=_make_mock_cursor([note]))
         db.pastoral_notes.count_documents = AsyncMock(return_value=1)
-        db.members.find_one = AsyncMock(side_effect=[
-            _make_admin_user(),  # auth
-            _make_member(),  # enrichment
-        ])
+        db.members.find_one = AsyncMock(
+            side_effect=[
+                _make_admin_user(),  # auth
+                _make_member(),  # enrichment
+            ]
+        )
 
         response = client.get("/pastoral-notes", headers=_auth_headers())
         assert response.status_code == 200
@@ -1863,8 +2069,7 @@ class TestPastoralNotes:
         db.pastoral_notes.find_one = AsyncMock(return_value=note)
         db.members.find_one = AsyncMock(return_value=_make_member())
 
-        response = client.get(f"/pastoral-notes/{TEST_NOTE_ID}",
-                              headers=_auth_headers())
+        response = client.get(f"/pastoral-notes/{TEST_NOTE_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_get_pastoral_note_not_found(self, client, db):
@@ -1872,13 +2077,12 @@ class TestPastoralNotes:
         _setup_auth(db)
         db.pastoral_notes.find_one = AsyncMock(return_value=None)
 
-        response = client.get(f"/pastoral-notes/{str(uuid.uuid4())}",
-                              headers=_auth_headers())
+        response = client.get(f"/pastoral-notes/{uuid.uuid4()!s}", headers=_auth_headers())
         assert response.status_code == 404
 
     def test_get_private_note_other_user(self, client, db):
         """Cannot access another user's private note."""
-        admin = _make_admin_user()
+        _make_admin_user()
         note = {
             "id": TEST_NOTE_ID,
             "member_id": TEST_MEMBER_ID,
@@ -1893,8 +2097,7 @@ class TestPastoralNotes:
         db.users.find_one = AsyncMock(return_value=pastor)
         db.pastoral_notes.find_one = AsyncMock(return_value=note)
 
-        response = client.get(f"/pastoral-notes/{TEST_NOTE_ID}",
-                              headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.get(f"/pastoral-notes/{TEST_NOTE_ID}", headers=_auth_headers(TEST_PASTOR_ID))
         assert response.status_code == 403
 
     def test_update_pastoral_note(self, client, db):
@@ -1914,9 +2117,13 @@ class TestPastoralNotes:
         db.pastoral_notes.find_one = AsyncMock(side_effect=[note, updated_note])
         db.members.find_one = AsyncMock(return_value=_make_member())
 
-        response = client.put(f"/pastoral-notes/{TEST_NOTE_ID}", json={
-            "title": "Updated Visit",
-        }, headers=_auth_headers())
+        response = client.put(
+            f"/pastoral-notes/{TEST_NOTE_ID}",
+            json={
+                "title": "Updated Visit",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
     def test_delete_pastoral_note(self, client, db):
@@ -1934,8 +2141,7 @@ class TestPastoralNotes:
         db.pastoral_notes.find_one = AsyncMock(return_value=note)
         db.members.find_one = AsyncMock(return_value=_make_member())
 
-        response = client.delete(f"/pastoral-notes/{TEST_NOTE_ID}",
-                                 headers=_auth_headers())
+        response = client.delete(f"/pastoral-notes/{TEST_NOTE_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_delete_pastoral_note_not_found(self, client, db):
@@ -1943,8 +2149,7 @@ class TestPastoralNotes:
         _setup_auth(db)
         db.pastoral_notes.find_one = AsyncMock(return_value=None)
 
-        response = client.delete(f"/pastoral-notes/{str(uuid.uuid4())}",
-                                 headers=_auth_headers())
+        response = client.delete(f"/pastoral-notes/{uuid.uuid4()!s}", headers=_auth_headers())
         assert response.status_code == 404
 
     def test_complete_note_followup(self, client, db):
@@ -1960,8 +2165,7 @@ class TestPastoralNotes:
         db.users.find_one = AsyncMock(return_value=admin)
         db.pastoral_notes.find_one = AsyncMock(return_value=note)
 
-        response = client.post(f"/pastoral-notes/{TEST_NOTE_ID}/complete-followup",
-                               headers=_auth_headers())
+        response = client.post(f"/pastoral-notes/{TEST_NOTE_ID}/complete-followup", headers=_auth_headers())
         assert response.status_code in [200, 201]
 
     def test_complete_followup_no_followup_date(self, client, db):
@@ -1976,8 +2180,7 @@ class TestPastoralNotes:
         db.users.find_one = AsyncMock(return_value=admin)
         db.pastoral_notes.find_one = AsyncMock(return_value=note)
 
-        response = client.post(f"/pastoral-notes/{TEST_NOTE_ID}/complete-followup",
-                               headers=_auth_headers())
+        response = client.post(f"/pastoral-notes/{TEST_NOTE_ID}/complete-followup", headers=_auth_headers())
         assert response.status_code == 400
 
     def test_get_member_pastoral_notes(self, client, db):
@@ -1988,8 +2191,7 @@ class TestPastoralNotes:
         db.members.find_one = AsyncMock(return_value=member)
         db.pastoral_notes.find = MagicMock(return_value=_make_mock_cursor([]))
 
-        response = client.get(f"/pastoral-notes/member/{TEST_MEMBER_ID}",
-                              headers=_auth_headers())
+        response = client.get(f"/pastoral-notes/member/{TEST_MEMBER_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_get_followup_due_notes(self, client, db):
@@ -2002,6 +2204,7 @@ class TestPastoralNotes:
 
 
 # ==================== GRIEF SUPPORT ROUTE TESTS ====================
+
 
 class TestGriefSupport:
     """Tests for /grief-support/* endpoints."""
@@ -2022,16 +2225,21 @@ class TestGriefSupport:
     def test_get_member_grief_timeline(self, client, db):
         """Get grief timeline for a member."""
         _setup_auth(db)
-        db.grief_support.find = MagicMock(return_value=_make_mock_cursor([{
-            "id": TEST_GRIEF_STAGE_ID,
-            "member_id": TEST_MEMBER_ID,
-            "stage": "1_week",
-            "scheduled_date": "2025-04-05",
-            "completed": False,
-        }]))
+        db.grief_support.find = MagicMock(
+            return_value=_make_mock_cursor(
+                [
+                    {
+                        "id": TEST_GRIEF_STAGE_ID,
+                        "member_id": TEST_MEMBER_ID,
+                        "stage": "1_week",
+                        "scheduled_date": "2025-04-05",
+                        "completed": False,
+                    }
+                ]
+            )
+        )
 
-        response = client.get(f"/grief-support/member/{TEST_MEMBER_ID}",
-                              headers=_auth_headers())
+        response = client.get(f"/grief-support/member/{TEST_MEMBER_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_complete_grief_stage(self, client, db):
@@ -2054,12 +2262,12 @@ class TestGriefSupport:
         db.care_events.find_one = AsyncMock(return_value=event)
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.post(f"/grief-support/{TEST_GRIEF_STAGE_ID}/complete",
-                               headers=_auth_headers())
+        response = client.post(f"/grief-support/{TEST_GRIEF_STAGE_ID}/complete", headers=_auth_headers())
         assert response.status_code in [200, 201]
 
 
 # ==================== FINANCIAL AID TESTS ====================
+
 
 class TestFinancialAid:
     """Tests for /financial-aid-schedules/* endpoints."""
@@ -2069,8 +2277,7 @@ class TestFinancialAid:
         _setup_auth(db)
         db.financial_aid_schedules.find = MagicMock(return_value=_make_mock_cursor([]))
 
-        response = client.get(f"/financial-aid-schedules/member/{TEST_MEMBER_ID}",
-                              headers=_auth_headers())
+        response = client.get(f"/financial-aid-schedules/member/{TEST_MEMBER_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_financial_aid_no_auth(self, client, db):
@@ -2081,6 +2288,7 @@ class TestFinancialAid:
 
 
 # ==================== INTEGRATION ENDPOINT TESTS ====================
+
 
 class TestIntegrations:
     """Tests for /integrations/* endpoints."""
@@ -2100,10 +2308,14 @@ class TestIntegrations:
         db.users.find_one = AsyncMock(return_value=admin)
         db.settings.find_one = AsyncMock(return_value=None)
 
-        response = client.post("/integrations/ping/whatsapp", json={
-            "phone": "+6281234567890",
-            "message": "Test message",
-        }, headers=_auth_headers())
+        response = client.post(
+            "/integrations/ping/whatsapp",
+            json={
+                "phone": "+6281234567890",
+                "message": "Test message",
+            },
+            headers=_auth_headers(),
+        )
         # Will fail because WhatsApp gateway is not configured, but should not crash
         assert response.status_code in [200, 201, 500]
 
@@ -2112,14 +2324,19 @@ class TestIntegrations:
         pastor = _make_pastor_user()
         db.users.find_one = AsyncMock(return_value=pastor)
 
-        response = client.post("/integrations/ping/whatsapp", json={
-            "phone": "+6281234567890",
-            "message": "Test",
-        }, headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.post(
+            "/integrations/ping/whatsapp",
+            json={
+                "phone": "+6281234567890",
+                "message": "Test",
+            },
+            headers=_auth_headers(TEST_PASTOR_ID),
+        )
         assert response.status_code == 403
 
 
 # ==================== STATIC FILE TESTS ====================
+
 
 class TestStaticFiles:
     """Tests for /uploads/* and /user-photos/* endpoints."""
@@ -2152,18 +2369,18 @@ class TestStaticFiles:
 
 # ==================== ADMIN OPERATIONS TESTS ====================
 
+
 class TestAdminOperations:
     """Tests for admin-level operations."""
 
     def test_recalculate_engagement(self, client, db):
         """Recalculate engagement for all members."""
         _setup_auth(db)
-        member = _make_member(last_contact_date=datetime.now(timezone.utc).isoformat())
+        member = _make_member(last_contact_date=datetime.now(UTC).isoformat())
         db.members.find = MagicMock(return_value=_make_mock_cursor([member]))
         db.settings.find_one = AsyncMock(return_value=None)
 
-        response = client.post("/admin/recalculate-engagement",
-                               headers=_auth_headers())
+        response = client.post("/admin/recalculate-engagement", headers=_auth_headers())
         assert response.status_code in [200, 201]
         data = response.json()
         assert data["success"] is True
@@ -2173,37 +2390,37 @@ class TestAdminOperations:
         """Pastor cannot recalculate engagement."""
         _setup_auth(db, _make_pastor_user())
 
-        response = client.post("/admin/recalculate-engagement",
-                               headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.post("/admin/recalculate-engagement", headers=_auth_headers(TEST_PASTOR_ID))
         assert response.status_code == 403
 
     def test_run_reminders_pastor_denied(self, client, db):
         """Pastor cannot trigger reminders."""
         _setup_auth(db, _make_pastor_user())
 
-        response = client.post("/reminders/run-now",
-                               headers=_auth_headers(TEST_PASTOR_ID))
+        response = client.post("/reminders/run-now", headers=_auth_headers(TEST_PASTOR_ID))
         assert response.status_code == 403
 
 
 # ==================== WEBHOOK TESTS ====================
+
 
 class TestWebhook:
     """Tests for /sync/webhook endpoint."""
 
     def test_webhook_missing_signature(self, client, db):
         """Webhook without signature returns 401."""
-        response = client.post("/sync/webhook", json={
-            "event_type": "test",
-            "campus_id": TEST_CAMPUS_ID,
-        })
+        response = client.post(
+            "/sync/webhook",
+            json={
+                "event_type": "test",
+                "campus_id": TEST_CAMPUS_ID,
+            },
+        )
         assert response.status_code == 401
 
     def test_webhook_missing_campus(self, client, db):
         """Webhook without campus_id returns 400."""
-        response = client.post("/sync/webhook",
-                               json={"event_type": "test"},
-                               headers={"X-Webhook-Signature": "fake"})
+        response = client.post("/sync/webhook", json={"event_type": "test"}, headers={"X-Webhook-Signature": "fake"})
         assert response.status_code == 400
 
     def test_webhook_test_event(self, client, db):
@@ -2220,12 +2437,14 @@ class TestWebhook:
         body_bytes = json.dumps(payload).encode()
         sig = hmac.new(webhook_secret.encode(), body_bytes, hashlib.sha256).hexdigest()
 
-        response = client.post("/sync/webhook",
-                               content=body_bytes,
-                               headers={
-                                   "X-Webhook-Signature": sig,
-                                   "Content-Type": "application/json",
-                               })
+        response = client.post(
+            "/sync/webhook",
+            content=body_bytes,
+            headers={
+                "X-Webhook-Signature": sig,
+                "Content-Type": "application/json",
+            },
+        )
         # Signature verification may differ due to body serialization
         assert response.status_code in [200, 201, 401]
 
@@ -2238,9 +2457,11 @@ class TestWebhook:
         }
         db.sync_configs.find_one = AsyncMock(return_value=config)
 
-        response = client.post("/sync/webhook",
-                               json={"event_type": "test", "campus_id": TEST_CAMPUS_ID},
-                               headers={"X-Webhook-Signature": "wrong_signature"})
+        response = client.post(
+            "/sync/webhook",
+            json={"event_type": "test", "campus_id": TEST_CAMPUS_ID},
+            headers={"X-Webhook-Signature": "wrong_signature"},
+        )
         assert response.status_code == 401
 
     def test_webhook_sync_disabled(self, client, db):
@@ -2252,22 +2473,27 @@ class TestWebhook:
         }
         db.sync_configs.find_one = AsyncMock(return_value=config)
 
-        response = client.post("/sync/webhook",
-                               json={"event_type": "test", "campus_id": TEST_CAMPUS_ID},
-                               headers={"X-Webhook-Signature": "any"})
+        response = client.post(
+            "/sync/webhook",
+            json={"event_type": "test", "campus_id": TEST_CAMPUS_ID},
+            headers={"X-Webhook-Signature": "any"},
+        )
         assert response.status_code == 403
 
     def test_webhook_no_config(self, client, db):
         """Webhook when no config exists returns 404."""
         db.sync_configs.find_one = AsyncMock(return_value=None)
 
-        response = client.post("/sync/webhook",
-                               json={"event_type": "test", "campus_id": TEST_CAMPUS_ID},
-                               headers={"X-Webhook-Signature": "any"})
+        response = client.post(
+            "/sync/webhook",
+            json={"event_type": "test", "campus_id": TEST_CAMPUS_ID},
+            headers={"X-Webhook-Signature": "any"},
+        )
         assert response.status_code == 404
 
 
 # ==================== DASHBOARD TESTS ====================
+
 
 class TestDashboard:
     """Tests for /dashboard/* endpoints."""
@@ -2276,12 +2502,18 @@ class TestDashboard:
         """Get dashboard statistics."""
         _setup_auth(db)
         # Aggregation pipeline returns stats
-        db.members.aggregate = MagicMock(return_value=_make_mock_agg_cursor([{
-            "total": 100,
-            "active": 70,
-            "at_risk": 20,
-            "disconnected": 10,
-        }]))
+        db.members.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor(
+                [
+                    {
+                        "total": 100,
+                        "active": 70,
+                        "at_risk": 20,
+                        "disconnected": 10,
+                    }
+                ]
+            )
+        )
         db.care_events.aggregate = MagicMock(return_value=_make_mock_agg_cursor([]))
         db.members.count_documents = AsyncMock(return_value=100)
         db.care_events.count_documents = AsyncMock(return_value=50)
@@ -2315,6 +2547,7 @@ class TestDashboard:
 
 # ==================== SSE STREAM TESTS ====================
 
+
 class TestSSEStream:
     """Tests for /stream/* endpoints."""
 
@@ -2334,6 +2567,7 @@ class TestSSEStream:
 
 # ==================== SYNC MEMBER WEBHOOK ENDPOINT TEST ====================
 
+
 class TestMemberSyncWebhook:
     """Tests for /sync/members/webhook (GET, informational)."""
 
@@ -2346,6 +2580,7 @@ class TestMemberSyncWebhook:
 
 # ==================== PROFILE UPDATE TESTS ====================
 
+
 class TestProfileUpdate:
     """Tests for /auth/profile endpoint."""
 
@@ -2355,16 +2590,22 @@ class TestProfileUpdate:
         updated_admin = {**admin, "name": "New Name"}
         # Remove hashed_password from the updated response (endpoint uses projection)
         updated_no_pw = {k: v for k, v in updated_admin.items() if k != "hashed_password"}
-        db.users.find_one = AsyncMock(side_effect=[
-            admin,  # auth (get_current_user)
-            updated_no_pw,  # find_one after update (no hashed_password projection)
-        ])
+        db.users.find_one = AsyncMock(
+            side_effect=[
+                admin,  # auth (get_current_user)
+                updated_no_pw,  # find_one after update (no hashed_password projection)
+            ]
+        )
         db.users.update_one = AsyncMock(return_value=_make_update_result())
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.put("/auth/profile", json={
-            "name": "New Name",
-        }, headers=_auth_headers())
+        response = client.put(
+            "/auth/profile",
+            json={
+                "name": "New Name",
+            },
+            headers=_auth_headers(),
+        )
         assert response.status_code == 200
 
     def test_update_profile_no_auth(self, client, db):
@@ -2382,6 +2623,7 @@ class TestProfileUpdate:
 
 
 # ==================== MULTI-TENANCY TESTS ====================
+
 
 class TestMultiTenancy:
     """Tests verifying campus-based data isolation."""
@@ -2415,6 +2657,7 @@ class TestMultiTenancy:
 
 # ==================== ERROR HANDLING TESTS ====================
 
+
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
@@ -2431,11 +2674,9 @@ class TestErrorHandling:
     def test_expired_token(self, client, db):
         """Expired JWT token returns 401."""
         expired_token = pyjwt.encode(
-            {"sub": TEST_USER_ID, "exp": datetime.now(timezone.utc) - timedelta(hours=1)},
-            TEST_SECRET, algorithm="HS256"
+            {"sub": TEST_USER_ID, "exp": datetime.now(UTC) - timedelta(hours=1)}, TEST_SECRET, algorithm="HS256"
         )
-        response = client.get("/auth/me",
-                              headers={"Authorization": f"Bearer {expired_token}"})
+        response = client.get("/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
         assert response.status_code == 401
 
     def test_token_user_not_found(self, client, db):
@@ -2447,13 +2688,14 @@ class TestErrorHandling:
     def test_malformed_json_body(self, client, db):
         """Malformed JSON returns 400."""
         _setup_auth(db)
-        response = client.post("/members",
-                               content=b"not valid json",
-                               headers={**_auth_headers(), "Content-Type": "application/json"})
+        response = client.post(
+            "/members", content=b"not valid json", headers={**_auth_headers(), "Content-Type": "application/json"}
+        )
         assert response.status_code == 400
 
 
 # ==================== UTILITY FUNCTION TESTS ====================
+
 
 class TestUtilityFunctions:
     """Tests for utility functions in server.py."""
@@ -2461,13 +2703,15 @@ class TestUtilityFunctions:
     def test_msgspec_enc_hook_datetime(self):
         """msgspec encoder handles datetime."""
         from server import msgspec_enc_hook
-        dt = datetime(2025, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+
+        dt = datetime(2025, 1, 15, 10, 30, 0, tzinfo=UTC)
         result = msgspec_enc_hook(dt)
         assert "2025-01-15" in result
 
     def test_msgspec_enc_hook_date(self):
         """msgspec encoder handles date."""
         from server import msgspec_enc_hook
+
         d = date(2025, 1, 15)
         result = msgspec_enc_hook(d)
         assert result == "2025-01-15"
@@ -2475,45 +2719,49 @@ class TestUtilityFunctions:
     def test_msgspec_enc_hook_uuid(self):
         """msgspec encoder handles UUID."""
         from server import msgspec_enc_hook
+
         u = uuid.uuid4()
         result = msgspec_enc_hook(u)
         assert result == str(u)
 
     def test_msgspec_enc_hook_enum(self):
         """msgspec encoder handles Enum."""
-        from server import msgspec_enc_hook
         from enums import EventType
+        from server import msgspec_enc_hook
+
         result = msgspec_enc_hook(EventType.BIRTHDAY)
         assert result == "birthday"
 
     def test_validate_image_magic_bytes_jpeg(self):
         """Validate JPEG magic bytes."""
         from server import validate_image_magic_bytes
-        jpeg_data = b'\xff\xd8\xff\xe0' + b'\x00' * 100
+
+        jpeg_data = b"\xff\xd8\xff\xe0" + b"\x00" * 100
         is_valid, mime = validate_image_magic_bytes(jpeg_data)
         assert is_valid is True
-        assert mime == 'image/jpeg'
+        assert mime == "image/jpeg"
 
     def test_validate_image_magic_bytes_invalid(self):
         """Reject invalid image data."""
         from server import validate_image_magic_bytes
-        bad_data = b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09'
-        is_valid, msg = validate_image_magic_bytes(bad_data)
+
+        bad_data = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09"
+        is_valid, _msg = validate_image_magic_bytes(bad_data)
         assert is_valid is False
 
     def test_validate_image_too_small(self):
         """Reject too-small file."""
         from server import validate_image_magic_bytes
-        tiny = b'\x00\x01'
-        is_valid, msg = validate_image_magic_bytes(tiny)
+
+        tiny = b"\x00\x01"
+        is_valid, _msg = validate_image_magic_bytes(tiny)
         assert is_valid is False
 
     def test_generate_grief_timeline(self):
         """Generate grief timeline produces 6 stages."""
         from server import generate_grief_timeline
-        timeline = generate_grief_timeline(
-            date.today(), "event-id-123", "member-id-456"
-        )
+
+        timeline = generate_grief_timeline(date.today(), "event-id-123", "member-id-456")
         assert len(timeline) == 6
         assert timeline[0]["stage"] == "1_week"
         assert timeline[-1]["stage"] == "1_year"
@@ -2521,9 +2769,8 @@ class TestUtilityFunctions:
     def test_generate_accident_followup_timeline(self):
         """Generate accident followup produces 3 stages."""
         from server import generate_accident_followup_timeline
-        timeline = generate_accident_followup_timeline(
-            date.today(), "event-id-123", "member-id-456", "campus-id-789"
-        )
+
+        timeline = generate_accident_followup_timeline(date.today(), "event-id-123", "member-id-456", "campus-id-789")
         assert len(timeline) == 3
         assert timeline[0]["stage"] == "first_followup"
         assert timeline[-1]["stage"] == "final_followup"
@@ -2531,19 +2778,22 @@ class TestUtilityFunctions:
     def test_now_jakarta(self):
         """now_jakarta returns timezone-aware datetime."""
         from server import now_jakarta
+
         result = now_jakarta()
         assert result.tzinfo is not None
 
     def test_to_jakarta(self):
         """to_jakarta converts UTC to Jakarta timezone."""
         from server import to_jakarta
-        utc_dt = datetime(2025, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
+
+        utc_dt = datetime(2025, 1, 15, 0, 0, 0, tzinfo=UTC)
         jkt = to_jakarta(utc_dt)
         assert jkt.hour == 7  # UTC+7
 
     def test_to_jakarta_naive(self):
         """to_jakarta assumes UTC for naive datetime."""
         from server import to_jakarta
+
         naive_dt = datetime(2025, 1, 15, 0, 0, 0)
         jkt = to_jakarta(naive_dt)
         assert jkt.hour == 7
@@ -2551,31 +2801,36 @@ class TestUtilityFunctions:
     def test_get_jakarta_date_str(self):
         """get_jakarta_date_str returns YYYY-MM-DD string."""
         from server import get_jakarta_date_str
+
         result = get_jakarta_date_str()
         assert len(result) == 10
-        assert result[4] == '-'
+        assert result[4] == "-"
 
     def test_get_date_in_timezone(self):
         """get_date_in_timezone returns date string for timezone."""
         from server import get_date_in_timezone
+
         result = get_date_in_timezone("Asia/Jakarta")
         assert len(result) == 10
 
     def test_get_date_in_timezone_invalid(self):
         """get_date_in_timezone falls back for invalid timezone."""
         from server import get_date_in_timezone
+
         result = get_date_in_timezone("Invalid/TZ")
         assert len(result) == 10  # Still returns a valid date
 
     def test_is_valid_timezone(self):
         """Validate timezone strings."""
         from server import is_valid_timezone
+
         assert is_valid_timezone("Asia/Jakarta") is True
         assert is_valid_timezone("Invalid/TZ") is False
 
     def test_encrypt_decrypt_password(self):
         """encrypt_password and decrypt_password roundtrip."""
-        from server import encrypt_password, decrypt_password
+        from server import decrypt_password, encrypt_password
+
         original = "MySecretPassword123!"
         encrypted = encrypt_password(original)
         assert encrypted != original
@@ -2585,14 +2840,16 @@ class TestUtilityFunctions:
     def test_safe_error_detail_dev(self):
         """safe_error_detail returns full error in development."""
         from server import safe_error_detail
+
         err = Exception("Something went wrong")
         result = safe_error_detail(err, 500)
         assert "Something went wrong" in result
 
     def test_to_mongo_doc_struct(self):
         """to_mongo_doc converts Struct to dict."""
-        from server import to_mongo_doc
         from models import Campus
+        from server import to_mongo_doc
+
         campus = Campus(campus_name="Test")
         doc = to_mongo_doc(campus)
         assert isinstance(doc, dict)
@@ -2601,6 +2858,7 @@ class TestUtilityFunctions:
     def test_to_mongo_doc_dict(self):
         """to_mongo_doc passes through dict."""
         from server import to_mongo_doc
+
         d = {"key": "value", "nested": {"a": 1}}
         result = to_mongo_doc(d)
         assert result["key"] == "value"
@@ -2608,12 +2866,14 @@ class TestUtilityFunctions:
     def test_campus_filter_full_admin(self):
         """Full admin gets empty filter."""
         from server import get_campus_filter
+
         user = {"role": "full_admin"}
         assert get_campus_filter(user) == {}
 
     def test_campus_filter_pastor(self):
         """Pastor gets campus-scoped filter."""
         from server import get_campus_filter
+
         user = {"role": "pastor", "campus_id": "c1"}
         f = get_campus_filter(user)
         assert f == {"campus_id": "c1"}
@@ -2621,6 +2881,7 @@ class TestUtilityFunctions:
     def test_campus_filter_no_campus(self):
         """User with no campus gets impossible filter."""
         from server import get_campus_filter
+
         user = {"role": "pastor"}
         f = get_campus_filter(user)
         assert "$eq" in str(f) or "$exists" in str(f)
@@ -2628,12 +2889,14 @@ class TestUtilityFunctions:
 
 # ==================== CUSTOM RESPONSE CLASS TESTS ====================
 
+
 class TestCustomMsgspecResponse:
     """Tests for CustomMsgspecResponse."""
 
     def test_render_simple(self):
         """CustomMsgspecResponse renders simple dict."""
         from server import CustomMsgspecResponse
+
         resp = CustomMsgspecResponse(content={"key": "value"})
         body = resp.render({"key": "value"})
         assert b'"key"' in body
@@ -2642,12 +2905,14 @@ class TestCustomMsgspecResponse:
     def test_render_with_datetime(self):
         """CustomMsgspecResponse handles datetime in content."""
         from server import CustomMsgspecResponse
-        resp = CustomMsgspecResponse(content={"time": datetime.now(timezone.utc)})
-        body = resp.render({"time": datetime.now(timezone.utc)})
+
+        resp = CustomMsgspecResponse(content={"time": datetime.now(UTC)})
+        body = resp.render({"time": datetime.now(UTC)})
         assert len(body) > 0
 
 
 # ==================== LOGIN RATE LIMITING TESTS ====================
+
 
 class TestLoginRateLimiting:
     """Tests for login brute force protection."""
@@ -2655,6 +2920,7 @@ class TestLoginRateLimiting:
     def test_rate_limit_check(self):
         """Rate limit allows initial attempts."""
         from server import _check_login_rate_limit, _login_attempts
+
         _login_attempts.clear()
         allowed, msg = _check_login_rate_limit("1.2.3.4", "test@test.com")
         assert allowed is True
@@ -2662,7 +2928,8 @@ class TestLoginRateLimiting:
 
     def test_record_failed_login(self):
         """Failed login is recorded."""
-        from server import _record_failed_login, _login_attempts
+        from server import _login_attempts, _record_failed_login
+
         _login_attempts.clear()
         _record_failed_login("1.2.3.4", "test@test.com")
         key = "1.2.3.4:test@test.com"
@@ -2671,7 +2938,8 @@ class TestLoginRateLimiting:
 
     def test_clear_login_attempts(self):
         """Clearing attempts removes the record."""
-        from server import _record_failed_login, _clear_login_attempts, _login_attempts
+        from server import _clear_login_attempts, _login_attempts, _record_failed_login
+
         _login_attempts.clear()
         _record_failed_login("1.2.3.4", "test@test.com")
         _clear_login_attempts("1.2.3.4", "test@test.com")
@@ -2679,15 +2947,13 @@ class TestLoginRateLimiting:
 
     def test_lockout_after_max_attempts(self):
         """Account locks after max failed attempts."""
-        from server import (
-            _check_login_rate_limit, _record_failed_login,
-            _login_attempts, LOGIN_MAX_ATTEMPTS
-        )
+        from server import LOGIN_MAX_ATTEMPTS, _check_login_rate_limit, _login_attempts, _record_failed_login
+
         _login_attempts.clear()
         ip = "5.6.7.8"
         email = "lockme@test.com"
 
-        for i in range(LOGIN_MAX_ATTEMPTS):
+        for _i in range(LOGIN_MAX_ATTEMPTS):
             _record_failed_login(ip, email)
 
         allowed, msg = _check_login_rate_limit(ip, email)
@@ -2697,8 +2963,9 @@ class TestLoginRateLimiting:
     def test_cleanup_old_attempts(self):
         """Old login attempts are cleaned up."""
         from server import _cleanup_old_login_attempts, _login_attempts
+
         _login_attempts.clear()
-        old_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        old_time = datetime.now(UTC) - timedelta(hours=1)
         _login_attempts["old:user@test.com"] = {
             "attempts": 3,
             "last_attempt": old_time,
@@ -2710,13 +2977,15 @@ class TestLoginRateLimiting:
 
 # ==================== ENGAGEMENT CALCULATION TESTS ====================
 
+
 class TestEngagementCalculation:
     """Tests for engagement status calculation."""
 
     def test_active_status(self):
         """Recent contact = active."""
         from utils import calculate_engagement_status
-        recent = datetime.now(timezone.utc) - timedelta(days=5)
+
+        recent = datetime.now(UTC) - timedelta(days=5)
         status, days = calculate_engagement_status(recent)
         assert status == "active"
         assert days == 5
@@ -2724,20 +2993,23 @@ class TestEngagementCalculation:
     def test_at_risk_status(self):
         """Moderate gap = at_risk."""
         from utils import calculate_engagement_status
-        moderate = datetime.now(timezone.utc) - timedelta(days=70)
-        status, days = calculate_engagement_status(moderate)
+
+        moderate = datetime.now(UTC) - timedelta(days=70)
+        status, _days = calculate_engagement_status(moderate)
         assert status == "at_risk"
 
     def test_disconnected_status(self):
         """Long gap = disconnected."""
         from utils import calculate_engagement_status
-        old = datetime.now(timezone.utc) - timedelta(days=100)
-        status, days = calculate_engagement_status(old)
+
+        old = datetime.now(UTC) - timedelta(days=100)
+        status, _days = calculate_engagement_status(old)
         assert status == "disconnected"
 
     def test_no_contact(self):
         """No contact = disconnected with 999 days."""
         from utils import calculate_engagement_status
+
         status, days = calculate_engagement_status(None)
         assert status == "disconnected"
         assert days == 999
@@ -2745,29 +3017,34 @@ class TestEngagementCalculation:
 
 # ==================== PHONE NORMALIZATION TESTS ====================
 
+
 class TestPhoneNormalization:
     """Tests for phone number normalization."""
 
     def test_normalize_08(self):
         """08xxx becomes +62xxx."""
         from utils import normalize_phone_number
+
         result = normalize_phone_number("081234567890")
         assert result.startswith("+62")
 
     def test_normalize_already_international(self):
         """Already international format stays the same."""
         from utils import normalize_phone_number
+
         result = normalize_phone_number("+6281234567890")
         assert result == "+6281234567890"
 
     def test_normalize_empty(self):
         """Empty phone returns empty."""
         from utils import normalize_phone_number
+
         result = normalize_phone_number("")
         assert result == ""
 
     def test_normalize_none(self):
         """None phone returns empty."""
         from utils import normalize_phone_number
+
         result = normalize_phone_number(None)
         assert result == "" or result is None

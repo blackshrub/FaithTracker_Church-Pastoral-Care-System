@@ -1,12 +1,13 @@
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
+
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from enums import EngagementStatus, ActivityActionType
 from constants import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
-from utils import calculate_engagement_status, normalize_phone_number, escape_regex
+from enums import ActivityActionType, EngagementStatus
 from models import MemberCreate, MemberUpdate, generate_uuid
+from utils import calculate_engagement_status, escape_regex, normalize_phone_number
 
 logger = logging.getLogger(__name__)
 
@@ -14,36 +15,33 @@ logger = logging.getLogger(__name__)
 class MemberService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self._db = db
-    
+
     async def get_by_id(
-        self, 
-        member_id: str, 
-        church_id: str,
-        projection: Optional[Dict[str, int]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, member_id: str, church_id: str, projection: dict[str, int] | None = None
+    ) -> dict[str, Any] | None:
         query = {"id": member_id, "church_id": church_id}
         if projection:
             projection["_id"] = 0
         else:
             projection = {"_id": 0}
-        
+
         return await self._db.members.find_one(query, projection)
-    
+
     async def get_many(
         self,
         church_id: str,
-        campus_id: Optional[str] = None,
-        search: Optional[str] = None,
-        engagement_status: Optional[str] = None,
+        campus_id: str | None = None,
+        search: str | None = None,
+        engagement_status: str | None = None,
         skip: int = 0,
         limit: int = DEFAULT_PAGE_SIZE,
-        projection: Optional[Dict[str, int]] = None
-    ) -> tuple[List[Dict[str, Any]], int]:
-        query: Dict[str, Any] = {"church_id": church_id}
-        
+        projection: dict[str, int] | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        query: dict[str, Any] = {"church_id": church_id}
+
         if campus_id:
             query["campus_id"] = campus_id
-        
+
         if search:
             safe_search = escape_regex(search)
             query["$or"] = [
@@ -51,10 +49,10 @@ class MemberService:
                 {"phone": {"$regex": safe_search, "$options": "i"}},
                 {"email": {"$regex": safe_search, "$options": "i"}},
             ]
-        
+
         if engagement_status:
             query["engagement_status"] = engagement_status
-        
+
         if projection is None:
             projection = {
                 "_id": 0,
@@ -72,27 +70,22 @@ class MemberService:
         projection["_id"] = 0
 
         from services.db_utils import paginated_query
+
         capped_limit = min(limit, MAX_PAGE_SIZE)
         members, total = await paginated_query(
-            self._db.members, query, sort=[("name", 1)],
-            skip=skip, limit=capped_limit, projection=projection
+            self._db.members, query, sort=[("name", 1)], skip=skip, limit=capped_limit, projection=projection
         )
 
         return members, total
-    
+
     async def create(
-        self,
-        data: MemberCreate,
-        church_id: str,
-        campus_id: str,
-        created_by_id: str,
-        created_by_name: str
-    ) -> Dict[str, Any]:
+        self, data: MemberCreate, church_id: str, campus_id: str, created_by_id: str, created_by_name: str
+    ) -> dict[str, Any]:
         member_id = generate_uuid()
-        now = datetime.now(timezone.utc)
-        
+        now = datetime.now(UTC)
+
         phone = normalize_phone_number(data.phone) if data.phone else None
-        
+
         member_doc = {
             "id": member_id,
             "church_id": church_id,
@@ -115,9 +108,9 @@ class MemberService:
             "updated_at": now,
             "created_by": created_by_id,
         }
-        
+
         await self._db.members.insert_one(member_doc)
-        
+
         await self._log_activity(
             church_id=church_id,
             campus_id=campus_id,
@@ -126,26 +119,21 @@ class MemberService:
             action=ActivityActionType.CREATE_MEMBER,
             member_id=member_id,
             member_name=data.name,
-            details={"phone": phone, "email": data.email}
+            details={"phone": phone, "email": data.email},
         )
-        
+
         del member_doc["_id"]
         return member_doc
-    
+
     async def update(
-        self,
-        member_id: str,
-        church_id: str,
-        data: MemberUpdate,
-        updated_by_id: str,
-        updated_by_name: str
-    ) -> Optional[Dict[str, Any]]:
+        self, member_id: str, church_id: str, data: MemberUpdate, updated_by_id: str, updated_by_name: str
+    ) -> dict[str, Any] | None:
         member = await self.get_by_id(member_id, church_id)
         if not member:
             return None
-        
-        update_data: Dict[str, Any] = {"updated_at": datetime.now(timezone.utc)}
-        
+
+        update_data: dict[str, Any] = {"updated_at": datetime.now(UTC)}
+
         if data.name is not None:
             update_data["name"] = data.name
         if data.phone is not None:
@@ -164,12 +152,9 @@ class MemberService:
             update_data["categories"] = data.categories
         if data.notes is not None:
             update_data["notes"] = data.notes
-        
-        await self._db.members.update_one(
-            {"id": member_id, "church_id": church_id},
-            {"$set": update_data}
-        )
-        
+
+        await self._db.members.update_one({"id": member_id, "church_id": church_id}, {"$set": update_data})
+
         await self._log_activity(
             church_id=church_id,
             campus_id=member.get("campus_id"),
@@ -178,25 +163,19 @@ class MemberService:
             action=ActivityActionType.UPDATE_MEMBER,
             member_id=member_id,
             member_name=data.name or member.get("name"),
-            details={"updated_fields": list(update_data.keys())}
+            details={"updated_fields": list(update_data.keys())},
         )
-        
+
         return await self.get_by_id(member_id, church_id)
-    
-    async def delete(
-        self,
-        member_id: str,
-        church_id: str,
-        deleted_by_id: str,
-        deleted_by_name: str
-    ) -> bool:
+
+    async def delete(self, member_id: str, church_id: str, deleted_by_id: str, deleted_by_name: str) -> bool:
         member = await self.get_by_id(member_id, church_id)
         if not member:
             return False
-        
+
         await self._db.members.delete_one({"id": member_id, "church_id": church_id})
         await self._db.care_events.delete_many({"member_id": member_id, "church_id": church_id})
-        
+
         await self._log_activity(
             church_id=church_id,
             campus_id=member.get("campus_id"),
@@ -205,72 +184,52 @@ class MemberService:
             action=ActivityActionType.DELETE_MEMBER,
             member_id=member_id,
             member_name=member.get("name"),
-            details={}
+            details={},
         )
-        
+
         return True
-    
+
     async def update_engagement(
-        self,
-        member_id: str,
-        church_id: str,
-        at_risk_days: int = 60,
-        disconnected_days: int = 90
+        self, member_id: str, church_id: str, at_risk_days: int = 60, disconnected_days: int = 90
     ) -> None:
         member = await self.get_by_id(member_id, church_id, {"last_contact_date": 1})
         if not member:
             return
-        
-        status, days = calculate_engagement_status(
-            member.get("last_contact_date"),
-            at_risk_days,
-            disconnected_days
-        )
-        
+
+        status, days = calculate_engagement_status(member.get("last_contact_date"), at_risk_days, disconnected_days)
+
         await self._db.members.update_one(
             {"id": member_id, "church_id": church_id},
-            {"$set": {
-                "engagement_status": status.value,
-                "days_since_last_contact": days
-            }}
+            {"$set": {"engagement_status": status.value, "days_since_last_contact": days}},
         )
-    
-    async def update_last_contact(
-        self,
-        member_id: str,
-        church_id: str,
-        contact_date: Optional[datetime] = None
-    ) -> None:
+
+    async def update_last_contact(self, member_id: str, church_id: str, contact_date: datetime | None = None) -> None:
         if contact_date is None:
-            contact_date = datetime.now(timezone.utc)
-        
+            contact_date = datetime.now(UTC)
+
         await self._db.members.update_one(
             {"id": member_id, "church_id": church_id},
-            {"$set": {
-                "last_contact_date": contact_date,
-                "engagement_status": EngagementStatus.ACTIVE.value,
-                "days_since_last_contact": 0,
-                "updated_at": datetime.now(timezone.utc)
-            }}
+            {
+                "$set": {
+                    "last_contact_date": contact_date,
+                    "engagement_status": EngagementStatus.ACTIVE.value,
+                    "days_since_last_contact": 0,
+                    "updated_at": datetime.now(UTC),
+                }
+            },
         )
-    
+
     async def get_at_risk_members(
-        self,
-        church_id: str,
-        campus_id: Optional[str] = None,
-        limit: int = 50
-    ) -> List[Dict[str, Any]]:
-        query: Dict[str, Any] = {
+        self, church_id: str, campus_id: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        query: dict[str, Any] = {
             "church_id": church_id,
-            "engagement_status": {"$in": [
-                EngagementStatus.AT_RISK.value,
-                EngagementStatus.DISCONNECTED.value
-            ]}
+            "engagement_status": {"$in": [EngagementStatus.AT_RISK.value, EngagementStatus.DISCONNECTED.value]},
         }
-        
+
         if campus_id:
             query["campus_id"] = campus_id
-        
+
         projection = {
             "_id": 0,
             "id": 1,
@@ -280,22 +239,22 @@ class MemberService:
             "days_since_last_contact": 1,
             "last_contact_date": 1,
         }
-        
+
         cursor = self._db.members.find(query, projection)
         cursor = cursor.sort("days_since_last_contact", -1).limit(limit)
-        
+
         return await cursor.to_list(length=limit)
-    
+
     async def _log_activity(
         self,
         church_id: str,
-        campus_id: Optional[str],
+        campus_id: str | None,
         user_id: str,
         user_name: str,
         action: ActivityActionType,
-        member_id: Optional[str],
-        member_name: Optional[str],
-        details: Dict[str, Any]
+        member_id: str | None,
+        member_name: str | None,
+        details: dict[str, Any],
     ) -> None:
         log_doc = {
             "id": generate_uuid(),
@@ -307,6 +266,6 @@ class MemberService:
             "member_id": member_id,
             "member_name": member_name,
             "details": details,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         }
         await self._db.activity_logs.insert_one(log_doc)

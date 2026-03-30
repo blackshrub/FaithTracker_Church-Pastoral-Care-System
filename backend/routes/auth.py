@@ -2,32 +2,49 @@
 FaithTracker Auth Routes - Authentication and user management endpoints
 """
 
-from litestar import get, post, put, delete, Request, Response
-from litestar.exceptions import HTTPException
-from litestar.status_codes import (
-    HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN,
-    HTTP_404_NOT_FOUND, HTTP_429_TOO_MANY_REQUESTS
-)
-from litestar.datastructures import UploadFile
-from datetime import datetime, timezone
-from pathlib import Path
-from PIL import Image
 import io
 import logging
+from datetime import UTC, datetime
+from pathlib import Path
 
-from dependencies import (
-    get_db, get_current_user, get_current_admin,
-    verify_password, get_password_hash, create_access_token, safe_error_detail,
-    get_client_ip, check_login_rate_limit, record_failed_login,
-    clear_login_attempts
+from litestar import Request, delete, get, post, put
+from litestar.datastructures import UploadFile
+from litestar.exceptions import HTTPException
+from litestar.status_codes import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+    HTTP_429_TOO_MANY_REQUESTS,
 )
-from models import (
-    UserCreate, UserUpdate, UserLogin, User, UserResponse, TokenResponse,
-    ProfileUpdate, PasswordChange, to_mongo_doc
+from PIL import Image
+
+from constants import MAX_IMAGE_SIZE
+from dependencies import (
+    check_login_rate_limit,
+    clear_login_attempts,
+    create_access_token,
+    get_client_ip,
+    get_current_admin,
+    get_current_user,
+    get_db,
+    get_password_hash,
+    record_failed_login,
+    safe_error_detail,
+    verify_password,
 )
 from enums import UserRole
-from constants import MAX_IMAGE_SIZE
-from utils import validate_email, validate_password_strength, normalize_phone_number, validate_image_magic_bytes
+from models import (
+    PasswordChange,
+    ProfileUpdate,
+    TokenResponse,
+    User,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    UserUpdate,
+    to_mongo_doc,
+)
+from utils import normalize_phone_number, validate_email, validate_image_magic_bytes, validate_password_strength
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +53,7 @@ ROOT_DIR = Path(__file__).parent.parent
 
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
+
 
 @post("/auth/register")
 async def register_user(data: UserCreate, request: Request) -> dict:
@@ -66,16 +84,16 @@ async def register_user(data: UserCreate, request: Request) -> dict:
             role=data.role,
             campus_id=data.campus_id,
             phone=normalize_phone_number(data.phone),
-            hashed_password=get_password_hash(data.password)
+            hashed_password=get_password_hash(data.password),
         )
-        
+
         await db.users.insert_one(to_mongo_doc(user))
-        
+
         campus_name = None
         if user.campus_id:
             campus = await db.campuses.find_one({"id": user.campus_id}, {"_id": 0})
             campus_name = campus["campus_name"] if campus else None
-        
+
         return UserResponse(
             id=user.id,
             email=user.email,
@@ -85,12 +103,12 @@ async def register_user(data: UserCreate, request: Request) -> dict:
             campus_name=campus_name,
             phone=user.phone,
             is_active=user.is_active,
-            created_at=user.created_at
+            created_at=user.created_at,
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error registering user: {str(e)}")
+        logger.error(f"Error registering user: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -109,42 +127,30 @@ async def login(data: UserLogin, request: Request) -> dict:
     # Check rate limit BEFORE processing login (DragonflyDB-backed, TTL handles cleanup)
     is_allowed, error_msg = await check_login_rate_limit(client_ip, data.email)
     if not is_allowed:
-        raise HTTPException(
-            status_code=HTTP_429_TOO_MANY_REQUESTS,
-            detail=error_msg
-        )
+        raise HTTPException(status_code=HTTP_429_TOO_MANY_REQUESTS, detail=error_msg)
 
     try:
         user = await db.users.find_one({"email": data.email}, {"_id": 0})
         if not user:
             # Record failed attempt (user not found)
             await record_failed_login(client_ip, data.email)
-            raise HTTPException(
-                status_code=HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password"
-            )
+            raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
         if not verify_password(data.password, user["hashed_password"]):
             # Record failed attempt (wrong password)
             await record_failed_login(client_ip, data.email)
-            raise HTTPException(
-                status_code=HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password"
-            )
+            raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
         if not user.get("is_active", True):
-            raise HTTPException(
-                status_code=HTTP_403_FORBIDDEN,
-                detail="User account is disabled"
-            )
+            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="User account is disabled")
 
         # For campus-specific users, validate campus_id
-        if user.get("role") in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
-            if data.campus_id and user["campus_id"] != data.campus_id:
-                raise HTTPException(
-                    status_code=HTTP_403_FORBIDDEN,
-                    detail="You don't have access to this campus"
-                )
+        if (
+            user.get("role") in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]
+            and data.campus_id
+            and user["campus_id"] != data.campus_id
+        ):
+            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="You don't have access to this campus")
 
         # For full admins, use the selected campus_id from login
         active_campus_id = user.get("campus_id")
@@ -154,14 +160,10 @@ async def login(data: UserLogin, request: Request) -> dict:
                 active_campus_id = data.campus_id
                 # Update user's active campus
                 await db.users.update_one(
-                    {"id": user["id"]},
-                    {"$set": {"campus_id": data.campus_id, "updated_at": datetime.now(timezone.utc)}}
+                    {"id": user["id"]}, {"$set": {"campus_id": data.campus_id, "updated_at": datetime.now(UTC)}}
                 )
             else:
-                raise HTTPException(
-                    status_code=HTTP_400_BAD_REQUEST,
-                    detail="Please select a campus to continue"
-                )
+                raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Please select a campus to continue")
 
         # Clear failed attempts on successful login
         await clear_login_attempts(client_ip, data.email)
@@ -187,13 +189,13 @@ async def login(data: UserLogin, request: Request) -> dict:
                 campus_name=campus_name,
                 phone=user["phone"],
                 is_active=user.get("is_active", True),
-                created_at=user["created_at"]
-            )
+                created_at=user["created_at"],
+            ),
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error logging in: {str(e)}")
+        logger.error(f"Error logging in: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -206,7 +208,7 @@ async def get_current_user_info(request: Request) -> dict:
     if current_user.get("campus_id"):
         campus = await db.campuses.find_one({"id": current_user["campus_id"]}, {"_id": 0})
         campus_name = campus["campus_name"] if campus else None
-    
+
     return UserResponse(
         id=current_user["id"],
         email=current_user["email"],
@@ -216,7 +218,7 @@ async def get_current_user_info(request: Request) -> dict:
         campus_name=campus_name,
         phone=current_user["phone"],
         is_active=current_user.get("is_active", True),
-        created_at=current_user["created_at"]
+        created_at=current_user["created_at"],
     )
 
 
@@ -235,32 +237,34 @@ async def list_users(request: Request) -> list:
         pipeline = [
             {"$match": query},
             # Only fetch required fields (exclude hashed_password for security)
-            {"$project": {
-                "_id": 0,
-                "id": 1,
-                "email": 1,
-                "name": 1,
-                "role": 1,
-                "campus_id": 1,
-                "phone": 1,
-                "is_active": 1,
-                "created_at": 1,
-                "photo_url": 1
-            }},
+            {
+                "$project": {
+                    "_id": 0,
+                    "id": 1,
+                    "email": 1,
+                    "name": 1,
+                    "role": 1,
+                    "campus_id": 1,
+                    "phone": 1,
+                    "is_active": 1,
+                    "created_at": 1,
+                    "photo_url": 1,
+                }
+            },
             # Lookup campus name
-            {"$lookup": {
-                "from": "campuses",
-                "localField": "campus_id",
-                "foreignField": "id",
-                "as": "campus_info",
-                "pipeline": [{"$project": {"campus_name": 1, "_id": 0}}]
-            }},
+            {
+                "$lookup": {
+                    "from": "campuses",
+                    "localField": "campus_id",
+                    "foreignField": "id",
+                    "as": "campus_info",
+                    "pipeline": [{"$project": {"campus_name": 1, "_id": 0}}],
+                }
+            },
             # Flatten campus_info array
-            {"$addFields": {
-                "campus_name": {"$arrayElemAt": ["$campus_info.campus_name", 0]}
-            }},
+            {"$addFields": {"campus_name": {"$arrayElemAt": ["$campus_info.campus_name", 0]}}},
             {"$project": {"campus_info": 0}},
-            {"$limit": 100}
+            {"$limit": 100},
         ]
 
         users = await db.users.aggregate(pipeline).to_list(100)
@@ -276,14 +280,14 @@ async def list_users(request: Request) -> list:
                 campus_name=u.get("campus_name"),
                 phone=u["phone"],
                 is_active=u.get("is_active", True),
-                created_at=u["created_at"]
+                created_at=u["created_at"],
             )
             for u in users
         ]
 
         return result
     except Exception as e:
-        logger.error(f"Error listing users: {str(e)}")
+        logger.error(f"Error listing users: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -294,28 +298,25 @@ async def update_user(user_id: str, data: UserUpdate, request: Request) -> dict:
     current_user = await get_current_user(request)
     if current_user["role"] != "full_admin":
         raise HTTPException(status_code=403, detail="Only full administrators can update users")
-    
+
     try:
         update_data = {k: v for k, v in to_mongo_doc(data).items() if v is not None}
 
         # Normalize phone number if provided
-        if 'phone' in update_data and update_data['phone']:
-            update_data['phone'] = normalize_phone_number(update_data['phone'])
+        if update_data.get("phone"):
+            update_data["phone"] = normalize_phone_number(update_data["phone"])
 
         # Hash password if provided (with strength validation)
-        if 'password' in update_data:
-            is_valid_password, password_error = validate_password_strength(update_data['password'])
+        if "password" in update_data:
+            is_valid_password, password_error = validate_password_strength(update_data["password"])
             if not is_valid_password:
                 raise HTTPException(status_code=400, detail=password_error)
-            update_data['hashed_password'] = get_password_hash(update_data['password'])
-            del update_data['password']
+            update_data["hashed_password"] = get_password_hash(update_data["password"])
+            del update_data["password"]
 
-        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["updated_at"] = datetime.now(UTC)
 
-        result = await db.users.update_one(
-            {"id": user_id},
-            {"$set": update_data}
-        )
+        result = await db.users.update_one({"id": user_id}, {"$set": update_data})
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
@@ -326,13 +327,13 @@ async def update_user(user_id: str, data: UserUpdate, request: Request) -> dict:
         if updated_user.get("campus_id"):
             campus = await db.campuses.find_one({"id": updated_user["campus_id"]}, {"_id": 0})
             updated_user["campus_name"] = campus["campus_name"] if campus else None
-        
+
         return updated_user
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating user: {str(e)}")
+        logger.error(f"Error updating user: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -348,21 +349,18 @@ async def update_own_profile(data: ProfileUpdate, request: Request) -> dict:
             raise HTTPException(status_code=400, detail="No fields to update")
 
         # Normalize phone number if provided
-        if 'phone' in update_data and update_data['phone']:
-            update_data['phone'] = normalize_phone_number(update_data['phone'])
+        if update_data.get("phone"):
+            update_data["phone"] = normalize_phone_number(update_data["phone"])
 
         # Check if email is being changed and if it's already taken
-        if 'email' in update_data and update_data['email'] != current_user.get('email'):
-            existing = await db.users.find_one({"email": update_data['email'], "id": {"$ne": current_user["id"]}})
+        if "email" in update_data and update_data["email"] != current_user.get("email"):
+            existing = await db.users.find_one({"email": update_data["email"], "id": {"$ne": current_user["id"]}})
             if existing:
                 raise HTTPException(status_code=400, detail="Email already in use")
 
-        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["updated_at"] = datetime.now(UTC)
 
-        result = await db.users.update_one(
-            {"id": current_user["id"]},
-            {"$set": update_data}
-        )
+        result = await db.users.update_one({"id": current_user["id"]}, {"$set": update_data})
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
@@ -379,7 +377,7 @@ async def update_own_profile(data: ProfileUpdate, request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating profile: {str(e)}")
+        logger.error(f"Error updating profile: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -411,11 +409,7 @@ async def change_password(data: PasswordChange, request: Request) -> dict:
         new_hashed = get_password_hash(data.new_password)
 
         await db.users.update_one(
-            {"id": current_user["id"]},
-            {"$set": {
-                "hashed_password": new_hashed,
-                "updated_at": datetime.now(timezone.utc)
-            }}
+            {"id": current_user["id"]}, {"$set": {"hashed_password": new_hashed, "updated_at": datetime.now(UTC)}}
         )
 
         return {"message": "Password changed successfully"}
@@ -423,7 +417,7 @@ async def change_password(data: PasswordChange, request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error changing password: {str(e)}")
+        logger.error(f"Error changing password: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -441,7 +435,9 @@ async def upload_user_photo(user_id: str, request: Request, data: UploadFile) ->
         # Validate file size
         contents = await file.read()
         if len(contents) > MAX_IMAGE_SIZE:
-            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB.")
+            raise HTTPException(
+                status_code=400, detail=f"File too large. Maximum size is {MAX_IMAGE_SIZE // (1024 * 1024)} MB."
+            )
 
         # Security: Validate image by magic bytes (not just Content-Type which can be spoofed)
         is_valid, result = validate_image_magic_bytes(contents)
@@ -461,30 +457,24 @@ async def upload_user_photo(user_id: str, request: Request, data: UploadFile) ->
             img = Image.open(io.BytesIO(contents))
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
-        img = img.convert('RGB')
+        img = img.convert("RGB")
         img.thumbnail((400, 400), Image.Resampling.LANCZOS)
         try:
-            img.save(filepath, 'JPEG', quality=85, optimize=True, progressive=True)
+            img.save(filepath, "JPEG", quality=85, optimize=True, progressive=True)
         except OSError as e:
-            logger.error(f"Failed to save user photo: {str(e)}")
+            logger.error(f"Failed to save user photo: {e!s}")
             raise HTTPException(status_code=507, detail="Failed to save photo. Disk may be full.")
-        
+
         # Update user record
         photo_url = f"/api/user-photos/{filename}"
-        await db.users.update_one(
-            {"id": user_id},
-            {"$set": {
-                "photo_url": photo_url,
-                "updated_at": datetime.now(timezone.utc)
-            }}
-        )
-        
+        await db.users.update_one({"id": user_id}, {"$set": {"photo_url": photo_url, "updated_at": datetime.now(UTC)}})
+
         return {"message": "Photo uploaded successfully", "photo_url": photo_url}
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error uploading user photo: {str(e)}")
+        logger.error(f"Error uploading user photo: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -497,16 +487,16 @@ async def delete_user(user_id: str, request: Request) -> dict:
         # Prevent deleting self
         if user_id == current_admin["id"]:
             raise HTTPException(status_code=400, detail="Cannot delete your own account")
-        
+
         result = await db.users.delete_one({"id": user_id})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         return {"success": True, "message": "User deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting user: {str(e)}")
+        logger.error(f"Error deleting user: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 

@@ -3,8 +3,9 @@
 Provides helpers that reduce redundant database round-trips,
 e.g. combining count + find into a single $facet aggregation.
 """
+
 import logging
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,8 @@ async def paginated_query(
     sort: list,
     skip: int,
     limit: int,
-    projection: Optional[dict] = None,
-) -> Tuple[List[Dict[str, Any]], int]:
+    projection: dict | None = None,
+) -> tuple[list[dict[str, Any]], int]:
     """Execute a single MongoDB query that returns both data and total count.
 
     Replaces the common pattern of:
@@ -36,16 +37,16 @@ async def paginated_query(
     Returns:
         Tuple of (data_list, total_count)
     """
-    pipeline: List[Dict[str, Any]] = [
+    pipeline: list[dict[str, Any]] = [
         {"$match": query},
     ]
 
     if sort:
-        sort_spec = {field: direction for field, direction in sort}
+        sort_spec = dict(sort)
         pipeline.append({"$sort": sort_spec})
 
     # Build the data sub-pipeline
-    data_pipeline: List[Dict[str, Any]] = [
+    data_pipeline: list[dict[str, Any]] = [
         {"$skip": skip},
         {"$limit": limit},
     ]
@@ -55,12 +56,14 @@ async def paginated_query(
         proj["_id"] = 0
         data_pipeline.append({"$project": proj})
 
-    pipeline.append({
-        "$facet": {
-            "data": data_pipeline,
-            "total": [{"$count": "count"}],
+    pipeline.append(
+        {
+            "$facet": {
+                "data": data_pipeline,
+                "total": [{"$count": "count"}],
+            }
         }
-    })
+    )
 
     result = await collection.aggregate(pipeline).to_list(1)
     if result:

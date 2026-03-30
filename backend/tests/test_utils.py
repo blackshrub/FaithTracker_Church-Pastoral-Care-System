@@ -11,102 +11,98 @@ Tests cover:
 All tests are pure unit tests - no database or external services required.
 """
 
-import sys
 import os
 import re
-import time
+import sys
 import uuid
+from datetime import UTC, date, datetime, timedelta
+
 import pytest
-from datetime import datetime, date, timedelta, timezone
-from unittest.mock import patch
 
 # Ensure backend is on the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils import (
-    escape_regex,
-    validate_email,
-    validate_phone,
-    validate_password_strength,
-    normalize_phone_number,
-    calculate_engagement_status,
-    get_from_cache,
-    set_in_cache,
-    invalidate_cache,
-    validate_image_magic_bytes,
-    _cache,
-    _cache_timestamps,
-    PASSWORD_MIN_LENGTH,
-    PASSWORD_MAX_LENGTH,
-)
-from models import (
-    is_valid_uuid,
-    generate_uuid,
-    Campus,
-    Member,
-    CareEvent,
-    User,
-    UserCreate,
-    UserLogin,
-    MemberCreate,
-    CareEventCreate,
-    GriefSupport,
-    AccidentFollowup,
-    NotificationLog,
-    FinancialAidSchedule,
-    ActivityLog,
-    SyncConfig,
-    SyncLog,
-    to_mongo_doc,
-)
-from enums import (
-    EngagementStatus,
-    EventType,
-    GriefStage,
-    AidType,
-    NotificationChannel,
-    NotificationStatus,
-    UserRole,
-    ScheduleFrequency,
-    WeekDay,
-    ActivityActionType,
-    NoteCategory,
-)
 from constants import (
-    ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
-    ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
-    ENGAGEMENT_NO_CONTACT_DAYS,
-    GRIEF_ONE_WEEK_DAYS,
-    GRIEF_TWO_WEEKS_DAYS,
-    GRIEF_ONE_MONTH_DAYS,
-    GRIEF_THREE_MONTHS_DAYS,
-    GRIEF_SIX_MONTHS_DAYS,
-    GRIEF_ONE_YEAR_DAYS,
+    ACCIDENT_FINAL_FOLLOWUP_DAYS,
     ACCIDENT_FIRST_FOLLOWUP_DAYS,
     ACCIDENT_SECOND_FOLLOWUP_DAYS,
-    ACCIDENT_FINAL_FOLLOWUP_DAYS,
-    DEFAULT_REMINDER_DAYS_BIRTHDAY,
-    DEFAULT_REMINDER_DAYS_CHILDBIRTH,
-    DEFAULT_REMINDER_DAYS_FINANCIAL_AID,
-    DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS,
-    DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT,
-    JWT_TOKEN_EXPIRE_HOURS,
-    DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE,
-    MAX_PAGE_NUMBER,
-    MAX_LIMIT,
-    DEFAULT_ANALYTICS_DAYS,
-    DEFAULT_UPCOMING_DAYS,
-    MAX_IMAGE_SIZE,
-    MAX_CSV_SIZE,
-    MAX_REQUEST_BODY_SIZE,
-    IMAGE_MAGIC_BYTES,
-    MAX_CACHE_SIZE,
     API_MAX_RETRIES,
     API_RETRY_DELAYS,
     API_RETRY_TIMEOUT,
+    DEFAULT_ANALYTICS_DAYS,
+    DEFAULT_PAGE_SIZE,
+    DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS,
+    DEFAULT_REMINDER_DAYS_BIRTHDAY,
+    DEFAULT_REMINDER_DAYS_CHILDBIRTH,
+    DEFAULT_REMINDER_DAYS_FINANCIAL_AID,
+    DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT,
+    DEFAULT_UPCOMING_DAYS,
+    ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
+    ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
+    ENGAGEMENT_NO_CONTACT_DAYS,
+    GRIEF_ONE_MONTH_DAYS,
+    GRIEF_ONE_WEEK_DAYS,
+    GRIEF_ONE_YEAR_DAYS,
+    GRIEF_SIX_MONTHS_DAYS,
+    GRIEF_THREE_MONTHS_DAYS,
+    GRIEF_TWO_WEEKS_DAYS,
+    IMAGE_MAGIC_BYTES,
+    JWT_TOKEN_EXPIRE_HOURS,
+    MAX_CACHE_SIZE,
+    MAX_CSV_SIZE,
+    MAX_IMAGE_SIZE,
+    MAX_LIMIT,
+    MAX_PAGE_NUMBER,
+    MAX_PAGE_SIZE,
+    MAX_REQUEST_BODY_SIZE,
 )
-
+from enums import (
+    ActivityActionType,
+    AidType,
+    EngagementStatus,
+    EventType,
+    GriefStage,
+    NoteCategory,
+    NotificationChannel,
+    NotificationStatus,
+    ScheduleFrequency,
+    UserRole,
+    WeekDay,
+)
+from models import (
+    AccidentFollowup,
+    ActivityLog,
+    Campus,
+    CareEvent,
+    FinancialAidSchedule,
+    GriefSupport,
+    Member,
+    NotificationLog,
+    SyncConfig,
+    SyncLog,
+    User,
+    UserCreate,
+    UserLogin,
+    generate_uuid,
+    is_valid_uuid,
+    to_mongo_doc,
+)
+from utils import (
+    PASSWORD_MAX_LENGTH,
+    PASSWORD_MIN_LENGTH,
+    _cache,
+    _cache_timestamps,
+    calculate_engagement_status,
+    escape_regex,
+    get_from_cache,
+    invalidate_cache,
+    normalize_phone_number,
+    set_in_cache,
+    validate_email,
+    validate_image_magic_bytes,
+    validate_password_strength,
+    validate_phone,
+)
 
 # ==================== FIXTURES ====================
 
@@ -210,11 +206,11 @@ class TestEscapeRegex:
 
     @pytest.mark.unit
     def test_all_special_chars_at_once(self):
-        all_special = r'\.^$*+?{}[]|()'
+        all_special = r"\.^$*+?{}[]|()"
         result = escape_regex(all_special)
         # Every character should be escaped
-        for char in r'\.^$*+?{}[]|()':
-            assert f'\\{char}' in result
+        for char in r"\.^$*+?{}[]|()":
+            assert f"\\{char}" in result
 
 
 # ==================== TESTS: validate_email ====================
@@ -453,7 +449,7 @@ class TestValidatePasswordStrength:
     @pytest.mark.unit
     def test_one_below_minimum(self):
         password = "a" * (PASSWORD_MIN_LENGTH - 1)
-        is_valid, msg = validate_password_strength(password)
+        is_valid, _msg = validate_password_strength(password)
         assert is_valid is False
 
     @pytest.mark.unit
@@ -473,7 +469,7 @@ class TestValidatePasswordStrength:
     @pytest.mark.unit
     def test_one_above_maximum(self):
         password = "a" * (PASSWORD_MAX_LENGTH + 1)
-        is_valid, msg = validate_password_strength(password)
+        is_valid, _msg = validate_password_strength(password)
         assert is_valid is False
 
     @pytest.mark.unit
@@ -485,7 +481,7 @@ class TestValidatePasswordStrength:
     @pytest.mark.unit
     def test_valid_simple_password(self):
         """Password only requires length, no complexity."""
-        is_valid, msg = validate_password_strength("abcdefgh")
+        is_valid, _msg = validate_password_strength("abcdefgh")
         assert is_valid is True
 
     @pytest.mark.unit
@@ -576,7 +572,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_active_recent_contact(self):
         """Contact within at_risk threshold should be ACTIVE."""
-        recent = datetime.now(timezone.utc) - timedelta(days=10)
+        recent = datetime.now(UTC) - timedelta(days=10)
         status, days = calculate_engagement_status(recent)
         assert status == EngagementStatus.ACTIVE
         assert days == 10
@@ -584,7 +580,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_at_risk_contact(self):
         """Contact between at_risk and disconnected thresholds."""
-        at_risk_date = datetime.now(timezone.utc) - timedelta(days=70)
+        at_risk_date = datetime.now(UTC) - timedelta(days=70)
         status, days = calculate_engagement_status(at_risk_date)
         assert status == EngagementStatus.AT_RISK
         assert days == 70
@@ -592,7 +588,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_disconnected_old_contact(self):
         """Contact beyond disconnected threshold."""
-        old = datetime.now(timezone.utc) - timedelta(days=120)
+        old = datetime.now(UTC) - timedelta(days=120)
         status, days = calculate_engagement_status(old)
         assert status == EngagementStatus.DISCONNECTED
         assert days == 120
@@ -600,7 +596,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_exactly_at_risk_boundary(self):
         """Contact at exactly the at_risk threshold."""
-        boundary = datetime.now(timezone.utc) - timedelta(days=ENGAGEMENT_AT_RISK_DAYS_DEFAULT)
+        boundary = datetime.now(UTC) - timedelta(days=ENGAGEMENT_AT_RISK_DAYS_DEFAULT)
         status, days = calculate_engagement_status(boundary)
         assert status == EngagementStatus.AT_RISK
         assert days == ENGAGEMENT_AT_RISK_DAYS_DEFAULT
@@ -608,7 +604,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_exactly_disconnected_boundary(self):
         """Contact at exactly the disconnected threshold."""
-        boundary = datetime.now(timezone.utc) - timedelta(days=ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT)
+        boundary = datetime.now(UTC) - timedelta(days=ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT)
         status, days = calculate_engagement_status(boundary)
         assert status == EngagementStatus.DISCONNECTED
         assert days == ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT
@@ -616,21 +612,21 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_one_day_before_at_risk(self):
         """One day before at_risk threshold should be ACTIVE."""
-        almost = datetime.now(timezone.utc) - timedelta(days=ENGAGEMENT_AT_RISK_DAYS_DEFAULT - 1)
-        status, days = calculate_engagement_status(almost)
+        almost = datetime.now(UTC) - timedelta(days=ENGAGEMENT_AT_RISK_DAYS_DEFAULT - 1)
+        status, _days = calculate_engagement_status(almost)
         assert status == EngagementStatus.ACTIVE
 
     @pytest.mark.unit
     def test_one_day_before_disconnected(self):
         """One day before disconnected threshold should be AT_RISK."""
-        almost = datetime.now(timezone.utc) - timedelta(days=ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT - 1)
-        status, days = calculate_engagement_status(almost)
+        almost = datetime.now(UTC) - timedelta(days=ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT - 1)
+        status, _days = calculate_engagement_status(almost)
         assert status == EngagementStatus.AT_RISK
 
     @pytest.mark.unit
     def test_string_date_iso_format(self):
         """String dates in ISO format should be parsed correctly."""
-        recent = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+        recent = (datetime.now(UTC) - timedelta(days=5)).isoformat()
         status, days = calculate_engagement_status(recent)
         assert status == EngagementStatus.ACTIVE
         assert days == 5
@@ -660,7 +656,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_custom_thresholds(self):
         """Custom at_risk_days and disconnected_days."""
-        recent = datetime.now(timezone.utc) - timedelta(days=15)
+        recent = datetime.now(UTC) - timedelta(days=15)
         # With custom thresholds: at_risk=10, disconnected=20
         status, days = calculate_engagement_status(recent, at_risk_days=10, disconnected_days=20)
         assert status == EngagementStatus.AT_RISK
@@ -668,14 +664,14 @@ class TestCalculateEngagementStatus:
 
     @pytest.mark.unit
     def test_custom_thresholds_active(self):
-        recent = datetime.now(timezone.utc) - timedelta(days=5)
+        recent = datetime.now(UTC) - timedelta(days=5)
         status, days = calculate_engagement_status(recent, at_risk_days=10, disconnected_days=20)
         assert status == EngagementStatus.ACTIVE
         assert days == 5
 
     @pytest.mark.unit
     def test_custom_thresholds_disconnected(self):
-        old = datetime.now(timezone.utc) - timedelta(days=25)
+        old = datetime.now(UTC) - timedelta(days=25)
         status, days = calculate_engagement_status(old, at_risk_days=10, disconnected_days=20)
         assert status == EngagementStatus.DISCONNECTED
         assert days == 25
@@ -683,7 +679,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_today_contact(self):
         """Contact today should be ACTIVE with 0 days."""
-        today = datetime.now(timezone.utc)
+        today = datetime.now(UTC)
         status, days = calculate_engagement_status(today)
         assert status == EngagementStatus.ACTIVE
         assert days == 0
@@ -691,7 +687,7 @@ class TestCalculateEngagementStatus:
     @pytest.mark.unit
     def test_future_contact_date(self):
         """Future dates should result in negative days but still ACTIVE."""
-        future = datetime.now(timezone.utc) + timedelta(days=5)
+        future = datetime.now(UTC) + timedelta(days=5)
         status, days = calculate_engagement_status(future)
         assert status == EngagementStatus.ACTIVE
         assert days < 0
@@ -740,7 +736,7 @@ class TestCacheFunctions:
         """Expired cache entries should return None."""
         set_in_cache("expire_key", "old_value")
         # Manually set timestamp to the past
-        _cache_timestamps["expire_key"] = datetime.now(timezone.utc) - timedelta(seconds=600)
+        _cache_timestamps["expire_key"] = datetime.now(UTC) - timedelta(seconds=600)
         result = get_from_cache("expire_key", ttl_seconds=300)
         assert result is None
         # Entry should be cleaned up
@@ -759,7 +755,7 @@ class TestCacheFunctions:
         """Custom TTL should be respected."""
         set_in_cache("ttl_key", "value")
         # Set timestamp to 5 seconds ago
-        _cache_timestamps["ttl_key"] = datetime.now(timezone.utc) - timedelta(seconds=5)
+        _cache_timestamps["ttl_key"] = datetime.now(UTC) - timedelta(seconds=5)
         # With 10 second TTL, should still be valid
         assert get_from_cache("ttl_key", ttl_seconds=10) == "value"
         # With 3 second TTL, should be expired
@@ -810,9 +806,7 @@ class TestCacheFunctions:
         for i in range(MAX_CACHE_SIZE):
             set_in_cache(f"fill_{i}", f"value_{i}")
             # Stagger timestamps slightly so oldest is deterministic
-            _cache_timestamps[f"fill_{i}"] = datetime.now(timezone.utc) - timedelta(
-                seconds=MAX_CACHE_SIZE - i
-            )
+            _cache_timestamps[f"fill_{i}"] = datetime.now(UTC) - timedelta(seconds=MAX_CACHE_SIZE - i)
 
         assert len(_cache) == MAX_CACHE_SIZE
 
@@ -839,28 +833,28 @@ class TestValidateImageMagicBytes:
 
     @pytest.mark.unit
     def test_valid_jpeg(self):
-        content = b'\xff\xd8\xff\xe0' + b'\x00' * 100
+        content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
         is_valid, mime = validate_image_magic_bytes(content)
         assert is_valid is True
         assert mime == "image/jpeg"
 
     @pytest.mark.unit
     def test_valid_png(self):
-        content = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
         is_valid, mime = validate_image_magic_bytes(content)
         assert is_valid is True
         assert mime == "image/png"
 
     @pytest.mark.unit
     def test_valid_gif87a(self):
-        content = b'GIF87a' + b'\x00' * 100
+        content = b"GIF87a" + b"\x00" * 100
         is_valid, mime = validate_image_magic_bytes(content)
         assert is_valid is True
         assert mime == "image/gif"
 
     @pytest.mark.unit
     def test_valid_gif89a(self):
-        content = b'GIF89a' + b'\x00' * 100
+        content = b"GIF89a" + b"\x00" * 100
         is_valid, mime = validate_image_magic_bytes(content)
         assert is_valid is True
         assert mime == "image/gif"
@@ -868,54 +862,54 @@ class TestValidateImageMagicBytes:
     @pytest.mark.unit
     def test_valid_webp(self):
         # WebP: RIFF + 4 bytes size + WEBP
-        content = b'RIFF\x00\x00\x00\x00WEBP' + b'\x00' * 100
+        content = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 100
         is_valid, mime = validate_image_magic_bytes(content)
         assert is_valid is True
         assert mime == "image/webp"
 
     @pytest.mark.unit
     def test_too_small_file(self):
-        content = b'\xff\xd8'  # Only 2 bytes
+        content = b"\xff\xd8"  # Only 2 bytes
         is_valid, msg = validate_image_magic_bytes(content)
         assert is_valid is False
         assert "too small" in msg.lower()
 
     @pytest.mark.unit
     def test_empty_content(self):
-        is_valid, msg = validate_image_magic_bytes(b'')
+        is_valid, msg = validate_image_magic_bytes(b"")
         assert is_valid is False
         assert "too small" in msg.lower()
 
     @pytest.mark.unit
     def test_exactly_8_bytes_invalid(self):
-        content = b'\x00' * 8
+        content = b"\x00" * 8
         is_valid, msg = validate_image_magic_bytes(content)
         assert is_valid is False
         assert "invalid image format" in msg.lower()
 
     @pytest.mark.unit
     def test_pdf_file_rejected(self):
-        content = b'%PDF-1.4' + b'\x00' * 100
-        is_valid, msg = validate_image_magic_bytes(content)
+        content = b"%PDF-1.4" + b"\x00" * 100
+        is_valid, _msg = validate_image_magic_bytes(content)
         assert is_valid is False
 
     @pytest.mark.unit
     def test_text_file_rejected(self):
-        content = b'Hello, World! This is plain text.' + b'\x00' * 100
-        is_valid, msg = validate_image_magic_bytes(content)
+        content = b"Hello, World! This is plain text." + b"\x00" * 100
+        is_valid, _msg = validate_image_magic_bytes(content)
         assert is_valid is False
 
     @pytest.mark.unit
     def test_executable_rejected(self):
-        content = b'MZ' + b'\x00' * 100  # Windows PE header
-        is_valid, msg = validate_image_magic_bytes(content)
+        content = b"MZ" + b"\x00" * 100  # Windows PE header
+        is_valid, _msg = validate_image_magic_bytes(content)
         assert is_valid is False
 
     @pytest.mark.unit
     def test_riff_without_webp_marker(self):
         """RIFF header without WEBP marker should fail the special WebP check."""
-        content = b'RIFF\x00\x00\x00\x00AVI ' + b'\x00' * 100
-        is_valid, msg = validate_image_magic_bytes(content)
+        content = b"RIFF\x00\x00\x00\x00AVI " + b"\x00" * 100
+        is_valid, _msg = validate_image_magic_bytes(content)
         # RIFF alone matches in IMAGE_MAGIC_BYTES dict, so it might pass
         # Let's check what the constant dict says
         # IMAGE_MAGIC_BYTES has b'RIFF': 'image/webp' as a partial check
@@ -1026,7 +1020,7 @@ class TestGenerateUuid:
         """Should match UUID v4 pattern (version 4 at position 13)."""
         result = generate_uuid()
         # UUID v4 has '4' as the 13th character (version nibble)
-        assert result[14] == '4'
+        assert result[14] == "4"
 
     @pytest.mark.unit
     def test_correct_length(self):
@@ -1420,8 +1414,13 @@ class TestEventTypeEnum:
     @pytest.mark.unit
     def test_expected_members(self):
         expected = {
-            "birthday", "childbirth", "grief_loss", "new_house",
-            "accident_illness", "financial_aid", "regular_contact"
+            "birthday",
+            "childbirth",
+            "grief_loss",
+            "new_house",
+            "accident_illness",
+            "financial_aid",
+            "regular_contact",
         }
         actual = {e.value for e in EventType}
         assert actual == expected
@@ -1675,8 +1674,7 @@ class TestGriefTimelineConstants:
         ]
         for i in range(len(timeline) - 1):
             assert timeline[i] < timeline[i + 1], (
-                f"Grief timeline not ascending at index {i}: "
-                f"{timeline[i]} >= {timeline[i + 1]}"
+                f"Grief timeline not ascending at index {i}: {timeline[i]} >= {timeline[i + 1]}"
             )
 
     @pytest.mark.unit
@@ -1805,8 +1803,8 @@ class TestFileUploadConstants:
 
     @pytest.mark.unit
     def test_values(self):
-        assert MAX_IMAGE_SIZE == 10 * 1024 * 1024       # 10 MB
-        assert MAX_CSV_SIZE == 5 * 1024 * 1024           # 5 MB
+        assert MAX_IMAGE_SIZE == 10 * 1024 * 1024  # 10 MB
+        assert MAX_CSV_SIZE == 5 * 1024 * 1024  # 5 MB
         assert MAX_REQUEST_BODY_SIZE == 15 * 1024 * 1024  # 15 MB
 
     @pytest.mark.unit
@@ -1825,25 +1823,25 @@ class TestImageMagicBytesConstant:
 
     @pytest.mark.unit
     def test_contains_jpeg(self):
-        assert b'\xff\xd8\xff' in IMAGE_MAGIC_BYTES
-        assert IMAGE_MAGIC_BYTES[b'\xff\xd8\xff'] == 'image/jpeg'
+        assert b"\xff\xd8\xff" in IMAGE_MAGIC_BYTES
+        assert IMAGE_MAGIC_BYTES[b"\xff\xd8\xff"] == "image/jpeg"
 
     @pytest.mark.unit
     def test_contains_png(self):
-        assert b'\x89PNG\r\n\x1a\n' in IMAGE_MAGIC_BYTES
-        assert IMAGE_MAGIC_BYTES[b'\x89PNG\r\n\x1a\n'] == 'image/png'
+        assert b"\x89PNG\r\n\x1a\n" in IMAGE_MAGIC_BYTES
+        assert IMAGE_MAGIC_BYTES[b"\x89PNG\r\n\x1a\n"] == "image/png"
 
     @pytest.mark.unit
     def test_contains_gif(self):
-        assert b'GIF87a' in IMAGE_MAGIC_BYTES
-        assert b'GIF89a' in IMAGE_MAGIC_BYTES
-        assert IMAGE_MAGIC_BYTES[b'GIF87a'] == 'image/gif'
-        assert IMAGE_MAGIC_BYTES[b'GIF89a'] == 'image/gif'
+        assert b"GIF87a" in IMAGE_MAGIC_BYTES
+        assert b"GIF89a" in IMAGE_MAGIC_BYTES
+        assert IMAGE_MAGIC_BYTES[b"GIF87a"] == "image/gif"
+        assert IMAGE_MAGIC_BYTES[b"GIF89a"] == "image/gif"
 
     @pytest.mark.unit
     def test_contains_webp(self):
-        assert b'RIFF' in IMAGE_MAGIC_BYTES
-        assert IMAGE_MAGIC_BYTES[b'RIFF'] == 'image/webp'
+        assert b"RIFF" in IMAGE_MAGIC_BYTES
+        assert IMAGE_MAGIC_BYTES[b"RIFF"] == "image/webp"
 
     @pytest.mark.unit
     def test_keys_are_bytes(self):

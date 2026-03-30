@@ -24,11 +24,12 @@ Covers:
 - Engagement calculation
 """
 
-import pytest
-import sys
 import os
+import sys
 import uuid
-from datetime import datetime, timezone, timedelta, date
+from datetime import UTC, date, datetime, timedelta
+
+import pytest
 
 # Add parent directory to path so we can import backend modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,18 +37,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bcrypt
 import jwt
 
-# These modules do NOT depend on litestar and can be imported directly
-from enums import (
-    EngagementStatus, EventType, GriefStage, AidType,
-    UserRole, ActivityActionType,
-)
-from utils import calculate_engagement_status, normalize_phone_number
 from constants import (
-    GRIEF_ONE_WEEK_DAYS, GRIEF_TWO_WEEKS_DAYS, GRIEF_ONE_MONTH_DAYS,
-    GRIEF_THREE_MONTHS_DAYS, GRIEF_SIX_MONTHS_DAYS, GRIEF_ONE_YEAR_DAYS,
-    JWT_TOKEN_EXPIRE_HOURS, ENGAGEMENT_NO_CONTACT_DAYS,
+    ENGAGEMENT_NO_CONTACT_DAYS,
+    GRIEF_ONE_MONTH_DAYS,
+    GRIEF_ONE_WEEK_DAYS,
+    GRIEF_ONE_YEAR_DAYS,
+    GRIEF_SIX_MONTHS_DAYS,
+    GRIEF_THREE_MONTHS_DAYS,
+    GRIEF_TWO_WEEKS_DAYS,
+    JWT_TOKEN_EXPIRE_HOURS,
 )
 
+# These modules do NOT depend on litestar and can be imported directly
+from enums import (
+    ActivityActionType,
+    AidType,
+    EngagementStatus,
+    EventType,
+    GriefStage,
+    UserRole,
+)
+from utils import calculate_engagement_status, normalize_phone_number
 
 # ---------------------------------------------------------------------------
 # Inline replicas of key functions from dependencies.py and server.py
@@ -60,22 +70,21 @@ TEST_PASSWORD = "TestPass123!"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a bcrypt hash (replica of dependencies.verify_password)."""
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt (replica of dependencies.get_password_hash)."""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def create_access_token(data: dict, secret: str = TEST_JWT_SECRET,
-                         expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, secret: str = TEST_JWT_SECRET, expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token (replica of dependencies.create_access_token)."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
+        expire = datetime.now(UTC) + timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, secret, algorithm="HS256")
 
@@ -90,10 +99,10 @@ def get_campus_filter(user: dict) -> dict:
     return {"campus_id": {"$exists": False, "$eq": "IMPOSSIBLE_VALUE"}}
 
 
-def generate_grief_timeline(mourning_date: date, care_event_id: str,
-                             member_id: str) -> list:
+def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: str) -> list:
     """Generate 6-stage grief support timeline (replica of server.generate_grief_timeline)."""
     from models import generate_uuid
+
     stages = [
         (GriefStage.ONE_WEEK, GRIEF_ONE_WEEK_DAYS),
         (GriefStage.TWO_WEEKS, GRIEF_TWO_WEEKS_DAYS),
@@ -115,8 +124,8 @@ def generate_grief_timeline(mourning_date: date, care_event_id: str,
             "completed_at": None,
             "notes": None,
             "reminder_sent": False,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
         }
         timeline.append(grief_support)
     return timeline
@@ -126,21 +135,28 @@ def generate_grief_timeline(mourning_date: date, care_event_id: str,
 # Test data helpers
 # ---------------------------------------------------------------------------
 
+
 def _hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def _make_token(user_id: str, secret: str = TEST_JWT_SECRET, expired: bool = False) -> str:
     """Create a JWT token for testing."""
-    exp = datetime.now(timezone.utc) + (
-        timedelta(hours=-1) if expired else timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
-    )
+    exp = datetime.now(UTC) + (timedelta(hours=-1) if expired else timedelta(hours=JWT_TOKEN_EXPIRE_HOURS))
     return jwt.encode({"sub": user_id, "exp": exp}, secret, algorithm="HS256")
 
 
-async def _insert_user(db, campus_id, *, role="full_admin", email="admin@test.com",
-                        name="Test Admin", phone="+6281234567890", user_id=None,
-                        is_active=True):
+async def _insert_user(
+    db,
+    campus_id,
+    *,
+    role="full_admin",
+    email="admin@test.com",
+    name="Test Admin",
+    phone="+6281234567890",
+    user_id=None,
+    is_active=True,
+):
     """Insert a test user and return the document."""
     uid = user_id or str(uuid.uuid4())
     user = {
@@ -152,18 +168,26 @@ async def _insert_user(db, campus_id, *, role="full_admin", email="admin@test.co
         "campus_id": campus_id,
         "role": role,
         "is_active": is_active,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await db.users.insert_one(user)
     return user
 
 
-async def _insert_member(db, campus_id, *, name="John Doe", member_id=None,
-                          phone="+6281234567892", engagement="active",
-                          last_contact=None, birth_date=None):
+async def _insert_member(
+    db,
+    campus_id,
+    *,
+    name="John Doe",
+    member_id=None,
+    phone="+6281234567892",
+    engagement="active",
+    last_contact=None,
+    birth_date=None,
+):
     """Insert a test member and return the document."""
     mid = member_id or str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     member = {
         "id": mid,
         "campus_id": campus_id,
@@ -181,13 +205,21 @@ async def _insert_member(db, campus_id, *, name="John Doe", member_id=None,
     return member
 
 
-async def _insert_care_event(db, campus_id, member_id, *,
-                              event_type="birthday", title="Test Event",
-                              completed=False, ignored=False, event_id=None,
-                              event_date=None):
+async def _insert_care_event(
+    db,
+    campus_id,
+    member_id,
+    *,
+    event_type="birthday",
+    title="Test Event",
+    completed=False,
+    ignored=False,
+    event_id=None,
+    event_date=None,
+):
     """Insert a care event and return the document."""
     eid = event_id or str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     event = {
         "id": eid,
         "campus_id": campus_id,
@@ -208,6 +240,7 @@ async def _insert_care_event(db, campus_id, member_id, *,
 # =====================================================================
 # AUTHENTICATION TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestAuthentication:
@@ -272,7 +305,7 @@ class TestAuthentication:
     @pytest.mark.asyncio
     async def test_token_without_sub_claim(self, test_db, test_campus):
         """Token missing 'sub' claim must not resolve a user."""
-        exp = datetime.now(timezone.utc) + timedelta(hours=1)
+        exp = datetime.now(UTC) + timedelta(hours=1)
         token = jwt.encode({"exp": exp}, TEST_JWT_SECRET, algorithm="HS256")
         payload = jwt.decode(token, TEST_JWT_SECRET, algorithms=["HS256"])
         assert payload.get("sub") is None
@@ -307,6 +340,7 @@ class TestAuthentication:
 # MEMBER CRUD TESTS
 # =====================================================================
 
+
 @pytest.mark.integration
 class TestMemberCRUD:
     """Member create, read, update, delete with multi-tenancy checks."""
@@ -324,9 +358,7 @@ class TestMemberCRUD:
     async def test_get_member(self, test_db, test_campus):
         """Retrieve a member by ID with campus scoping."""
         member = await _insert_member(test_db, test_campus["id"])
-        found = await test_db.members.find_one(
-            {"id": member["id"], "campus_id": test_campus["id"]}, {"_id": 0}
-        )
+        found = await test_db.members.find_one({"id": member["id"], "campus_id": test_campus["id"]}, {"_id": 0})
         assert found is not None
         assert found["id"] == member["id"]
 
@@ -336,7 +368,7 @@ class TestMemberCRUD:
         member = await _insert_member(test_db, test_campus["id"])
         result = await test_db.members.update_one(
             {"id": member["id"], "campus_id": test_campus["id"]},
-            {"$set": {"name": "Updated Name", "updated_at": datetime.now(timezone.utc)}}
+            {"$set": {"name": "Updated Name", "updated_at": datetime.now(UTC)}},
         )
         assert result.modified_count == 1
         updated = await test_db.members.find_one({"id": member["id"]}, {"_id": 0})
@@ -351,9 +383,7 @@ class TestMemberCRUD:
         # Delete member
         await test_db.members.delete_one({"id": member["id"]})
         # Cascade: delete related care events (mirrors delete_member handler)
-        await test_db.care_events.delete_many(
-            {"member_id": member["id"], "campus_id": test_campus["id"]}
-        )
+        await test_db.care_events.delete_many({"member_id": member["id"], "campus_id": test_campus["id"]})
 
         assert await test_db.members.find_one({"id": member["id"]}) is None
         events = await test_db.care_events.find({"member_id": member["id"]}).to_list(None)
@@ -375,9 +405,7 @@ class TestMemberCRUD:
     async def test_get_member_wrong_campus(self, test_db, test_campus, second_campus):
         """Multi-tenancy: member from campus A must not be visible with campus B filter."""
         member = await _insert_member(test_db, test_campus["id"])
-        found = await test_db.members.find_one(
-            {"id": member["id"], "campus_id": second_campus["id"]}, {"_id": 0}
-        )
+        found = await test_db.members.find_one({"id": member["id"], "campus_id": second_campus["id"]}, {"_id": 0})
         assert found is None, "Member from another campus should not be accessible"
 
     @pytest.mark.asyncio
@@ -411,10 +439,8 @@ class TestMemberCRUD:
     @pytest.mark.asyncio
     async def test_member_engagement_calculated(self, test_db, test_campus):
         """Engagement status is computed from last_contact_date."""
-        old_contact = datetime.now(timezone.utc) - timedelta(days=100)
-        member = await _insert_member(
-            test_db, test_campus["id"], last_contact=old_contact
-        )
+        old_contact = datetime.now(UTC) - timedelta(days=100)
+        await _insert_member(test_db, test_campus["id"], last_contact=old_contact)
         status, days = calculate_engagement_status(old_contact)
         assert status == EngagementStatus.DISCONNECTED
         assert days >= 100
@@ -423,20 +449,19 @@ class TestMemberCRUD:
     async def test_delete_member_cascades_grief_support(self, test_db, test_campus):
         """Deleting a member also removes grief_support records."""
         member = await _insert_member(test_db, test_campus["id"])
-        event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="grief_loss"
+        event = await _insert_care_event(test_db, test_campus["id"], member["id"], event_type="grief_loss")
+        await test_db.grief_support.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "campus_id": test_campus["id"],
+                "member_id": member["id"],
+                "care_event_id": event["id"],
+                "stage": "1_week",
+                "scheduled_date": date.today().isoformat(),
+                "completed": False,
+                "created_at": datetime.now(UTC),
+            }
         )
-        await test_db.grief_support.insert_one({
-            "id": str(uuid.uuid4()),
-            "campus_id": test_campus["id"],
-            "member_id": member["id"],
-            "care_event_id": event["id"],
-            "stage": "1_week",
-            "scheduled_date": date.today().isoformat(),
-            "completed": False,
-            "created_at": datetime.now(timezone.utc),
-        })
 
         # Cascade delete
         await test_db.members.delete_one({"id": member["id"]})
@@ -450,6 +475,7 @@ class TestMemberCRUD:
 # CARE EVENT TESTS
 # =====================================================================
 
+
 @pytest.mark.integration
 class TestCareEvents:
     """Care event creation, completion, ignoring, deletion, and engagement updates."""
@@ -458,8 +484,7 @@ class TestCareEvents:
     async def test_create_care_event(self, test_db, test_campus, test_member):
         """Create a care event and verify persistence."""
         event = await _insert_care_event(
-            test_db, test_campus["id"], test_member["id"],
-            event_type="birthday", title="Birthday Celebration"
+            test_db, test_campus["id"], test_member["id"], event_type="birthday", title="Birthday Celebration"
         )
         found = await test_db.care_events.find_one({"id": event["id"]}, {"_id": 0})
         assert found is not None
@@ -470,32 +495,33 @@ class TestCareEvents:
     @pytest.mark.asyncio
     async def test_complete_care_event(self, test_db, test_campus, test_member):
         """Completing a care event sets completed flag and updates member engagement."""
-        event = await _insert_care_event(
-            test_db, test_campus["id"], test_member["id"],
-            event_type="regular_contact"
-        )
-        now = datetime.now(timezone.utc)
+        event = await _insert_care_event(test_db, test_campus["id"], test_member["id"], event_type="regular_contact")
+        now = datetime.now(UTC)
 
         # Complete the event (mirrors complete_care_event handler)
         await test_db.care_events.update_one(
             {"id": event["id"]},
-            {"$set": {
-                "completed": True,
-                "completed_at": now,
-                "completed_by_user_id": "test-user",
-                "completed_by_user_name": "Test User",
-                "updated_at": now,
-            }}
+            {
+                "$set": {
+                    "completed": True,
+                    "completed_at": now,
+                    "completed_by_user_id": "test-user",
+                    "completed_by_user_name": "Test User",
+                    "updated_at": now,
+                }
+            },
         )
         # Update member engagement
         await test_db.members.update_one(
             {"id": test_member["id"]},
-            {"$set": {
-                "last_contact_date": now,
-                "days_since_last_contact": 0,
-                "engagement_status": "active",
-                "updated_at": now,
-            }}
+            {
+                "$set": {
+                    "last_contact_date": now,
+                    "days_since_last_contact": 0,
+                    "engagement_status": "active",
+                    "updated_at": now,
+                }
+            },
         )
 
         updated_event = await test_db.care_events.find_one({"id": event["id"]}, {"_id": 0})
@@ -509,10 +535,7 @@ class TestCareEvents:
     @pytest.mark.asyncio
     async def test_complete_idempotent(self, test_db, test_campus, test_member):
         """Completing an already-completed event is idempotent."""
-        event = await _insert_care_event(
-            test_db, test_campus["id"], test_member["id"],
-            completed=True
-        )
+        event = await _insert_care_event(test_db, test_campus["id"], test_member["id"], completed=True)
         found = await test_db.care_events.find_one({"id": event["id"]}, {"_id": 0})
         # Handler checks: if event.get("completed"): return {"success": True, ...}
         assert found["completed"] is True
@@ -520,19 +543,19 @@ class TestCareEvents:
     @pytest.mark.asyncio
     async def test_ignore_care_event(self, test_db, test_campus, test_member):
         """Ignoring a care event sets the ignored flag with user info."""
-        event = await _insert_care_event(
-            test_db, test_campus["id"], test_member["id"]
-        )
-        now = datetime.now(timezone.utc)
+        event = await _insert_care_event(test_db, test_campus["id"], test_member["id"])
+        now = datetime.now(UTC)
         await test_db.care_events.update_one(
             {"id": event["id"]},
-            {"$set": {
-                "ignored": True,
-                "ignored_at": now,
-                "ignored_by": "test-user",
-                "ignored_by_name": "Test User",
-                "updated_at": now,
-            }}
+            {
+                "$set": {
+                    "ignored": True,
+                    "ignored_at": now,
+                    "ignored_by": "test-user",
+                    "ignored_by_name": "Test User",
+                    "updated_at": now,
+                }
+            },
         )
         updated = await test_db.care_events.find_one({"id": event["id"]}, {"_id": 0})
         assert updated["ignored"] is True
@@ -543,45 +566,52 @@ class TestCareEvents:
         """Deleting the most recent care event causes engagement recalculation."""
         member = await _insert_member(test_db, test_campus["id"])
 
-        old_date = datetime.now(timezone.utc) - timedelta(days=80)
-        recent_date = datetime.now(timezone.utc) - timedelta(days=2)
+        old_date = datetime.now(UTC) - timedelta(days=80)
+        recent_date = datetime.now(UTC) - timedelta(days=2)
 
         await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="regular_contact", title="Old Contact",
-            event_id="evt-old"
+            test_db,
+            test_campus["id"],
+            member["id"],
+            event_type="regular_contact",
+            title="Old Contact",
+            event_id="evt-old",
         )
-        await test_db.care_events.update_one(
-            {"id": "evt-old"}, {"$set": {"created_at": old_date}}
-        )
+        await test_db.care_events.update_one({"id": "evt-old"}, {"$set": {"created_at": old_date}})
 
         await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="regular_contact", title="Recent Contact",
-            event_id="evt-recent"
+            test_db,
+            test_campus["id"],
+            member["id"],
+            event_type="regular_contact",
+            title="Recent Contact",
+            event_id="evt-recent",
         )
-        await test_db.care_events.update_one(
-            {"id": "evt-recent"}, {"$set": {"created_at": recent_date}}
-        )
+        await test_db.care_events.update_one({"id": "evt-recent"}, {"$set": {"created_at": recent_date}})
 
         # Delete the recent event
         await test_db.care_events.delete_one({"id": "evt-recent"})
 
         # Recalculate last contact from remaining events (mirrors handler logic)
-        remaining = await test_db.care_events.find(
-            {"member_id": member["id"]}, {"_id": 0, "created_at": 1}
-        ).sort("created_at", -1).limit(1).to_list(1)
+        remaining = (
+            await test_db.care_events.find({"member_id": member["id"]}, {"_id": 0, "created_at": 1})
+            .sort("created_at", -1)
+            .limit(1)
+            .to_list(1)
+        )
 
         if remaining:
             last_contact = remaining[0]["created_at"]
             status, days = calculate_engagement_status(last_contact)
             await test_db.members.update_one(
                 {"id": member["id"]},
-                {"$set": {
-                    "last_contact_date": last_contact,
-                    "engagement_status": status.value,
-                    "days_since_last_contact": days,
-                }}
+                {
+                    "$set": {
+                        "last_contact_date": last_contact,
+                        "engagement_status": status.value,
+                        "days_since_last_contact": days,
+                    }
+                },
             )
 
         updated_member = await test_db.members.find_one({"id": member["id"]}, {"_id": 0})
@@ -595,16 +625,11 @@ class TestCareEvents:
     async def test_delete_all_events_disconnects_member(self, test_db, test_campus):
         """When all care events are deleted, member becomes disconnected."""
         member = await _insert_member(test_db, test_campus["id"])
-        event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="regular_contact"
-        )
+        event = await _insert_care_event(test_db, test_campus["id"], member["id"], event_type="regular_contact")
 
         await test_db.care_events.delete_one({"id": event["id"]})
 
-        remaining = await test_db.care_events.find(
-            {"member_id": member["id"]}, {"_id": 0}
-        ).to_list(None)
+        remaining = await test_db.care_events.find({"member_id": member["id"]}, {"_id": 0}).to_list(None)
         assert len(remaining) == 0
 
         status, days = calculate_engagement_status(None)
@@ -615,20 +640,14 @@ class TestCareEvents:
     async def test_care_event_scoped_by_campus(self, test_db, test_campus, second_campus):
         """Care event from campus A is not visible when querying campus B."""
         member = await _insert_member(test_db, test_campus["id"])
-        event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"]
-        )
-        found = await test_db.care_events.find_one(
-            {"id": event["id"], "campus_id": second_campus["id"]}, {"_id": 0}
-        )
+        event = await _insert_care_event(test_db, test_campus["id"], member["id"])
+        found = await test_db.care_events.find_one({"id": event["id"], "campus_id": second_campus["id"]}, {"_id": 0})
         assert found is None
 
     @pytest.mark.asyncio
     async def test_care_event_not_found_returns_none(self, test_db, test_campus):
         """Querying a nonexistent event ID returns None."""
-        found = await test_db.care_events.find_one(
-            {"id": "nonexistent-event-id"}, {"_id": 0}
-        )
+        found = await test_db.care_events.find_one({"id": "nonexistent-event-id"}, {"_id": 0})
         assert found is None
 
     @pytest.mark.asyncio
@@ -636,7 +655,7 @@ class TestCareEvents:
         """Financial aid events store aid_type and aid_amount."""
         member = await _insert_member(test_db, test_campus["id"])
         event_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         event = {
             "id": event_id,
             "campus_id": test_campus["id"],
@@ -660,6 +679,7 @@ class TestCareEvents:
 # GRIEF TIMELINE TESTS
 # =====================================================================
 
+
 @pytest.mark.integration
 class TestGriefTimeline:
     """Grief support timeline auto-generation."""
@@ -669,8 +689,7 @@ class TestGriefTimeline:
         """Creating a grief/loss event generates 6 followup stages."""
         member = await _insert_member(test_db, test_campus["id"])
         event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="grief_loss", title="Grief - Father passed"
+            test_db, test_campus["id"], member["id"], event_type="grief_loss", title="Grief - Father passed"
         )
 
         mourning_date = date.today()
@@ -679,12 +698,12 @@ class TestGriefTimeline:
         assert len(timeline) == 6, "Grief timeline should have 6 stages"
 
         expected_offsets = [
-            GRIEF_ONE_WEEK_DAYS,       # 7
-            GRIEF_TWO_WEEKS_DAYS,      # 14
-            GRIEF_ONE_MONTH_DAYS,      # 30
-            GRIEF_THREE_MONTHS_DAYS,   # 90
-            GRIEF_SIX_MONTHS_DAYS,     # 180
-            GRIEF_ONE_YEAR_DAYS,       # 365
+            GRIEF_ONE_WEEK_DAYS,  # 7
+            GRIEF_TWO_WEEKS_DAYS,  # 14
+            GRIEF_ONE_MONTH_DAYS,  # 30
+            GRIEF_THREE_MONTHS_DAYS,  # 90
+            GRIEF_SIX_MONTHS_DAYS,  # 180
+            GRIEF_ONE_YEAR_DAYS,  # 365
         ]
         expected_stages = [
             GriefStage.ONE_WEEK,
@@ -708,10 +727,7 @@ class TestGriefTimeline:
     async def test_grief_timeline_unique_ids(self, test_db, test_campus):
         """Each grief timeline stage has a unique ID."""
         member = await _insert_member(test_db, test_campus["id"])
-        event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="grief_loss"
-        )
+        event = await _insert_care_event(test_db, test_campus["id"], member["id"], event_type="grief_loss")
         timeline = generate_grief_timeline(date.today(), event["id"], member["id"])
         ids = [stage["id"] for stage in timeline]
         assert len(ids) == len(set(ids)), "All stage IDs should be unique"
@@ -720,28 +736,20 @@ class TestGriefTimeline:
     async def test_grief_timeline_persisted(self, test_db, test_campus):
         """Grief timeline stages are persisted to the grief_support collection."""
         member = await _insert_member(test_db, test_campus["id"])
-        event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="grief_loss"
-        )
+        event = await _insert_care_event(test_db, test_campus["id"], member["id"], event_type="grief_loss")
         timeline = generate_grief_timeline(date.today(), event["id"], member["id"])
         for stage in timeline:
             stage["campus_id"] = test_campus["id"]
         await test_db.grief_support.insert_many(timeline)
 
-        stored = await test_db.grief_support.find(
-            {"care_event_id": event["id"]}, {"_id": 0}
-        ).to_list(None)
+        stored = await test_db.grief_support.find({"care_event_id": event["id"]}, {"_id": 0}).to_list(None)
         assert len(stored) == 6
 
     @pytest.mark.asyncio
     async def test_delete_grief_event_cascades(self, test_db, test_campus):
         """Deleting a grief parent event removes all grief_support stages."""
         member = await _insert_member(test_db, test_campus["id"])
-        event = await _insert_care_event(
-            test_db, test_campus["id"], member["id"],
-            event_type="grief_loss"
-        )
+        event = await _insert_care_event(test_db, test_campus["id"], member["id"], event_type="grief_loss")
         timeline = generate_grief_timeline(date.today(), event["id"], member["id"])
         for stage in timeline:
             stage["campus_id"] = test_campus["id"]
@@ -751,9 +759,7 @@ class TestGriefTimeline:
         await test_db.grief_support.delete_many({"care_event_id": event["id"]})
         await test_db.care_events.delete_one({"id": event["id"]})
 
-        remaining_stages = await test_db.grief_support.find(
-            {"care_event_id": event["id"]}
-        ).to_list(None)
+        remaining_stages = await test_db.grief_support.find({"care_event_id": event["id"]}).to_list(None)
         assert len(remaining_stages) == 0
         assert await test_db.care_events.find_one({"id": event["id"]}) is None
 
@@ -761,6 +767,7 @@ class TestGriefTimeline:
 # =====================================================================
 # SETTINGS ENDPOINT TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestSettingsEndpoints:
@@ -770,49 +777,45 @@ class TestSettingsEndpoints:
     async def test_user_preferences_requires_auth(self, test_db, test_campus):
         """User preferences endpoint requires a valid user."""
         fake_user_id = str(uuid.uuid4())
-        prefs = await test_db.user_preferences.find_one(
-            {"user_id": fake_user_id}, {"_id": 0}
-        )
+        prefs = await test_db.user_preferences.find_one({"user_id": fake_user_id}, {"_id": 0})
         assert prefs is None, "No preferences should exist for unknown user"
 
     @pytest.mark.asyncio
     async def test_user_preferences_own_only(self, test_db, test_campus):
         """Non-admin user can only access their own preferences."""
         pastor = await _insert_user(
-            test_db, test_campus["id"],
-            role="pastor", email="pastor@test.com", name="Pastor",
-            user_id="pastor-id-1"
+            test_db, test_campus["id"], role="pastor", email="pastor@test.com", name="Pastor", user_id="pastor-id-1"
         )
         other_user = await _insert_user(
-            test_db, test_campus["id"],
-            role="pastor", email="other@test.com", name="Other",
-            user_id="other-id-2", phone="+6281234567891"
+            test_db,
+            test_campus["id"],
+            role="pastor",
+            email="other@test.com",
+            name="Other",
+            user_id="other-id-2",
+            phone="+6281234567891",
         )
 
         # Store preferences for pastor
-        await test_db.user_preferences.insert_one({
-            "user_id": pastor["id"],
-            "data": {"language": "en"},
-        })
-
-        own_prefs = await test_db.user_preferences.find_one(
-            {"user_id": pastor["id"]}, {"_id": 0}
+        await test_db.user_preferences.insert_one(
+            {
+                "user_id": pastor["id"],
+                "data": {"language": "en"},
+            }
         )
+
+        own_prefs = await test_db.user_preferences.find_one({"user_id": pastor["id"]}, {"_id": 0})
         assert own_prefs is not None
         assert own_prefs["data"]["language"] == "en"
 
-        cross_prefs = await test_db.user_preferences.find_one(
-            {"user_id": other_user["id"]}, {"_id": 0}
-        )
+        cross_prefs = await test_db.user_preferences.find_one({"user_id": other_user["id"]}, {"_id": 0})
         assert cross_prefs is None
 
     @pytest.mark.asyncio
     async def test_user_preferences_default(self, test_db, test_campus):
         """When no preferences stored, handler returns default (Indonesian)."""
         user = await _insert_user(test_db, test_campus["id"])
-        prefs = await test_db.user_preferences.find_one(
-            {"user_id": user["id"]}, {"_id": 0}
-        )
+        prefs = await test_db.user_preferences.find_one({"user_id": user["id"]}, {"_id": 0})
         if not prefs:
             result = {"language": "id"}
         else:
@@ -825,16 +828,16 @@ class TestSettingsEndpoints:
         user = await _insert_user(test_db, test_campus["id"])
         await test_db.user_preferences.update_one(
             {"user_id": user["id"]},
-            {"$set": {
-                "user_id": user["id"],
-                "data": {"email_notifications": True, "whatsapp_notifications": False},
-                "updated_at": datetime.now(timezone.utc),
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "user_id": user["id"],
+                    "data": {"email_notifications": True, "whatsapp_notifications": False},
+                    "updated_at": datetime.now(UTC),
+                }
+            },
+            upsert=True,
         )
-        prefs = await test_db.user_preferences.find_one(
-            {"user_id": user["id"]}, {"_id": 0}
-        )
+        prefs = await test_db.user_preferences.find_one({"user_id": user["id"]}, {"_id": 0})
         assert prefs is not None
         assert prefs["data"]["whatsapp_notifications"] is False
 
@@ -855,13 +858,15 @@ class TestSettingsEndpoints:
         admin = await _insert_user(test_db, test_campus["id"])
         await test_db.settings.update_one(
             {"type": "engagement"},
-            {"$set": {
-                "type": "engagement",
-                "data": {"atRiskDays": 45, "inactiveDays": 75},
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": admin["id"],
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "engagement",
+                    "data": {"atRiskDays": 45, "inactiveDays": 75},
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": admin["id"],
+                }
+            },
+            upsert=True,
         )
         settings = await test_db.settings.find_one({"type": "engagement"}, {"_id": 0})
         assert settings["data"]["atRiskDays"] == 45
@@ -891,17 +896,19 @@ class TestSettingsEndpoints:
         admin = await _insert_user(test_db, test_campus["id"])
         await test_db.settings.update_one(
             {"type": "automation"},
-            {"$set": {
-                "type": "automation",
-                "data": {
-                    "digestTime": "09:30",
-                    "whatsappGateway": "https://wa.example.com",
-                    "enabled": False,
-                },
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": admin["id"],
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "automation",
+                    "data": {
+                        "digestTime": "09:30",
+                        "whatsappGateway": "https://wa.example.com",
+                        "enabled": False,
+                    },
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": admin["id"],
+                }
+            },
+            upsert=True,
         )
         settings = await test_db.settings.find_one({"type": "automation"}, {"_id": 0})
         assert settings["data"]["digestTime"] == "09:30"
@@ -950,13 +957,15 @@ class TestSettingsEndpoints:
         ]
         await test_db.settings.update_one(
             {"type": "grief_stages"},
-            {"$set": {
-                "type": "grief_stages",
-                "data": custom_stages,
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": admin["id"],
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "grief_stages",
+                    "data": custom_stages,
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": admin["id"],
+                }
+            },
+            upsert=True,
         )
         settings = await test_db.settings.find_one({"type": "grief_stages"}, {"_id": 0})
         assert len(settings["data"]) == 2
@@ -970,9 +979,11 @@ class TestSettingsEndpoints:
             result = {
                 "key": "overdue_writeoff",
                 "data": {
-                    "birthday": 7, "financial_aid": 0,
-                    "accident_illness": 14, "grief_support": 14,
-                }
+                    "birthday": 7,
+                    "financial_aid": 0,
+                    "accident_illness": 14,
+                    "grief_support": 14,
+                },
             }
         else:
             result = settings
@@ -984,13 +995,15 @@ class TestSettingsEndpoints:
         admin = await _insert_user(test_db, test_campus["id"])
         await test_db.settings.update_one(
             {"key": "overdue_writeoff"},
-            {"$set": {
-                "key": "overdue_writeoff",
-                "data": {"days": 60, "enabled": True},
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": admin["id"],
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "key": "overdue_writeoff",
+                    "data": {"days": 60, "enabled": True},
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": admin["id"],
+                }
+            },
+            upsert=True,
         )
         settings = await test_db.settings.find_one({"key": "overdue_writeoff"}, {"_id": 0})
         assert settings["data"]["days"] == 60
@@ -1000,6 +1013,7 @@ class TestSettingsEndpoints:
 # =====================================================================
 # EXPORT ENDPOINT TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestExportEndpoints:
@@ -1016,10 +1030,7 @@ class TestExportEndpoints:
     async def test_export_care_events_scoped_by_campus(self, test_db, test_campus, second_campus):
         """Export only includes care events from the user's campus."""
         member_a = await _insert_member(test_db, test_campus["id"], name="Campus A Member")
-        member_b = await _insert_member(
-            test_db, second_campus["id"], name="Campus B Member",
-            phone="+6281234567899"
-        )
+        member_b = await _insert_member(test_db, second_campus["id"], name="Campus B Member", phone="+6281234567899")
         await _insert_care_event(test_db, test_campus["id"], member_a["id"], title="Event A")
         await _insert_care_event(test_db, second_campus["id"], member_b["id"], title="Event B")
 
@@ -1033,10 +1044,7 @@ class TestExportEndpoints:
     async def test_export_members_scoped_by_campus(self, test_db, test_campus, second_campus):
         """Member CSV export respects campus filter."""
         await _insert_member(test_db, test_campus["id"], name="Exported Member")
-        await _insert_member(
-            test_db, second_campus["id"], name="Other Campus Member",
-            phone="+6281234567899"
-        )
+        await _insert_member(test_db, second_campus["id"], name="Other Campus Member", phone="+6281234567899")
 
         campus_filter = {"campus_id": test_campus["id"]}
         members = await test_db.members.find(campus_filter, {"_id": 0}).to_list(10000)
@@ -1047,10 +1055,7 @@ class TestExportEndpoints:
     async def test_export_full_admin_sees_all(self, test_db, test_campus, second_campus):
         """Full admin export (empty campus filter) sees all campuses."""
         await _insert_member(test_db, test_campus["id"], name="Member A")
-        await _insert_member(
-            test_db, second_campus["id"], name="Member B",
-            phone="+6281234567899"
-        )
+        await _insert_member(test_db, second_campus["id"], name="Member B", phone="+6281234567899")
 
         members = await test_db.members.find({}, {"_id": 0}).to_list(10000)
         assert len(members) == 2
@@ -1059,6 +1064,7 @@ class TestExportEndpoints:
 # =====================================================================
 # SETUP WIZARD TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestSetupWizard:
@@ -1084,7 +1090,7 @@ class TestSetupWizard:
             "location": "Jakarta",
             "timezone": "Asia/Jakarta",
             "is_active": True,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
         }
         await test_db.campuses.insert_one(campus)
         new_count = await test_db.campuses.count_documents({})
@@ -1095,15 +1101,11 @@ class TestSetupWizard:
         """Once a non-default church admin exists, setup_first_admin is blocked."""
         DEFAULT_SYSTEM_ADMIN_EMAIL = "admin@gkbj.church"
 
-        await _insert_user(
-            test_db, test_campus["id"],
-            role="full_admin", email="church@admin.com", name="Church Admin"
-        )
+        await _insert_user(test_db, test_campus["id"], role="full_admin", email="church@admin.com", name="Church Admin")
 
-        church_admin_count = await test_db.users.count_documents({
-            "role": UserRole.FULL_ADMIN.value,
-            "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
-        })
+        church_admin_count = await test_db.users.count_documents(
+            {"role": UserRole.FULL_ADMIN.value, "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}}
+        )
         assert church_admin_count > 0
         # Handler: if church_admin_count > 0: raise HTTPException(400)
 
@@ -1113,15 +1115,12 @@ class TestSetupWizard:
         DEFAULT_SYSTEM_ADMIN_EMAIL = "admin@gkbj.church"
 
         await _insert_user(
-            test_db, test_campus["id"],
-            role="full_admin", email=DEFAULT_SYSTEM_ADMIN_EMAIL,
-            name="System Admin"
+            test_db, test_campus["id"], role="full_admin", email=DEFAULT_SYSTEM_ADMIN_EMAIL, name="System Admin"
         )
 
-        church_admin_count = await test_db.users.count_documents({
-            "role": UserRole.FULL_ADMIN.value,
-            "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
-        })
+        church_admin_count = await test_db.users.count_documents(
+            {"role": UserRole.FULL_ADMIN.value, "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}}
+        )
         assert church_admin_count == 0
         # Handler would allow creation
 
@@ -1144,10 +1143,9 @@ class TestSetupWizard:
         """Check setup status correctly reports needs_setup."""
         DEFAULT_SYSTEM_ADMIN_EMAIL = "admin@gkbj.church"
 
-        church_admin_count = await test_db.users.count_documents({
-            "role": UserRole.FULL_ADMIN.value,
-            "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
-        })
+        church_admin_count = await test_db.users.count_documents(
+            {"role": UserRole.FULL_ADMIN.value, "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}}
+        )
         campus_count = await test_db.campuses.count_documents({})
 
         needs_setup = church_admin_count == 0 or campus_count == 0
@@ -1157,6 +1155,7 @@ class TestSetupWizard:
 # =====================================================================
 # REMINDER STATS TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestReminderStats:
@@ -1182,29 +1181,40 @@ class TestReminderStats:
     @pytest.mark.asyncio
     async def test_reminder_stats_counts(self, test_db, test_campus):
         """Reminder stats correctly counts sent/failed notifications."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         campus_id = test_campus["id"]
 
-        await test_db.notification_logs.insert_many([
-            {
-                "id": str(uuid.uuid4()), "campus_id": campus_id,
-                "status": "sent", "channel": "whatsapp",
-                "recipient": "+6281234567890", "message": "Test",
-                "created_at": now,
-            },
-            {
-                "id": str(uuid.uuid4()), "campus_id": campus_id,
-                "status": "sent", "channel": "whatsapp",
-                "recipient": "+6281234567891", "message": "Test 2",
-                "created_at": now,
-            },
-            {
-                "id": str(uuid.uuid4()), "campus_id": campus_id,
-                "status": "failed", "channel": "whatsapp",
-                "recipient": "+6281234567892", "message": "Test 3",
-                "created_at": now,
-            },
-        ])
+        await test_db.notification_logs.insert_many(
+            [
+                {
+                    "id": str(uuid.uuid4()),
+                    "campus_id": campus_id,
+                    "status": "sent",
+                    "channel": "whatsapp",
+                    "recipient": "+6281234567890",
+                    "message": "Test",
+                    "created_at": now,
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "campus_id": campus_id,
+                    "status": "sent",
+                    "channel": "whatsapp",
+                    "recipient": "+6281234567891",
+                    "message": "Test 2",
+                    "created_at": now,
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "campus_id": campus_id,
+                    "status": "failed",
+                    "channel": "whatsapp",
+                    "recipient": "+6281234567892",
+                    "message": "Test 3",
+                    "created_at": now,
+                },
+            ]
+        )
 
         campus_filter = {"campus_id": campus_id}
         logs = await test_db.notification_logs.find(campus_filter, {"_id": 0}).to_list(1000)
@@ -1221,22 +1231,30 @@ class TestReminderStats:
         campus_id = test_campus["id"]
         member = await _insert_member(test_db, campus_id)
 
-        await test_db.grief_support.insert_many([
-            {
-                "id": str(uuid.uuid4()), "campus_id": campus_id,
-                "member_id": member["id"], "care_event_id": "evt-1",
-                "stage": GriefStage.ONE_WEEK.value,
-                "scheduled_date": today.isoformat(),
-                "completed": False, "created_at": datetime.now(timezone.utc),
-            },
-            {
-                "id": str(uuid.uuid4()), "campus_id": campus_id,
-                "member_id": member["id"], "care_event_id": "evt-1",
-                "stage": GriefStage.ONE_MONTH.value,
-                "scheduled_date": (today + timedelta(days=30)).isoformat(),
-                "completed": False, "created_at": datetime.now(timezone.utc),
-            },
-        ])
+        await test_db.grief_support.insert_many(
+            [
+                {
+                    "id": str(uuid.uuid4()),
+                    "campus_id": campus_id,
+                    "member_id": member["id"],
+                    "care_event_id": "evt-1",
+                    "stage": GriefStage.ONE_WEEK.value,
+                    "scheduled_date": today.isoformat(),
+                    "completed": False,
+                    "created_at": datetime.now(UTC),
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "campus_id": campus_id,
+                    "member_id": member["id"],
+                    "care_event_id": "evt-1",
+                    "stage": GriefStage.ONE_MONTH.value,
+                    "scheduled_date": (today + timedelta(days=30)).isoformat(),
+                    "completed": False,
+                    "created_at": datetime.now(UTC),
+                },
+            ]
+        )
 
         grief_query = {
             "campus_id": campus_id,
@@ -1255,14 +1273,20 @@ class TestReminderStats:
         member = await _insert_member(test_db, campus_id)
 
         await _insert_care_event(
-            test_db, campus_id, member["id"],
-            event_type="birthday", title="Birthday soon",
-            event_date=today + timedelta(days=3)
+            test_db,
+            campus_id,
+            member["id"],
+            event_type="birthday",
+            title="Birthday soon",
+            event_date=today + timedelta(days=3),
         )
         await _insert_care_event(
-            test_db, campus_id, member["id"],
-            event_type="birthday", title="Birthday far",
-            event_date=today + timedelta(days=30)
+            test_db,
+            campus_id,
+            member["id"],
+            event_type="birthday",
+            title="Birthday far",
+            event_date=today + timedelta(days=30),
         )
 
         birthday_query = {
@@ -1279,6 +1303,7 @@ class TestReminderStats:
 # ACTIVITY LOGGING TESTS
 # =====================================================================
 
+
 @pytest.mark.integration
 class TestActivityLogging:
     """Tests for activity log creation and querying."""
@@ -1286,7 +1311,7 @@ class TestActivityLogging:
     @pytest.mark.asyncio
     async def test_activity_log_creation(self, test_db, test_campus):
         """Activity logs are persisted with correct fields."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         activity = {
             "id": str(uuid.uuid4()),
             "campus_id": test_campus["id"],
@@ -1302,9 +1327,7 @@ class TestActivityLogging:
         }
         await test_db.activity_logs.insert_one(activity)
 
-        found = await test_db.activity_logs.find_one(
-            {"id": activity["id"]}, {"_id": 0}
-        )
+        found = await test_db.activity_logs.find_one({"id": activity["id"]}, {"_id": 0})
         assert found is not None
         assert found["action_type"] == "complete_task"
         assert found["member_name"] == "John Doe"
@@ -1312,23 +1335,29 @@ class TestActivityLogging:
     @pytest.mark.asyncio
     async def test_activity_log_scoped_by_campus(self, test_db, test_campus, second_campus):
         """Activity logs are campus-scoped."""
-        now = datetime.now(timezone.utc)
-        await test_db.activity_logs.insert_one({
-            "id": str(uuid.uuid4()),
-            "campus_id": test_campus["id"],
-            "user_id": "u1", "user_name": "User A",
-            "action_type": "complete_task", "created_at": now,
-        })
-        await test_db.activity_logs.insert_one({
-            "id": str(uuid.uuid4()),
-            "campus_id": second_campus["id"],
-            "user_id": "u2", "user_name": "User B",
-            "action_type": "create_care_event", "created_at": now,
-        })
+        now = datetime.now(UTC)
+        await test_db.activity_logs.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "campus_id": test_campus["id"],
+                "user_id": "u1",
+                "user_name": "User A",
+                "action_type": "complete_task",
+                "created_at": now,
+            }
+        )
+        await test_db.activity_logs.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "campus_id": second_campus["id"],
+                "user_id": "u2",
+                "user_name": "User B",
+                "action_type": "create_care_event",
+                "created_at": now,
+            }
+        )
 
-        campus_a_logs = await test_db.activity_logs.find(
-            {"campus_id": test_campus["id"]}, {"_id": 0}
-        ).to_list(None)
+        campus_a_logs = await test_db.activity_logs.find({"campus_id": test_campus["id"]}, {"_id": 0}).to_list(None)
         assert len(campus_a_logs) == 1
         assert campus_a_logs[0]["user_name"] == "User A"
 
@@ -1337,25 +1366,24 @@ class TestActivityLogging:
         """Deleting a care event also removes its activity logs."""
         event_id = "evt-to-delete"
         member = await _insert_member(test_db, test_campus["id"])
-        await _insert_care_event(
-            test_db, test_campus["id"], member["id"], event_id=event_id
+        await _insert_care_event(test_db, test_campus["id"], member["id"], event_id=event_id)
+        await test_db.activity_logs.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "campus_id": test_campus["id"],
+                "care_event_id": event_id,
+                "user_id": "u1",
+                "user_name": "U1",
+                "action_type": "complete_task",
+                "created_at": datetime.now(UTC),
+            }
         )
-        await test_db.activity_logs.insert_one({
-            "id": str(uuid.uuid4()),
-            "campus_id": test_campus["id"],
-            "care_event_id": event_id,
-            "user_id": "u1", "user_name": "U1",
-            "action_type": "complete_task",
-            "created_at": datetime.now(timezone.utc),
-        })
 
         # Cascade from delete_care_event
         await test_db.care_events.delete_one({"id": event_id})
         await test_db.activity_logs.delete_many({"care_event_id": event_id})
 
-        logs = await test_db.activity_logs.find(
-            {"care_event_id": event_id}
-        ).to_list(None)
+        logs = await test_db.activity_logs.find({"care_event_id": event_id}).to_list(None)
         assert len(logs) == 0
 
     @pytest.mark.asyncio
@@ -1370,27 +1398,28 @@ class TestActivityLogging:
 # ENGAGEMENT CALCULATION TESTS
 # =====================================================================
 
+
 @pytest.mark.integration
 class TestEngagementCalculation:
     """Tests for the engagement status calculation utility."""
 
     def test_active_status(self):
         """Recent contact yields active status."""
-        last_contact = datetime.now(timezone.utc) - timedelta(days=5)
+        last_contact = datetime.now(UTC) - timedelta(days=5)
         status, days = calculate_engagement_status(last_contact)
         assert status == EngagementStatus.ACTIVE
         assert days == 5
 
     def test_at_risk_status(self):
         """Contact 60-89 days ago yields at-risk status."""
-        last_contact = datetime.now(timezone.utc) - timedelta(days=70)
+        last_contact = datetime.now(UTC) - timedelta(days=70)
         status, days = calculate_engagement_status(last_contact)
         assert status == EngagementStatus.AT_RISK
         assert 69 <= days <= 71
 
     def test_disconnected_status(self):
         """Contact 90+ days ago yields disconnected status."""
-        last_contact = datetime.now(timezone.utc) - timedelta(days=100)
+        last_contact = datetime.now(UTC) - timedelta(days=100)
         status, days = calculate_engagement_status(last_contact)
         assert status == EngagementStatus.DISCONNECTED
         assert days >= 100
@@ -1403,40 +1432,39 @@ class TestEngagementCalculation:
 
     def test_string_date_handled(self):
         """String date inputs are parsed correctly."""
-        last_contact_str = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
-        status, days = calculate_engagement_status(last_contact_str)
+        last_contact_str = (datetime.now(UTC) - timedelta(days=10)).isoformat()
+        status, _days = calculate_engagement_status(last_contact_str)
         assert status == EngagementStatus.ACTIVE
 
     def test_custom_thresholds(self):
         """Custom at-risk and disconnected thresholds are respected."""
-        last_contact = datetime.now(timezone.utc) - timedelta(days=35)
-        status, days = calculate_engagement_status(
-            last_contact, at_risk_days=30, disconnected_days=60
-        )
+        last_contact = datetime.now(UTC) - timedelta(days=35)
+        status, _days = calculate_engagement_status(last_contact, at_risk_days=30, disconnected_days=60)
         assert status == EngagementStatus.AT_RISK
 
     def test_timezone_naive_handled(self):
         """Timezone-naive datetime is treated as UTC."""
         last_contact = datetime.now() - timedelta(days=15)
-        status, days = calculate_engagement_status(last_contact)
+        status, _days = calculate_engagement_status(last_contact)
         assert status == EngagementStatus.ACTIVE
 
     def test_boundary_at_risk(self):
         """Exactly at the at-risk threshold."""
-        last_contact = datetime.now(timezone.utc) - timedelta(days=60)
-        status, days = calculate_engagement_status(last_contact)
+        last_contact = datetime.now(UTC) - timedelta(days=60)
+        status, _days = calculate_engagement_status(last_contact)
         assert status == EngagementStatus.AT_RISK
 
     def test_boundary_disconnected(self):
         """Exactly at the disconnected threshold."""
-        last_contact = datetime.now(timezone.utc) - timedelta(days=90)
-        status, days = calculate_engagement_status(last_contact)
+        last_contact = datetime.now(UTC) - timedelta(days=90)
+        status, _days = calculate_engagement_status(last_contact)
         assert status == EngagementStatus.DISCONNECTED
 
 
 # =====================================================================
 # PHONE NUMBER NORMALIZATION TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestPhoneNormalization:
@@ -1462,6 +1490,7 @@ class TestPhoneNormalization:
 # =====================================================================
 # ONE-TIME EVENT AUTO-COMPLETION TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestOneTimeEventAutoCompletion:
@@ -1502,6 +1531,7 @@ class TestOneTimeEventAutoCompletion:
 # BULK OPERATIONS TESTS
 # =====================================================================
 
+
 @pytest.mark.integration
 class TestBulkOperations:
     """Tests for bulk ignore and bulk delete operations."""
@@ -1510,25 +1540,23 @@ class TestBulkOperations:
     async def test_bulk_ignore(self, test_db, test_campus):
         """Bulk ignore marks multiple events as ignored."""
         member = await _insert_member(test_db, test_campus["id"])
-        e1 = await _insert_care_event(
-            test_db, test_campus["id"], member["id"], title="Birthday 1"
-        )
-        e2 = await _insert_care_event(
-            test_db, test_campus["id"], member["id"], title="Birthday 2"
-        )
+        e1 = await _insert_care_event(test_db, test_campus["id"], member["id"], title="Birthday 1")
+        e2 = await _insert_care_event(test_db, test_campus["id"], member["id"], title="Birthday 2")
 
         event_ids = [e1["id"], e2["id"]]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         result = await test_db.care_events.update_many(
             {"id": {"$in": event_ids}, "ignored": {"$ne": True}},
-            {"$set": {
-                "ignored": True,
-                "ignored_at": now,
-                "ignored_by_user_id": "test-user",
-                "ignored_by_user_name": "Test User",
-                "updated_at": now,
-            }}
+            {
+                "$set": {
+                    "ignored": True,
+                    "ignored_at": now,
+                    "ignored_by_user_id": "test-user",
+                    "ignored_by_user_name": "Test User",
+                    "updated_at": now,
+                }
+            },
         )
         assert result.modified_count == 2
 
@@ -1540,12 +1568,9 @@ class TestBulkOperations:
     async def test_bulk_ignore_already_ignored_skipped(self, test_db, test_campus):
         """Bulk ignore skips already-ignored events."""
         member = await _insert_member(test_db, test_campus["id"])
-        e1 = await _insert_care_event(
-            test_db, test_campus["id"], member["id"], ignored=True
-        )
+        e1 = await _insert_care_event(test_db, test_campus["id"], member["id"], ignored=True)
         result = await test_db.care_events.update_many(
-            {"id": {"$in": [e1["id"]]}, "ignored": {"$ne": True}},
-            {"$set": {"ignored": True}}
+            {"id": {"$in": [e1["id"]]}, "ignored": {"$ne": True}}, {"$set": {"ignored": True}}
         )
         assert result.modified_count == 0
 
@@ -1553,26 +1578,21 @@ class TestBulkOperations:
     async def test_bulk_delete(self, test_db, test_campus):
         """Bulk delete removes multiple events."""
         member = await _insert_member(test_db, test_campus["id"])
-        e1 = await _insert_care_event(
-            test_db, test_campus["id"], member["id"], title="Delete Me 1"
-        )
-        e2 = await _insert_care_event(
-            test_db, test_campus["id"], member["id"], title="Delete Me 2"
-        )
+        e1 = await _insert_care_event(test_db, test_campus["id"], member["id"], title="Delete Me 1")
+        e2 = await _insert_care_event(test_db, test_campus["id"], member["id"], title="Delete Me 2")
 
         event_ids = [e1["id"], e2["id"]]
         result = await test_db.care_events.delete_many({"id": {"$in": event_ids}})
         assert result.deleted_count == 2
 
-        remaining = await test_db.care_events.find(
-            {"id": {"$in": event_ids}}
-        ).to_list(None)
+        remaining = await test_db.care_events.find({"id": {"$in": event_ids}}).to_list(None)
         assert len(remaining) == 0
 
 
 # =====================================================================
 # MEMBER ARCHIVAL TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestMemberArchival:
@@ -1582,13 +1602,8 @@ class TestMemberArchival:
     async def test_archived_members_excluded_by_default(self, test_db, test_campus):
         """Archived members are excluded from default listing."""
         await _insert_member(test_db, test_campus["id"], name="Active Member")
-        archived = await _insert_member(
-            test_db, test_campus["id"], name="Archived Member",
-            phone="+6281234567899"
-        )
-        await test_db.members.update_one(
-            {"id": archived["id"]}, {"$set": {"is_archived": True}}
-        )
+        archived = await _insert_member(test_db, test_campus["id"], name="Archived Member", phone="+6281234567899")
+        await test_db.members.update_one({"id": archived["id"]}, {"$set": {"is_archived": True}})
 
         query = {"campus_id": test_campus["id"], "is_archived": {"$ne": True}}
         members = await test_db.members.find(query, {"_id": 0}).to_list(None)
@@ -1600,13 +1615,8 @@ class TestMemberArchival:
     async def test_show_archived_flag(self, test_db, test_campus):
         """show_archived=true shows only archived members."""
         await _insert_member(test_db, test_campus["id"], name="Active")
-        archived = await _insert_member(
-            test_db, test_campus["id"], name="Archived",
-            phone="+6281234567899"
-        )
-        await test_db.members.update_one(
-            {"id": archived["id"]}, {"$set": {"is_archived": True}}
-        )
+        archived = await _insert_member(test_db, test_campus["id"], name="Archived", phone="+6281234567899")
+        await test_db.members.update_one({"id": archived["id"]}, {"$set": {"is_archived": True}})
 
         query = {"campus_id": test_campus["id"], "is_archived": True}
         members = await test_db.members.find(query, {"_id": 0}).to_list(None)
@@ -1617,6 +1627,7 @@ class TestMemberArchival:
 # =====================================================================
 # TOKEN CREATION TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestTokenCreation:
@@ -1631,14 +1642,11 @@ class TestTokenCreation:
 
     def test_create_token_custom_expiry(self):
         """Token created with custom expiry delta."""
-        token = create_access_token(
-            data={"sub": "user-456"},
-            expires_delta=timedelta(minutes=30)
-        )
+        token = create_access_token(data={"sub": "user-456"}, expires_delta=timedelta(minutes=30))
         payload = jwt.decode(token, TEST_JWT_SECRET, algorithms=["HS256"])
         assert payload["sub"] == "user-456"
-        exp_dt = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-        now = datetime.now(timezone.utc)
+        exp_dt = datetime.fromtimestamp(payload["exp"], tz=UTC)
+        now = datetime.now(UTC)
         diff = (exp_dt - now).total_seconds()
         assert 25 * 60 < diff < 35 * 60
 
@@ -1646,6 +1654,7 @@ class TestTokenCreation:
 # =====================================================================
 # PASSWORD HASHING TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestPasswordHashing:
@@ -1678,6 +1687,7 @@ class TestPasswordHashing:
 # =====================================================================
 # ENUM CONSISTENCY TESTS
 # =====================================================================
+
 
 @pytest.mark.integration
 class TestEnumConsistency:

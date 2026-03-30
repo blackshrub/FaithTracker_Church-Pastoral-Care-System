@@ -15,49 +15,49 @@ Covers:
 - SSE stream_activity
 """
 
-import pytest
+import asyncio
+import hashlib
+import hmac as hmac_mod
+import json
 import os
 import sys
 import uuid
-import json
-import io
-import csv
-import hashlib
-import hmac as hmac_mod
-import asyncio
-from datetime import datetime, timezone, timedelta, date
-from unittest.mock import MagicMock, AsyncMock, patch, PropertyMock
-from enum import Enum
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Set env vars BEFORE any imports that read them
-os.environ.update({
-    'MONGO_URL': 'mongodb://mock:27017',
-    'DB_NAME': 'faithtracker_test',
-    'JWT_SECRET_KEY': 'test-secret-key-1234567890abcdef1234567890abcdef',
-    'ENCRYPTION_KEY': 'cc7F8DmC4HF2hXLZxWIwZPitOgPS9Ybza0pl2_U0luQ=',
-    'DRAGONFLY_URL': 'redis://mock:6379',
-    'FRONTEND_URL': 'http://localhost:3000',
-    'ALLOWED_ORIGINS': 'http://localhost:3000',
-    'ENVIRONMENT': 'development',
-})
+os.environ.update(
+    {
+        "MONGO_URL": "mongodb://mock:27017",
+        "DB_NAME": "faithtracker_test",
+        "JWT_SECRET_KEY": "test-secret-key-1234567890abcdef1234567890abcdef",
+        "ENCRYPTION_KEY": "cc7F8DmC4HF2hXLZxWIwZPitOgPS9Ybza0pl2_U0luQ=",
+        "DRAGONFLY_URL": "redis://mock:6379",
+        "FRONTEND_URL": "http://localhost:3000",
+        "ALLOWED_ORIGINS": "http://localhost:3000",
+        "ENVIRONMENT": "development",
+    }
+)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import bcrypt
 import jwt as pyjwt
-from bson import ObjectId
 
 # ==================== TEST CONSTANTS ====================
 
-TEST_SECRET = os.environ['JWT_SECRET_KEY']
+TEST_SECRET = os.environ["JWT_SECRET_KEY"]
 TEST_CAMPUS_ID = str(uuid.uuid4())
 TEST_USER_ID = str(uuid.uuid4())
 TEST_MEMBER_ID = str(uuid.uuid4())
 
-HASHED_PASSWORD = bcrypt.hashpw(b"TestPassword123!", bcrypt.gensalt()).decode('utf-8')
+HASHED_PASSWORD = bcrypt.hashpw(b"TestPassword123!", bcrypt.gensalt()).decode("utf-8")
 
 
 # ==================== MOCK HELPERS ====================
+
 
 def _make_mock_cursor(data=None):
     cursor = MagicMock()
@@ -126,7 +126,7 @@ def _make_campus_admin_user(**overrides):
 def _make_token(user_id=TEST_USER_ID, secret=TEST_SECRET, **extra):
     payload = {
         "sub": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        "exp": datetime.now(UTC) + timedelta(hours=24),
         **extra,
     }
     return pyjwt.encode(payload, secret, algorithm="HS256")
@@ -143,7 +143,7 @@ def _mock_request(user=None, headers=None, body=None, json_data=None, scope=None
     if headers:
         h.update(headers)
     req.headers = h
-    req.body = AsyncMock(return_value=body or b'{}')
+    req.body = AsyncMock(return_value=body or b"{}")
     req.json = AsyncMock(return_value=json_data or {})
     req.method = "GET"
     req.url = MagicMock()
@@ -163,6 +163,7 @@ def _make_mock_httpx_response(status_code=200, json_data=None, text=""):
 @pytest.fixture(autouse=True)
 def _reset_caches():
     from utils import invalidate_cache
+
     invalidate_cache()
     yield
 
@@ -171,11 +172,22 @@ def _reset_caches():
 def mock_db():
     db = MagicMock()
     for collection_name in [
-        'users', 'members', 'campuses', 'care_events', 'settings',
-        'activity_logs', 'notification_logs', 'grief_support',
-        'accident_followup', 'financial_aid_schedules', 'sync_configs',
-        'sync_logs', 'webhook_logs', 'user_preferences', 'dashboard_cache',
-        'pastoral_notes',
+        "users",
+        "members",
+        "campuses",
+        "care_events",
+        "settings",
+        "activity_logs",
+        "notification_logs",
+        "grief_support",
+        "accident_followup",
+        "financial_aid_schedules",
+        "sync_configs",
+        "sync_logs",
+        "webhook_logs",
+        "user_preferences",
+        "dashboard_cache",
+        "pastoral_notes",
     ]:
         coll = MagicMock()
         coll.find_one = AsyncMock(return_value=None)
@@ -206,6 +218,7 @@ def setup_server(mock_db):
 
 # ==================== 1. perform_member_sync_for_campus TESTS ====================
 
+
 class TestPerformMemberSyncForCampus:
     """Tests for the biggest uncovered function (~430 stmts)."""
 
@@ -220,10 +233,12 @@ class TestPerformMemberSyncForCampus:
     @pytest.mark.asyncio
     async def test_sync_disabled_flag(self, setup_server, mock_db):
         """Sync config exists but is_enabled=False."""
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": False,
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": False,
+            }
+        )
         result = await setup_server.perform_member_sync_for_campus(TEST_CAMPUS_ID)
         assert result["success"] is False
 
@@ -231,19 +246,21 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_login_failure(self, setup_server, mock_db):
         """API login returns non-200."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+            }
+        )
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor([]))
 
         login_resp = _make_mock_httpx_response(401, text="Unauthorized")
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -257,16 +274,18 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_successful_create_and_update(self, setup_server, mock_db):
         """Successful sync: creates new members, updates existing ones."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [],
+            }
+        )
 
         existing_member = {
             "id": "local-1",
@@ -300,7 +319,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -315,18 +334,20 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_with_filter_rules(self, setup_server, mock_db):
         """Sync applies dynamic filter rules correctly."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [
-                {"field": "gender", "operator": "equals", "value": "Female"},
-            ],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [
+                    {"field": "gender", "operator": "equals", "value": "Female"},
+                ],
+            }
+        )
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor([]))
 
         core_members = [
@@ -337,7 +358,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -352,18 +373,20 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_exclude_filter_mode(self, setup_server, mock_db):
         """Test exclude filter mode."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "exclude",
-            "filter_rules": [
-                {"field": "gender", "operator": "equals", "value": "Male"},
-            ],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "exclude",
+                "filter_rules": [
+                    {"field": "gender", "operator": "equals", "value": "Male"},
+                ],
+            }
+        )
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor([]))
 
         core_members = [
@@ -374,7 +397,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -389,16 +412,18 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_archives_members_not_in_source(self, setup_server, mock_db):
         """Members in DB but not in API source get archived."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [],
+            }
+        )
 
         existing = {
             "id": "local-orphan",
@@ -412,7 +437,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, [])
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -427,17 +452,20 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_network_error(self, setup_server, mock_db):
         """Network error during sync is handled gracefully."""
         import httpx as httpx_mod
-        encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-        })
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        encrypted_pwd = setup_server.encrypt_password("test123")
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+            }
+        )
+
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -450,25 +478,26 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_paginated_response(self, setup_server, mock_db):
         """Sync handles paginated API responses (dict with data key)."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [],
+            }
+        )
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor([]))
 
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
-        page1 = _make_mock_httpx_response(200, {
-            "data": [{"id": "c1", "full_name": "Member 1", "is_active": True}],
-            "pagination": {"has_more": False}
-        })
+        page1 = _make_mock_httpx_response(
+            200, {"data": [{"id": "c1", "full_name": "Member 1", "is_active": True}], "pagination": {"has_more": False}}
+        )
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -483,18 +512,20 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_with_contains_filter(self, setup_server, mock_db):
         """Test contains filter operator."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [
-                {"field": "name", "operator": "contains", "value": "John"},
-            ],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [
+                    {"field": "name", "operator": "contains", "value": "John"},
+                ],
+            }
+        )
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor([]))
 
         core_members = [
@@ -505,7 +536,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -520,16 +551,18 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_member_with_photo_url(self, setup_server, mock_db):
         """Sync handles external photo URLs."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [],
+            }
+        )
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor([]))
 
         core_members = [
@@ -545,7 +578,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -560,16 +593,18 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_archive_inactive_existing_member(self, setup_server, mock_db):
         """Existing member marked inactive in core gets archived locally."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [],
+            }
+        )
 
         existing = {
             "id": "local-1",
@@ -587,7 +622,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -602,16 +637,18 @@ class TestPerformMemberSyncForCampus:
     async def test_sync_unarchive_reactivated_member(self, setup_server, mock_db):
         """Archived member that becomes active in core gets unarchived."""
         encrypted_pwd = setup_server.encrypt_password("test123")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "api_base_url": "https://core.example.com",
-            "api_path_prefix": "/api",
-            "api_email": "sync@test.com",
-            "api_password": encrypted_pwd,
-            "filter_mode": "include",
-            "filter_rules": [],
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "api_base_url": "https://core.example.com",
+                "api_path_prefix": "/api",
+                "api_email": "sync@test.com",
+                "api_password": encrypted_pwd,
+                "filter_mode": "include",
+                "filter_rules": [],
+            }
+        )
 
         existing = {
             "id": "local-1",
@@ -629,7 +666,7 @@ class TestPerformMemberSyncForCampus:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, core_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -643,13 +680,20 @@ class TestPerformMemberSyncForCampus:
 
 # ==================== 2. _compute_monthly_report_data TESTS ====================
 
+
 class TestComputeMonthlyReportData:
     """Tests for monthly management report data (~160 stmts)."""
 
     def _setup_empty_db(self, mock_db):
         """Set up mock DB that returns at least 1 member to avoid div-by-zero."""
-        members = [{"id": "m1", "engagement_status": "active", "days_since_last_contact": 5,
-                     "last_contact_date": datetime.now(timezone.utc).isoformat()}]
+        members = [
+            {
+                "id": "m1",
+                "engagement_status": "active",
+                "days_since_last_contact": 5,
+                "last_contact_date": datetime.now(UTC).isoformat(),
+            }
+        ]
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
         mock_db.care_events.find = MagicMock(return_value=_make_mock_cursor([]))
         mock_db.activity_logs.find = MagicMock(return_value=_make_mock_cursor([]))
@@ -676,34 +720,91 @@ class TestComputeMonthlyReportData:
         user = _make_admin_user()
 
         members = [
-            {"id": "m1", "name": "A", "engagement_status": "active", "days_since_last_contact": 5,
-             "last_contact_date": datetime.now(timezone.utc).isoformat(), "gender": "Male", "age": 30},
-            {"id": "m2", "name": "B", "engagement_status": "at_risk", "days_since_last_contact": 70,
-             "last_contact_date": None, "gender": "Female", "age": 50},
-            {"id": "m3", "name": "C", "engagement_status": "disconnected", "days_since_last_contact": 100,
-             "last_contact_date": None, "gender": "Male", "age": 40},
+            {
+                "id": "m1",
+                "name": "A",
+                "engagement_status": "active",
+                "days_since_last_contact": 5,
+                "last_contact_date": datetime.now(UTC).isoformat(),
+                "gender": "Male",
+                "age": 30,
+            },
+            {
+                "id": "m2",
+                "name": "B",
+                "engagement_status": "at_risk",
+                "days_since_last_contact": 70,
+                "last_contact_date": None,
+                "gender": "Female",
+                "age": 50,
+            },
+            {
+                "id": "m3",
+                "name": "C",
+                "engagement_status": "disconnected",
+                "days_since_last_contact": 100,
+                "last_contact_date": None,
+                "gender": "Male",
+                "age": 40,
+            },
         ]
 
         events = [
-            {"id": "e1", "event_type": "birthday", "event_date": "2024-06-15",
-             "completed": True, "ignored": False, "member_id": "m1",
-             "completed_at": datetime(2024, 6, 15, tzinfo=timezone.utc)},
-            {"id": "e2", "event_type": "grief_loss", "event_date": "2024-06-10",
-             "completed": False, "ignored": False, "member_id": "m2"},
-            {"id": "e3", "event_type": "accident_illness", "event_date": "2024-06-20",
-             "completed": True, "ignored": False, "member_id": "m1"},
-            {"id": "e4", "event_type": "financial_aid", "event_date": "2024-06-05",
-             "completed": True, "ignored": False, "member_id": "m3", "aid_amount": 500000},
+            {
+                "id": "e1",
+                "event_type": "birthday",
+                "event_date": "2024-06-15",
+                "completed": True,
+                "ignored": False,
+                "member_id": "m1",
+                "completed_at": datetime(2024, 6, 15, tzinfo=UTC),
+            },
+            {
+                "id": "e2",
+                "event_type": "grief_loss",
+                "event_date": "2024-06-10",
+                "completed": False,
+                "ignored": False,
+                "member_id": "m2",
+            },
+            {
+                "id": "e3",
+                "event_type": "accident_illness",
+                "event_date": "2024-06-20",
+                "completed": True,
+                "ignored": False,
+                "member_id": "m1",
+            },
+            {
+                "id": "e4",
+                "event_type": "financial_aid",
+                "event_date": "2024-06-05",
+                "completed": True,
+                "ignored": False,
+                "member_id": "m3",
+                "aid_amount": 500000,
+            },
         ]
 
         activities = [
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "complete_task",
-             "member_id": "m1", "created_at": datetime(2024, 6, 15, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "create_care_event",
-             "member_id": "m2", "created_at": datetime(2024, 6, 10, tzinfo=timezone.utc)},
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "complete_task",
+                "member_id": "m1",
+                "created_at": datetime(2024, 6, 15, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "create_care_event",
+                "member_id": "m2",
+                "created_at": datetime(2024, 6, 10, tzinfo=UTC),
+            },
         ]
 
         call_count = [0]
+
         def mock_events_find(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] <= 2:
@@ -744,6 +845,7 @@ class TestComputeMonthlyReportData:
 
 # ==================== 3. get_staff_performance_report TESTS ====================
 
+
 class TestStaffPerformance:
     """Tests for staff performance report (~150 stmts)."""
 
@@ -754,29 +856,70 @@ class TestStaffPerformance:
         request = _mock_request(user=user)
 
         mock_db.users.find_one = AsyncMock(return_value=user)
-        mock_db.users.find = MagicMock(return_value=_make_mock_cursor([
-            {"id": "u1", "name": "Staff A", "email": "a@t.com", "role": "pastor", "photo_url": None},
-            {"id": "u2", "name": "Staff B", "email": "b@t.com", "role": "pastor", "photo_url": None},
-        ]))
+        mock_db.users.find = MagicMock(
+            return_value=_make_mock_cursor(
+                [
+                    {"id": "u1", "name": "Staff A", "email": "a@t.com", "role": "pastor", "photo_url": None},
+                    {"id": "u2", "name": "Staff B", "email": "b@t.com", "role": "pastor", "photo_url": None},
+                ]
+            )
+        )
 
         activities = [
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "complete_task",
-             "member_id": "m1", "event_type": "birthday", "created_at": datetime(2024, 6, 5, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "complete_task",
-             "member_id": "m2", "event_type": "birthday", "created_at": datetime(2024, 6, 6, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "ignore_task",
-             "created_at": datetime(2024, 6, 7, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "create_care_event",
-             "created_at": datetime(2024, 6, 8, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "create_member",
-             "created_at": datetime(2024, 6, 9, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "update_member",
-             "created_at": datetime(2024, 6, 10, tzinfo=timezone.utc)},
-            {"user_id": "u1", "user_name": "Staff A", "action_type": "send_reminder",
-             "created_at": datetime(2024, 6, 11, tzinfo=timezone.utc)},
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "complete_task",
+                "member_id": "m1",
+                "event_type": "birthday",
+                "created_at": datetime(2024, 6, 5, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "complete_task",
+                "member_id": "m2",
+                "event_type": "birthday",
+                "created_at": datetime(2024, 6, 6, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "ignore_task",
+                "created_at": datetime(2024, 6, 7, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "create_care_event",
+                "created_at": datetime(2024, 6, 8, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "create_member",
+                "created_at": datetime(2024, 6, 9, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "update_member",
+                "created_at": datetime(2024, 6, 10, tzinfo=UTC),
+            },
+            {
+                "user_id": "u1",
+                "user_name": "Staff A",
+                "action_type": "send_reminder",
+                "created_at": datetime(2024, 6, 11, tzinfo=UTC),
+            },
             # Unknown user in activities (covers the "user not in staff_data" branch)
-            {"user_id": "u3", "user_name": "Ghost Staff", "action_type": "complete_task",
-             "member_id": "m5", "created_at": "2024-06-12T10:00:00"},
+            {
+                "user_id": "u3",
+                "user_name": "Ghost Staff",
+                "action_type": "complete_task",
+                "member_id": "m5",
+                "created_at": "2024-06-12T10:00:00",
+            },
         ]
         mock_db.activity_logs.find = MagicMock(return_value=_make_mock_cursor(activities))
 
@@ -803,6 +946,7 @@ class TestStaffPerformance:
 
 # ==================== 4. get_yearly_summary_report TESTS ====================
 
+
 class TestYearlySummary:
     """Tests for yearly summary report."""
 
@@ -814,7 +958,7 @@ class TestYearlySummary:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         members = [
-            {"id": "m1", "engagement_status": "active", "created_at": datetime(2024, 1, 1, tzinfo=timezone.utc)},
+            {"id": "m1", "engagement_status": "active", "created_at": datetime(2024, 1, 1, tzinfo=UTC)},
         ]
 
         events = [
@@ -849,6 +993,7 @@ class TestYearlySummary:
 
 # ==================== 5. import/export TESTS ====================
 
+
 class TestImportExport:
     """Tests for import CSV, import JSON, export CSV, import from external API."""
 
@@ -860,8 +1005,16 @@ class TestImportExport:
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
         external_members = [
-            {"id": "ext1", "name": "Ext Member 1", "phone": "+621111", "birth_date": "1990-01-01",
-             "address": "Addr 1", "membership_status": "baptized", "category": "youth", "gender": "Male"},
+            {
+                "id": "ext1",
+                "name": "Ext Member 1",
+                "phone": "+621111",
+                "birth_date": "1990-01-01",
+                "address": "Addr 1",
+                "membership_status": "baptized",
+                "category": "youth",
+                "gender": "Male",
+            },
             {"id": "ext2", "name": "Ext Member 2", "phone": "+622222"},
         ]
 
@@ -870,7 +1023,7 @@ class TestImportExport:
 
         mock_resp = _make_mock_httpx_response(200, external_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -893,22 +1046,37 @@ class TestImportExport:
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
         external_members = [
-            {"id": "ext1", "name": "Updated Member", "phone": "+621111",
-             "birth_date": "1990-01-01", "address": "New Addr", "gender": "Female",
-             "membership_status": "baptized", "category": "adult"},
+            {
+                "id": "ext1",
+                "name": "Updated Member",
+                "phone": "+621111",
+                "birth_date": "1990-01-01",
+                "address": "New Addr",
+                "gender": "Female",
+                "membership_status": "baptized",
+                "category": "adult",
+            },
         ]
 
-        mock_db.members.find_one = AsyncMock(return_value={
-            "id": "local-1", "external_member_id": "ext1", "name": "Old Name",
-            "is_archived": True,
-        })
-        mock_db.members.find = MagicMock(return_value=_make_mock_cursor([
-            {"id": "local-1", "external_member_id": "ext1", "name": "Old Name"},
-        ]))
+        mock_db.members.find_one = AsyncMock(
+            return_value={
+                "id": "local-1",
+                "external_member_id": "ext1",
+                "name": "Old Name",
+                "is_archived": True,
+            }
+        )
+        mock_db.members.find = MagicMock(
+            return_value=_make_mock_cursor(
+                [
+                    {"id": "local-1", "external_member_id": "ext1", "name": "Old Name"},
+                ]
+            )
+        )
 
         mock_resp = _make_mock_httpx_response(200, external_members)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -925,11 +1093,12 @@ class TestImportExport:
     async def test_import_from_external_api_error(self, setup_server, mock_db):
         """Import from API handles HTTP error."""
         from litestar.exceptions import HTTPException
+
         admin = _make_admin_user()
         request = _mock_request(user=admin)
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -951,7 +1120,7 @@ class TestImportExport:
         csv_content = "name,phone,external_member_id,notes\nJohn Doe,+621111,ext1,Note1\nJane Smith,+622222,,\n"
 
         mock_file = MagicMock()
-        mock_file.read = AsyncMock(return_value=csv_content.encode('utf-8'))
+        mock_file.read = AsyncMock(return_value=csv_content.encode("utf-8"))
 
         result = await setup_server.import_members_csv.fn(request=request, data=mock_file)
         assert result["success"] is True
@@ -961,6 +1130,7 @@ class TestImportExport:
     async def test_import_csv_too_large(self, setup_server, mock_db):
         """CSV file exceeding size limit is rejected."""
         from litestar.exceptions import HTTPException
+
         user = _make_admin_user()
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
@@ -976,6 +1146,7 @@ class TestImportExport:
     async def test_import_csv_no_campus(self, setup_server, mock_db):
         """CSV import with no campus assigned."""
         from litestar.exceptions import HTTPException
+
         user = _make_admin_user(campus_id=None)
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
@@ -1007,6 +1178,7 @@ class TestImportExport:
     async def test_import_json_no_campus(self, setup_server, mock_db):
         """JSON import with no campus assigned."""
         from litestar.exceptions import HTTPException
+
         user = _make_admin_user(campus_id=None)
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
@@ -1022,11 +1194,21 @@ class TestImportExport:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         members = [
-            {"id": "m1", "name": "Member 1", "phone": "+621111",
-             "engagement_status": "active", "days_since_last_contact": 5,
-             "last_contact_date": datetime.now(timezone.utc).isoformat()},
-            {"id": "m2", "name": "Member 2", "phone": "+622222",
-             "engagement_status": "disconnected", "days_since_last_contact": 100},
+            {
+                "id": "m1",
+                "name": "Member 1",
+                "phone": "+621111",
+                "engagement_status": "active",
+                "days_since_last_contact": 5,
+                "last_contact_date": datetime.now(UTC).isoformat(),
+            },
+            {
+                "id": "m2",
+                "name": "Member 2",
+                "phone": "+622222",
+                "engagement_status": "disconnected",
+                "days_since_last_contact": 100,
+            },
         ]
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
 
@@ -1041,8 +1223,14 @@ class TestImportExport:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         events = [
-            {"id": "e1", "member_id": "m1", "event_type": "birthday",
-             "event_date": "2024-06-15", "title": "Birthday", "completed": True},
+            {
+                "id": "e1",
+                "member_id": "m1",
+                "event_type": "birthday",
+                "event_date": "2024-06-15",
+                "title": "Birthday",
+                "completed": True,
+            },
         ]
         mock_db.care_events.find = MagicMock(return_value=_make_mock_cursor(events))
 
@@ -1052,6 +1240,7 @@ class TestImportExport:
 
 # ==================== 6. webhook processing TESTS ====================
 
+
 class TestWebhookProcessing:
     """Tests for receive_sync_webhook and process_webhook_member (~115 stmts)."""
 
@@ -1059,6 +1248,7 @@ class TestWebhookProcessing:
     async def test_webhook_missing_signature(self, setup_server, mock_db):
         """Webhook without signature is rejected."""
         from litestar.exceptions import HTTPException
+
         request = MagicMock()
         request.body = AsyncMock(return_value=b'{"event_type": "test"}')
         request.json = AsyncMock(return_value={"event_type": "test"})
@@ -1073,14 +1263,17 @@ class TestWebhookProcessing:
     async def test_webhook_invalid_signature(self, setup_server, mock_db):
         """Webhook with invalid signature is rejected."""
         from litestar.exceptions import HTTPException
+
         payload = {"event_type": "member.created", "campus_id": TEST_CAMPUS_ID, "member_id": "m1"}
         body = json.dumps(payload).encode()
 
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "webhook_secret": "real-secret",
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "webhook_secret": "real-secret",
+            }
+        )
 
         request = MagicMock()
         request.body = AsyncMock(return_value=body)
@@ -1101,11 +1294,13 @@ class TestWebhookProcessing:
 
         sig = hmac_mod.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "webhook_secret": secret,
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": True,
+                "webhook_secret": secret,
+            }
+        )
 
         request = MagicMock()
         request.body = AsyncMock(return_value=body)
@@ -1144,20 +1339,23 @@ class TestWebhookProcessing:
         request.headers = {"X-Webhook-Signature": sig}
         request.scope = {"client": ("127.0.0.1", 12345)}
 
-        member_resp = _make_mock_httpx_response(200, {
-            "full_name": "New Webhook Member",
-            "phone": "+621111",
-            "date_of_birth": "1990-01-01",
-            "gender": "Male",
-            "member_status": "youth",
-            "is_active": True,
-            "photo_url": "https://cdn.example.com/photo.jpg",
-        })
+        member_resp = _make_mock_httpx_response(
+            200,
+            {
+                "full_name": "New Webhook Member",
+                "phone": "+621111",
+                "date_of_birth": "1990-01-01",
+                "gender": "Male",
+                "member_status": "youth",
+                "is_active": True,
+                "photo_url": "https://cdn.example.com/photo.jpg",
+            },
+        )
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
 
         setup_server._core_api_token_cache.clear()
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1187,9 +1385,13 @@ class TestWebhookProcessing:
             "api_password": encrypted_pwd,
         }
         mock_db.sync_configs.find_one = AsyncMock(return_value=config)
-        mock_db.members.find_one = AsyncMock(return_value={
-            "id": "local-1", "external_member_id": "core-m1", "name": "Old Name",
-        })
+        mock_db.members.find_one = AsyncMock(
+            return_value={
+                "id": "local-1",
+                "external_member_id": "core-m1",
+                "name": "Old Name",
+            }
+        )
 
         request = MagicMock()
         request.body = AsyncMock(return_value=body)
@@ -1197,15 +1399,18 @@ class TestWebhookProcessing:
         request.headers = {"X-Webhook-Signature": sig}
         request.scope = {"client": ("127.0.0.1", 12345)}
 
-        member_resp = _make_mock_httpx_response(200, {
-            "full_name": "Updated Member",
-            "phone": "+621111",
-            "is_active": True,
-        })
+        member_resp = _make_mock_httpx_response(
+            200,
+            {
+                "full_name": "Updated Member",
+                "phone": "+621111",
+                "is_active": True,
+            },
+        )
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         setup_server._core_api_token_cache.clear()
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1245,7 +1450,7 @@ class TestWebhookProcessing:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         setup_server._core_api_token_cache.clear()
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1259,6 +1464,7 @@ class TestWebhookProcessing:
     async def test_webhook_missing_campus_id(self, setup_server, mock_db):
         """Webhook without campus_id in payload."""
         from litestar.exceptions import HTTPException
+
         payload = {"event_type": "test"}
         body = json.dumps(payload).encode()
 
@@ -1276,6 +1482,7 @@ class TestWebhookProcessing:
     async def test_webhook_no_config(self, setup_server, mock_db):
         """Webhook for campus with no sync config."""
         from litestar.exceptions import HTTPException
+
         payload = {"event_type": "test", "campus_id": TEST_CAMPUS_ID}
         body = json.dumps(payload).encode()
 
@@ -1295,14 +1502,17 @@ class TestWebhookProcessing:
     async def test_webhook_sync_disabled(self, setup_server, mock_db):
         """Webhook for campus with sync disabled."""
         from litestar.exceptions import HTTPException
+
         payload = {"event_type": "test", "campus_id": TEST_CAMPUS_ID}
         body = json.dumps(payload).encode()
 
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": False,
-            "webhook_secret": "s",
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "is_enabled": False,
+                "webhook_secret": "s",
+            }
+        )
 
         request = MagicMock()
         request.body = AsyncMock(return_value=body)
@@ -1317,6 +1527,7 @@ class TestWebhookProcessing:
 
 # ==================== 7. test_connection / discover_fields TESTS ====================
 
+
 class TestSyncTestConnection:
     """Tests for test_sync_connection and discover_fields."""
 
@@ -1328,6 +1539,7 @@ class TestSyncTestConnection:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1338,7 +1550,7 @@ class TestSyncTestConnection:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         page1 = _make_mock_httpx_response(200, [{"id": "m1", "name": "Member 1"}])
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1356,6 +1568,7 @@ class TestSyncTestConnection:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1365,7 +1578,7 @@ class TestSyncTestConnection:
 
         login_resp = _make_mock_httpx_response(401, {"detail": "Invalid credentials"}, text="Invalid credentials")
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1382,6 +1595,7 @@ class TestSyncTestConnection:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1390,7 +1604,7 @@ class TestSyncTestConnection:
 
         login_resp = _make_mock_httpx_response(200, {})
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1404,18 +1618,20 @@ class TestSyncTestConnection:
     async def test_connection_timeout(self, setup_server, mock_db):
         """Connection test with timeout."""
         import httpx as httpx_mod
+
         user = _make_campus_admin_user()
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
             api_password="test123",
         )
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1433,12 +1649,15 @@ class TestSyncTestConnection:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         encrypted_pwd = setup_server.encrypt_password("stored-pass")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "campus_id": TEST_CAMPUS_ID,
-            "api_password": encrypted_pwd,
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "campus_id": TEST_CAMPUS_ID,
+                "api_password": encrypted_pwd,
+            }
+        )
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1448,7 +1667,7 @@ class TestSyncTestConnection:
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
         members_resp = _make_mock_httpx_response(200, [])
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1466,6 +1685,7 @@ class TestSyncTestConnection:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1474,14 +1694,29 @@ class TestSyncTestConnection:
         )
 
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
-        members_resp = _make_mock_httpx_response(200, [
-            {"name": "John", "gender": "Male", "age": 30, "birth_date": "1990-01-01",
-             "is_active": True, "category": "adult"},
-            {"name": "Jane", "gender": "Female", "age": 25, "birth_date": "1995-05-15",
-             "is_active": False, "category": "youth"},
-        ])
+        members_resp = _make_mock_httpx_response(
+            200,
+            [
+                {
+                    "name": "John",
+                    "gender": "Male",
+                    "age": 30,
+                    "birth_date": "1990-01-01",
+                    "is_active": True,
+                    "category": "adult",
+                },
+                {
+                    "name": "Jane",
+                    "gender": "Female",
+                    "age": 25,
+                    "birth_date": "1995-05-15",
+                    "is_active": False,
+                    "category": "youth",
+                },
+            ],
+        )
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1503,6 +1738,7 @@ class TestSyncTestConnection:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1515,7 +1751,7 @@ class TestSyncTestConnection:
         members_resp.status_code = 200
         members_resp.json = MagicMock(return_value=[])
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1528,6 +1764,7 @@ class TestSyncTestConnection:
 
 # ==================== 8. sync_members_pull TESTS ====================
 
+
 class TestSyncMembersPull:
     """Tests for the sync_members_from_core endpoint."""
 
@@ -1538,8 +1775,7 @@ class TestSyncMembersPull:
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
 
-        with patch.object(setup_server, 'perform_member_sync_for_campus',
-                          new_callable=AsyncMock) as mock_sync:
+        with patch.object(setup_server, "perform_member_sync_for_campus", new_callable=AsyncMock) as mock_sync:
             mock_sync.return_value = {"success": True, "stats": {}, "duration_seconds": 1.5}
             result = await setup_server.sync_members_from_core.fn(request)
             assert result["success"] is True
@@ -1548,12 +1784,12 @@ class TestSyncMembersPull:
     async def test_pull_fails(self, setup_server, mock_db):
         """Pull sync failure raises HTTPException."""
         from litestar.exceptions import HTTPException
+
         user = _make_campus_admin_user()
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
 
-        with patch.object(setup_server, 'perform_member_sync_for_campus',
-                          new_callable=AsyncMock) as mock_sync:
+        with patch.object(setup_server, "perform_member_sync_for_campus", new_callable=AsyncMock) as mock_sync:
             mock_sync.return_value = {"success": False, "error": "Config missing"}
             with pytest.raises(HTTPException):
                 await setup_server.sync_members_from_core.fn(request)
@@ -1562,6 +1798,7 @@ class TestSyncMembersPull:
     async def test_pull_no_campus(self, setup_server, mock_db):
         """Pull with no campus_id raises error."""
         from litestar.exceptions import HTTPException
+
         user = _make_campus_admin_user(campus_id=None)
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
@@ -1572,6 +1809,7 @@ class TestSyncMembersPull:
 
 
 # ==================== 9. Settings endpoints TESTS ====================
+
 
 class TestSettingsEndpoints:
     """Tests for overdue writeoff, automation, grief stages, accident followup."""
@@ -1584,6 +1822,7 @@ class TestSettingsEndpoints:
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
         from models import OverdueWriteoffSettingsUpdate
+
         data = OverdueWriteoffSettingsUpdate(days=30, enabled=True)
 
         result = await setup_server.update_overdue_writeoff_settings.fn(data=data, request=request)
@@ -1597,9 +1836,10 @@ class TestSettingsEndpoints:
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
         from models import AutomationSettingsUpdate
+
         data = AutomationSettingsUpdate(digestTime="09:00", whatsappGateway="https://wa.api", enabled=True)
 
-        with patch('scheduler.schedule_daily_digest') as mock_sched:
+        with patch("scheduler.schedule_daily_digest"):
             result = await setup_server.update_automation_settings.fn(data=data, request=request)
             assert result["success"] is True
 
@@ -1607,11 +1847,13 @@ class TestSettingsEndpoints:
     async def test_update_automation_settings_invalid_time(self, setup_server, mock_db):
         """Update automation settings with invalid time format."""
         from litestar.exceptions import HTTPException
+
         admin = _make_admin_user()
         request = _mock_request(user=admin)
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
         from models import AutomationSettingsUpdate
+
         data = AutomationSettingsUpdate(digestTime="25:00", whatsappGateway="", enabled=True)
 
         with pytest.raises(HTTPException) as exc_info:
@@ -1648,6 +1890,7 @@ class TestSettingsEndpoints:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import UserPreferencesUpdate
+
         data = UserPreferencesUpdate(email_notifications=False, whatsapp_notifications=True)
 
         result = await setup_server.update_user_preferences.fn(user_id=user["id"], data=data, request=request)
@@ -1655,6 +1898,7 @@ class TestSettingsEndpoints:
 
 
 # ==================== 10. Notification logs TESTS ====================
+
 
 class TestNotificationLogs:
     """Tests for notification log endpoint."""
@@ -1669,11 +1913,13 @@ class TestNotificationLogs:
         mock_db.notification_logs.find = MagicMock(return_value=_make_mock_cursor([]))
 
         from enums import NotificationStatus
+
         result = await setup_server.get_notification_logs.fn(request=request, limit=50, status=NotificationStatus.SENT)
         assert isinstance(result, list)
 
 
 # ==================== 11. PDF report generation TESTS ====================
+
 
 class TestPdfReport:
     """Tests for PDF report export."""
@@ -1687,20 +1933,27 @@ class TestPdfReport:
         mock_db.campuses.find_one = AsyncMock(return_value={"campus_name": "Test Campus"})
 
         # Need at least 1 member to avoid div-by-zero in report
-        members = [{"id": "m1", "engagement_status": "active", "days_since_last_contact": 5,
-                     "last_contact_date": datetime.now(timezone.utc).isoformat()}]
+        members = [
+            {
+                "id": "m1",
+                "engagement_status": "active",
+                "days_since_last_contact": 5,
+                "last_contact_date": datetime.now(UTC).isoformat(),
+            }
+        ]
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
         mock_db.care_events.find = MagicMock(return_value=_make_mock_cursor([]))
         mock_db.activity_logs.find = MagicMock(return_value=_make_mock_cursor([]))
 
         mock_pdf_generator = MagicMock(return_value=b"%PDF-1.4 fake pdf content")
 
-        with patch.object(setup_server, 'get_pdf_generator', return_value=mock_pdf_generator):
+        with patch.object(setup_server, "get_pdf_generator", return_value=mock_pdf_generator):
             result = await setup_server.export_monthly_report_pdf.fn(request=request, year=2024, month=6)
             assert result.media_type == "application/pdf"
 
 
 # ==================== 12. sync_logs endpoint TESTS ====================
+
 
 class TestSyncLogs:
     """Tests for sync log listing."""
@@ -1717,9 +1970,7 @@ class TestSyncLogs:
             {"id": "sl2", "status": "error", "error_message": "Timeout"},
         ]
         facet_result = [{"data": logs, "total": [{"count": len(logs)}]}]
-        mock_db.sync_logs.aggregate = MagicMock(
-            return_value=_make_mock_agg_cursor(facet_result)
-        )
+        mock_db.sync_logs.aggregate = MagicMock(return_value=_make_mock_agg_cursor(facet_result))
 
         result = await setup_server.get_sync_logs.fn(request=request)
         assert result["total"] == 2
@@ -1727,6 +1978,7 @@ class TestSyncLogs:
 
 
 # ==================== 13. save_sync_config TESTS ====================
+
 
 class TestSaveSyncConfig:
     """Tests for saving sync configuration."""
@@ -1740,6 +1992,7 @@ class TestSaveSyncConfig:
         mock_db.sync_configs.find_one = AsyncMock(return_value=None)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1748,12 +2001,9 @@ class TestSaveSyncConfig:
             api_path_prefix="/api",
         )
 
-        login_resp = _make_mock_httpx_response(200, {
-            "access_token": "t",
-            "user": {"church_id": "church-123"}
-        })
+        login_resp = _make_mock_httpx_response(200, {"access_token": "t", "user": {"church_id": "church-123"}})
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1770,13 +2020,16 @@ class TestSaveSyncConfig:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         encrypted_pwd = setup_server.encrypt_password("stored-pass")
-        mock_db.sync_configs.find_one = AsyncMock(return_value={
-            "id": "existing-config-id",
-            "campus_id": TEST_CAMPUS_ID,
-            "api_password": encrypted_pwd,
-        })
+        mock_db.sync_configs.find_one = AsyncMock(
+            return_value={
+                "id": "existing-config-id",
+                "campus_id": TEST_CAMPUS_ID,
+                "api_password": encrypted_pwd,
+            }
+        )
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1786,7 +2039,7 @@ class TestSaveSyncConfig:
 
         login_resp = _make_mock_httpx_response(200, {"access_token": "t"})
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1798,6 +2051,7 @@ class TestSaveSyncConfig:
 
 # ==================== 14. get_cached_core_token TESTS ====================
 
+
 class TestGetCachedCoreToken:
     """Tests for core API token caching."""
 
@@ -1806,7 +2060,7 @@ class TestGetCachedCoreToken:
         """Cached valid token is returned without API call."""
         setup_server._core_api_token_cache["camp-1"] = {
             "token": "cached-token",
-            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1)
+            "expires_at": datetime.now(UTC) + timedelta(hours=1),
         }
 
         config = {
@@ -1824,7 +2078,7 @@ class TestGetCachedCoreToken:
         """Expired token triggers new login."""
         setup_server._core_api_token_cache["camp-2"] = {
             "token": "old-token",
-            "expires_at": datetime.now(timezone.utc) - timedelta(hours=1)
+            "expires_at": datetime.now(UTC) - timedelta(hours=1),
         }
 
         config = {
@@ -1836,7 +2090,7 @@ class TestGetCachedCoreToken:
 
         login_resp = _make_mock_httpx_response(200, {"access_token": "new-token"})
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1848,6 +2102,7 @@ class TestGetCachedCoreToken:
 
 # ==================== 15. SSE stream_activity TESTS ====================
 
+
 class TestStreamActivity:
     """Tests for SSE stream activity endpoint."""
 
@@ -1858,7 +2113,7 @@ class TestStreamActivity:
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
 
-        with patch.object(setup_server, 'subscribe_to_activities', new_callable=AsyncMock) as mock_sub:
+        with patch.object(setup_server, "subscribe_to_activities", new_callable=AsyncMock) as mock_sub:
             mock_sub.return_value = asyncio.Queue()
             result = await setup_server.stream_activity.fn(request=request, token=None)
             assert result is not None
@@ -1874,7 +2129,7 @@ class TestStreamActivity:
         token = _make_token(user["id"])
         mock_db.users.find_one = AsyncMock(return_value=user)
 
-        with patch.object(setup_server, 'subscribe_to_activities', new_callable=AsyncMock) as mock_sub:
+        with patch.object(setup_server, "subscribe_to_activities", new_callable=AsyncMock) as mock_sub:
             mock_sub.return_value = asyncio.Queue()
             result = await setup_server.stream_activity.fn(request=request, token=token)
             assert result is not None
@@ -1883,6 +2138,7 @@ class TestStreamActivity:
     async def test_stream_activity_no_auth(self, setup_server, mock_db):
         """Stream activity with no auth raises 401."""
         from litestar.exceptions import HTTPException
+
         request = MagicMock()
         request.headers = {}
         request.scope = {"client": ("127.0.0.1", 12345)}
@@ -1895,6 +2151,7 @@ class TestStreamActivity:
 
 # ==================== 16. connection test with paginated response formats ====================
 
+
 class TestConnectionPaginatedFormats:
     """Test sync connection with various paginated response formats."""
 
@@ -1906,6 +2163,7 @@ class TestConnectionPaginatedFormats:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1913,12 +2171,15 @@ class TestConnectionPaginatedFormats:
         )
 
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
-        members_resp = _make_mock_httpx_response(200, {
-            "pagination": {"total": 150},
-            "data": [{"id": "m1"}],
-        })
+        members_resp = _make_mock_httpx_response(
+            200,
+            {
+                "pagination": {"total": 150},
+                "data": [{"id": "m1"}],
+            },
+        )
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1937,6 +2198,7 @@ class TestConnectionPaginatedFormats:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from models import SyncConfigCreate
+
         data = SyncConfigCreate(
             api_base_url="https://core.example.com",
             api_email="sync@test.com",
@@ -1944,11 +2206,9 @@ class TestConnectionPaginatedFormats:
         )
 
         login_resp = _make_mock_httpx_response(200, {"access_token": "fake-token"})
-        members_resp = _make_mock_httpx_response(200, {
-            "data": [{"id": "m1"}, {"id": "m2"}]
-        })
+        members_resp = _make_mock_httpx_response(200, {"data": [{"id": "m1"}, {"id": "m2"}]})
 
-        with patch('httpx.AsyncClient') as mock_httpx:
+        with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
             mock_httpx.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -1962,6 +2222,7 @@ class TestConnectionPaginatedFormats:
 
 # ==================== 17. monthly report endpoint TESTS ====================
 
+
 class TestMonthlyReportEndpoint:
     """Test the monthly report route handler."""
 
@@ -1972,8 +2233,14 @@ class TestMonthlyReportEndpoint:
         request = _mock_request(user=user)
         mock_db.users.find_one = AsyncMock(return_value=user)
 
-        members = [{"id": "m1", "engagement_status": "active", "days_since_last_contact": 5,
-                     "last_contact_date": datetime.now(timezone.utc).isoformat()}]
+        members = [
+            {
+                "id": "m1",
+                "engagement_status": "active",
+                "days_since_last_contact": 5,
+                "last_contact_date": datetime.now(UTC).isoformat(),
+            }
+        ]
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
         mock_db.care_events.find = MagicMock(return_value=_make_mock_cursor([]))
         mock_db.activity_logs.find = MagicMock(return_value=_make_mock_cursor([]))
@@ -1983,6 +2250,7 @@ class TestMonthlyReportEndpoint:
 
 
 # ==================== 18. run_reminders_now TESTS ====================
+
 
 class TestRunRemindersNow:
     """Test manual reminder trigger."""
@@ -1994,7 +2262,7 @@ class TestRunRemindersNow:
         request = _mock_request(user=admin)
         mock_db.users.find_one = AsyncMock(return_value=admin)
 
-        with patch.object(setup_server, 'daily_reminder_job', new_callable=AsyncMock) as mock_job:
+        with patch.object(setup_server, "daily_reminder_job", new_callable=AsyncMock) as mock_job:
             mock_job.return_value = None
             result = await setup_server.run_reminders_now.fn(request=request)
             assert result["success"] is True

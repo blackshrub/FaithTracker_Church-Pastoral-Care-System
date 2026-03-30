@@ -1,19 +1,21 @@
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
 import logging
+import os
+
+from motor.motor_asyncio import AsyncIOMotorClient
 
 logger = logging.getLogger(__name__)
 
+
 async def create_database_indexes():
     """Create performance indexes for faster queries"""
-    
-    mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+
+    mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
     client = AsyncIOMotorClient(mongo_url)
-    db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
-    
+    db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
+
     print("Creating database indexes for performance optimization...")
-    
+
     # Members collection indexes
     await db.members.create_index("campus_id")
     await db.members.create_index("last_contact_date")
@@ -23,13 +25,10 @@ async def create_database_indexes():
     await db.members.create_index([("name", "text"), ("phone", "text")])  # Text search
     # Unique compound index for API-synced members (sparse to allow null external_member_id)
     await db.members.create_index(
-        [("campus_id", 1), ("external_member_id", 1)],
-        unique=True,
-        sparse=True,
-        name="campus_id_1_external_member_id_1"
+        [("campus_id", 1), ("external_member_id", 1)], unique=True, sparse=True, name="campus_id_1_external_member_id_1"
     )
     print("✅ Members indexes created")
-    
+
     # Care events collection indexes
     await db.care_events.create_index("member_id")
     await db.care_events.create_index("campus_id")
@@ -38,7 +37,7 @@ async def create_database_indexes():
     await db.care_events.create_index("completed")
     await db.care_events.create_index([("member_id", 1), ("event_date", -1)])  # Compound
     print("✅ Care events indexes created")
-    
+
     # Grief support collection indexes
     await db.grief_support.create_index("member_id")
     await db.grief_support.create_index("campus_id")
@@ -62,19 +61,19 @@ async def create_database_indexes():
     await db.financial_aid_schedules.create_index("is_active")
     await db.financial_aid_schedules.create_index("frequency")
     print("✅ Financial aid schedules indexes created")
-    
+
     # Notification logs indexes
     await db.notification_logs.create_index("created_at")
     await db.notification_logs.create_index("member_id")
     await db.notification_logs.create_index("status")
     print("✅ Notification logs indexes created")
-    
+
     # Users collection indexes
     await db.users.create_index("email", unique=True)
     await db.users.create_index("campus_id")
     await db.users.create_index("role")
     print("✅ Users indexes created")
-    
+
     # Job locks indexes (for distributed scheduler locking)
     await db.job_locks.create_index("lock_id", unique=True)
     await db.job_locks.create_index("expires_at")
@@ -110,8 +109,9 @@ async def create_database_indexes():
     print("  - Analytics: 2-3x faster")
     print("  - Search: 10x faster")
     print("  - Scheduler: Prevents duplicate job execution across workers")
-    
+
     client.close()
+
 
 if __name__ == "__main__":
     asyncio.run(create_database_indexes())

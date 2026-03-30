@@ -15,30 +15,31 @@ Usage:
     python bulk_engagement_update.py [--campus-id CAMPUS_ID] [--dry-run]
 """
 
-import asyncio
 import argparse
-import sys
+import asyncio
 import os
-from datetime import datetime, timezone
-from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
+import sys
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
+
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
 # Jakarta timezone (UTC+7)
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
 # Colors for output
-GREEN = '\033[0;32m'
-BLUE = '\033[0;34m'
-YELLOW = '\033[1;33m'
-CYAN = '\033[0;36m'
-BOLD = '\033[1m'
-NC = '\033[0m'  # No Color
+GREEN = "\033[0;32m"
+BLUE = "\033[0;34m"
+YELLOW = "\033[1;33m"
+CYAN = "\033[0;36m"
+BOLD = "\033[1m"
+NC = "\033[0m"  # No Color
 
 
 def now_jakarta():
@@ -62,10 +63,7 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
     print(f"{CYAN}{BOLD}🔄 Bulk Engagement Status Update{NC}\n")
 
     # Build match stage
-    match_stage = {
-        "deleted": {"$ne": True},
-        "is_archived": {"$ne": True}
-    }
+    match_stage = {"deleted": {"$ne": True}, "is_archived": {"$ne": True}}
     if campus_id:
         match_stage["campus_id"] = campus_id
         print(f"{BLUE}📍 Campus filter:{NC} {campus_id}")
@@ -103,18 +101,13 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                                     {
                                         "$subtract": [
                                             current_date,
-                                            {
-                                                "$dateFromString": {
-                                                    "dateString": "$last_contact_date",
-                                                    "onError": None
-                                                }
-                                            }
+                                            {"$dateFromString": {"dateString": "$last_contact_date", "onError": None}},
                                         ]
                                     },
-                                    86400000  # milliseconds in a day
+                                    86400000,  # milliseconds in a day
                                 ]
                             },
-                            999
+                            999,
                         ]
                     }
                 }
@@ -124,27 +117,16 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                     "new_engagement_status": {
                         "$switch": {
                             "branches": [
-                                {
-                                    "case": {"$lte": ["$days_since_contact", 60]},
-                                    "then": "active"
-                                },
-                                {
-                                    "case": {"$lte": ["$days_since_contact", 180]},
-                                    "then": "at_risk"
-                                },
+                                {"case": {"$lte": ["$days_since_contact", 60]}, "then": "active"},
+                                {"case": {"$lte": ["$days_since_contact", 180]}, "then": "at_risk"},
                             ],
-                            "default": "disconnected"
+                            "default": "disconnected",
                         }
                     }
                 }
             },
-            {
-                "$group": {
-                    "_id": "$new_engagement_status",
-                    "count": {"$sum": 1}
-                }
-            },
-            {"$sort": {"_id": 1}}
+            {"$group": {"_id": "$new_engagement_status", "count": {"$sum": 1}}},
+            {"$sort": {"_id": 1}},
         ]
 
         result = await db.members.aggregate(pipeline).to_list(None)
@@ -171,7 +153,7 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
             "total": total_members,
             "updated": 0,
             "dry_run": True,
-            "distribution": {r["_id"]: r["count"] for r in result}
+            "distribution": {r["_id"]: r["count"] for r in result},
         }
 
     else:
@@ -196,16 +178,16 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                                                     "$dateFromString": {
                                                         "dateString": "$last_contact_date",
                                                         "onError": None,
-                                                        "onNull": None
+                                                        "onNull": None,
                                                     }
-                                                }
+                                                },
                                             ]
                                         },
-                                        86400000  # milliseconds in a day
+                                        86400000,  # milliseconds in a day
                                     ]
                                 }
                             },
-                            999
+                            999,
                         ]
                     }
                 }
@@ -216,22 +198,16 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                     "engagement_status": {
                         "$switch": {
                             "branches": [
-                                {
-                                    "case": {"$lte": ["$days_since_contact_calc", 60]},
-                                    "then": "active"
-                                },
-                                {
-                                    "case": {"$lte": ["$days_since_contact_calc", 180]},
-                                    "then": "at_risk"
-                                },
+                                {"case": {"$lte": ["$days_since_contact_calc", 60]}, "then": "active"},
+                                {"case": {"$lte": ["$days_since_contact_calc", 180]}, "then": "at_risk"},
                             ],
-                            "default": "disconnected"
+                            "default": "disconnected",
                         }
                     },
                     # Update days_since_last_contact field
                     "days_since_last_contact": "$days_since_contact_calc",
                     # Update timestamp
-                    "updated_at": now.isoformat()
+                    "updated_at": now.isoformat(),
                 }
             },
             {
@@ -241,12 +217,8 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
             },
             {
                 # Merge back to members collection
-                "$merge": {
-                    "into": "members",
-                    "whenMatched": "merge",
-                    "whenNotMatched": "discard"
-                }
-            }
+                "$merge": {"into": "members", "whenMatched": "merge", "whenNotMatched": "discard"}
+            },
         ]
 
         # Execute the aggregation pipeline
@@ -262,21 +234,18 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
             print(f"{CYAN}📊 Statistics:{NC}")
             print(f"  • Members processed: {BOLD}{total_members:,}{NC}")
             print(f"  • Time taken: {BOLD}{duration:.2f}s{NC}")
-            print(f"  • Speed: {BOLD}{int(total_members/duration):,} members/second{NC}")
+            print(f"  • Speed: {BOLD}{int(total_members / duration):,} members/second{NC}")
 
             # Show updated distribution
             print(f"\n{CYAN}📈 Updated Distribution:{NC}")
 
-            status_counts = await db.members.aggregate([
-                {"$match": match_stage},
-                {
-                    "$group": {
-                        "_id": "$engagement_status",
-                        "count": {"$sum": 1}
-                    }
-                },
-                {"$sort": {"_id": 1}}
-            ]).to_list(None)
+            status_counts = await db.members.aggregate(
+                [
+                    {"$match": match_stage},
+                    {"$group": {"_id": "$engagement_status", "count": {"$sum": 1}}},
+                    {"$sort": {"_id": 1}},
+                ]
+            ).to_list(None)
 
             for status_group in status_counts:
                 status = status_group["_id"]
@@ -298,36 +267,28 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                 "total": total_members,
                 "updated": total_members,
                 "duration": duration,
-                "speed": int(total_members/duration),
-                "distribution": {r["_id"]: r["count"] for r in status_counts}
+                "speed": int(total_members / duration),
+                "distribution": {r["_id"]: r["count"] for r in status_counts},
             }
 
         except Exception as e:
-            print(f"{YELLOW}⚠ Error during update:{NC} {str(e)}")
+            print(f"{YELLOW}⚠ Error during update:{NC} {e!s}")
             raise
 
 
 async def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(
-        description='Bulk update member engagement statuses using MongoDB aggregation'
-    )
+    parser = argparse.ArgumentParser(description="Bulk update member engagement statuses using MongoDB aggregation")
     parser.add_argument(
-        '--campus-id',
-        help='Update only members from specific campus (default: all campuses)',
-        default=None
+        "--campus-id", help="Update only members from specific campus (default: all campuses)", default=None
     )
-    parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be updated without making changes'
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be updated without making changes")
 
     args = parser.parse_args()
 
     # Get database connection
-    mongo_url = os.getenv('MONGO_URL')
-    db_name = os.getenv('DB_NAME', 'pastoral_care_db')
+    mongo_url = os.getenv("MONGO_URL")
+    db_name = os.getenv("DB_NAME", "pastoral_care_db")
 
     if not mongo_url:
         print(f"{YELLOW}⚠ MONGO_URL not set in environment{NC}")
@@ -336,22 +297,18 @@ async def main():
     try:
         # Connect to database
         client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         db = client[db_name]
 
         # Run bulk update
-        result = await bulk_update_engagement_statuses(
-            db,
-            campus_id=args.campus_id,
-            dry_run=args.dry_run
-        )
+        await bulk_update_engagement_statuses(db, campus_id=args.campus_id, dry_run=args.dry_run)
 
         client.close()
 
         sys.exit(0)
 
     except Exception as e:
-        print(f"{YELLOW}⚠ Error:{NC} {str(e)}")
+        print(f"{YELLOW}⚠ Error:{NC} {e!s}")
         sys.exit(1)
 
 

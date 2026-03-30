@@ -4,9 +4,11 @@ Test multi-tenancy data isolation
 Critical tests to ensure campuses cannot access each other's data.
 """
 
-import pytest
-import sys
 import os
+import sys
+from datetime import UTC
+
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,14 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 async def test_members_isolated_by_campus(test_db, test_campus, second_campus, test_member, test_member_second_campus):
     """Test that members query is filtered by campus_id"""
     # Query members for first campus
-    campus1_members = await test_db.members.find({
-        "campus_id": test_campus["id"]
-    }).to_list(None)
+    campus1_members = await test_db.members.find({"campus_id": test_campus["id"]}).to_list(None)
 
     # Query members for second campus
-    campus2_members = await test_db.members.find({
-        "campus_id": second_campus["id"]
-    }).to_list(None)
+    campus2_members = await test_db.members.find({"campus_id": second_campus["id"]}).to_list(None)
 
     # Each campus should see only their member
     assert len(campus1_members) == 1
@@ -33,7 +31,9 @@ async def test_members_isolated_by_campus(test_db, test_campus, second_campus, t
 
 
 @pytest.mark.asyncio
-async def test_care_events_isolated_by_campus(test_db, test_campus, second_campus, test_member, test_member_second_campus):
+async def test_care_events_isolated_by_campus(
+    test_db, test_campus, second_campus, test_member, test_member_second_campus
+):
     """Test that care events are isolated by campus"""
     # Create care event for first campus
     event1 = {
@@ -42,7 +42,7 @@ async def test_care_events_isolated_by_campus(test_db, test_campus, second_campu
         "member_id": test_member["id"],
         "event_type": "birthday",
         "event_date": "2024-01-15",
-        "title": "Campus 1 Event"
+        "title": "Campus 1 Event",
     }
     await test_db.care_events.insert_one(event1)
 
@@ -53,18 +53,14 @@ async def test_care_events_isolated_by_campus(test_db, test_campus, second_campu
         "member_id": test_member_second_campus["id"],
         "event_type": "birthday",
         "event_date": "2024-01-15",
-        "title": "Campus 2 Event"
+        "title": "Campus 2 Event",
     }
     await test_db.care_events.insert_one(event2)
 
     # Query events for each campus
-    campus1_events = await test_db.care_events.find({
-        "campus_id": test_campus["id"]
-    }).to_list(None)
+    campus1_events = await test_db.care_events.find({"campus_id": test_campus["id"]}).to_list(None)
 
-    campus2_events = await test_db.care_events.find({
-        "campus_id": second_campus["id"]
-    }).to_list(None)
+    campus2_events = await test_db.care_events.find({"campus_id": second_campus["id"]}).to_list(None)
 
     # Each should see only their events
     assert len(campus1_events) == 1
@@ -82,7 +78,7 @@ async def test_users_isolated_by_campus(test_db, test_campus, second_campus):
         "campus_id": test_campus["id"],
         "name": "Campus 1 Admin",
         "email": "admin1@test.com",
-        "role": "campus_admin"
+        "role": "campus_admin",
     }
     await test_db.users.insert_one(user1)
 
@@ -92,20 +88,18 @@ async def test_users_isolated_by_campus(test_db, test_campus, second_campus):
         "campus_id": second_campus["id"],
         "name": "Campus 2 Admin",
         "email": "admin2@test.com",
-        "role": "campus_admin"
+        "role": "campus_admin",
     }
     await test_db.users.insert_one(user2)
 
     # Query users for each campus
-    campus1_users = await test_db.users.find({
-        "campus_id": test_campus["id"],
-        "role": {"$ne": "full_admin"}
-    }).to_list(None)
+    campus1_users = await test_db.users.find({"campus_id": test_campus["id"], "role": {"$ne": "full_admin"}}).to_list(
+        None
+    )
 
-    campus2_users = await test_db.users.find({
-        "campus_id": second_campus["id"],
-        "role": {"$ne": "full_admin"}
-    }).to_list(None)
+    campus2_users = await test_db.users.find({"campus_id": second_campus["id"], "role": {"$ne": "full_admin"}}).to_list(
+        None
+    )
 
     # Each should see only their users
     assert len(campus1_users) == 1
@@ -121,9 +115,9 @@ async def test_cannot_modify_other_campus_member(test_db, test_campus, second_ca
     result = await test_db.members.update_one(
         {
             "id": test_member_second_campus["id"],
-            "campus_id": test_campus["id"]  # Wrong campus!
+            "campus_id": test_campus["id"],  # Wrong campus!
         },
-        {"$set": {"name": "Hacked Name"}}
+        {"$set": {"name": "Hacked Name"}},
     )
 
     # Update should fail (0 documents modified)
@@ -138,10 +132,12 @@ async def test_cannot_modify_other_campus_member(test_db, test_campus, second_ca
 async def test_cannot_delete_other_campus_member(test_db, test_campus, second_campus, test_member_second_campus):
     """Test that deleting a member requires matching campus_id"""
     # Try to delete member from campus2 using campus1's id
-    result = await test_db.members.delete_one({
-        "id": test_member_second_campus["id"],
-        "campus_id": test_campus["id"]  # Wrong campus!
-    })
+    result = await test_db.members.delete_one(
+        {
+            "id": test_member_second_campus["id"],
+            "campus_id": test_campus["id"],  # Wrong campus!
+        }
+    )
 
     # Delete should fail (0 documents deleted)
     assert result.deleted_count == 0
@@ -155,31 +151,17 @@ async def test_cannot_delete_other_campus_member(test_db, test_campus, second_ca
 async def test_activity_logs_isolated_by_campus(test_db, test_campus, second_campus):
     """Test that activity logs are isolated by campus"""
     # Create activity log for first campus
-    log1 = {
-        "id": "log-1",
-        "campus_id": test_campus["id"],
-        "action": "member_created",
-        "user_name": "Admin 1"
-    }
+    log1 = {"id": "log-1", "campus_id": test_campus["id"], "action": "member_created", "user_name": "Admin 1"}
     await test_db.activity_logs.insert_one(log1)
 
     # Create activity log for second campus
-    log2 = {
-        "id": "log-2",
-        "campus_id": second_campus["id"],
-        "action": "member_created",
-        "user_name": "Admin 2"
-    }
+    log2 = {"id": "log-2", "campus_id": second_campus["id"], "action": "member_created", "user_name": "Admin 2"}
     await test_db.activity_logs.insert_one(log2)
 
     # Query logs for each campus
-    campus1_logs = await test_db.activity_logs.find({
-        "campus_id": test_campus["id"]
-    }).to_list(None)
+    campus1_logs = await test_db.activity_logs.find({"campus_id": test_campus["id"]}).to_list(None)
 
-    campus2_logs = await test_db.activity_logs.find({
-        "campus_id": second_campus["id"]
-    }).to_list(None)
+    campus2_logs = await test_db.activity_logs.find({"campus_id": second_campus["id"]}).to_list(None)
 
     # Each should see only their logs
     assert len(campus1_logs) == 1
@@ -197,14 +179,12 @@ async def test_full_admin_can_see_all_campuses(test_db, test_campus, second_camp
         "campus_id": test_campus["id"],
         "name": "Super Admin",
         "email": "super@test.com",
-        "role": "full_admin"
+        "role": "full_admin",
     }
     await test_db.users.insert_one(admin)
 
     # Full admin should be able to query all campuses
-    all_campuses = await test_db.campuses.find(
-        {"is_active": True}
-    ).to_list(None)
+    all_campuses = await test_db.campuses.find({"is_active": True}).to_list(None)
 
     # Should see both campuses
     assert len(all_campuses) == 2
@@ -216,14 +196,14 @@ async def test_full_admin_can_see_all_campuses(test_db, test_campus, second_camp
 @pytest.mark.asyncio
 async def test_dashboard_cache_isolated_by_campus(test_db, test_campus, second_campus):
     """Test that dashboard cache is isolated by campus"""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Create cache for first campus
     cache1 = {
         "cache_key": f"dashboard_reminders_{test_campus['id']}_2024-01-15",
         "campus_id": test_campus["id"],
         "data": {"total_tasks": 5},
-        "calculated_at": datetime.now(timezone.utc)
+        "calculated_at": datetime.now(UTC),
     }
     await test_db.dashboard_cache.insert_one(cache1)
 
@@ -232,18 +212,14 @@ async def test_dashboard_cache_isolated_by_campus(test_db, test_campus, second_c
         "cache_key": f"dashboard_reminders_{second_campus['id']}_2024-01-15",
         "campus_id": second_campus["id"],
         "data": {"total_tasks": 3},
-        "calculated_at": datetime.now(timezone.utc)
+        "calculated_at": datetime.now(UTC),
     }
     await test_db.dashboard_cache.insert_one(cache2)
 
     # Query cache for each campus
-    campus1_cache = await test_db.dashboard_cache.find_one({
-        "campus_id": test_campus["id"]
-    })
+    campus1_cache = await test_db.dashboard_cache.find_one({"campus_id": test_campus["id"]})
 
-    campus2_cache = await test_db.dashboard_cache.find_one({
-        "campus_id": second_campus["id"]
-    })
+    campus2_cache = await test_db.dashboard_cache.find_one({"campus_id": second_campus["id"]})
 
     # Each should see only their cache
     assert campus1_cache["data"]["total_tasks"] == 5
@@ -251,7 +227,9 @@ async def test_dashboard_cache_isolated_by_campus(test_db, test_campus, second_c
 
 
 @pytest.mark.asyncio
-async def test_grief_support_isolated_by_campus(test_db, test_campus, second_campus, test_member, test_member_second_campus):
+async def test_grief_support_isolated_by_campus(
+    test_db, test_campus, second_campus, test_member, test_member_second_campus
+):
     """Test that grief support stages are isolated by campus"""
     # Create grief stage for first campus
     stage1 = {
@@ -259,7 +237,7 @@ async def test_grief_support_isolated_by_campus(test_db, test_campus, second_cam
         "campus_id": test_campus["id"],
         "member_id": test_member["id"],
         "stage": "1_week",
-        "completed": False
+        "completed": False,
     }
     await test_db.grief_support.insert_one(stage1)
 
@@ -269,18 +247,14 @@ async def test_grief_support_isolated_by_campus(test_db, test_campus, second_cam
         "campus_id": second_campus["id"],
         "member_id": test_member_second_campus["id"],
         "stage": "1_week",
-        "completed": False
+        "completed": False,
     }
     await test_db.grief_support.insert_one(stage2)
 
     # Query stages for each campus
-    campus1_stages = await test_db.grief_support.find({
-        "campus_id": test_campus["id"]
-    }).to_list(None)
+    campus1_stages = await test_db.grief_support.find({"campus_id": test_campus["id"]}).to_list(None)
 
-    campus2_stages = await test_db.grief_support.find({
-        "campus_id": second_campus["id"]
-    }).to_list(None)
+    campus2_stages = await test_db.grief_support.find({"campus_id": second_campus["id"]}).to_list(None)
 
     # Each should see only their stages
     assert len(campus1_stages) == 1

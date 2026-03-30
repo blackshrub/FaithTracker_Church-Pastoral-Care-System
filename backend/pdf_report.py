@@ -3,12 +3,13 @@ PDF Report Generator for FaithTracker Management Reports
 Uses WeasyPrint to generate professional PDF reports from HTML templates
 """
 
-from weasyprint import HTML
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
+
+from weasyprint import HTML
 
 
-def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = "GKBJ") -> bytes:
+def generate_monthly_report_pdf(report_data: dict[str, Any], campus_name: str = "GKBJ") -> bytes:
     """
     Generate a professional PDF management report from report data.
 
@@ -48,25 +49,31 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     for care in care_breakdown:
         care_rows += f"""
         <tr>
-            <td>{care.get('label', 'Unknown')}</td>
-            <td class="text-center">{care.get('total', 0)}</td>
-            <td class="text-center text-success">{care.get('completed', 0)}</td>
-            <td class="text-center text-warning">{care.get('pending', 0)}</td>
-            <td class="text-center text-muted">{care.get('ignored', 0)}</td>
+            <td>{care.get("label", "Unknown")}</td>
+            <td class="text-center">{care.get("total", 0)}</td>
+            <td class="text-center text-success">{care.get("completed", 0)}</td>
+            <td class="text-center text-warning">{care.get("pending", 0)}</td>
+            <td class="text-center text-muted">{care.get("ignored", 0)}</td>
         </tr>
         """
 
     # Generate insights
     insights_html = ""
     for insight in insights:
-        icon = "✅" if insight.get("type") == "success" else "⚠️" if insight.get("type") == "warning" else "ℹ️"
-        color = "#22c55e" if insight.get("type") == "success" else "#f59e0b" if insight.get("type") == "warning" else "#3b82f6"
+        icon = "✅" if insight.get("type") == "success" else "⚠️" if insight.get("type") == "warning" else "ℹ️"  # noqa: RUF001
+        color = (
+            "#22c55e"
+            if insight.get("type") == "success"
+            else "#f59e0b"
+            if insight.get("type") == "warning"
+            else "#3b82f6"
+        )
         insights_html += f"""
         <div class="insight-item" style="border-left: 4px solid {color};">
             <span class="insight-icon">{icon}</span>
             <div>
-                <strong>{insight.get('category', '')}</strong>
-                <p>{insight.get('message', '')}</p>
+                <strong>{insight.get("category", "")}</strong>
+                <p>{insight.get("message", "")}</p>
             </div>
         </div>
         """
@@ -93,7 +100,7 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     comp_financial = comparison.get("financial_aid", {})
 
     # Get current date for metadata
-    generated_date = datetime.now().strftime('%Y-%m-%d')
+    generated_date = datetime.now().strftime("%Y-%m-%d")
 
     html_content = f"""
     <!DOCTYPE html>
@@ -101,12 +108,12 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
     <head>
         <meta charset="UTF-8">
         <meta name="author" content="{campus_name}">
-        <meta name="description" content="Monthly Pastoral Care Report for {period.get('month_name', '')} {period.get('year', '')}">
+        <meta name="description" content="Monthly Pastoral Care Report for {period.get("month_name", "")} {period.get("year", "")}">
         <meta name="keywords" content="pastoral care, church report, ministry, {campus_name}">
         <meta name="generator" content="FaithTracker Pastoral Care System">
         <meta name="dcterms.created" content="{generated_date}">
         <meta name="dcterms.modified" content="{generated_date}">
-        <title>Pastoral Care Report - {campus_name} - {period.get('month_name', '')} {period.get('year', '')}</title>
+        <title>Pastoral Care Report - {campus_name} - {period.get("month_name", "")} {period.get("year", "")}</title>
         <style>
             @page {{
                 size: A4;
@@ -458,8 +465,8 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             <h1>{campus_name}</h1>
             <h2>Monthly Pastoral Care Report</h2>
             <div class="date">
-                {period.get('month_name', '')} {period.get('year', '')} |
-                Generated: {datetime.now().strftime('%d %B %Y, %H:%M')}
+                {period.get("month_name", "")} {period.get("year", "")} |
+                Generated: {datetime.now().strftime("%d %B %Y, %H:%M")}
             </div>
         </div>
 
@@ -467,38 +474,38 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             <div class="section-title">Executive Summary</div>
             <div class="stats-grid">
                 <div class="stat-box highlight">
-                    <div class="stat-value">{fmt_num(exec_summary.get('total_members', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("total_members", 0))}</div>
                     <div class="stat-label">Total Members</div>
                 </div>
                 <div class="stat-box success">
-                    <div class="stat-value">{fmt_num(exec_summary.get('active_members', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("active_members", 0))}</div>
                     <div class="stat-label">Active</div>
                 </div>
                 <div class="stat-box warning">
-                    <div class="stat-value">{fmt_num(exec_summary.get('at_risk_members', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("at_risk_members", 0))}</div>
                     <div class="stat-label">At Risk</div>
                 </div>
                 <div class="stat-box danger">
-                    <div class="stat-value">{fmt_num(exec_summary.get('disconnected_members', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("disconnected_members", 0))}</div>
                     <div class="stat-label">Disconnected</div>
                 </div>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-box">
-                    <div class="stat-value">{fmt_num(exec_summary.get('total_care_events', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("total_care_events", 0))}</div>
                     <div class="stat-label">Care Events</div>
                 </div>
                 <div class="stat-box success">
-                    <div class="stat-value">{fmt_num(exec_summary.get('completed_events', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("completed_events", 0))}</div>
                     <div class="stat-label">Completed</div>
                 </div>
                 <div class="stat-box warning">
-                    <div class="stat-value">{fmt_num(exec_summary.get('pending_events', 0))}</div>
+                    <div class="stat-value">{fmt_num(exec_summary.get("pending_events", 0))}</div>
                     <div class="stat-label">Pending</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{fmt_currency(exec_summary.get('financial_aid_total', 0))}</div>
+                    <div class="stat-value">{fmt_currency(exec_summary.get("financial_aid_total", 0))}</div>
                     <div class="stat-label">Financial Aid</div>
                 </div>
             </div>
@@ -509,23 +516,23 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             <div class="kpi-grid">
                 <div class="kpi-card">
                     <div class="kpi-title">Care Completion Rate</div>
-                    <div class="kpi-value">{fmt_num(care_rate.get('current', 0))}%</div>
-                    <div class="kpi-target">Target: {care_rate.get('target', 85)}%</div>
+                    <div class="kpi-value">{fmt_num(care_rate.get("current", 0))}%</div>
+                    <div class="kpi-target">Target: {care_rate.get("target", 85)}%</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-title">Member Engagement</div>
-                    <div class="kpi-value">{fmt_num(engagement.get('current', 0))}%</div>
-                    <div class="kpi-subtitle">{fmt_num(engagement.get('disconnected_percentage', 0))}% disconnected</div>
+                    <div class="kpi-value">{fmt_num(engagement.get("current", 0))}%</div>
+                    <div class="kpi-subtitle">{fmt_num(engagement.get("disconnected_percentage", 0))}% disconnected</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-title">Member Reach</div>
-                    <div class="kpi-value">{fmt_num(reach_rate.get('current', 0))}%</div>
-                    <div class="kpi-subtitle">{reach_rate.get('members_contacted', 0)} contacted</div>
+                    <div class="kpi-value">{fmt_num(reach_rate.get("current", 0))}%</div>
+                    <div class="kpi-subtitle">{reach_rate.get("members_contacted", 0)} contacted</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-title">Birthday Completion</div>
-                    <div class="kpi-value">{fmt_num(bday.get('current', 0))}%</div>
-                    <div class="kpi-subtitle">{bday.get('celebrated', 0)} of {bday.get('total', 0)}</div>
+                    <div class="kpi-value">{fmt_num(bday.get("current", 0))}%</div>
+                    <div class="kpi-subtitle">{bday.get("celebrated", 0)} of {bday.get("total", 0)}</div>
                 </div>
             </div>
         </div>
@@ -535,23 +542,23 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             <div class="ministry-grid">
                 <div class="ministry-card">
                     <h4>Grief Support</h4>
-                    <div class="value">{ministry.get('grief_support', {}).get('families_supported', 0)}</div>
-                    <div class="sub">families | {ministry.get('grief_support', {}).get('total_touchpoints', 0)} touchpoints</div>
+                    <div class="value">{ministry.get("grief_support", {}).get("families_supported", 0)}</div>
+                    <div class="sub">families | {ministry.get("grief_support", {}).get("total_touchpoints", 0)} touchpoints</div>
                 </div>
                 <div class="ministry-card">
                     <h4>Hospital Visits</h4>
-                    <div class="value">{ministry.get('hospital_visits', {}).get('total_visits', 0)}</div>
-                    <div class="sub">visits | {ministry.get('hospital_visits', {}).get('patients_visited', 0)} patients</div>
+                    <div class="value">{ministry.get("hospital_visits", {}).get("total_visits", 0)}</div>
+                    <div class="sub">visits | {ministry.get("hospital_visits", {}).get("patients_visited", 0)} patients</div>
                 </div>
                 <div class="ministry-card">
                     <h4>Birthdays</h4>
-                    <div class="value">{ministry.get('birthday_ministry', {}).get('celebrated', 0)}</div>
-                    <div class="sub">celebrated | {ministry.get('birthday_ministry', {}).get('ignored', 0)} skipped</div>
+                    <div class="value">{ministry.get("birthday_ministry", {}).get("celebrated", 0)}</div>
+                    <div class="sub">celebrated | {ministry.get("birthday_ministry", {}).get("ignored", 0)} skipped</div>
                 </div>
                 <div class="ministry-card">
                     <h4>Financial Aid</h4>
-                    <div class="value">{fmt_currency(ministry.get('financial_aid', {}).get('total_amount', 0))}</div>
-                    <div class="sub">{ministry.get('financial_aid', {}).get('recipients', 0)} recipients</div>
+                    <div class="value">{fmt_currency(ministry.get("financial_aid", {}).get("total_amount", 0))}</div>
+                    <div class="sub">{ministry.get("financial_aid", {}).get("recipients", 0)} recipients</div>
                 </div>
             </div>
         </div>
@@ -579,23 +586,23 @@ def generate_monthly_report_pdf(report_data: Dict[str, Any], campus_name: str = 
             <div class="comparison-grid">
                 <div class="comparison-card">
                     <div class="label">Total Events</div>
-                    <div class="current">{fmt_num(comp_events.get('current', 0))}</div>
-                    <div class="change {'change-positive' if comp_events.get('change', 0) >= 0 else 'change-negative'}">
-                        {'+' if comp_events.get('change', 0) >= 0 else ''}{fmt_num(comp_events.get('change', 0))} vs last month
+                    <div class="current">{fmt_num(comp_events.get("current", 0))}</div>
+                    <div class="change {"change-positive" if comp_events.get("change", 0) >= 0 else "change-negative"}">
+                        {"+" if comp_events.get("change", 0) >= 0 else ""}{fmt_num(comp_events.get("change", 0))} vs last month
                     </div>
                 </div>
                 <div class="comparison-card">
                     <div class="label">Completion Rate</div>
-                    <div class="current">{fmt_num(comp_completion.get('current', 0))}%</div>
-                    <div class="change {'change-positive' if comp_completion.get('change', 0) >= 0 else 'change-negative'}">
-                        {'+' if comp_completion.get('change', 0) >= 0 else ''}{fmt_num(comp_completion.get('change', 0))}%
+                    <div class="current">{fmt_num(comp_completion.get("current", 0))}%</div>
+                    <div class="change {"change-positive" if comp_completion.get("change", 0) >= 0 else "change-negative"}">
+                        {"+" if comp_completion.get("change", 0) >= 0 else ""}{fmt_num(comp_completion.get("change", 0))}%
                     </div>
                 </div>
                 <div class="comparison-card">
                     <div class="label">Financial Aid</div>
-                    <div class="current">{fmt_currency(comp_financial.get('current', 0))}</div>
-                    <div class="change {'change-positive' if comp_financial.get('change', 0) >= 0 else 'change-negative'}">
-                        {'+' if comp_financial.get('change', 0) >= 0 else ''}{fmt_currency(comp_financial.get('change', 0))}
+                    <div class="current">{fmt_currency(comp_financial.get("current", 0))}</div>
+                    <div class="change {"change-positive" if comp_financial.get("change", 0) >= 0 else "change-negative"}">
+                        {"+" if comp_financial.get("change", 0) >= 0 else ""}{fmt_currency(comp_financial.get("change", 0))}
                     </div>
                 </div>
             </div>

@@ -5,20 +5,27 @@ All data models used throughout the application.
 Using msgspec.Struct instead of Pydantic BaseModel for faster serialization.
 """
 
-import re
-import uuid
-import secrets
 import logging
-from datetime import datetime, date, timezone
-from typing import Annotated, List, Dict, Any, Optional
+import re
+import secrets
+import uuid
+from datetime import UTC, date, datetime
+from typing import Annotated, Any
 
 import msgspec
-from msgspec import Struct, field, UNSET, UnsetType
+from msgspec import UNSET, Struct, field
 
 from enums import (
-    EngagementStatus, EventType, GriefStage, AidType,
-    NotificationChannel, NotificationStatus, UserRole,
-    ScheduleFrequency, WeekDay, ActivityActionType, NoteCategory
+    ActivityActionType,
+    AidType,
+    EngagementStatus,
+    EventType,
+    GriefStage,
+    NotificationChannel,
+    NotificationStatus,
+    ScheduleFrequency,
+    UserRole,
+    WeekDay,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ==================== UUID UTILITIES ====================
 
 # UUID v4 pattern for validation
-UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.IGNORECASE)
+UUID_PATTERN = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.IGNORECASE)
 
 
 def is_valid_uuid(value: str) -> bool:
@@ -49,6 +56,7 @@ def generate_uuid() -> str:
 
 # ==================== CAMPUS MODELS ====================
 
+
 class CampusCreate(Struct):
     campus_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
     location: str | None = None  # msgspec doesn't support max_length on union types
@@ -61,11 +69,12 @@ class Campus(Struct):
     location: str | None = None
     timezone: str = "Asia/Jakarta"  # Campus timezone (default UTC+7)
     is_active: bool = True
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ==================== MEMBER MODELS ====================
+
 
 class MemberCreate(Struct):
     name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
@@ -119,11 +128,12 @@ class Member(Struct):
     marital_status: str | None = None
     membership_status: str | None = None
     age: int | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ==================== CARE EVENT MODELS ====================
+
 
 class VisitationLogEntry(Struct):
     visitor_name: Annotated[str, msgspec.Meta(min_length=1, max_length=200)]
@@ -190,7 +200,7 @@ class CareEvent(Struct):
     # Accident/illness fields (merged from hospital, only hospital_name, use event_date as admission)
     hospital_name: str | None = None
     accident_stage_id: str | None = None  # Link to accident_followup stage (for timeline entries)
-    visitation_log: List[Dict[str, Any]] = field(default_factory=list)
+    visitation_log: list[dict[str, Any]] = field(default_factory=list)
     # Follow-up type marker
     followup_type: str | None = None  # "scheduled" or "additional" (for grief/accident follow-ups)
     # Financial aid fields
@@ -201,11 +211,12 @@ class CareEvent(Struct):
     reminder_sent_at: datetime | None = None
     reminder_sent_by_user_id: str | None = None
     reminder_sent_by_user_name: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ==================== SETUP MODELS ====================
+
 
 class SetupAdminRequest(Struct):
     email: str  # Email validation handled at route level
@@ -228,6 +239,7 @@ class AdditionalVisitRequest(Struct):
 
 # ==================== GRIEF SUPPORT MODELS ====================
 
+
 class GriefSupport(Struct):
     care_event_id: str
     member_id: str
@@ -242,8 +254,8 @@ class GriefSupport(Struct):
     ignored_by: str | None = None
     notes: str | None = None
     reminder_sent: bool = False
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class AccidentFollowup(Struct):
@@ -260,11 +272,12 @@ class AccidentFollowup(Struct):
     ignored_by: str | None = None
     notes: str | None = None
     reminder_sent: bool = False
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ==================== NOTIFICATION MODELS ====================
+
 
 class NotificationLog(Struct):
     channel: NotificationChannel
@@ -277,11 +290,12 @@ class NotificationLog(Struct):
     member_id: str | None = None
     campus_id: str | None = None
     pastoral_team_user_id: str | None = None  # If sent to pastoral team
-    response_data: Dict[str, Any] | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    response_data: dict[str, Any] | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ==================== FINANCIAL AID MODELS ====================
+
 
 class FinancialAidSchedule(Struct):
     member_id: str
@@ -303,15 +317,16 @@ class FinancialAidSchedule(Struct):
     month_of_year: int | None = None  # 1-12
     # Tracking
     is_active: bool = True
-    ignored_occurrences: List[str] = field(default_factory=list)  # List of dates (YYYY-MM-DD) that were ignored
+    ignored_occurrences: list[str] = field(default_factory=list)  # List of dates (YYYY-MM-DD) that were ignored
     occurrences_completed: int = 0
     notes: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class FinancialAidScheduleCreate(Struct):
     """Create a financial aid schedule"""
+
     member_id: str
     title: str
     aid_type: str  # AidType enum value as string
@@ -327,8 +342,10 @@ class FinancialAidScheduleCreate(Struct):
 
 # ==================== SETTINGS MODELS ====================
 
+
 class AutomationSettingsUpdate(Struct):
     """Automation settings (daily digest time, WhatsApp gateway)"""
+
     digestTime: str = "08:00"
     whatsappGateway: str = ""
     enabled: bool = True
@@ -336,23 +353,27 @@ class AutomationSettingsUpdate(Struct):
 
 class OverdueWriteoffSettingsUpdate(Struct):
     """Overdue task writeoff settings"""
+
     days: int = 30
     enabled: bool = False
 
 
 class EngagementSettingsUpdate(Struct):
     """Engagement threshold settings"""
+
     active_days: int = 60
     at_risk_days: int = 90
 
 
 class UserPreferencesUpdate(Struct):
     """User preferences for notifications, etc."""
+
     email_notifications: bool = True
     whatsapp_notifications: bool = True
 
 
 # ==================== PASTORAL NOTES MODELS ====================
+
 
 class PastoralNoteCreate(Struct):
     member_id: str
@@ -375,6 +396,7 @@ class PastoralNoteUpdate(Struct):
 
 
 # ==================== USER MODELS ====================
+
 
 class UserCreate(Struct):
     email: str  # Email validation handled at route level
@@ -409,8 +431,8 @@ class User(Struct):
     phone: str | None = None  # For receiving pastoral care task reminders
     photo_url: str | None = None
     is_active: bool = True
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class UserResponse(Struct):
@@ -434,6 +456,7 @@ class TokenResponse(Struct):
 
 class ProfileUpdate(Struct):
     """Model for self-profile update (excludes role and campus)"""
+
     name: str | None = None
     email: str | None = None
     phone: str | None = None
@@ -441,11 +464,13 @@ class ProfileUpdate(Struct):
 
 class PasswordChange(Struct):
     """Model for password change"""
+
     current_password: str
     new_password: str
 
 
 # ==================== ACTIVITY LOG MODELS ====================
+
 
 class ActivityLog(Struct):
     campus_id: str
@@ -459,7 +484,7 @@ class ActivityLog(Struct):
     care_event_id: str | None = None
     event_type: EventType | None = None
     notes: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class ActivityLogResponse(Struct):
@@ -479,6 +504,7 @@ class ActivityLogResponse(Struct):
 
 # ==================== SYNC MODELS ====================
 
+
 class SyncConfig(Struct):
     campus_id: str  # FaithTracker campus ID
     api_base_url: str  # e.g., https://faithflow.yourdomain.com
@@ -497,13 +523,13 @@ class SyncConfig(Struct):
     reconciliation_time: str = "03:00"  # Time for daily reconciliation (HH:MM format)
     # Sync filters (optional - empty means sync all)
     filter_mode: str = "include"  # "include" or "exclude"
-    filter_rules: List[Dict[str, Any]] | None = None  # Dynamic filter rules
+    filter_rules: list[dict[str, Any]] | None = None  # Dynamic filter rules
     # Example: [{"field": "gender", "operator": "equals", "value": "Female"}, {"field": "age", "operator": "between", "value": [18, 35]}]
     last_sync_at: datetime | None = None
     last_sync_status: str | None = None  # success, error
     last_sync_message: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SyncConfigCreate(Struct):
@@ -518,7 +544,7 @@ class SyncConfigCreate(Struct):
     reconciliation_enabled: bool = False
     reconciliation_time: str = "03:00"
     filter_mode: str = "include"
-    filter_rules: List[Dict[str, Any]] | None = None
+    filter_rules: list[dict[str, Any]] | None = None
     is_enabled: bool = False
 
 
@@ -533,17 +559,18 @@ class SyncLog(Struct):
     members_archived: int = 0
     members_unarchived: int = 0
     error_message: str | None = None
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     duration_seconds: float | None = None
 
 
 # ==================== SERIALIZATION HELPERS ====================
 
+
 def to_mongo_doc(obj, _original_obj=None) -> dict:
     """Convert msgspec Struct to MongoDB-ready dict preserving datetime as native types."""
     from enum import Enum as PyEnum
-    
+
     if isinstance(obj, dict):
         result = {}
         for k, v in obj.items():
@@ -564,11 +591,18 @@ def to_mongo_doc(obj, _original_obj=None) -> dict:
             elif isinstance(v, dict):
                 result[k] = to_mongo_doc(v)
             elif isinstance(v, list):
-                result[k] = [to_mongo_doc(item) if isinstance(item, (dict, Struct)) else
-                            item if isinstance(item, datetime) else
-                            item.isoformat() if isinstance(item, date) else
-                            item.value if isinstance(item, PyEnum) else item
-                            for item in v]
+                result[k] = [
+                    to_mongo_doc(item)
+                    if isinstance(item, (dict, Struct))
+                    else item
+                    if isinstance(item, datetime)
+                    else item.isoformat()
+                    if isinstance(item, date)
+                    else item.value
+                    if isinstance(item, PyEnum)
+                    else item
+                    for item in v
+                ]
             else:
                 result[k] = v
         return result

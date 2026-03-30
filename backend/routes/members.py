@@ -3,6 +3,7 @@ FaithTracker Member Routes
 Handles member CRUD operations, photo uploads, and at-risk member listing
 """
 
+import contextlib
 import io
 import logging
 from collections.abc import Awaitable, Callable
@@ -110,10 +111,8 @@ async def create_member(data: MemberCreate, request: Request) -> dict:
             await _invalidate_dashboard_cache(campus_id)
 
         # Index in Meilisearch (fire-and-forget)
-        try:
+        with contextlib.suppress(Exception):
             get_search_service().index_member(member_dict)
-        except Exception:
-            pass
 
         return {"id": member_obj.id, "name": member_obj.name, "campus_id": member_obj.campus_id}
     except Exception as e:
@@ -217,9 +216,8 @@ async def list_members(
 
         # Update engagement status for each member
         for member in members:
-            if member.get("last_contact_date"):
-                if isinstance(member["last_contact_date"], str):
-                    member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
+            if member.get("last_contact_date") and isinstance(member["last_contact_date"], str):
+                member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
             status, days = calculate_engagement_status(member.get("last_contact_date"))
             member["engagement_status"] = status
@@ -264,9 +262,8 @@ async def list_at_risk_members(request: Request) -> list:
 
         at_risk_members = []
         for member in members:
-            if member.get("last_contact_date"):
-                if isinstance(member["last_contact_date"], str):
-                    member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
+            if member.get("last_contact_date") and isinstance(member["last_contact_date"], str):
+                member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
             status, days = calculate_engagement_status(member.get("last_contact_date"))
             member["engagement_status"] = status
@@ -300,9 +297,8 @@ async def get_member(member_id: str, request: Request) -> dict:
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        if member.get("last_contact_date"):
-            if isinstance(member["last_contact_date"], str):
-                member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
+        if member.get("last_contact_date") and isinstance(member["last_contact_date"], str):
+            member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
         status, days = calculate_engagement_status(member.get("last_contact_date"))
         member["engagement_status"] = status
@@ -355,10 +351,8 @@ async def update_member(member_id: str, data: MemberUpdate, request: Request) ->
             await _invalidate_dashboard_cache(updated_member.get("campus_id"))
 
         # Re-index in Meilisearch (fire-and-forget)
-        try:
+        with contextlib.suppress(Exception):
             get_search_service().index_member(updated_member)
-        except Exception:
-            pass
 
         return updated_member
     except HTTPException:
@@ -419,10 +413,8 @@ async def delete_member(member_id: str, request: Request) -> dict:
             await _invalidate_dashboard_cache(member.get("campus_id") or current_user.get("campus_id"))
 
         # Remove from Meilisearch (fire-and-forget)
-        try:
+        with contextlib.suppress(Exception):
             get_search_service().remove_member(member_id)
-        except Exception:
-            pass
 
         return {"success": True, "message": "Member deleted successfully"}
     except HTTPException:

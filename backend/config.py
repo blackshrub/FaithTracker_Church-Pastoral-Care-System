@@ -5,12 +5,13 @@ Validates required environment variables on startup
 
 import os
 import sys
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
 # Required environment variables
 REQUIRED_ENV_VARS = [
@@ -22,7 +23,7 @@ REQUIRED_ENV_VARS = [
 # Production-critical environment variables
 # Note: ALLOWED_ORIGINS or FRONTEND_URL should be set (docker-compose uses ALLOWED_ORIGINS)
 PRODUCTION_ENV_VARS = [
-    ("ALLOWED_ORIGINS", lambda v: v != '*', "ALLOWED_ORIGINS should not be '*' in production"),
+    ("ALLOWED_ORIGINS", lambda v: v != "*", "ALLOWED_ORIGINS should not be '*' in production"),
     ("ENCRYPTION_KEY", lambda v: v and len(v) > 32, "ENCRYPTION_KEY must be set and strong"),
 ]
 

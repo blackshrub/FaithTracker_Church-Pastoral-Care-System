@@ -5,18 +5,20 @@ Uses APScheduler for timezone-aware job scheduling
 """
 
 import asyncio
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+import contextlib
 import logging
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
-import httpx
-import uuid
-import smtplib
 import random
-from email.mime.text import MIMEText
+import smtplib
+import uuid
+from datetime import UTC, date, datetime, timedelta
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from zoneinfo import ZoneInfo
+
+import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from utils import normalize_phone_number
 
@@ -25,9 +27,11 @@ logger = logging.getLogger(__name__)
 # Jakarta timezone
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
+
 def now_jakarta():
     """Get current datetime in Jakarta timezone"""
     return datetime.now(JAKARTA_TZ)
+
 
 def today_jakarta():
     """Get current date in Jakarta timezone"""
@@ -50,25 +54,21 @@ def safe_parse_date(date_str: str) -> date | None:
     except (ValueError, TypeError):
         return None
 
+
 # MongoDB connection - limited pool for background jobs only
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-client = AsyncIOMotorClient(
-    mongo_url,
-    maxPoolSize=10,
-    minPoolSize=2,
-    maxIdleTimeMS=30000
-)
-db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
+mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+client = AsyncIOMotorClient(mongo_url, maxPoolSize=10, minPoolSize=2, maxIdleTimeMS=30000)
+db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
 
 scheduler = AsyncIOScheduler()
 
 # Email configuration from environment
-SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-SMTP_USER = os.environ.get('SMTP_USER', '')
-SMTP_PASS = os.environ.get('SMTP_PASS', '')
-SMTP_FROM = os.environ.get('SMTP_FROM', SMTP_USER)
-ALERT_EMAIL = os.environ.get('ALERT_EMAIL', os.environ.get('SMTP_USER', ''))
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
+ALERT_EMAIL = os.environ.get("ALERT_EMAIL", os.environ.get("SMTP_USER", ""))
 
 # Retry configuration
 WHATSAPP_MAX_RETRIES = 3
@@ -83,10 +83,10 @@ async def send_email_alert(subject: str, body: str):
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = SMTP_FROM
-        msg['To'] = ALERT_EMAIL
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
+        msg["From"] = SMTP_FROM
+        msg["To"] = ALERT_EMAIL
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
 
         # Run SMTP in thread pool to avoid blocking
         def _send():
@@ -101,7 +101,7 @@ async def send_email_alert(subject: str, body: str):
         logger.info(f"Email alert sent to {ALERT_EMAIL}: {subject}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send email alert: {str(e)}")
+        logger.error(f"Failed to send email alert: {e!s}")
         return False
 
 
@@ -110,7 +110,7 @@ async def send_whatsapp(phone: str, message: str, log_context: dict):
     last_error = None
 
     # Try environment variable first, then fall back to database settings
-    whatsapp_url = os.environ.get('WHATSAPP_GATEWAY_URL')
+    whatsapp_url = os.environ.get("WHATSAPP_GATEWAY_URL")
     if not whatsapp_url:
         # Fall back to database settings
         settings = await db.settings.find_one({"type": "automation"})
@@ -122,68 +122,74 @@ async def send_whatsapp(phone: str, message: str, log_context: dict):
         logger.error(error_msg)
         return {"success": False, "error": error_msg}
 
-    phone_formatted = phone if phone.endswith('@s.whatsapp.net') else f"{phone}@s.whatsapp.net"
+    phone_formatted = phone if phone.endswith("@s.whatsapp.net") else f"{phone}@s.whatsapp.net"
 
     # Retry loop with exponential backoff
     for attempt in range(WHATSAPP_MAX_RETRIES):
         try:
             from services.http_client import get_http_client
+
             http_client = await get_http_client()
             response = await http_client.post(
-                f"{whatsapp_url}/send/message",
-                json={"phone": phone_formatted, "message": message}
+                f"{whatsapp_url}/send/message", json={"phone": phone_formatted, "message": message}
             )
             result = response.json()
 
             # Check if successful
-            if result.get('code') == 'SUCCESS':
+            if result.get("code") == "SUCCESS":
                 # Log successful notification
-                await db.notification_logs.insert_one({
-                    **log_context,
-                    "channel": "whatsapp",
-                    "recipient": phone_formatted,
-                    "message": message,
-                    "status": "sent",
-                    "response_data": result,
-                    "attempts": attempt + 1,
-                    "created_at": datetime.now(timezone.utc)
-                })
+                await db.notification_logs.insert_one(
+                    {
+                        **log_context,
+                        "channel": "whatsapp",
+                        "recipient": phone_formatted,
+                        "message": message,
+                        "status": "sent",
+                        "response_data": result,
+                        "attempts": attempt + 1,
+                        "created_at": datetime.now(UTC),
+                    }
+                )
                 return {"success": True, "result": result, "attempts": attempt + 1}
 
             # Not successful but got a response - check if retryable
-            error_code = result.get('code', 'UNKNOWN')
+            error_code = result.get("code", "UNKNOWN")
             last_error = f"Gateway returned: {error_code}"
 
             # Don't retry for non-recoverable errors
-            if error_code in ['INVALID_PHONE', 'NOT_REGISTERED']:
+            if error_code in ["INVALID_PHONE", "NOT_REGISTERED"]:
                 break
 
         except httpx.ConnectError as e:
-            last_error = f"Connection error: {str(e)}"
+            last_error = f"Connection error: {e!s}"
         except httpx.TimeoutException as e:
-            last_error = f"Timeout: {str(e)}"
+            last_error = f"Timeout: {e!s}"
         except Exception as e:
-            last_error = f"Error: {str(e)}"
+            last_error = f"Error: {e!s}"
 
         # Log retry attempt
         if attempt < WHATSAPP_MAX_RETRIES - 1:
             delay = WHATSAPP_RETRY_DELAYS[attempt]
-            logger.warning(f"WhatsApp send failed (attempt {attempt + 1}/{WHATSAPP_MAX_RETRIES}): {last_error}. Retrying in {delay}s...")
+            logger.warning(
+                f"WhatsApp send failed (attempt {attempt + 1}/{WHATSAPP_MAX_RETRIES}): {last_error}. Retrying in {delay}s..."
+            )
             await asyncio.sleep(delay)
 
     # All retries exhausted - log failure and send email alert
     logger.error(f"WhatsApp send failed after {WHATSAPP_MAX_RETRIES} attempts: {last_error}")
 
-    await db.notification_logs.insert_one({
-        **log_context,
-        "channel": "whatsapp",
-        "recipient": phone_formatted,
-        "message": message,
-        "status": "failed",
-        "error": last_error,
-        "attempts": WHATSAPP_MAX_RETRIES,
-        "created_at": datetime.now(timezone.utc)
-    })
+    await db.notification_logs.insert_one(
+        {
+            **log_context,
+            "channel": "whatsapp",
+            "recipient": phone_formatted,
+            "message": message,
+            "status": "failed",
+            "error": last_error,
+            "attempts": WHATSAPP_MAX_RETRIES,
+            "created_at": datetime.now(UTC),
+        }
+    )
 
     # Send email alert for persistent failure
     await send_email_alert(
@@ -192,7 +198,7 @@ async def send_whatsapp(phone: str, message: str, log_context: dict):
 
 Recipient: {phone_formatted}
 Error: {last_error}
-Time: {datetime.now(JAKARTA_TZ).strftime('%Y-%m-%d %H:%M:%S')} WIB
+Time: {datetime.now(JAKARTA_TZ).strftime("%Y-%m-%d %H:%M:%S")} WIB
 
 Message preview (first 200 chars):
 {message[:200]}...
@@ -204,16 +210,17 @@ Please check:
 
 ---
 FaithTracker Pastoral Care System
-"""
+""",
     )
 
     return {"success": False, "error": last_error, "attempts": WHATSAPP_MAX_RETRIES}
+
 
 async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
     """Generate daily digest for a specific campus"""
     try:
         today = today_jakarta()  # Use Jakarta timezone
-        church_name = os.environ.get('CHURCH_NAME', 'Church')
+        church_name = os.environ.get("CHURCH_NAME", "Church")
 
         # 1. Birthdays today
         # Birthday events store original birth_date (e.g., "1980-05-15"), not current year's date
@@ -224,19 +231,15 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         # Get all members with birth_date in this campus
         # Note: MongoDB $and is required for multiple conditions on same field
         members_with_birthday = await db.members.find(
-            {
-                "campus_id": campus_id,
-                "birth_date": {"$exists": True, "$type": "string", "$ne": ""}
-            },
-            {"_id": 0, "id": 1, "name": 1, "phone": 1, "birth_date": 1}
+            {"campus_id": campus_id, "birth_date": {"$exists": True, "$type": "string", "$ne": ""}},
+            {"_id": 0, "id": 1, "name": 1, "phone": 1, "birth_date": 1},
         ).to_list(5000)
 
-        today_month_day = (today.month, today.day)
         week_ahead = today + timedelta(days=7)
 
         for member in members_with_birthday:
             try:
-                birth_date = datetime.strptime(member["birth_date"], '%Y-%m-%d').date()
+                birth_date = datetime.strptime(member["birth_date"], "%Y-%m-%d").date()
                 this_year_birthday = birth_date.replace(year=today.year)
 
                 # Handle leap year edge case (Feb 29 -> Feb 28 if not leap year)
@@ -249,17 +252,17 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 # Check if birthday event exists and is not completed
                 event = await db.care_events.find_one(
                     {"member_id": member["id"], "event_type": "birthday", "completed": False, "ignored": {"$ne": True}},
-                    {"_id": 0}
+                    {"_id": 0},
                 )
 
                 if not event:
                     continue
 
                 # Skip members without phone number
-                if not member.get('phone'):
+                if not member.get("phone"):
                     continue
 
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
 
                 if this_year_birthday == today:
                     # Birthday TODAY
@@ -267,7 +270,9 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 elif today < this_year_birthday <= week_ahead:
                     # Birthday in next 7 days
                     days_until = (this_year_birthday - today).days
-                    birthday_week_members.append(f"  - {member['name']} ({days_until} hari lagi)\n    wa.me/{phone_clean}")
+                    birthday_week_members.append(
+                        f"  - {member['name']} ({days_until} hari lagi)\n    wa.me/{phone_clean}"
+                    )
             except (ValueError, KeyError, TypeError):
                 # TypeError: birth_date is None/not a string
                 # ValueError: invalid date format
@@ -275,50 +280,42 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 continue
 
         # 3. Grief stages due today
-        grief_due = await db.grief_support.find({
-            "campus_id": campus_id,
-            "scheduled_date": today.isoformat(),
-            "completed": False
-        }, {"_id": 0}).to_list(100)
+        grief_due = await db.grief_support.find(
+            {"campus_id": campus_id, "scheduled_date": today.isoformat(), "completed": False}, {"_id": 0}
+        ).to_list(100)
 
         # 3b. OVERDUE Grief stages (past due, not completed)
-        overdue_grief = await db.grief_support.find({
-            "campus_id": campus_id,
-            "scheduled_date": {"$lt": today.isoformat()},
-            "completed": False
-        }, {"_id": 0}).to_list(100)
+        overdue_grief = await db.grief_support.find(
+            {"campus_id": campus_id, "scheduled_date": {"$lt": today.isoformat()}, "completed": False}, {"_id": 0}
+        ).to_list(100)
 
         # 4. Accident/illness follow-ups due today
         # Query accident_followup collection (similar to grief_support) with scheduled_date
-        accident_followups_due = await db.accident_followup.find({
-            "campus_id": campus_id,
-            "scheduled_date": today.isoformat(),
-            "completed": False,
-            "ignored": {"$ne": True}
-        }, {"_id": 0}).to_list(100)
+        accident_followups_due = await db.accident_followup.find(
+            {"campus_id": campus_id, "scheduled_date": today.isoformat(), "completed": False, "ignored": {"$ne": True}},
+            {"_id": 0},
+        ).to_list(100)
 
         # 4b. OVERDUE Hospital follow-ups (past due, not completed)
-        overdue_hospital = await db.accident_followup.find({
-            "campus_id": campus_id,
-            "scheduled_date": {"$lt": today.isoformat()},
-            "completed": False,
-            "ignored": {"$ne": True}
-        }, {"_id": 0}).to_list(100)
+        overdue_hospital = await db.accident_followup.find(
+            {
+                "campus_id": campus_id,
+                "scheduled_date": {"$lt": today.isoformat()},
+                "completed": False,
+                "ignored": {"$ne": True},
+            },
+            {"_id": 0},
+        ).to_list(100)
 
         # 5. Financial aid due today
-        financial_aid_due = await db.financial_aid_schedules.find({
-            "campus_id": campus_id,
-            "next_occurrence": today.isoformat(),
-            "is_active": True
-        }, {"_id": 0}).to_list(100)
+        financial_aid_due = await db.financial_aid_schedules.find(
+            {"campus_id": campus_id, "next_occurrence": today.isoformat(), "is_active": True}, {"_id": 0}
+        ).to_list(100)
 
         # 5b. OVERDUE Financial aid (past due, still active)
-        overdue_financial_aid = await db.financial_aid_schedules.find({
-            "campus_id": campus_id,
-            "next_occurrence": {"$lt": today.isoformat()},
-            "is_active": True
-        }, {"_id": 0}).to_list(100)
-
+        overdue_financial_aid = await db.financial_aid_schedules.find(
+            {"campus_id": campus_id, "next_occurrence": {"$lt": today.isoformat()}, "is_active": True}, {"_id": 0}
+        ).to_list(100)
 
         # 7. Pastoral Notes with overdue follow-ups (due today or past due)
         # Exclude empty/null follow_up_date and ensure it's a valid date string
@@ -327,22 +324,26 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "follow_up_date": {
                 "$lte": today.isoformat(),
                 "$nin": [None, ""],  # Exclude null and empty string
-                "$regex": r"^\d{4}-\d{2}-\d{2}"  # Must start with YYYY-MM-DD format
+                "$regex": r"^\d{4}-\d{2}-\d{2}",  # Must start with YYYY-MM-DD format
             },
             "follow_up_completed": False,
-            "is_private": {"$ne": True}  # Don't include private notes in digest
+            "is_private": {"$ne": True},  # Don't include private notes in digest
         }
 
-        overdue_notes = await db.pastoral_notes.find(
-            overdue_notes_query,
-            {"_id": 0}
-        ).to_list(100)
+        overdue_notes = await db.pastoral_notes.find(overdue_notes_query, {"_id": 0}).to_list(100)
 
         # ---- Batch member lookup (eliminates N+1 queries) ----
         # Collect ALL member_ids from ALL result sets, do ONE batched fetch
         all_member_ids = set()
-        for collection in [grief_due, overdue_grief, accident_followups_due, overdue_hospital,
-                           financial_aid_due, overdue_financial_aid, overdue_notes]:
+        for collection in [
+            grief_due,
+            overdue_grief,
+            accident_followups_due,
+            overdue_hospital,
+            financial_aid_due,
+            overdue_financial_aid,
+            overdue_notes,
+        ]:
             for item in collection:
                 mid = item.get("member_id")
                 if mid:
@@ -350,8 +351,7 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
 
         if all_member_ids:
             members_batch = await db.members.find(
-                {"id": {"$in": list(all_member_ids)}},
-                {"_id": 0, "id": 1, "name": 1, "phone": 1}
+                {"id": {"$in": list(all_member_ids)}}, {"_id": 0, "id": 1, "name": 1, "phone": 1}
             ).to_list(len(all_member_ids) + 10)
             member_map = {m["id"]: m for m in members_batch}
         else:
@@ -365,55 +365,59 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "1_month": "1 bulan",
             "3_months": "3 bulan",
             "6_months": "6 bulan",
-            "1_year": "1 tahun"
+            "1_year": "1 tahun",
         }
         for stage in grief_due:
             member = member_map.get(stage["member_id"])
-            if member and member.get('phone'):
+            if member and member.get("phone"):
                 stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
                 grief_members.append(f"  - {member['name']} ({stage_name} setelah dukacita)\n    wa.me/{phone_clean}")
 
         # ---- Process overdue grief stages ----
         overdue_grief_members = []
         for stage in overdue_grief:
             member = member_map.get(stage["member_id"])
-            if member and member.get('phone'):
+            if member and member.get("phone"):
                 scheduled_date = safe_parse_date(stage.get("scheduled_date"))
                 if not scheduled_date:
                     continue  # Skip if date is invalid
                 stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
                 days_overdue = (today - scheduled_date).days
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                overdue_grief_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
+                overdue_grief_members.append(
+                    f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}"
+                )
 
         # ---- Process accident/illness follow-ups due today ----
         hospital_followups = []
         hospital_stage_names = {
             "first_followup": "tindak lanjut ke-1",
             "second_followup": "tindak lanjut ke-2",
-            "final_followup": "tindak lanjut akhir"
+            "final_followup": "tindak lanjut akhir",
         }
 
         for followup in accident_followups_due:
             member = member_map.get(followup["member_id"])
-            if member and member.get('phone'):
+            if member and member.get("phone"):
                 stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
                 hospital_followups.append(f"  - {member['name']} ({stage_name})\n    wa.me/{phone_clean}")
 
         # ---- Process overdue hospital follow-ups ----
         overdue_hospital_members = []
         for followup in overdue_hospital:
             member = member_map.get(followup["member_id"])
-            if member and member.get('phone'):
+            if member and member.get("phone"):
                 scheduled_date = safe_parse_date(followup.get("scheduled_date"))
                 if not scheduled_date:
                     continue  # Skip if date is invalid
                 stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
                 days_overdue = (today - scheduled_date).days
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                overdue_hospital_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
+                overdue_hospital_members.append(
+                    f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}"
+                )
 
         # ---- Process financial aid due today ----
         financial_aid_members = []
@@ -421,27 +425,29 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "education": "Pendidikan",
             "medical": "Kesehatan",
             "living": "Kebutuhan Hidup",
-            "other": "Lainnya"
+            "other": "Lainnya",
         }
         for aid in financial_aid_due:
             member = member_map.get(aid["member_id"])
-            if member and member.get('phone'):
+            if member and member.get("phone"):
                 aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
                 financial_aid_members.append(f"  - {member['name']} ({aid_type})\n    wa.me/{phone_clean}")
 
         # ---- Process overdue financial aid ----
         overdue_financial_members = []
         for aid in overdue_financial_aid:
             member = member_map.get(aid["member_id"])
-            if member and member.get('phone'):
+            if member and member.get("phone"):
                 next_occurrence = safe_parse_date(aid.get("next_occurrence"))
                 if not next_occurrence:
                     continue  # Skip if date is invalid
                 aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
                 days_overdue = (today - next_occurrence).days
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                overdue_financial_members.append(f"  - {member['name']} ({aid_type}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
+                overdue_financial_members.append(
+                    f"  - {member['name']} ({aid_type}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}"
+                )
 
         # ---- Process pastoral notes ----
         overdue_notes_formatted = []
@@ -454,13 +460,13 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "spiritual": "Rohani",
             "family": "Keluarga",
             "work": "Pekerjaan",
-            "other": "Lainnya"
+            "other": "Lainnya",
         }
 
         for note in overdue_notes:
             member = member_map.get(note["member_id"])
-            if member and member.get('phone'):
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+            if member and member.get("phone"):
+                phone_clean = member["phone"].replace("@s.whatsapp.net", "")
                 note_date = safe_parse_date(note.get("follow_up_date"))
                 if not note_date:
                     continue  # Skip if date is invalid
@@ -487,10 +493,10 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         at_risk_list = []
         for member in members:
             # Skip members without phone number
-            if not member.get('phone'):
+            if not member.get("phone"):
                 continue
 
-            last_contact = member.get('last_contact_date')
+            last_contact = member.get("last_contact_date")
             if last_contact:
                 if isinstance(last_contact, str):
                     # Handle empty string safely
@@ -500,21 +506,21 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                         try:
                             last_contact = datetime.fromisoformat(last_contact)
                             if last_contact.tzinfo is None:
-                                last_contact = last_contact.replace(tzinfo=timezone.utc)
-                            days = (datetime.now(timezone.utc) - last_contact).days
+                                last_contact = last_contact.replace(tzinfo=UTC)
+                            days = (datetime.now(UTC) - last_contact).days
                         except (ValueError, TypeError):
                             days = 999
-                elif hasattr(last_contact, 'tzinfo'):
+                elif hasattr(last_contact, "tzinfo"):
                     if last_contact.tzinfo is None:
-                        last_contact = last_contact.replace(tzinfo=timezone.utc)
-                    days = (datetime.now(timezone.utc) - last_contact).days
+                        last_contact = last_contact.replace(tzinfo=UTC)
+                    days = (datetime.now(UTC) - last_contact).days
                 else:
                     days = 999
             else:
                 days = 999
 
             if days >= 30:
-                at_risk_list.append((member['name'], days, member['phone']))
+                at_risk_list.append((member["name"], days, member["phone"]))
 
         # Randomize the list and pick 10 random members (different each day)
         # Use today's date as seed for consistent results within the same day
@@ -522,7 +528,7 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         at_risk_sample = random.sample(at_risk_list, min(10, len(at_risk_list))) if at_risk_list else []
         at_risk_formatted = []
         for name, days, phone in at_risk_sample:
-            phone_clean = phone.replace('@s.whatsapp.net', '')
+            phone_clean = phone.replace("@s.whatsapp.net", "")
             at_risk_formatted.append(f"  - {name} ({days} hari)\n    wa.me/{phone_clean}")
 
         # Build digest message
@@ -552,7 +558,6 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             digest_parts.extend(financial_aid_members)
             digest_parts.append("")
 
-
         if notes_due_today:
             digest_parts.append(f"*CATATAN PASTORAL - TINDAK LANJUT HARI INI ({len(notes_due_today)}):*")
             digest_parts.extend(notes_due_today[:10])
@@ -560,7 +565,12 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
 
         # Overdue section - combine grief, hospital, financial aid, and pastoral notes overdue
         if overdue_grief_members or overdue_hospital_members or overdue_financial_members or overdue_notes_formatted:
-            total_overdue = len(overdue_grief_members) + len(overdue_hospital_members) + len(overdue_financial_members) + len(overdue_notes_formatted)
+            total_overdue = (
+                len(overdue_grief_members)
+                + len(overdue_hospital_members)
+                + len(overdue_financial_members)
+                + len(overdue_notes_formatted)
+            )
             digest_parts.append(f"*TUGAS TERLAMBAT - PERLU SEGERA ({total_overdue}):*")
             if overdue_hospital_members:
                 digest_parts.append("_Rumah Sakit:_")
@@ -605,19 +615,20 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                 "overdue_financial": len(overdue_financial_members),
                 "at_risk": len(at_risk_list),
                 "notes_due_today": len(notes_due_today),
-                "overdue_notes": len(overdue_notes_formatted)
-            }
+                "overdue_notes": len(overdue_notes_formatted),
+            },
         }
     except Exception as e:
-        logger.error(f"Error generating digest for campus {campus_name}: {str(e)}")
+        logger.error(f"Error generating digest for campus {campus_name}: {e!s}")
         return None
+
 
 async def send_daily_digest_to_pastoral_team():
     """Send daily digest to all pastoral team members per campus"""
     try:
-        logger.info("="*60)
+        logger.info("=" * 60)
         logger.info("SENDING DAILY DIGEST TO PASTORAL TEAM")
-        logger.info("="*60)
+        logger.info("=" * 60)
 
         # Get all active campuses
         campuses = await db.campuses.find({"is_active": True}, {"_id": 0}).to_list(200)
@@ -641,53 +652,50 @@ async def send_daily_digest_to_pastoral_team():
                 continue
 
             # Skip if no tasks
-            if digest["stats"]["birthdays_today"] == 0 and \
-               digest["stats"]["grief_due"] == 0 and \
-               digest["stats"]["hospital_followups"] == 0 and \
-               digest["stats"]["financial_aid"] == 0 and \
-               digest["stats"]["overdue_grief"] == 0 and \
-               digest["stats"]["overdue_hospital"] == 0 and \
-               digest["stats"]["overdue_financial"] == 0 and \
-               digest["stats"]["at_risk"] == 0 and \
-               digest["stats"].get("notes_due_today", 0) == 0 and \
-               digest["stats"].get("overdue_notes", 0) == 0:
+            if (
+                digest["stats"]["birthdays_today"] == 0
+                and digest["stats"]["grief_due"] == 0
+                and digest["stats"]["hospital_followups"] == 0
+                and digest["stats"]["financial_aid"] == 0
+                and digest["stats"]["overdue_grief"] == 0
+                and digest["stats"]["overdue_hospital"] == 0
+                and digest["stats"]["overdue_financial"] == 0
+                and digest["stats"]["at_risk"] == 0
+                and digest["stats"].get("notes_due_today", 0) == 0
+                and digest["stats"].get("overdue_notes", 0) == 0
+            ):
                 logger.info(f"  Skipping {campus_name} - no urgent tasks")
                 continue
 
             # Get pastoral team members for this specific campus only (no full_admin here)
-            pastoral_team = await db.users.find({
-                "campus_id": campus_id,
-                "role": {"$in": ["campus_admin", "pastor"]},
-                "is_active": True
-            }, {"_id": 0}).to_list(100)
+            pastoral_team = await db.users.find(
+                {"campus_id": campus_id, "role": {"$in": ["campus_admin", "pastor"]}, "is_active": True}, {"_id": 0}
+            ).to_list(100)
 
             logger.info(f"  {campus_name}: {len(pastoral_team)} team members, {sum(digest['stats'].values())} tasks")
 
             # Send to each team member (skip if already sent by user_id OR phone)
             for user in pastoral_team:
-                if user['id'] in sent_to_users:
+                if user["id"] in sent_to_users:
                     logger.info(f"  Skipping {user['name']} (user already received digest)")
                     continue
 
                 # Normalize phone for deduplication - use consistent format to catch duplicates
-                raw_phone = user.get('phone', '').replace('@s.whatsapp.net', '')
-                user_phone = normalize_phone_number(raw_phone) if raw_phone else ''
+                raw_phone = user.get("phone", "").replace("@s.whatsapp.net", "")
+                user_phone = normalize_phone_number(raw_phone) if raw_phone else ""
                 if user_phone and user_phone in sent_to_phones:
                     logger.info(f"  Skipping {user['name']} (phone {user_phone} already received digest)")
-                    sent_to_users.add(user['id'])  # Mark user as processed
+                    sent_to_users.add(user["id"])  # Mark user as processed
                     continue
 
                 try:
                     result = await send_whatsapp(
-                        user['phone'],
-                        digest['message'],
-                        {
-                            "id": str(uuid.uuid4()),
-                            "campus_id": campus_id,
-                            "pastoral_team_user_id": user['id']
-                        })
+                        user["phone"],
+                        digest["message"],
+                        {"id": str(uuid.uuid4()), "campus_id": campus_id, "pastoral_team_user_id": user["id"]},
+                    )
 
-                    sent_to_users.add(user['id'])
+                    sent_to_users.add(user["id"])
                     if user_phone:
                         sent_to_phones.add(user_phone)
                     if result.get("success"):
@@ -699,13 +707,10 @@ async def send_daily_digest_to_pastoral_team():
 
                 except Exception as user_error:
                     total_failed += 1
-                    logger.error(f"  Error sending digest to user {user.get('email')}: {str(user_error)}")
+                    logger.error(f"  Error sending digest to user {user.get('email')}: {user_error!s}")
 
         # Handle full_admin users separately - send consolidated digest from first campus with tasks
-        full_admins = await db.users.find({
-            "role": "full_admin",
-            "is_active": True
-        }, {"_id": 0}).to_list(100)
+        full_admins = await db.users.find({"role": "full_admin", "is_active": True}, {"_id": 0}).to_list(100)
 
         if full_admins:
             logger.info(f"\n  Sending digest to {len(full_admins)} full_admin users...")
@@ -714,44 +719,43 @@ async def send_daily_digest_to_pastoral_team():
             first_campus_digest = None
             for campus in campuses:
                 digest = await generate_daily_digest_for_campus(campus["id"], campus["campus_name"])
-                if digest and (digest["stats"]["birthdays_today"] > 0 or
-                              digest["stats"]["grief_due"] > 0 or
-                              digest["stats"]["hospital_followups"] > 0 or
-                              digest["stats"]["financial_aid"] > 0 or
-                              digest["stats"]["overdue_grief"] > 0 or
-                              digest["stats"]["overdue_hospital"] > 0 or
-                              digest["stats"]["overdue_financial"] > 0 or
-                              digest["stats"]["at_risk"] > 0 or
-                              digest["stats"].get("notes_due_today", 0) > 0 or
-                              digest["stats"].get("overdue_notes", 0) > 0):
+                if digest and (
+                    digest["stats"]["birthdays_today"] > 0
+                    or digest["stats"]["grief_due"] > 0
+                    or digest["stats"]["hospital_followups"] > 0
+                    or digest["stats"]["financial_aid"] > 0
+                    or digest["stats"]["overdue_grief"] > 0
+                    or digest["stats"]["overdue_hospital"] > 0
+                    or digest["stats"]["overdue_financial"] > 0
+                    or digest["stats"]["at_risk"] > 0
+                    or digest["stats"].get("notes_due_today", 0) > 0
+                    or digest["stats"].get("overdue_notes", 0) > 0
+                ):
                     first_campus_digest = digest
                     break
 
             if first_campus_digest:
                 for admin in full_admins:
-                    if admin['id'] in sent_to_users:
+                    if admin["id"] in sent_to_users:
                         logger.info(f"  Skipping {admin['name']} (user already received digest)")
                         continue
 
                     # Normalize phone for deduplication - use consistent format to catch duplicates
-                    raw_admin_phone = admin.get('phone', '').replace('@s.whatsapp.net', '')
-                    admin_phone = normalize_phone_number(raw_admin_phone) if raw_admin_phone else ''
+                    raw_admin_phone = admin.get("phone", "").replace("@s.whatsapp.net", "")
+                    admin_phone = normalize_phone_number(raw_admin_phone) if raw_admin_phone else ""
                     if admin_phone and admin_phone in sent_to_phones:
                         logger.info(f"  Skipping {admin['name']} (phone {admin_phone} already received digest)")
-                        sent_to_users.add(admin['id'])  # Mark user as processed
+                        sent_to_users.add(admin["id"])  # Mark user as processed
                         continue
 
                     try:
                         result = await send_whatsapp(
-                            admin['phone'],
-                            first_campus_digest['message'],
-                            {
-                                "id": str(uuid.uuid4()),
-                                "campus_id": "all",
-                                "pastoral_team_user_id": admin['id']
-                            })
+                            admin["phone"],
+                            first_campus_digest["message"],
+                            {"id": str(uuid.uuid4()), "campus_id": "all", "pastoral_team_user_id": admin["id"]},
+                        )
 
-                        sent_to_users.add(admin['id'])
+                        sent_to_users.add(admin["id"])
                         if admin_phone:
                             sent_to_phones.add(admin_phone)
                         if result.get("success"):
@@ -759,13 +763,15 @@ async def send_daily_digest_to_pastoral_team():
                             logger.info(f"  Sent digest to full_admin {admin['name']} ({admin['phone']})")
                         else:
                             total_failed += 1
-                            logger.error(f"  Failed to send digest to full_admin {admin['name']}: {result.get('error')}")
+                            logger.error(
+                                f"  Failed to send digest to full_admin {admin['name']}: {result.get('error')}"
+                            )
 
                     except Exception as admin_error:
                         total_failed += 1
-                        logger.error(f"  Error sending digest to full_admin {admin.get('email')}: {str(admin_error)}")
+                        logger.error(f"  Error sending digest to full_admin {admin.get('email')}: {admin_error!s}")
 
-        logger.info(f"\nDaily reminder job completed")
+        logger.info("\nDaily reminder job completed")
         logger.info(f"   Campuses processed: {len(campuses)}")
         logger.info(f"   Messages sent: {total_sent}")
         logger.info(f"   Messages failed: {total_failed}")
@@ -776,7 +782,7 @@ async def send_daily_digest_to_pastoral_team():
                 subject=f"[FaithTracker] Daily Digest Summary - {total_failed} Failed",
                 body=f"""Daily Digest Job Summary
 
-Time: {datetime.now(JAKARTA_TZ).strftime('%Y-%m-%d %H:%M:%S')} WIB
+Time: {datetime.now(JAKARTA_TZ).strftime("%Y-%m-%d %H:%M:%S")} WIB
 Campuses processed: {len(campuses)}
 Messages sent: {total_sent}
 Messages failed: {total_failed}
@@ -785,24 +791,24 @@ Please check the WhatsApp gateway status if failures persist.
 
 ---
 FaithTracker Pastoral Care System
-"""
+""",
             )
 
     except Exception as e:
-        logger.error(f"Error in daily reminder job: {str(e)}")
+        logger.error(f"Error in daily reminder job: {e!s}")
         # Send error email
         await send_email_alert(
             subject="[FaithTracker] Daily Digest Job Failed",
             body=f"""Daily Digest Job encountered an error.
 
-Error: {str(e)}
-Time: {datetime.now(JAKARTA_TZ).strftime('%Y-%m-%d %H:%M:%S')} WIB
+Error: {e!s}
+Time: {datetime.now(JAKARTA_TZ).strftime("%Y-%m-%d %H:%M:%S")} WIB
 
 Please check the application logs for more details.
 
 ---
 FaithTracker Pastoral Care System
-"""
+""",
         )
 
 
@@ -823,10 +829,9 @@ async def member_reconciliation_job():
         from server import perform_member_sync_for_campus
 
         # Get all campuses with sync enabled and reconciliation enabled
-        sync_configs = await db.sync_configs.find({
-            "is_enabled": True,
-            "reconciliation_enabled": True
-        }, {"_id": 0}).to_list(200)
+        sync_configs = await db.sync_configs.find(
+            {"is_enabled": True, "reconciliation_enabled": True}, {"_id": 0}
+        ).to_list(200)
 
         if not sync_configs:
             logger.info("No campuses configured for reconciliation")
@@ -852,13 +857,13 @@ async def member_reconciliation_job():
                         f"updated={stats.get('updated', 0)}, "
                         f"matched_by_name={stats.get('matched_by_name_phone', 0) + stats.get('matched_by_name_only', 0)}"
                     )
-                    total_synced += stats.get('fetched', 0)
+                    total_synced += stats.get("fetched", 0)
                 else:
                     logger.error(f"Campus {campus_id} sync failed: {result.get('error')}")
                     total_errors += 1
 
             except Exception as campus_error:
-                logger.error(f"Error reconciling campus {config.get('campus_id')}: {str(campus_error)}")
+                logger.error(f"Error reconciling campus {config.get('campus_id')}: {campus_error!s}")
                 total_errors += 1
 
         logger.info(f"Daily reconciliation complete: {total_synced} members synced, {total_errors} errors")
@@ -875,22 +880,22 @@ Please check the logs for details and verify the sync configuration for affected
 
 ---
 FaithTracker Pastoral Care System
-"""
+""",
             )
 
     except Exception as e:
-        logger.error(f"Error in reconciliation job: {str(e)}")
+        logger.error(f"Error in reconciliation job: {e!s}")
         await send_email_alert(
             subject="[FaithTracker] Member Reconciliation Job Failed",
             body=f"""The daily member reconciliation job failed unexpectedly.
 
-Error: {str(e)}
+Error: {e!s}
 
 Please check the scheduler logs for more details.
 
 ---
 FaithTracker Pastoral Care System
-"""
+""",
         )
     finally:
         await release_job_lock("member_reconciliation")
@@ -904,17 +909,19 @@ async def refresh_all_dashboard_caches():
         return
 
     try:
-        from server import db, get_campus_timezone, get_date_in_timezone, get_writeoff_settings, SECRET_KEY
-        from routes.dashboard import calculate_dashboard_reminders, init_dashboard_routes
         from dependencies import init_dependencies
-        from services.cache import get_cache, CacheService
+        from routes.dashboard import calculate_dashboard_reminders, init_dashboard_routes
+        from server import SECRET_KEY, db, get_campus_timezone, get_date_in_timezone, get_writeoff_settings
+        from services.cache import CacheService, get_cache
 
         # Initialize dependencies for dashboard module
         init_dependencies(db, SECRET_KEY)
         init_dashboard_routes(get_campus_timezone, get_date_in_timezone, get_writeoff_settings)
 
         # Get all active campuses
-        campuses = await db.campuses.find({"is_active": True}, {"_id": 0, "id": 1, "campus_name": 1, "timezone": 1}).to_list(200)
+        campuses = await db.campuses.find(
+            {"is_active": True}, {"_id": 0, "id": 1, "campus_name": 1, "timezone": 1}
+        ).to_list(200)
 
         logger.info(f"Refreshing dashboard cache for {len(campuses)} campuses...")
 
@@ -942,23 +949,23 @@ async def refresh_all_dashboard_caches():
                     "$set": {
                         "cache_key": cache_key,
                         "data": data,
-                        "calculated_at": datetime.now(timezone.utc),
-                        "expires_at": datetime.now(timezone.utc) + timedelta(hours=24)  # Cache for full day
+                        "calculated_at": datetime.now(UTC),
+                        "expires_at": datetime.now(UTC) + timedelta(hours=24),  # Cache for full day
                     }
                 },
-                upsert=True
+                upsert=True,
             )
 
             logger.info(f"Dashboard cache refreshed for {campus['campus_name']} - {data['total_tasks']} tasks")
 
         # Clean up old cache entries (older than 2 days)
-        two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        two_days_ago = datetime.now(UTC) - timedelta(days=2)
         await db.dashboard_cache.delete_many({"calculated_at": {"$lt": two_days_ago}})
 
         logger.info("Dashboard cache refresh complete")
 
     except Exception as e:
-        logger.error(f"Error refreshing dashboard caches: {str(e)}")
+        logger.error(f"Error refreshing dashboard caches: {e!s}")
     finally:
         await release_job_lock("cache_refresh")
 
@@ -977,7 +984,7 @@ async def acquire_job_lock(job_name: str, ttl_seconds: int = 300):
     """
     try:
         lock_id = f"job_lock_{job_name}_{today_jakarta().isoformat()}"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
 
         # Try to insert lock document (will fail if already exists due to unique index)
@@ -986,18 +993,11 @@ async def acquire_job_lock(job_name: str, ttl_seconds: int = 300):
                 "lock_id": lock_id,
                 "$or": [
                     {"expires_at": {"$lt": now}},  # Lock expired
-                    {"expires_at": {"$exists": False}}  # No expiry (shouldn't happen)
-                ]
+                    {"expires_at": {"$exists": False}},  # No expiry (shouldn't happen)
+                ],
             },
-            {
-                "$set": {
-                    "lock_id": lock_id,
-                    "job_name": job_name,
-                    "acquired_at": now,
-                    "expires_at": expires_at
-                }
-            },
-            upsert=True
+            {"$set": {"lock_id": lock_id, "job_name": job_name, "acquired_at": now, "expires_at": expires_at}},
+            upsert=True,
         )
 
         # If we modified a document, we got the lock
@@ -1019,6 +1019,7 @@ async def acquire_job_lock(job_name: str, ttl_seconds: int = 300):
         logger.error(f"Error acquiring lock for {job_name}: {error_str}")
         return False
 
+
 async def release_job_lock(job_name: str):
     """Release the distributed lock for a job"""
     try:
@@ -1026,7 +1027,8 @@ async def release_job_lock(job_name: str):
         await db.job_locks.delete_one({"lock_id": lock_id})
         logger.info(f"Released lock for {job_name}")
     except Exception as e:
-        logger.error(f"Error releasing lock for {job_name}: {str(e)}")
+        logger.error(f"Error releasing lock for {job_name}: {e!s}")
+
 
 async def daily_reminder_job():
     """Main daily reminder job - sends digest to pastoral team"""
@@ -1052,6 +1054,7 @@ async def daily_reminder_job():
         # Always release the lock when done
         await release_job_lock("daily_reminder")
 
+
 async def get_digest_time_from_db():
     """Get the digest time from database settings, default to 08:00"""
     try:
@@ -1060,35 +1063,35 @@ async def get_digest_time_from_db():
             return settings["data"]["digestTime"]
         return "08:00"
     except Exception as e:
-        logger.error(f"Error getting digest time from DB: {str(e)}")
+        logger.error(f"Error getting digest time from DB: {e!s}")
         return "08:00"
+
 
 def schedule_daily_digest(hour: int, minute: int):
     """Schedule or reschedule the daily digest job"""
     try:
         # Remove existing job if present
-        try:
-            scheduler.remove_job('daily_reminders')
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            scheduler.remove_job("daily_reminders")
 
         # Add job with new time
         # misfire_grace_time allows digest to run if container restarts after scheduled time
         scheduler.add_job(
             daily_reminder_job,
-            'cron',
+            "cron",
             hour=hour,
             minute=minute,
-            timezone='Asia/Jakarta',
-            id='daily_reminders',
-            name='Daily Pastoral Care Digest',
+            timezone="Asia/Jakarta",
+            id="daily_reminders",
+            name="Daily Pastoral Care Digest",
             replace_existing=True,
             misfire_grace_time=21600,  # 6 hours - matches reconciliation grace period
-            coalesce=True
+            coalesce=True,
         )
         logger.info(f"Daily digest scheduled for {hour:02d}:{minute:02d} Asia/Jakarta")
     except Exception as e:
-        logger.error(f"Error scheduling daily digest: {str(e)}")
+        logger.error(f"Error scheduling daily digest: {e!s}")
+
 
 async def reschedule_daily_digest():
     """Reschedule daily digest based on current database settings"""
@@ -1099,6 +1102,7 @@ async def reschedule_daily_digest():
     except ValueError:
         logger.error(f"Invalid digest time format: {digest_time}, using default 08:00")
         schedule_daily_digest(8, 0)
+
 
 async def init_daily_digest_schedule():
     """Initialize daily digest schedule from database on startup"""
@@ -1132,11 +1136,9 @@ async def check_missed_digest():
         # Check if digest was already sent today by looking at notification_logs
         # Use Jakarta midnight (not UTC) since digests run on Jakarta time
         today_start = datetime(now.year, now.month, now.day, tzinfo=JAKARTA_TZ)
-        today_digest_count = await db.notification_logs.count_documents({
-            "pastoral_team_user_id": {"$exists": True},
-            "status": "sent",
-            "created_at": {"$gte": today_start}
-        })
+        today_digest_count = await db.notification_logs.count_documents(
+            {"pastoral_team_user_id": {"$exists": True}, "status": "sent", "created_at": {"$gte": today_start}}
+        )
 
         if today_digest_count > 0:
             logger.info(f"Digest already sent today ({today_digest_count} messages found)")
@@ -1151,7 +1153,7 @@ async def check_missed_digest():
         await daily_reminder_job()
 
     except Exception as e:
-        logger.error(f"Error checking missed digest: {str(e)}")
+        logger.error(f"Error checking missed digest: {e!s}")
 
 
 async def check_missed_reconciliation():
@@ -1160,34 +1162,31 @@ async def check_missed_reconciliation():
     This handles cases where the container restarts after 3 AM but misfire_grace_time has expired.
     """
     await asyncio.sleep(5)  # Wait for DB connection to be ready
-    
+
     try:
         logger.info("Checking for missed reconciliation syncs...")
-        
+
         # Get campuses with reconciliation enabled
-        sync_configs = await db.sync_configs.find({
-            "is_enabled": True,
-            "reconciliation_enabled": True
-        }).to_list(200)
-        
+        sync_configs = await db.sync_configs.find({"is_enabled": True, "reconciliation_enabled": True}).to_list(200)
+
         if not sync_configs:
             logger.info("No campuses configured for reconciliation")
             return
-        
+
         for config in sync_configs:
             campus_id = config.get("campus_id")
             last_sync_at = config.get("last_sync_at")
-            
+
             # Check if last sync was more than 24 hours ago
             if last_sync_at:
                 if isinstance(last_sync_at, str):
                     last_sync_at = datetime.fromisoformat(last_sync_at.replace("Z", "+00:00"))
                 elif isinstance(last_sync_at, datetime) and last_sync_at.tzinfo is None:
                     # MongoDB returns naive datetime - assume UTC
-                    last_sync_at = last_sync_at.replace(tzinfo=timezone.utc)
-                
-                hours_since_sync = (datetime.now(timezone.utc) - last_sync_at).total_seconds() / 3600
-                
+                    last_sync_at = last_sync_at.replace(tzinfo=UTC)
+
+                hours_since_sync = (datetime.now(UTC) - last_sync_at).total_seconds() / 3600
+
                 if hours_since_sync > 24:
                     logger.warning(
                         f"Campus {campus_id}: Last sync was {hours_since_sync:.1f} hours ago. "
@@ -1202,9 +1201,10 @@ async def check_missed_reconciliation():
                 logger.warning(f"Campus {campus_id}: No previous sync found. Running initial reconciliation...")
                 await member_reconciliation_job()
                 return
-                
+
     except Exception as e:
-        logger.error(f"Error checking missed reconciliation: {str(e)}")
+        logger.error(f"Error checking missed reconciliation: {e!s}")
+
 
 def start_scheduler():
     """Start the scheduler with jobs configured from database"""
@@ -1213,15 +1213,15 @@ def start_scheduler():
         # misfire_grace_time allows job to run if container restarts after midnight
         scheduler.add_job(
             refresh_all_dashboard_caches,
-            'cron',
+            "cron",
             hour=0,
             minute=0,
-            timezone='Asia/Jakarta',
-            id='midnight_cache_refresh',
-            name='Midnight Dashboard Cache Refresh',
+            timezone="Asia/Jakarta",
+            id="midnight_cache_refresh",
+            name="Midnight Dashboard Cache Refresh",
             replace_existing=True,
             misfire_grace_time=3600,  # 1 hour grace time
-            coalesce=True
+            coalesce=True,
         )
 
         # Run daily reconciliation at 3 AM Jakarta time
@@ -1229,30 +1229,30 @@ def start_scheduler():
         # coalesce: If multiple misfires, run only once
         scheduler.add_job(
             member_reconciliation_job,
-            'cron',
+            "cron",
             hour=3,
             minute=0,
-            timezone='Asia/Jakarta',
-            id='member_reconciliation',
-            name='Daily Member Reconciliation',
+            timezone="Asia/Jakarta",
+            id="member_reconciliation",
+            name="Daily Member Reconciliation",
             replace_existing=True,
             misfire_grace_time=21600,  # 6 hours in seconds
-            coalesce=True
+            coalesce=True,
         )
 
         # Default daily digest at 8 AM (will be updated from DB shortly after startup)
         # misfire_grace_time allows digest to run if container restarts after scheduled time
         scheduler.add_job(
             daily_reminder_job,
-            'cron',
+            "cron",
             hour=8,
             minute=0,
-            timezone='Asia/Jakarta',
-            id='daily_reminders',
-            name='Daily Pastoral Care Digest',
+            timezone="Asia/Jakarta",
+            id="daily_reminders",
+            name="Daily Pastoral Care Digest",
             replace_existing=True,
             misfire_grace_time=21600,  # 6 hours - matches reconciliation grace period
-            coalesce=True
+            coalesce=True,
         )
 
         scheduler.start()
@@ -1260,20 +1260,20 @@ def start_scheduler():
         # Schedule async initialization of digest time from database
         scheduler.add_job(
             init_daily_digest_schedule,
-            'date',  # Run once
-            id='init_digest_schedule',
-            name='Initialize Digest Schedule from DB',
-            replace_existing=True
+            "date",  # Run once
+            id="init_digest_schedule",
+            name="Initialize Digest Schedule from DB",
+            replace_existing=True,
         )
-        
+
         # Check for missed reconciliation on startup
         # This catches cases where container was down during scheduled reconciliation time
         scheduler.add_job(
             check_missed_reconciliation,
-            'date',  # Run once on startup
-            id='check_missed_reconciliation',
-            name='Check Missed Reconciliation on Startup',
-            replace_existing=True
+            "date",  # Run once on startup
+            id="check_missed_reconciliation",
+            name="Check Missed Reconciliation on Startup",
+            replace_existing=True,
         )
 
         # Check for missed daily digest on startup
@@ -1281,10 +1281,10 @@ def start_scheduler():
         # AND the misfire_grace_time has also expired
         scheduler.add_job(
             check_missed_digest,
-            'date',  # Run once on startup
-            id='check_missed_digest',
-            name='Check Missed Digest on Startup',
-            replace_existing=True
+            "date",  # Run once on startup
+            id="check_missed_digest",
+            name="Check Missed Digest on Startup",
+            replace_existing=True,
         )
 
         logger.info("Scheduler started successfully")
@@ -1294,7 +1294,8 @@ def start_scheduler():
         logger.info("  - Startup reconciliation check: enabled")
         logger.info("  - Startup missed digest check: enabled")
     except Exception as e:
-        logger.error(f"Error starting scheduler: {str(e)}")
+        logger.error(f"Error starting scheduler: {e!s}")
+
 
 def stop_scheduler():
     """Stop the scheduler"""
@@ -1303,4 +1304,4 @@ def stop_scheduler():
             scheduler.shutdown()
             logger.info("Scheduler stopped")
     except Exception as e:
-        logger.error(f"Error stopping scheduler: {str(e)}")
+        logger.error(f"Error stopping scheduler: {e!s}")

@@ -4,14 +4,15 @@ Test API Sync functionality
 Tests for FaithFlow API sync configuration, webhook handling, and member synchronization.
 """
 
-import pytest
-import sys
-import os
-import hmac
 import hashlib
+import hmac
 import json
-from datetime import datetime, timezone
+import os
+import sys
 import uuid
+from datetime import UTC, datetime
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -35,8 +36,8 @@ async def sync_config(test_db, test_campus):
         "filter_rules": [],
         "is_enabled": True,
         "webhook_secret": "test_webhook_secret_12345",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
     await test_db.sync_configs.insert_one(config)
     return config
@@ -51,15 +52,10 @@ async def sync_log(test_db, test_campus):
         "campus_id": test_campus["id"],
         "sync_type": "manual",
         "status": "completed",
-        "stats": {
-            "fetched": 100,
-            "created": 10,
-            "updated": 5,
-            "archived": 0
-        },
+        "stats": {"fetched": 100, "created": 10, "updated": 5, "archived": 0},
         "error": None,
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "completed_at": datetime.now(timezone.utc).isoformat()
+        "started_at": datetime.now(UTC).isoformat(),
+        "completed_at": datetime.now(UTC).isoformat(),
     }
     await test_db.sync_logs.insert_one(log)
     return log
@@ -78,7 +74,7 @@ async def test_create_sync_config(test_db, test_campus):
         "api_password": "encrypted",
         "is_enabled": True,
         "webhook_secret": "new_secret",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     await test_db.sync_configs.insert_one(config_data)
@@ -93,11 +89,7 @@ async def test_create_sync_config(test_db, test_campus):
 async def test_update_sync_config(test_db, sync_config):
     """Test updating sync configuration"""
     result = await test_db.sync_configs.update_one(
-        {"id": sync_config["id"]},
-        {"$set": {
-            "polling_interval_hours": 12,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"id": sync_config["id"]}, {"$set": {"polling_interval_hours": 12, "updated_at": datetime.now(UTC).isoformat()}}
     )
 
     assert result.modified_count == 1
@@ -109,10 +101,7 @@ async def test_update_sync_config(test_db, sync_config):
 @pytest.mark.asyncio
 async def test_disable_sync_config(test_db, sync_config):
     """Test disabling sync for a campus"""
-    result = await test_db.sync_configs.update_one(
-        {"id": sync_config["id"]},
-        {"$set": {"is_enabled": False}}
-    )
+    result = await test_db.sync_configs.update_one({"id": sync_config["id"]}, {"$set": {"is_enabled": False}})
 
     assert result.modified_count == 1
 
@@ -125,12 +114,11 @@ async def test_sync_config_filter_rules(test_db, sync_config):
     """Test sync configuration with filter rules"""
     filter_rules = [
         {"field": "gender", "operator": "equals", "value": "Female"},
-        {"field": "age", "operator": "between", "value": [18, 35]}
+        {"field": "age", "operator": "between", "value": [18, 35]},
     ]
 
     result = await test_db.sync_configs.update_one(
-        {"id": sync_config["id"]},
-        {"$set": {"filter_rules": filter_rules, "filter_mode": "include"}}
+        {"id": sync_config["id"]}, {"$set": {"filter_rules": filter_rules, "filter_mode": "include"}}
     )
 
     assert result.modified_count == 1
@@ -148,7 +136,7 @@ async def test_sync_log_creation(test_db, test_campus):
         "campus_id": test_campus["id"],
         "sync_type": "polling",
         "status": "in_progress",
-        "started_at": datetime.now(timezone.utc).isoformat()
+        "started_at": datetime.now(UTC).isoformat(),
     }
 
     await test_db.sync_logs.insert_one(log_data)
@@ -161,20 +149,11 @@ async def test_sync_log_creation(test_db, test_campus):
 @pytest.mark.asyncio
 async def test_sync_log_completion(test_db, sync_log):
     """Test updating sync log on completion"""
-    stats = {
-        "fetched": 200,
-        "created": 20,
-        "updated": 10,
-        "archived": 5
-    }
+    stats = {"fetched": 200, "created": 20, "updated": 10, "archived": 5}
 
     result = await test_db.sync_logs.update_one(
         {"id": sync_log["id"]},
-        {"$set": {
-            "status": "completed",
-            "stats": stats,
-            "completed_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"$set": {"status": "completed", "stats": stats, "completed_at": datetime.now(UTC).isoformat()}},
     )
 
     assert result.modified_count == 1
@@ -193,8 +172,8 @@ async def test_sync_log_failure(test_db, test_campus):
         "sync_type": "manual",
         "status": "failed",
         "error": "Connection timeout after 3 retries",
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "completed_at": datetime.now(timezone.utc).isoformat()
+        "started_at": datetime.now(UTC).isoformat(),
+        "completed_at": datetime.now(UTC).isoformat(),
     }
 
     await test_db.sync_logs.insert_one(log_data)
@@ -210,17 +189,9 @@ async def test_webhook_signature_verification():
     secret = "test_secret_key_12345"
     payload = json.dumps({"event": "member.created", "data": {"id": "123"}})
 
-    expected_signature = hmac.new(
-        secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    expected_signature = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
-    actual_signature = hmac.new(
-        secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    actual_signature = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
     assert hmac.compare_digest(expected_signature, actual_signature)
 
@@ -232,17 +203,9 @@ async def test_webhook_invalid_signature():
     wrong_secret = "wrong_secret"
     payload = json.dumps({"event": "member.created"})
 
-    correct_sig = hmac.new(
-        secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    correct_sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
-    wrong_sig = hmac.new(
-        wrong_secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    wrong_sig = hmac.new(wrong_secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
     assert not hmac.compare_digest(correct_sig, wrong_sig)
 
@@ -250,9 +213,7 @@ async def test_webhook_invalid_signature():
 @pytest.mark.asyncio
 async def test_sync_logs_query_by_campus(test_db, test_campus, sync_log):
     """Test querying sync logs by campus"""
-    logs = await test_db.sync_logs.find({
-        "campus_id": test_campus["id"]
-    }).sort("started_at", -1).to_list(None)
+    logs = await test_db.sync_logs.find({"campus_id": test_campus["id"]}).sort("started_at", -1).to_list(None)
 
     assert len(logs) >= 1
     assert all(log["campus_id"] == test_campus["id"] for log in logs)
@@ -261,9 +222,7 @@ async def test_sync_logs_query_by_campus(test_db, test_campus, sync_log):
 @pytest.mark.asyncio
 async def test_sync_config_unique_per_campus(test_db, test_campus, sync_config):
     """Test that only one sync config exists per campus"""
-    configs = await test_db.sync_configs.find({
-        "campus_id": test_campus["id"]
-    }).to_list(None)
+    configs = await test_db.sync_configs.find({"campus_id": test_campus["id"]}).to_list(None)
 
     assert len(configs) == 1
 
@@ -277,7 +236,7 @@ async def test_member_external_id_tracking(test_db, test_campus):
         "name": "External Member",
         "external_member_id": "ext-12345",
         "source": "faithflow_sync",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     await test_db.members.insert_one(member_data)
@@ -295,13 +254,13 @@ async def test_sync_updates_existing_member(test_db, test_campus):
         "campus_id": test_campus["id"],
         "name": "Original Name",
         "external_member_id": "ext-99999",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await test_db.members.insert_one(original)
 
     result = await test_db.members.update_one(
         {"external_member_id": "ext-99999", "campus_id": test_campus["id"]},
-        {"$set": {"name": "Updated Name", "phone": "+6281234567890"}}
+        {"$set": {"name": "Updated Name", "phone": "+6281234567890"}},
     )
 
     assert result.modified_count == 1

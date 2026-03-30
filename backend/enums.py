@@ -4,18 +4,20 @@ FaithTracker Enums - Centralized enum definitions
 All enum types used throughout the application for type safety and consistency.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EngagementStatus(str, Enum):
+class EngagementStatus(StrEnum):
     """Member engagement status based on days since last contact."""
+
     ACTIVE = "active"
     AT_RISK = "at_risk"
     DISCONNECTED = "disconnected"
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of pastoral care events."""
+
     BIRTHDAY = "birthday"
     CHILDBIRTH = "childbirth"
     GRIEF_LOSS = "grief_loss"
@@ -25,8 +27,9 @@ class EventType(str, Enum):
     REGULAR_CONTACT = "regular_contact"
 
 
-class GriefStage(str, Enum):
+class GriefStage(StrEnum):
     """Grief support timeline stages."""
+
     MOURNING = "mourning"
     ONE_WEEK = "1_week"
     TWO_WEEKS = "2_weeks"
@@ -36,8 +39,9 @@ class GriefStage(str, Enum):
     ONE_YEAR = "1_year"
 
 
-class AidType(str, Enum):
+class AidType(StrEnum):
     """Types of financial aid."""
+
     EDUCATION = "education"
     MEDICAL = "medical"
     EMERGENCY = "emergency"
@@ -47,36 +51,41 @@ class AidType(str, Enum):
     OTHER = "other"
 
 
-class NotificationChannel(str, Enum):
+class NotificationChannel(StrEnum):
     """Communication channels for notifications."""
+
     WHATSAPP = "whatsapp"
     EMAIL = "email"
 
 
-class NotificationStatus(str, Enum):
+class NotificationStatus(StrEnum):
     """Status of notification delivery."""
+
     SENT = "sent"
     FAILED = "failed"
     PENDING = "pending"
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User roles with different access levels."""
-    FULL_ADMIN = "full_admin"      # Can access all campuses
+
+    FULL_ADMIN = "full_admin"  # Can access all campuses
     CAMPUS_ADMIN = "campus_admin"  # Can manage their campus only
-    PASTOR = "pastor"              # Regular pastoral care staff
+    PASTOR = "pastor"  # Regular pastoral care staff
 
 
-class ScheduleFrequency(str, Enum):
+class ScheduleFrequency(StrEnum):
     """Frequency options for scheduled events."""
+
     ONE_TIME = "one_time"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
     ANNUALLY = "annually"
 
 
-class WeekDay(str, Enum):
+class WeekDay(StrEnum):
     """Days of the week."""
+
     MONDAY = "monday"
     TUESDAY = "tuesday"
     WEDNESDAY = "wednesday"
@@ -86,8 +95,9 @@ class WeekDay(str, Enum):
     SUNDAY = "sunday"
 
 
-class ActivityActionType(str, Enum):
+class ActivityActionType(StrEnum):
     """Types of actions logged in activity stream."""
+
     COMPLETE_TASK = "complete_task"
     IGNORE_TASK = "ignore_task"
     UNIGNORE_TASK = "unignore_task"
@@ -105,8 +115,9 @@ class ActivityActionType(str, Enum):
     DELETE_PASTORAL_NOTE = "delete_pastoral_note"
 
 
-class NoteCategory(str, Enum):
+class NoteCategory(StrEnum):
     """Categories for pastoral notes."""
+
     SPECIAL_NEEDS = "special_needs"
     HEALTH = "health"
     FINANCIAL = "financial"

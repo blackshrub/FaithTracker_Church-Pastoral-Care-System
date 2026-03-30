@@ -1,16 +1,19 @@
 """Campus routes"""
-from litestar import get, post, put, Request
+
+import logging
+from datetime import UTC, datetime
+
+from litestar import Request, get, post, put
 from litestar.exceptions import HTTPException
 from litestar.response import Response as LitestarResponse
-from datetime import datetime, timezone
-import logging
 
-from dependencies import get_db, get_current_user
-from models import Campus, CampusCreate, to_mongo_doc
+from dependencies import get_current_user, get_db
 from enums import UserRole
-from utils import get_from_cache, set_in_cache, invalidate_cache
+from models import Campus, CampusCreate, to_mongo_doc
+from utils import get_from_cache, invalidate_cache, set_in_cache
 
 logger = logging.getLogger(__name__)
+
 
 def safe_error_detail(e: Exception) -> str:
     return str(e) if str(e) else "Internal server error"
@@ -24,16 +27,12 @@ async def create_campus(data: CampusCreate, request: Request) -> dict:
     if current_user.get("role") != UserRole.FULL_ADMIN.value:
         raise HTTPException(status_code=403, detail="Only full administrators can create campuses")
     try:
-        campus_obj = Campus(
-            campus_name=data.campus_name,
-            location=data.location,
-            timezone=data.timezone
-        )
+        campus_obj = Campus(campus_name=data.campus_name, location=data.location, timezone=data.timezone)
         await db.campuses.insert_one(to_mongo_doc(campus_obj))
         invalidate_cache("campuses:")
         return {"id": campus_obj.id, "campus_name": campus_obj.campus_name, "location": campus_obj.location}
     except Exception as e:
-        logger.error(f"Error creating campus: {str(e)}")
+        logger.error(f"Error creating campus: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -53,15 +52,15 @@ async def list_campuses() -> list:
         serialized = []
         for c in campuses:
             cc = dict(c)
-            if isinstance(cc.get('created_at'), datetime):
-                cc['created_at'] = cc['created_at'].isoformat()
-            if isinstance(cc.get('updated_at'), datetime):
-                cc['updated_at'] = cc['updated_at'].isoformat()
+            if isinstance(cc.get("created_at"), datetime):
+                cc["created_at"] = cc["created_at"].isoformat()
+            if isinstance(cc.get("updated_at"), datetime):
+                cc["updated_at"] = cc["updated_at"].isoformat()
             serialized.append(cc)
         set_in_cache(cache_key, serialized)
         return LitestarResponse(content=serialized, headers=cache_headers)
     except Exception as e:
-        logger.error(f"Error listing campuses: {str(e)}")
+        logger.error(f"Error listing campuses: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -81,7 +80,7 @@ async def get_campus(campus_id: str) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting campus: {str(e)}")
+        logger.error(f"Error getting campus: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -94,8 +93,7 @@ async def update_campus(campus_id: str, data: CampusCreate, request: Request) ->
         raise HTTPException(status_code=403, detail="Only full administrators can update campuses")
     try:
         result = await db.campuses.update_one(
-            {"id": campus_id},
-            {"$set": {**to_mongo_doc(data), "updated_at": datetime.now(timezone.utc)}}
+            {"id": campus_id}, {"$set": {**to_mongo_doc(data), "updated_at": datetime.now(UTC)}}
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Campus not found")
@@ -104,7 +102,7 @@ async def update_campus(campus_id: str, data: CampusCreate, request: Request) ->
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating campus: {str(e)}")
+        logger.error(f"Error updating campus: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 

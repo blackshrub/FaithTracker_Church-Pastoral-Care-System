@@ -5,25 +5,25 @@ Validation, caching, and helper functions that don't depend on database.
 """
 
 import re
-from datetime import datetime, timezone
-from typing import Optional, Any
+from datetime import UTC, datetime
+from typing import Any
 
-from enums import EngagementStatus
 from constants import (
     ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
     ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
     ENGAGEMENT_NO_CONTACT_DAYS,
     IMAGE_MAGIC_BYTES,
-    MAX_CACHE_SIZE
+    MAX_CACHE_SIZE,
 )
+from enums import EngagementStatus
 
 # ==================== REGEX PATTERNS ====================
 
 # Email validation pattern (RFC 5322 simplified)
-EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+EMAIL_PATTERN = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 # Phone validation: digits only after stripping, reasonable length
-PHONE_PATTERN = re.compile(r'^\+?[0-9]{7,15}$')
+PHONE_PATTERN = re.compile(r"^\+?[0-9]{7,15}$")
 
 
 # ==================== PASSWORD CONSTANTS ====================
@@ -34,15 +34,16 @@ PASSWORD_MAX_LENGTH = 128
 
 # ==================== VALIDATION FUNCTIONS ====================
 
+
 def escape_regex(text: str) -> str:
     """
     Escape special regex characters to prevent NoSQL injection.
     This makes the text safe to use in MongoDB $regex queries.
     """
     # Escape all regex special characters
-    special_chars = r'\.^$*+?{}[]|()'
+    special_chars = r"\.^$*+?{}[]|()"
     for char in special_chars:
-        text = text.replace(char, '\\' + char)
+        text = text.replace(char, "\\" + char)
     return text
 
 
@@ -97,11 +98,12 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
 
 # ==================== PHONE NORMALIZATION ====================
 
+
 def normalize_phone_number(phone: str, default_country_code: str = "+62") -> str:
     """
     Normalize phone number to international format.
     Handles Indonesian phone numbers starting with 0.
-    
+
     Examples:
         081234567890 -> +6281234567890
         62812345678 -> +62812345678
@@ -109,41 +111,42 @@ def normalize_phone_number(phone: str, default_country_code: str = "+62") -> str
     """
     if not phone:
         return phone
-    
+
     # Remove whitespace and common separators
     phone = phone.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-    
+
     # Already has + prefix
     if phone.startswith("+"):
         return phone
-    
+
     # Starts with country code without +
     if phone.startswith("62"):
         return f"+{phone}"
-    
+
     # Starts with 0 (local Indonesian format)
     if phone.startswith("0"):
         return f"{default_country_code}{phone[1:]}"
-    
+
     # No recognizable prefix - assume it needs country code
     return f"{default_country_code}{phone}"
 
 
 # ==================== ENGAGEMENT STATUS ====================
 
+
 def calculate_engagement_status(
-    last_contact: Optional[datetime],
+    last_contact: datetime | None,
     at_risk_days: int = ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
-    disconnected_days: int = ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT
+    disconnected_days: int = ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
 ) -> tuple[EngagementStatus, int]:
     """
     Calculate engagement status and days since last contact.
-    
+
     Args:
         last_contact: Last contact datetime (can be None or string)
         at_risk_days: Days threshold for at-risk status (default from constants)
         disconnected_days: Days threshold for disconnected status (default from constants)
-    
+
     Returns:
         Tuple of (EngagementStatus, days_since_last_contact)
     """
@@ -156,14 +159,14 @@ def calculate_engagement_status(
             last_contact = datetime.fromisoformat(last_contact)
         except ValueError:
             return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
-    
+
     # Make timezone-aware if needed
     if last_contact.tzinfo is None:
-        last_contact = last_contact.replace(tzinfo=timezone.utc)
-    
-    now = datetime.now(timezone.utc)
+        last_contact = last_contact.replace(tzinfo=UTC)
+
+    now = datetime.now(UTC)
     days_since = (now - last_contact).days
-    
+
     if days_since < at_risk_days:
         return EngagementStatus.ACTIVE, days_since
     elif days_since < disconnected_days:
@@ -179,7 +182,7 @@ _cache: dict = {}
 _cache_timestamps: dict = {}
 
 
-def get_from_cache(key: str, ttl_seconds: int = 300) -> Optional[Any]:
+def get_from_cache(key: str, ttl_seconds: int = 300) -> Any | None:
     """
     Get value from cache if not expired.
 
@@ -191,7 +194,7 @@ def get_from_cache(key: str, ttl_seconds: int = 300) -> Optional[Any]:
         Cached value or None if expired/not found
     """
     if key in _cache:
-        age = (datetime.now(timezone.utc) - _cache_timestamps[key]).total_seconds()
+        age = (datetime.now(UTC) - _cache_timestamps[key]).total_seconds()
         if age < ttl_seconds:
             return _cache[key]
         else:
@@ -215,10 +218,10 @@ def set_in_cache(key: str, value: Any) -> None:
         del _cache[oldest_key]
         del _cache_timestamps[oldest_key]
     _cache[key] = value
-    _cache_timestamps[key] = datetime.now(timezone.utc)
+    _cache_timestamps[key] = datetime.now(UTC)
 
 
-def invalidate_cache(pattern: Optional[str] = None) -> None:
+def invalidate_cache(pattern: str | None = None) -> None:
     """
     Invalidate cache entries.
 
@@ -231,7 +234,7 @@ def invalidate_cache(pattern: Optional[str] = None) -> None:
         _cache.clear()
         _cache_timestamps.clear()
     else:
-        keys_to_delete = [k for k in _cache.keys() if pattern in k]
+        keys_to_delete = [k for k in _cache if pattern in k]
         for key in keys_to_delete:
             del _cache[key]
             del _cache_timestamps[key]
@@ -239,10 +242,11 @@ def invalidate_cache(pattern: Optional[str] = None) -> None:
 
 # ==================== IMAGE VALIDATION ====================
 
+
 def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
     """
     Validate image file by checking magic bytes (file signature).
-    
+
     Returns:
         (is_valid, detected_mime_type or error_message)
     """
@@ -254,7 +258,7 @@ def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
             return True, mime_type
 
     # Special check for WebP (RIFF....WEBP)
-    if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
-        return True, 'image/webp'
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return True, "image/webp"
 
     return False, "Invalid image format. Allowed: JPEG, PNG, GIF, WebP"

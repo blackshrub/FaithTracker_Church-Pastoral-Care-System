@@ -7,8 +7,10 @@ external APIs (WhatsApp gateway, etc.).
 Special-purpose calls (sync API with 60s timeout, etc.) should continue
 using their own per-request clients with specific timeout requirements.
 """
-import httpx
+
 import logging
+
+import httpx
 
 logger = logging.getLogger(__name__)
 

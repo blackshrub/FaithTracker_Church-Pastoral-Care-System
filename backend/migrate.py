@@ -5,39 +5,41 @@ Handles database schema changes and data transformations between versions
 """
 
 import asyncio
-import sys
+import contextlib
 import os
-from datetime import datetime, timezone
-from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
+import sys
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Dict, Callable
+
+from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
 # Colors for beautiful output
-GREEN = '\033[0;32m'
-BLUE = '\033[0;34m'
-YELLOW = '\033[1;33m'
-RED = '\033[0;31m'
-CYAN = '\033[0;36m'
-MAGENTA = '\033[0;35m'
-BOLD = '\033[1m'
-NC = '\033[0m'  # No Color
+GREEN = "\033[0;32m"
+BLUE = "\033[0;34m"
+YELLOW = "\033[1;33m"
+RED = "\033[0;31m"
+CYAN = "\033[0;36m"
+MAGENTA = "\033[0;35m"
+BOLD = "\033[1m"
+NC = "\033[0m"  # No Color
 
 
 def print_header():
     """Print beautiful header"""
-    print(f"\n{MAGENTA}{'='*60}{NC}")
+    print(f"\n{MAGENTA}{'=' * 60}{NC}")
     print(f"{CYAN}{BOLD}   🔄 FaithTracker Database Migration   {NC}")
-    print(f"{MAGENTA}{'='*60}{NC}\n")
+    print(f"{MAGENTA}{'=' * 60}{NC}\n")
 
 
 def print_step(message):
     """Print migration step"""
-    print(f"{BLUE}▶{NC} {message}...", end='', flush=True)
+    print(f"{BLUE}▶{NC} {message}...", end="", flush=True)
 
 
 def print_success(message=""):
@@ -50,7 +52,7 @@ def print_success(message=""):
 
 def print_info(message):
     """Print info message"""
-    print(f"{CYAN}ℹ{NC}  {message}")
+    print(f"{CYAN}ℹ{NC}  {message}")  # noqa: RUF001
 
 
 def print_warning(message):
@@ -64,6 +66,7 @@ def print_error(message):
 
 
 # ==================== MIGRATION DEFINITIONS ====================
+
 
 async def migration_001_initial(db):
     """
@@ -121,10 +124,7 @@ async def migration_004_normalize_phone_numbers(db):
                 continue  # Skip invalid formats
 
             if normalized != phone:
-                await db.members.update_one(
-                    {"_id": member["_id"]},
-                    {"$set": {"phone": normalized}}
-                )
+                await db.members.update_one({"_id": member["_id"]}, {"$set": {"phone": normalized}})
                 members_updated += 1
 
     return f"Normalized {members_updated} phone numbers"
@@ -138,8 +138,7 @@ async def migration_005_add_deleted_fields(db):
     for collection_name in collections:
         collection = db[collection_name]
         result = await collection.update_many(
-            {"deleted": {"$exists": False}},
-            {"$set": {"deleted": False, "deleted_at": None}}
+            {"deleted": {"$exists": False}}, {"$set": {"deleted": False, "deleted_at": None}}
         )
         total_updated += result.modified_count
 
@@ -148,10 +147,7 @@ async def migration_005_add_deleted_fields(db):
 
 async def migration_006_ensure_campus_is_active(db):
     """Ensure all campuses have is_active field (required for login selection)"""
-    result = await db.campuses.update_many(
-        {"is_active": {"$exists": False}},
-        {"$set": {"is_active": True}}
-    )
+    result = await db.campuses.update_many({"is_active": {"$exists": False}}, {"$set": {"is_active": True}})
     return f"Set is_active=True on {result.modified_count} campus(es)"
 
 
@@ -160,14 +156,11 @@ async def migration_007_fix_user_password_field(db):
     # Find users with old field name
     result = await db.users.update_many(
         {"password_hash": {"$exists": True}, "hashed_password": {"$exists": False}},
-        [{"$set": {"hashed_password": "$password_hash"}}, {"$unset": "password_hash"}]
+        [{"$set": {"hashed_password": "$password_hash"}}, {"$unset": "password_hash"}],
     )
 
     # Also ensure is_active exists
-    await db.users.update_many(
-        {"is_active": {"$exists": False}},
-        {"$set": {"is_active": True}}
-    )
+    await db.users.update_many({"is_active": {"$exists": False}}, {"$set": {"is_active": True}})
 
     return f"Fixed password field on {result.modified_count} user(s)"
 
@@ -182,10 +175,7 @@ async def migration_008_ensure_campus_id_field(db):
     async for campus in cursor:
         # Generate a UUID for the campus id field
         new_id = str(uuid.uuid4())
-        await db.campuses.update_one(
-            {"_id": campus["_id"]},
-            {"$set": {"id": new_id}}
-        )
+        await db.campuses.update_one({"_id": campus["_id"]}, {"$set": {"id": new_id}})
         campuses_updated += 1
 
     return f"Added id field to {campuses_updated} campus(es)"
@@ -196,7 +186,7 @@ async def migration_009_ensure_user_required_fields(db):
     import uuid
 
     users_fixed = 0
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Find all users and ensure they have all required fields
     cursor = db.users.find({})
@@ -229,10 +219,7 @@ async def migration_009_ensure_user_required_fields(db):
 
         # Apply updates if any
         if updates:
-            await db.users.update_one(
-                {"_id": user["_id"]},
-                {"$set": updates}
-            )
+            await db.users.update_one({"_id": user["_id"]}, {"$set": updates})
             users_fixed += 1
 
     return f"Fixed {users_fixed} user(s) with missing required fields"
@@ -244,11 +231,11 @@ async def migration_010_fix_corrupted_uuids(db):
     Some IDs were stored as binary data instead of valid UUID strings,
     causing 404 errors when trying to access them via API.
     """
-    import uuid
     import re
+    import uuid
 
     # UUID v4 pattern for validation
-    UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.IGNORECASE)
+    UUID_PATTERN = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.IGNORECASE)
 
     def is_valid_uuid(value):
         """Check if a string is a valid UUID format."""
@@ -268,7 +255,7 @@ async def migration_010_fix_corrupted_uuids(db):
         "campuses",
         "users",
         "api_sync_configs",
-        "api_sync_history"
+        "api_sync_history",
     ]
 
     total_fixed = 0
@@ -284,10 +271,7 @@ async def migration_010_fix_corrupted_uuids(db):
             if not is_valid_uuid(doc_id):
                 # Generate new valid UUID
                 new_id = str(uuid.uuid4())
-                await collection.update_one(
-                    {"_id": doc["_id"]},
-                    {"$set": {"id": new_id}}
-                )
+                await collection.update_one({"_id": doc["_id"]}, {"$set": {"id": new_id}})
                 fixed_count += 1
 
         if fixed_count > 0:
@@ -303,10 +287,8 @@ async def migration_011_fix_activity_logs_index(db):
     index and create the correct one.
     """
     # Drop the incorrect action_date index (if it exists)
-    try:
+    with contextlib.suppress(Exception):
         await db.activity_logs.drop_index("action_date_1")
-    except Exception:
-        pass  # Index may not exist if migration_002 was never run or already fixed
 
     # Create the correct index on created_at
     await db.activity_logs.create_index("created_at")
@@ -318,7 +300,7 @@ async def migration_011_fix_activity_logs_index(db):
 
 # List of all migrations in order
 # Format: (version_number, description, migration_function)
-MIGRATIONS: List[tuple[int, str, Callable]] = [
+MIGRATIONS: list[tuple[int, str, Callable]] = [
     (1, "Initial indexes", migration_001_initial),
     (2, "Activity logs indexes", migration_002_add_activity_logs_indexes),
     (3, "API sync collections", migration_003_add_api_sync_collections),
@@ -335,6 +317,7 @@ MIGRATIONS: List[tuple[int, str, Callable]] = [
 
 # ==================== MIGRATION ENGINE ====================
 
+
 async def get_current_version(db) -> int:
     """Get the current database version from migrations collection"""
     migration_doc = await db.migrations.find_one({"_id": "version"})
@@ -346,24 +329,21 @@ async def get_current_version(db) -> int:
 async def set_current_version(db, version: int):
     """Update the current database version"""
     await db.migrations.update_one(
-        {"_id": "version"},
-        {"$set": {
-            "version": version,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }},
-        upsert=True
+        {"_id": "version"}, {"$set": {"version": version, "updated_at": datetime.now(UTC).isoformat()}}, upsert=True
     )
 
 
 async def log_migration(db, version: int, description: str, success: bool, message: str):
     """Log migration execution to history"""
-    await db.migrations_history.insert_one({
-        "version": version,
-        "description": description,
-        "success": success,
-        "message": message,
-        "executed_at": datetime.now(timezone.utc).isoformat()
-    })
+    await db.migrations_history.insert_one(
+        {
+            "version": version,
+            "description": description,
+            "success": success,
+            "message": message,
+            "executed_at": datetime.now(UTC).isoformat(),
+        }
+    )
 
 
 async def run_migrations(db, current_version: int):
@@ -386,7 +366,7 @@ async def run_migrations(db, current_version: int):
             print_success(result)
 
         except Exception as e:
-            error_msg = f"Migration failed: {str(e)}"
+            error_msg = f"Migration failed: {e!s}"
             print_error(error_msg)
             await log_migration(db, version, description, False, error_msg)
             return False
@@ -418,8 +398,8 @@ async def run_migration_process():
     print_header()
 
     # Get configuration
-    mongo_url = os.environ.get('MONGO_URL')
-    db_name = os.environ.get('DB_NAME', 'pastoral_care_db')
+    mongo_url = os.environ.get("MONGO_URL")
+    db_name = os.environ.get("DB_NAME", "pastoral_care_db")
 
     if not mongo_url:
         print_error("MONGO_URL not set in environment")
@@ -429,7 +409,7 @@ async def run_migration_process():
         # Connect to database
         print_step("Connecting to database")
         client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         db = client[db_name]
         print_success(f"Connected to {db_name}")
 
@@ -441,17 +421,17 @@ async def run_migration_process():
         print_info(f"Latest available version: v{latest_version:03d}")
 
         if current_version >= latest_version:
-            print(f"\n{GREEN}{'='*60}{NC}")
+            print(f"\n{GREEN}{'=' * 60}{NC}")
             print(f"{GREEN}{BOLD}   ✓ Database is up to date!   {NC}")
-            print(f"{GREEN}{'='*60}{NC}\n")
+            print(f"{GREEN}{'=' * 60}{NC}\n")
         else:
             # Run migrations
             success = await run_migrations(db, current_version)
 
             if success:
-                print(f"\n{GREEN}{'='*60}{NC}")
+                print(f"\n{GREEN}{'=' * 60}{NC}")
                 print(f"{GREEN}{BOLD}   ✓ All migrations completed successfully!   {NC}")
-                print(f"{GREEN}{'='*60}{NC}\n")
+                print(f"{GREEN}{'=' * 60}{NC}\n")
 
                 new_version = await get_current_version(db)
                 print(f"{CYAN}📊 Summary:{NC}")
@@ -459,9 +439,9 @@ async def run_migration_process():
                 print(f"   Current version:   v{new_version:03d}")
                 print(f"   Migrations run:    {new_version - current_version}")
             else:
-                print(f"\n{RED}{'='*60}{NC}")
+                print(f"\n{RED}{'=' * 60}{NC}")
                 print(f"{RED}{BOLD}   ✗ Migration failed!   {NC}")
-                print(f"{RED}{'='*60}{NC}\n")
+                print(f"{RED}{'=' * 60}{NC}\n")
                 print_warning("Database may be in an inconsistent state")
                 print_warning("Review the error above and fix before retrying")
 

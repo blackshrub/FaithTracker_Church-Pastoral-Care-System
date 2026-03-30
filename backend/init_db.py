@@ -4,45 +4,48 @@ FaithTracker Database Initialization Script
 Initializes database for fresh installations with indexes, admin user, and essential data
 """
 
-import asyncio
 import argparse
-import sys
+import asyncio
 import os
-from datetime import datetime, timezone
-from motor.motor_asyncio import AsyncIOMotorClient
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+
 import bcrypt
 from dotenv import load_dotenv
-from pathlib import Path
+from motor.motor_asyncio import AsyncIOMotorClient
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
+
 
 # Password hashing helper
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt."""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
 
 # Colors for beautiful output
-GREEN = '\033[0;32m'
-BLUE = '\033[0;34m'
-YELLOW = '\033[1;33m'
-RED = '\033[0;31m'
-CYAN = '\033[0;36m'
-BOLD = '\033[1m'
-NC = '\033[0m'  # No Color
+GREEN = "\033[0;32m"
+BLUE = "\033[0;34m"
+YELLOW = "\033[1;33m"
+RED = "\033[0;31m"
+CYAN = "\033[0;36m"
+BOLD = "\033[1m"
+NC = "\033[0m"  # No Color
 
 
 def print_header():
     """Print beautiful header"""
-    print(f"\n{BLUE}{'='*60}{NC}")
+    print(f"\n{BLUE}{'=' * 60}{NC}")
     print(f"{CYAN}{BOLD}   🚀 FaithTracker Database Initialization   {NC}")
-    print(f"{BLUE}{'='*60}{NC}\n")
+    print(f"{BLUE}{'=' * 60}{NC}\n")
 
 
 def print_step(step_num, total_steps, message):
     """Print step progress"""
-    print(f"{BLUE}[{step_num}/{total_steps}]{NC} {message}...", end='', flush=True)
+    print(f"{BLUE}[{step_num}/{total_steps}]{NC} {message}...", end="", flush=True)
 
 
 def print_success(message=""):
@@ -62,10 +65,10 @@ async def test_connection(mongo_url, db_name):
     """Test MongoDB connection"""
     try:
         client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         return client
     except Exception as e:
-        raise Exception(f"Cannot connect to MongoDB: {str(e)}")
+        raise Exception(f"Cannot connect to MongoDB: {e!s}")
 
 
 async def create_indexes(db):
@@ -152,8 +155,8 @@ async def create_admin_user(db, email, password, name="Administrator"):
         "role": "full_admin",
         "campus_id": None,  # Full admin has no specific campus
         "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
 
     await db.users.insert_one(user)
@@ -167,6 +170,7 @@ async def create_default_campus(db, church_name):
         return False, "Campus already exists"
 
     import uuid
+
     campus = {
         "id": str(uuid.uuid4()),
         "campus_name": f"{church_name} - Main Campus",
@@ -175,8 +179,8 @@ async def create_default_campus(db, church_name):
         "phone": "",
         "head_pastor": "",
         "is_active": True,  # Required for campus to show in login selection
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(UTC).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
 
     await db.campuses.insert_one(campus)
@@ -188,8 +192,8 @@ async def initialize_database(args):
     print_header()
 
     # Get configuration
-    mongo_url = os.environ.get('MONGO_URL')
-    db_name = os.environ.get('DB_NAME', 'pastoral_care_db')
+    mongo_url = os.environ.get("MONGO_URL")
+    db_name = os.environ.get("DB_NAME", "pastoral_care_db")
 
     if not mongo_url:
         print_error("MONGO_URL not set in environment")
@@ -215,12 +219,7 @@ async def initialize_database(args):
         # Step 3: Create admin user
         current_step += 1
         print_step(current_step, total_steps, "Creating admin user")
-        created, message = await create_admin_user(
-            db,
-            args.admin_email,
-            args.admin_password,
-            args.admin_name
-        )
+        created, message = await create_admin_user(db, args.admin_email, args.admin_password, args.admin_name)
         if created:
             print_success(f"{args.admin_email}")
         else:
@@ -243,9 +242,9 @@ async def initialize_database(args):
         print_success(f"{users_count} user(s), {campuses_count} campus(es)")
 
         # Print summary
-        print(f"\n{GREEN}{'='*60}{NC}")
+        print(f"\n{GREEN}{'=' * 60}{NC}")
         print(f"{GREEN}{BOLD}   ✓ Database initialized successfully!   {NC}")
-        print(f"{GREEN}{'='*60}{NC}\n")
+        print(f"{GREEN}{'=' * 60}{NC}\n")
 
         print(f"{CYAN}📊 Summary:{NC}")
         print(f"   Database:  {BOLD}{db_name}{NC}")
@@ -263,18 +262,16 @@ async def initialize_database(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='Initialize FaithTracker database for fresh installation'
-    )
-    parser.add_argument('--admin-email', required=True, help='Admin user email')
-    parser.add_argument('--admin-password', required=True, help='Admin user password')
-    parser.add_argument('--admin-name', default='Administrator', help='Admin user name')
-    parser.add_argument('--church-name', default='GKBJ', help='Church name')
+    parser = argparse.ArgumentParser(description="Initialize FaithTracker database for fresh installation")
+    parser.add_argument("--admin-email", required=True, help="Admin user email")
+    parser.add_argument("--admin-password", required=True, help="Admin user password")
+    parser.add_argument("--admin-name", default="Administrator", help="Admin user name")
+    parser.add_argument("--church-name", default="GKBJ", help="Church name")
 
     args = parser.parse_args()
 
     # Validate email
-    if '@' not in args.admin_email:
+    if "@" not in args.admin_email:
         print_error("Invalid email format")
         sys.exit(1)
 

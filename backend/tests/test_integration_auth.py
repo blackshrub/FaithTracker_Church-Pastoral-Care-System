@@ -12,34 +12,47 @@ Tests ALL functions in dependencies.py with mocked MongoDB:
 Target: 100% coverage of dependencies.py (all 133 statements).
 """
 
-import pytest
 import os
-from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Set env vars BEFORE any app imports
-os.environ.update({
-    'MONGO_URL': 'mongodb://mock:27017',
-    'DB_NAME': 'faithtracker_test',
-    'JWT_SECRET_KEY': 'test-secret-key-1234567890abcdef1234567890abcdef',
-    'ENCRYPTION_KEY': 'dGVzdC1lbmNyeXB0aW9uLWtleS0xMjM0NTY3ODkwYWI=',
-    'DRAGONFLY_URL': 'redis://mock:6379',
-    'FRONTEND_URL': 'http://localhost:3000',
-    'ALLOWED_ORIGINS': 'http://localhost:3000',
-    'ENVIRONMENT': 'development',
-})
+os.environ.update(
+    {
+        "MONGO_URL": "mongodb://mock:27017",
+        "DB_NAME": "faithtracker_test",
+        "JWT_SECRET_KEY": "test-secret-key-1234567890abcdef1234567890abcdef",
+        "ENCRYPTION_KEY": "dGVzdC1lbmNyeXB0aW9uLWtleS0xMjM0NTY3ODkwYWI=",
+        "DRAGONFLY_URL": "redis://mock:6379",
+        "FRONTEND_URL": "http://localhost:3000",
+        "ALLOWED_ORIGINS": "http://localhost:3000",
+        "ENVIRONMENT": "development",
+    }
+)
 
 # Now import
 from dependencies import (
-    init_dependencies, get_db, get_current_user, get_current_admin,
-    get_full_admin, get_campus_filter, verify_password, get_password_hash,
-    create_access_token, safe_error_detail, get_client_ip,
-    check_login_rate_limit, record_failed_login, clear_login_attempts,
+    LOGIN_ATTEMPT_WINDOW_MINUTES,
+    LOGIN_MAX_ATTEMPTS,
+    check_login_rate_limit,
+    clear_login_attempts,
+    create_access_token,
+    get_campus_filter,
+    get_client_ip,
+    get_current_admin,
+    get_current_user,
+    get_db,
+    get_full_admin,
+    get_password_hash,
+    init_dependencies,
     init_redis,
-    LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_MINUTES, LOGIN_ATTEMPT_WINDOW_MINUTES,
+    record_failed_login,
+    safe_error_detail,
+    verify_password,
 )
 from enums import UserRole
-
 
 # ==================== FIXTURES ====================
 
@@ -50,6 +63,7 @@ TEST_SECRET_KEY = "test-secret-key-for-jwt-signing-minimum-length"
 def reset_dependencies():
     """Reset global dependency state before and after each test."""
     import dependencies
+
     original_db = dependencies._db
     original_secret = dependencies._secret_key
     yield
@@ -132,6 +146,7 @@ def pastor_user():
 def make_valid_token(user_id: str = "admin-001", secret: str = TEST_SECRET_KEY) -> str:
     """Helper to create a valid JWT token for testing."""
     import dependencies
+
     old_secret = dependencies._secret_key
     dependencies._secret_key = secret
     token = create_access_token({"sub": user_id})
@@ -141,12 +156,14 @@ def make_valid_token(user_id: str = "admin-001", secret: str = TEST_SECRET_KEY) 
 
 # ==================== init_dependencies TESTS ====================
 
+
 class TestInitDependencies:
     """Tests for init_dependencies()."""
 
     def test_sets_db_and_secret_key(self, mock_db):
         """init_dependencies should set the global _db and _secret_key."""
         import dependencies
+
         init_dependencies(mock_db, "my-secret")
         assert dependencies._db is mock_db
         assert dependencies._secret_key == "my-secret"
@@ -154,6 +171,7 @@ class TestInitDependencies:
     def test_overwrites_previous_values(self, mock_db):
         """Calling init_dependencies again should overwrite previous values."""
         import dependencies
+
         first_db = MagicMock()
         init_dependencies(first_db, "secret-1")
         assert dependencies._db is first_db
@@ -164,6 +182,7 @@ class TestInitDependencies:
 
 
 # ==================== get_db TESTS ====================
+
 
 class TestGetDb:
     """Tests for get_db()."""
@@ -176,12 +195,14 @@ class TestGetDb:
     def test_raises_runtime_error_when_not_initialized(self):
         """get_db should raise RuntimeError if init_dependencies was never called."""
         import dependencies
+
         dependencies._db = None
         with pytest.raises(RuntimeError, match="Database not initialized"):
             get_db()
 
 
 # ==================== get_current_user TESTS ====================
+
 
 class TestGetCurrentUser:
     """Tests for get_current_user()."""
@@ -194,14 +215,13 @@ class TestGetCurrentUser:
 
         result = await get_current_user(mock_request)
         assert result == full_admin_user
-        initialized_db.users.find_one.assert_awaited_once_with(
-            {"id": "admin-001"}, {"_id": 0}
-        )
+        initialized_db.users.find_one.assert_awaited_once_with({"id": "admin-001"}, {"_id": 0})
 
     async def test_missing_authorization_header(self, initialized_db, mock_request):
         """Missing Authorization header should raise 401."""
         mock_request.headers = {}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -211,6 +231,7 @@ class TestGetCurrentUser:
         """Authorization header without 'Bearer ' prefix should raise 401."""
         mock_request.headers = {"Authorization": "Basic some-token"}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -219,6 +240,7 @@ class TestGetCurrentUser:
         """'Bearer ' followed by empty/whitespace-only token should raise 401."""
         mock_request.headers = {"Authorization": "Bearer   "}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -228,6 +250,7 @@ class TestGetCurrentUser:
         """'Bearer' with no token at all (just 7 chars extraction) should raise 401."""
         mock_request.headers = {"Authorization": "Bearer "}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -236,6 +259,7 @@ class TestGetCurrentUser:
     async def test_expired_token(self, initialized_db, mock_request):
         """An expired JWT token should raise 401."""
         import dependencies
+
         dependencies._secret_key = TEST_SECRET_KEY
         # Create a token that expired 1 hour ago
         expired_token = create_access_token(
@@ -244,6 +268,7 @@ class TestGetCurrentUser:
         )
         mock_request.headers = {"Authorization": f"Bearer {expired_token}"}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -252,6 +277,7 @@ class TestGetCurrentUser:
         """A malformed JWT should raise 401."""
         mock_request.headers = {"Authorization": "Bearer not-a-valid-jwt-token"}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -259,13 +285,15 @@ class TestGetCurrentUser:
     async def test_token_wrong_secret(self, initialized_db, mock_request):
         """A token signed with a different secret should raise 401."""
         import jwt as pyjwt
+
         wrong_token = pyjwt.encode(
-            {"sub": "admin-001", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+            {"sub": "admin-001", "exp": datetime.now(UTC) + timedelta(hours=1)},
             "wrong-secret-key",
             algorithm="HS256",
         )
         mock_request.headers = {"Authorization": f"Bearer {wrong_token}"}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -273,13 +301,15 @@ class TestGetCurrentUser:
     async def test_token_missing_sub_claim(self, initialized_db, mock_request):
         """A token without 'sub' claim should raise 401."""
         import jwt as pyjwt
+
         token_no_sub = pyjwt.encode(
-            {"exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+            {"exp": datetime.now(UTC) + timedelta(hours=1)},
             TEST_SECRET_KEY,
             algorithm="HS256",
         )
         mock_request.headers = {"Authorization": f"Bearer {token_no_sub}"}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
@@ -292,12 +322,14 @@ class TestGetCurrentUser:
         initialized_db.users.find_one = AsyncMock(return_value=None)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
 
 
 # ==================== get_current_admin TESTS ====================
+
 
 class TestGetCurrentAdmin:
     """Tests for get_current_admin()."""
@@ -327,6 +359,7 @@ class TestGetCurrentAdmin:
         initialized_db.users.find_one = AsyncMock(return_value=pastor_user)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_admin(mock_request)
         assert exc_info.value.status_code == 403
@@ -334,6 +367,7 @@ class TestGetCurrentAdmin:
 
 
 # ==================== get_full_admin TESTS ====================
+
 
 class TestGetFullAdmin:
     """Tests for get_full_admin()."""
@@ -354,6 +388,7 @@ class TestGetFullAdmin:
         initialized_db.users.find_one = AsyncMock(return_value=campus_admin_user)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_full_admin(mock_request)
         assert exc_info.value.status_code == 403
@@ -366,6 +401,7 @@ class TestGetFullAdmin:
         initialized_db.users.find_one = AsyncMock(return_value=pastor_user)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_full_admin(mock_request)
         assert exc_info.value.status_code == 403
@@ -373,6 +409,7 @@ class TestGetFullAdmin:
 
 
 # ==================== get_campus_filter TESTS ====================
+
 
 class TestGetCampusFilter:
     """Tests for get_campus_filter()."""
@@ -427,6 +464,7 @@ class TestGetCampusFilter:
 
 # ==================== verify_password TESTS ====================
 
+
 class TestVerifyPassword:
     """Tests for verify_password()."""
 
@@ -454,6 +492,7 @@ class TestVerifyPassword:
 
 # ==================== get_password_hash TESTS ====================
 
+
 class TestGetPasswordHash:
     """Tests for get_password_hash()."""
 
@@ -478,12 +517,14 @@ class TestGetPasswordHash:
 
 # ==================== create_access_token TESTS ====================
 
+
 class TestCreateAccessToken:
     """Tests for create_access_token()."""
 
     def test_default_expiry(self, initialized_db):
         """Token with default expiry should have expected hours from JWT_TOKEN_EXPIRE_HOURS."""
         import jwt as pyjwt
+
         from constants import JWT_TOKEN_EXPIRE_HOURS
 
         token = create_access_token({"sub": "user-001"})
@@ -492,8 +533,8 @@ class TestCreateAccessToken:
         assert "exp" in payload
 
         # Check expiry is approximately JWT_TOKEN_EXPIRE_HOURS from now
-        exp_dt = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-        expected = datetime.now(timezone.utc) + timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
+        exp_dt = datetime.fromtimestamp(payload["exp"], tz=UTC)
+        expected = datetime.now(UTC) + timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
         # Allow 5-second tolerance
         assert abs((exp_dt - expected).total_seconds()) < 5
 
@@ -505,8 +546,8 @@ class TestCreateAccessToken:
         token = create_access_token({"sub": "user-002"}, expires_delta=custom_delta)
         payload = pyjwt.decode(token, TEST_SECRET_KEY, algorithms=["HS256"])
 
-        exp_dt = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
-        expected = datetime.now(timezone.utc) + custom_delta
+        exp_dt = datetime.fromtimestamp(payload["exp"], tz=UTC)
+        expected = datetime.now(UTC) + custom_delta
         assert abs((exp_dt - expected).total_seconds()) < 5
 
     def test_token_preserves_extra_data(self, initialized_db):
@@ -532,6 +573,7 @@ class TestCreateAccessToken:
 
 
 # ==================== safe_error_detail TESTS ====================
+
 
 class TestSafeErrorDetail:
     """Tests for safe_error_detail()."""
@@ -595,6 +637,7 @@ class TestSafeErrorDetail:
 
 
 # ==================== get_client_ip TESTS ====================
+
 
 class TestGetClientIp:
     """Tests for get_client_ip()."""
@@ -677,6 +720,7 @@ class TestGetClientIp:
 
 # ==================== BRUTE FORCE PROTECTION TESTS (DragonflyDB-backed) ====================
 
+
 class TestBruteForceRedis:
     """Tests for DragonflyDB-backed brute force protection."""
 
@@ -713,21 +757,21 @@ class TestBruteForceRedis:
     async def test_no_redis_fails_open(self):
         """If redis is None, always allow login."""
         init_redis(None)
-        allowed, msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
+        allowed, _msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
         assert allowed is True
 
     @pytest.mark.asyncio
     async def test_record_and_check_below_max(self):
         """Attempts below max should still be allowed."""
-        for i in range(LOGIN_MAX_ATTEMPTS - 1):
+        for _i in range(LOGIN_MAX_ATTEMPTS - 1):
             await record_failed_login("1.2.3.4", "user@test.com")
-        allowed, msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
+        allowed, _msg = await check_login_rate_limit("1.2.3.4", "user@test.com")
         assert allowed is True
 
     @pytest.mark.asyncio
     async def test_lockout_after_max_attempts(self):
         """Account should be locked after max failed attempts."""
-        for i in range(LOGIN_MAX_ATTEMPTS):
+        for _i in range(LOGIN_MAX_ATTEMPTS):
             await record_failed_login("1.2.3.4", "lock@test.com")
         allowed, msg = await check_login_rate_limit("1.2.3.4", "lock@test.com")
         assert allowed is False
@@ -736,7 +780,7 @@ class TestBruteForceRedis:
     @pytest.mark.asyncio
     async def test_lockout_shows_remaining_minutes(self):
         """Locked message should include remaining minutes."""
-        for i in range(LOGIN_MAX_ATTEMPTS):
+        for _i in range(LOGIN_MAX_ATTEMPTS):
             await record_failed_login("1.2.3.4", "time@test.com")
         # Trigger lockout
         await check_login_rate_limit("1.2.3.4", "time@test.com")
@@ -749,14 +793,17 @@ class TestBruteForceRedis:
     async def test_expired_lockout_allows_login(self):
         """Expired lockout should allow login and clear the key."""
         import json as json_mod
+
         key = "ft:login:1.2.3.4:expired@test.com"
-        past = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
-        self.redis_store[key] = json_mod.dumps({
-            "attempts": 10,
-            "last_attempt": past,
-            "locked_until": past  # Already expired
-        })
-        allowed, msg = await check_login_rate_limit("1.2.3.4", "expired@test.com")
+        past = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
+        self.redis_store[key] = json_mod.dumps(
+            {
+                "attempts": 10,
+                "last_attempt": past,
+                "locked_until": past,  # Already expired
+            }
+        )
+        allowed, _msg = await check_login_rate_limit("1.2.3.4", "expired@test.com")
         assert allowed is True
         assert key not in self.redis_store  # Key should be deleted
 
@@ -770,7 +817,7 @@ class TestBruteForceRedis:
     @pytest.mark.asyncio
     async def test_different_ips_separate(self):
         """Different IPs should have separate attempt counters."""
-        for i in range(LOGIN_MAX_ATTEMPTS):
+        for _i in range(LOGIN_MAX_ATTEMPTS):
             await record_failed_login("1.1.1.1", "user@test.com")
         # Lock the first IP
         await check_login_rate_limit("1.1.1.1", "user@test.com")
@@ -796,13 +843,12 @@ class TestBruteForceRedis:
     async def test_record_resets_outside_window(self):
         """Attempts outside the window should reset the counter."""
         import json as json_mod
+
         key = "ft:login:1.2.3.4:window@test.com"
-        old_time = (datetime.now(timezone.utc) - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES + 1)).isoformat()
-        self.redis_store[key] = json_mod.dumps({
-            "attempts": LOGIN_MAX_ATTEMPTS - 1,
-            "last_attempt": old_time,
-            "locked_until": None
-        })
+        old_time = (datetime.now(UTC) - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES + 1)).isoformat()
+        self.redis_store[key] = json_mod.dumps(
+            {"attempts": LOGIN_MAX_ATTEMPTS - 1, "last_attempt": old_time, "locked_until": None}
+        )
         await record_failed_login("1.2.3.4", "window@test.com")
         record = json_mod.loads(self.redis_store[key])
         assert record["attempts"] == 1  # Reset, not incremented
@@ -811,14 +857,14 @@ class TestBruteForceRedis:
     async def test_redis_error_fails_open(self):
         """Redis errors should fail open (allow login)."""
         self.mock_redis.get = AsyncMock(side_effect=Exception("Redis down"))
-        allowed, msg = await check_login_rate_limit("1.2.3.4", "err@test.com")
+        allowed, _msg = await check_login_rate_limit("1.2.3.4", "err@test.com")
         assert allowed is True
 
     @pytest.mark.asyncio
     async def test_full_lockout_and_recovery_flow(self):
         """Full flow: fail max times → lockout → clear → allowed."""
         ip, email = "10.0.0.1", "flow@test.com"
-        for i in range(LOGIN_MAX_ATTEMPTS):
+        for _i in range(LOGIN_MAX_ATTEMPTS):
             await record_failed_login(ip, email)
         allowed, _ = await check_login_rate_limit(ip, email)
         assert allowed is False

@@ -12,36 +12,34 @@ Covers:
 All tests use mocks for the database layer so no running MongoDB is required.
 """
 
-import pytest
-import asyncio
-from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-from unittest.mock import AsyncMock, MagicMock, patch, call
-import sys
 import os
-import uuid
+import sys
+from datetime import UTC, date, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scheduler import (
-    now_jakarta,
-    today_jakarta,
-    safe_parse_date,
+    JAKARTA_TZ,
     acquire_job_lock,
-    release_job_lock,
-    generate_daily_digest_for_campus,
     check_missed_digest,
+    generate_daily_digest_for_campus,
     get_digest_time_from_db,
+    now_jakarta,
+    release_job_lock,
+    safe_parse_date,
     send_email_alert,
     send_whatsapp,
-    JAKARTA_TZ,
+    today_jakarta,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers for building mock DB objects
 # ---------------------------------------------------------------------------
+
 
 def make_mock_db():
     """Create a mock database with all collections used by the scheduler."""
@@ -99,6 +97,7 @@ def make_update_result(matched=0, upserted_id=None):
 # ---------------------------------------------------------------------------
 # Helper function tests
 # ---------------------------------------------------------------------------
+
 
 class TestNowJakarta:
     """Tests for now_jakarta() helper function"""
@@ -159,7 +158,7 @@ class TestTodayJakarta:
         This test documents the behavior rather than asserting a
         specific mismatch since the test could run at any time.
         """
-        utc_date = datetime.now(timezone.utc).date()
+        utc_date = datetime.now(UTC).date()
         jakarta_date = today_jakarta()
         diff = abs((jakarta_date - utc_date).days)
         assert diff <= 1
@@ -249,6 +248,7 @@ class TestSafeParseDate:
 # Job Lock System tests (using mocks)
 # ---------------------------------------------------------------------------
 
+
 class TestAcquireJobLock:
     """Tests for acquire_job_lock() distributed locking"""
 
@@ -257,11 +257,9 @@ class TestAcquireJobLock:
     async def test_successful_acquisition_via_upsert(self):
         """When update_one returns an upserted_id, lock is acquired"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(matched=0, upserted_id="new_id")
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(matched=0, upserted_id="new_id"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await acquire_job_lock("test_job", ttl_seconds=60)
             assert result is True
 
@@ -270,11 +268,9 @@ class TestAcquireJobLock:
     async def test_successful_acquisition_via_match(self):
         """When update_one matches an expired lock, lock is acquired"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(matched=1, upserted_id=None)
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(matched=1, upserted_id=None))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await acquire_job_lock("test_job", ttl_seconds=60)
             assert result is True
 
@@ -283,11 +279,9 @@ class TestAcquireJobLock:
     async def test_already_locked_duplicate_key(self):
         """When update_one raises E11000 duplicate key, returns False"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            side_effect=Exception("E11000 duplicate key error")
-        )
+        mock_db.job_locks.update_one = AsyncMock(side_effect=Exception("E11000 duplicate key error"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await acquire_job_lock("test_job", ttl_seconds=60)
             assert result is False
 
@@ -296,11 +290,9 @@ class TestAcquireJobLock:
     async def test_already_locked_no_match_no_upsert(self):
         """When update_one matches nothing and no upsert, returns False"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(matched=0, upserted_id=None)
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(matched=0, upserted_id=None))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await acquire_job_lock("test_job", ttl_seconds=60)
             assert result is False
 
@@ -309,11 +301,9 @@ class TestAcquireJobLock:
     async def test_unexpected_error_returns_false(self):
         """Non-duplicate-key errors should return False and log error"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            side_effect=Exception("Connection reset by peer")
-        )
+        mock_db.job_locks.update_one = AsyncMock(side_effect=Exception("Connection reset by peer"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await acquire_job_lock("test_job", ttl_seconds=60)
             assert result is False
 
@@ -322,11 +312,9 @@ class TestAcquireJobLock:
     async def test_lock_id_contains_job_name_and_date(self):
         """Lock ID should be formatted as job_lock_{name}_{date}"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(upserted_id="id1")
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             await acquire_job_lock("my_job", ttl_seconds=60)
 
         # Inspect the query passed to update_one
@@ -340,17 +328,15 @@ class TestAcquireJobLock:
     async def test_ttl_sets_correct_expiry(self):
         """The expires_at field should be approximately now + ttl_seconds"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(upserted_id="id1")
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             await acquire_job_lock("ttl_test", ttl_seconds=300)
 
         call_args = mock_db.job_locks.update_one.call_args
         update_doc = call_args[0][1]  # Second positional arg is the update
         expires_at = update_doc["$set"]["expires_at"]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Should be roughly 300 seconds from now (allow 5 sec tolerance)
         diff = abs((expires_at - now).total_seconds())
@@ -366,7 +352,7 @@ class TestReleaseJobLock:
         """Releasing should call delete_one with the correct lock_id"""
         mock_db = make_mock_db()
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             await release_job_lock("test_job")
 
         mock_db.job_locks.delete_one.assert_called_once()
@@ -382,7 +368,7 @@ class TestReleaseJobLock:
         # delete_one on a non-existent doc just returns with deleted_count=0
         mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             await release_job_lock("nonexistent_job")
 
     @pytest.mark.asyncio
@@ -392,7 +378,7 @@ class TestReleaseJobLock:
         mock_db = make_mock_db()
         mock_db.job_locks.delete_one = AsyncMock(side_effect=Exception("DB down"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             # Should not raise
             await release_job_lock("error_job")
 
@@ -419,7 +405,7 @@ class TestConcurrentLockAcquisition:
         mock_db = make_mock_db()
         mock_db.job_locks.update_one = simulated_update_one
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             results = []
             for _ in range(4):
                 r = await acquire_job_lock("concurrent_test", ttl_seconds=60)
@@ -433,12 +419,10 @@ class TestConcurrentLockAcquisition:
     async def test_sequential_acquire_release_cycle(self):
         """Multiple sequential acquire-release cycles should all succeed"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(upserted_id="id1")
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
         mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             for _ in range(5):
                 assert await acquire_job_lock("cycle_test", ttl_seconds=60) is True
                 await release_job_lock("cycle_test")
@@ -448,12 +432,10 @@ class TestConcurrentLockAcquisition:
     async def test_lock_cleanup_after_exception(self):
         """Lock should be released even if the job raises an exception"""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(
-            return_value=make_update_result(upserted_id="id1")
-        )
+        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
         mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             assert await acquire_job_lock("exc_test", ttl_seconds=60) is True
 
             try:
@@ -469,6 +451,7 @@ class TestConcurrentLockAcquisition:
 # ---------------------------------------------------------------------------
 # check_missed_digest() and timezone correctness tests
 # ---------------------------------------------------------------------------
+
 
 class TestCheckMissedDigest:
     """Tests for check_missed_digest() - the critical timezone fix"""
@@ -487,10 +470,7 @@ class TestCheckMissedDigest:
         Using UTC would miss digests sent between 00:00-06:59 Jakarta time.
         """
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "08:00"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "08:00"}})
 
         captured_queries = []
 
@@ -500,10 +480,11 @@ class TestCheckMissedDigest:
 
         mock_db.notification_logs.count_documents = capture_count_documents
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+        ):
             fake_now = datetime(2026, 3, 29, 10, 0, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
 
@@ -522,15 +503,13 @@ class TestCheckMissedDigest:
     async def test_skips_when_before_scheduled_time(self):
         """If current time is before the scheduled digest time, should skip"""
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "08:00"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "08:00"}})
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+        ):
             fake_now = datetime(2026, 3, 29, 7, 0, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
 
@@ -543,17 +522,15 @@ class TestCheckMissedDigest:
     async def test_runs_digest_when_missed(self):
         """If digest was missed (past time, no logs), should trigger daily_reminder_job"""
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "08:00"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "08:00"}})
         mock_db.notification_logs.count_documents = AsyncMock(return_value=0)
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now, \
-             patch('scheduler.daily_reminder_job', new_callable=AsyncMock) as mock_digest:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+            patch("scheduler.daily_reminder_job", new_callable=AsyncMock) as mock_digest,
+        ):
             fake_now = datetime(2026, 3, 29, 14, 0, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
 
@@ -565,17 +542,15 @@ class TestCheckMissedDigest:
     async def test_skips_when_digest_already_sent(self):
         """If digest was already sent today, should not re-run"""
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "08:00"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "08:00"}})
         mock_db.notification_logs.count_documents = AsyncMock(return_value=5)
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now, \
-             patch('scheduler.daily_reminder_job', new_callable=AsyncMock) as mock_digest:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+            patch("scheduler.daily_reminder_job", new_callable=AsyncMock) as mock_digest,
+        ):
             fake_now = datetime(2026, 3, 29, 14, 0, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
 
@@ -589,8 +564,7 @@ class TestCheckMissedDigest:
         mock_db = make_mock_db()
         mock_db.settings.find_one = AsyncMock(side_effect=Exception("DB connection lost"))
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock):
+        with patch("scheduler.db", mock_db), patch("scheduler.asyncio.sleep", new_callable=AsyncMock):
             await check_missed_digest()
 
     @pytest.mark.asyncio
@@ -601,11 +575,12 @@ class TestCheckMissedDigest:
         mock_db.settings.find_one = AsyncMock(return_value=None)
         mock_db.notification_logs.count_documents = AsyncMock(return_value=0)
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now, \
-             patch('scheduler.daily_reminder_job', new_callable=AsyncMock) as mock_digest:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+            patch("scheduler.daily_reminder_job", new_callable=AsyncMock) as mock_digest,
+        ):
             fake_now = datetime(2026, 3, 29, 10, 0, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
 
@@ -617,18 +592,16 @@ class TestCheckMissedDigest:
     async def test_hours_since_scheduled_calculated_correctly(self):
         """Verify the hours_since_scheduled calculation uses Jakarta time"""
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "08:00"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "08:00"}})
         mock_db.notification_logs.count_documents = AsyncMock(return_value=0)
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now, \
-             patch('scheduler.daily_reminder_job', new_callable=AsyncMock) as mock_digest, \
-             patch('scheduler.logger') as mock_logger:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+            patch("scheduler.daily_reminder_job", new_callable=AsyncMock),
+            patch("scheduler.logger") as mock_logger,
+        ):
             # 11:30 Jakarta, 3.5 hours past 08:00
             fake_now = datetime(2026, 3, 29, 11, 30, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
@@ -636,7 +609,7 @@ class TestCheckMissedDigest:
             await check_missed_digest()
 
             # Check the warning log message includes "3.5h late"
-            warning_calls = [c for c in mock_logger.warning.call_args_list]
+            warning_calls = list(mock_logger.warning.call_args_list)
             assert len(warning_calls) >= 1
             msg = warning_calls[0][0][0]
             assert "3.5" in msg
@@ -646,6 +619,7 @@ class TestCheckMissedDigest:
 # get_digest_time_from_db() tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetDigestTimeFromDb:
     """Tests for get_digest_time_from_db() settings retrieval"""
 
@@ -653,12 +627,9 @@ class TestGetDigestTimeFromDb:
     @pytest.mark.unit
     async def test_returns_configured_time(self):
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "06:30"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "06:30"}})
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await get_digest_time_from_db()
             assert result == "06:30"
 
@@ -668,7 +639,7 @@ class TestGetDigestTimeFromDb:
         mock_db = make_mock_db()
         mock_db.settings.find_one = AsyncMock(return_value=None)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await get_digest_time_from_db()
             assert result == "08:00"
 
@@ -676,12 +647,9 @@ class TestGetDigestTimeFromDb:
     @pytest.mark.unit
     async def test_returns_default_when_no_digest_time_key(self):
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {}})
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await get_digest_time_from_db()
             assert result == "08:00"
 
@@ -691,7 +659,7 @@ class TestGetDigestTimeFromDb:
         mock_db = make_mock_db()
         mock_db.settings.find_one = AsyncMock(side_effect=Exception("DB error"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await get_digest_time_from_db()
             assert result == "08:00"
 
@@ -700,12 +668,9 @@ class TestGetDigestTimeFromDb:
     async def test_returns_default_when_data_is_none(self):
         """Settings doc exists but data is None"""
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": None
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": None})
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await get_digest_time_from_db()
             assert result == "08:00"
 
@@ -714,12 +679,19 @@ class TestGetDigestTimeFromDb:
 # generate_daily_digest_for_campus() tests (mocked DB)
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateDailyDigestForCampus:
     """Tests for the daily digest generation logic"""
 
-    def _setup_mock_db_for_digest(self, members=None, care_events=None,
-                                   grief_support=None, accident_followup=None,
-                                   financial_aid=None, pastoral_notes=None):
+    def _setup_mock_db_for_digest(
+        self,
+        members=None,
+        care_events=None,
+        grief_support=None,
+        accident_followup=None,
+        financial_aid=None,
+        pastoral_notes=None,
+    ):
         """Helper to set up mock DB with specified data."""
         mock_db = make_mock_db()
 
@@ -731,9 +703,11 @@ class TestGenerateDailyDigestForCampus:
             # Return matching events based on member_id
             async def find_one_care(query, *args, **kwargs):
                 for evt in care_events:
-                    if evt.get("member_id") == query.get("member_id") and \
-                       evt.get("event_type") == query.get("event_type") and \
-                       not evt.get("completed", False):
+                    if (
+                        evt.get("member_id") == query.get("member_id")
+                        and evt.get("event_type") == query.get("event_type")
+                        and not evt.get("completed", False)
+                    ):
                         if query.get("ignored", {}).get("$ne") and evt.get("ignored"):
                             continue
                         return evt
@@ -762,6 +736,7 @@ class TestGenerateDailyDigestForCampus:
             overdue_items = [a for a in accident_followup if a.get("scheduled_date") < today.isoformat()]
 
             call_count_acc = [0]
+
             async def acc_to_list(_):
                 call_count_acc[0] += 1
                 if call_count_acc[0] == 1:
@@ -776,6 +751,7 @@ class TestGenerateDailyDigestForCampus:
             overdue_items = [f for f in financial_aid if f.get("next_occurrence") < today.isoformat()]
 
             call_count_fin = [0]
+
             async def fin_to_list(_):
                 call_count_fin[0] += 1
                 if call_count_fin[0] == 1:
@@ -793,8 +769,6 @@ class TestGenerateDailyDigestForCampus:
             for m in members:
                 member_map[m["id"]] = m
 
-        original_find_one = mock_db.members.find_one
-
         async def member_find_one(query, *args, **kwargs):
             mid = query.get("id")
             if mid and mid in member_map:
@@ -810,9 +784,9 @@ class TestGenerateDailyDigestForCampus:
     async def test_basic_structure(self):
         """Digest should contain required keys and stats structure"""
         mock_db = self._setup_mock_db_for_digest()
-        os.environ['CHURCH_NAME'] = 'Test Church'
+        os.environ["CHURCH_NAME"] = "Test Church"
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("campus1", "Test Campus")
 
         assert digest is not None
@@ -822,10 +796,17 @@ class TestGenerateDailyDigestForCampus:
         assert "stats" in digest
 
         expected_keys = [
-            "birthdays_today", "birthdays_week", "grief_due",
-            "hospital_followups", "financial_aid",
-            "overdue_grief", "overdue_hospital", "overdue_financial",
-            "at_risk", "notes_due_today", "overdue_notes"
+            "birthdays_today",
+            "birthdays_week",
+            "grief_due",
+            "hospital_followups",
+            "financial_aid",
+            "overdue_grief",
+            "overdue_hospital",
+            "overdue_financial",
+            "at_risk",
+            "notes_due_today",
+            "overdue_notes",
         ]
         for key in expected_keys:
             assert key in digest["stats"], f"Missing stats key: {key}"
@@ -835,9 +816,9 @@ class TestGenerateDailyDigestForCampus:
     async def test_empty_campus_shows_no_urgent_tasks(self):
         """A campus with no data should show 'no tasks' message"""
         mock_db = self._setup_mock_db_for_digest()
-        os.environ['CHURCH_NAME'] = 'Test Church'
+        os.environ["CHURCH_NAME"] = "Test Church"
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("empty", "Empty Campus")
 
         assert "Tidak ada tugas mendesak hari ini!" in digest["message"]
@@ -847,9 +828,9 @@ class TestGenerateDailyDigestForCampus:
     @pytest.mark.unit
     async def test_message_contains_church_name(self):
         mock_db = self._setup_mock_db_for_digest()
-        os.environ['CHURCH_NAME'] = 'GKBJ Test'
+        os.environ["CHURCH_NAME"] = "GKBJ Test"
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus 1")
 
         assert "GKBJ Test" in digest["message"]
@@ -858,9 +839,9 @@ class TestGenerateDailyDigestForCampus:
     @pytest.mark.unit
     async def test_message_contains_campus_name(self):
         mock_db = self._setup_mock_db_for_digest()
-        os.environ['CHURCH_NAME'] = 'Test'
+        os.environ["CHURCH_NAME"] = "Test"
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "My Campus")
 
         assert "My Campus" in digest["message"]
@@ -871,17 +852,19 @@ class TestGenerateDailyDigestForCampus:
         """Grief stages due today should appear in stats"""
         today = datetime.now(JAKARTA_TZ).date()
         member = {"id": "m1", "name": "Grief Person", "phone": "+6281111111111"}
-        grief = [{
-            "campus_id": "c1",
-            "member_id": "m1",
-            "stage": "1_week",
-            "scheduled_date": today.isoformat(),
-            "completed": False,
-        }]
+        grief = [
+            {
+                "campus_id": "c1",
+                "member_id": "m1",
+                "stage": "1_week",
+                "scheduled_date": today.isoformat(),
+                "completed": False,
+            }
+        ]
 
         mock_db = self._setup_mock_db_for_digest(members=[member], grief_support=grief)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["grief_due"] == 1
@@ -893,17 +876,19 @@ class TestGenerateDailyDigestForCampus:
         """Grief stages from past dates should count as overdue"""
         yesterday = (datetime.now(JAKARTA_TZ).date() - timedelta(days=1)).isoformat()
         member = {"id": "m1", "name": "Overdue Grief", "phone": "+6281222222222"}
-        grief = [{
-            "campus_id": "c1",
-            "member_id": "m1",
-            "stage": "2_weeks",
-            "scheduled_date": yesterday,
-            "completed": False,
-        }]
+        grief = [
+            {
+                "campus_id": "c1",
+                "member_id": "m1",
+                "stage": "2_weeks",
+                "scheduled_date": yesterday,
+                "completed": False,
+            }
+        ]
 
         mock_db = self._setup_mock_db_for_digest(members=[member], grief_support=grief)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["overdue_grief"] == 1
@@ -913,18 +898,20 @@ class TestGenerateDailyDigestForCampus:
     async def test_hospital_followup_due_today(self):
         today = datetime.now(JAKARTA_TZ).date()
         member = {"id": "m1", "name": "Hospital Person", "phone": "+6281333333333"}
-        followups = [{
-            "campus_id": "c1",
-            "member_id": "m1",
-            "stage": "first_followup",
-            "scheduled_date": today.isoformat(),
-            "completed": False,
-            "ignored": False,
-        }]
+        followups = [
+            {
+                "campus_id": "c1",
+                "member_id": "m1",
+                "stage": "first_followup",
+                "scheduled_date": today.isoformat(),
+                "completed": False,
+                "ignored": False,
+            }
+        ]
 
         mock_db = self._setup_mock_db_for_digest(members=[member], accident_followup=followups)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["hospital_followups"] == 1
@@ -935,17 +922,19 @@ class TestGenerateDailyDigestForCampus:
     async def test_financial_aid_due_today(self):
         today = datetime.now(JAKARTA_TZ).date()
         member = {"id": "m1", "name": "Aid Person", "phone": "+6281444444444"}
-        aid = [{
-            "campus_id": "c1",
-            "member_id": "m1",
-            "aid_type": "education",
-            "next_occurrence": today.isoformat(),
-            "is_active": True,
-        }]
+        aid = [
+            {
+                "campus_id": "c1",
+                "member_id": "m1",
+                "aid_type": "education",
+                "next_occurrence": today.isoformat(),
+                "is_active": True,
+            }
+        ]
 
         mock_db = self._setup_mock_db_for_digest(members=[member], financial_aid=aid)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["financial_aid"] == 1
@@ -955,7 +944,7 @@ class TestGenerateDailyDigestForCampus:
     @pytest.mark.unit
     async def test_at_risk_members_counted(self):
         """Members with no contact for 30+ days should be counted as at_risk"""
-        old_date = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        old_date = (datetime.now(UTC) - timedelta(days=60)).isoformat()
         member = {
             "id": "m1",
             "name": "At Risk Person",
@@ -965,7 +954,7 @@ class TestGenerateDailyDigestForCampus:
 
         mock_db = self._setup_mock_db_for_digest(members=[member])
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["at_risk"] >= 1
@@ -975,11 +964,9 @@ class TestGenerateDailyDigestForCampus:
     async def test_returns_none_on_exception(self):
         """If an error occurs during generation, should return None"""
         mock_db = make_mock_db()
-        mock_db.members.find.return_value.to_list = AsyncMock(
-            side_effect=Exception("Connection reset")
-        )
+        mock_db.members.find.return_value.to_list = AsyncMock(side_effect=Exception("Connection reset"))
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             result = await generate_daily_digest_for_campus("bad", "Bad Campus")
             assert result is None
 
@@ -1000,12 +987,9 @@ class TestGenerateDailyDigestForCampus:
             "completed": True,  # Already completed
         }
 
-        mock_db = self._setup_mock_db_for_digest(
-            members=[member],
-            care_events=[care_evt]
-        )
+        mock_db = self._setup_mock_db_for_digest(members=[member], care_events=[care_evt])
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["birthdays_today"] == 0
@@ -1014,6 +998,7 @@ class TestGenerateDailyDigestForCampus:
 # ---------------------------------------------------------------------------
 # Birthday reminder logic tests
 # ---------------------------------------------------------------------------
+
 
 class TestBirthdayLogic:
     """Tests for birthday detection within digest generation"""
@@ -1042,7 +1027,7 @@ class TestBirthdayLogic:
         # For at-risk calculation, return same member list
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["birthdays_today"] >= 1
@@ -1072,7 +1057,7 @@ class TestBirthdayLogic:
         mock_db.care_events.find_one = AsyncMock(return_value=care_evt)
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["birthdays_week"] >= 1
@@ -1100,7 +1085,7 @@ class TestBirthdayLogic:
         mock_db.care_events.find_one = AsyncMock(return_value=care_evt)
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert "No Phone Person" not in digest["message"]
@@ -1123,7 +1108,7 @@ class TestBirthdayLogic:
         mock_db.care_events.find_one = AsyncMock(return_value=None)
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         # Should not appear in birthday section (stats should be 0)
@@ -1146,7 +1131,7 @@ class TestBirthdayLogic:
         mock_db.care_events.find_one = AsyncMock(return_value=None)
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest is not None
@@ -1171,7 +1156,7 @@ class TestBirthdayLogic:
         mock_db.care_events.find_one = AsyncMock(return_value=None)
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest is not None
@@ -1180,6 +1165,7 @@ class TestBirthdayLogic:
 # ---------------------------------------------------------------------------
 # Pastoral notes in digest tests
 # ---------------------------------------------------------------------------
+
 
 class TestPastoralNotesInDigest:
     """Tests for pastoral notes follow-up detection in digests"""
@@ -1205,7 +1191,7 @@ class TestPastoralNotesInDigest:
         mock_db.members.find_one = AsyncMock(return_value=member)
         mock_db.pastoral_notes.find.return_value.to_list = AsyncMock(return_value=[note])
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["notes_due_today"] >= 1
@@ -1218,14 +1204,14 @@ class TestPastoralNotesInDigest:
         (is_private: {$ne: True}). Here we verify private notes
         are not passed to the digest because the query filters them out.
         """
-        today = datetime.now(JAKARTA_TZ).date()
+        datetime.now(JAKARTA_TZ).date()
         # Simulate that the DB query already filtered out private notes
         # (the actual filter is in the MongoDB query)
         mock_db = make_mock_db()
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[])
         mock_db.pastoral_notes.find.return_value.to_list = AsyncMock(return_value=[])
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["notes_due_today"] == 0
@@ -1235,6 +1221,7 @@ class TestPastoralNotesInDigest:
 # send_email_alert() tests
 # ---------------------------------------------------------------------------
 
+
 class TestSendEmailAlert:
     """Tests for the email alert sending function"""
 
@@ -1242,9 +1229,7 @@ class TestSendEmailAlert:
     @pytest.mark.unit
     async def test_skips_when_not_configured(self):
         """Should return False when SMTP credentials are not set"""
-        with patch('scheduler.SMTP_USER', ''), \
-             patch('scheduler.SMTP_PASS', ''), \
-             patch('scheduler.ALERT_EMAIL', ''):
+        with patch("scheduler.SMTP_USER", ""), patch("scheduler.SMTP_PASS", ""), patch("scheduler.ALERT_EMAIL", ""):
             result = await send_email_alert("Test Subject", "Test body")
             assert result is False
 
@@ -1252,10 +1237,12 @@ class TestSendEmailAlert:
     @pytest.mark.unit
     async def test_returns_false_on_smtp_error(self):
         """Should return False if SMTP connection fails"""
-        with patch('scheduler.SMTP_USER', 'user@test.com'), \
-             patch('scheduler.SMTP_PASS', 'password'), \
-             patch('scheduler.ALERT_EMAIL', 'alert@test.com'), \
-             patch('scheduler.smtplib.SMTP', side_effect=Exception("SMTP refused")):
+        with (
+            patch("scheduler.SMTP_USER", "user@test.com"),
+            patch("scheduler.SMTP_PASS", "password"),
+            patch("scheduler.ALERT_EMAIL", "alert@test.com"),
+            patch("scheduler.smtplib.SMTP", side_effect=Exception("SMTP refused")),
+        ):
             result = await send_email_alert("Test Subject", "Test body")
             assert result is False
 
@@ -1263,9 +1250,11 @@ class TestSendEmailAlert:
     @pytest.mark.unit
     async def test_skips_when_no_alert_email(self):
         """Should return False when ALERT_EMAIL is empty"""
-        with patch('scheduler.SMTP_USER', 'user@test.com'), \
-             patch('scheduler.SMTP_PASS', 'password'), \
-             patch('scheduler.ALERT_EMAIL', ''):
+        with (
+            patch("scheduler.SMTP_USER", "user@test.com"),
+            patch("scheduler.SMTP_PASS", "password"),
+            patch("scheduler.ALERT_EMAIL", ""),
+        ):
             result = await send_email_alert("Subject", "Body")
             assert result is False
 
@@ -1273,6 +1262,7 @@ class TestSendEmailAlert:
 # ---------------------------------------------------------------------------
 # send_whatsapp() tests
 # ---------------------------------------------------------------------------
+
 
 class TestSendWhatsapp:
     """Tests for WhatsApp message sending with retry mechanism"""
@@ -1284,8 +1274,7 @@ class TestSendWhatsapp:
         mock_db = make_mock_db()
         mock_db.settings.find_one = AsyncMock(return_value=None)
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value=None):
+        with patch("scheduler.db", mock_db), patch("scheduler.os.environ.get", return_value=None):
             result = await send_whatsapp("+6281234567890", "Hello", {})
             assert result["success"] is False
             assert "not configured" in result["error"]
@@ -1299,10 +1288,11 @@ class TestSendWhatsapp:
         mock_response = MagicMock()
         mock_response.json.return_value = {"code": "SUCCESS"}
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value='http://wa-gateway:3000'), \
-             patch('scheduler.httpx.AsyncClient') as mock_client_cls:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.os.environ.get", return_value="http://wa-gateway:3000"),
+            patch("scheduler.httpx.AsyncClient") as mock_client_cls,
+        ):
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1328,10 +1318,11 @@ class TestSendWhatsapp:
             captured_payloads.append(json)
             return mock_response
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value='http://wa-gateway:3000'), \
-             patch('scheduler.httpx.AsyncClient') as mock_client_cls:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.os.environ.get", return_value="http://wa-gateway:3000"),
+            patch("scheduler.httpx.AsyncClient") as mock_client_cls,
+        ):
             mock_client = AsyncMock()
             mock_client.post = capture_post
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1359,11 +1350,12 @@ class TestSendWhatsapp:
             call_count += 1
             return mock_response
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value='http://wa-gateway:3000'), \
-             patch('scheduler.httpx.AsyncClient') as mock_client_cls, \
-             patch('scheduler.send_email_alert', new_callable=AsyncMock):
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.os.environ.get", return_value="http://wa-gateway:3000"),
+            patch("scheduler.httpx.AsyncClient") as mock_client_cls,
+            patch("scheduler.send_email_alert", new_callable=AsyncMock),
+        ):
             mock_client = AsyncMock()
             mock_client.post = counting_post
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1391,11 +1383,12 @@ class TestSendWhatsapp:
             call_count += 1
             return mock_response
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value='http://wa-gateway:3000'), \
-             patch('scheduler.httpx.AsyncClient') as mock_client_cls, \
-             patch('scheduler.send_email_alert', new_callable=AsyncMock):
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.os.environ.get", return_value="http://wa-gateway:3000"),
+            patch("scheduler.httpx.AsyncClient") as mock_client_cls,
+            patch("scheduler.send_email_alert", new_callable=AsyncMock),
+        ):
             mock_client = AsyncMock()
             mock_client.post = counting_post
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1412,18 +1405,18 @@ class TestSendWhatsapp:
     async def test_falls_back_to_db_settings_for_gateway(self):
         """When env var is not set, should fall back to database settings"""
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"whatsappGateway": "http://db-gateway:3000"}
-        })
+        mock_db.settings.find_one = AsyncMock(
+            return_value={"type": "automation", "data": {"whatsappGateway": "http://db-gateway:3000"}}
+        )
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"code": "SUCCESS"}
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value=None), \
-             patch('scheduler.httpx.AsyncClient') as mock_client_cls:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.os.environ.get", return_value=None),
+            patch("scheduler.httpx.AsyncClient") as mock_client_cls,
+        ):
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1448,10 +1441,11 @@ class TestSendWhatsapp:
             captured_payloads.append(json)
             return mock_response
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.os.environ.get', return_value='http://wa:3000'), \
-             patch('scheduler.httpx.AsyncClient') as mock_client_cls:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.os.environ.get", return_value="http://wa:3000"),
+            patch("scheduler.httpx.AsyncClient") as mock_client_cls,
+        ):
             mock_client = AsyncMock()
             mock_client.post = capture_post
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1467,6 +1461,7 @@ class TestSendWhatsapp:
 # Multi-campus isolation tests in digest
 # ---------------------------------------------------------------------------
 
+
 class TestMultiCampusDigestIsolation:
     """Verify digest generation is isolated per campus"""
 
@@ -1474,14 +1469,14 @@ class TestMultiCampusDigestIsolation:
     @pytest.mark.unit
     async def test_campus_a_data_not_in_campus_b_digest(self):
         """Data in campus A should not appear in campus B's digest"""
-        today = datetime.now(JAKARTA_TZ).date()
+        datetime.now(JAKARTA_TZ).date()
 
         mock_db = make_mock_db()
         # grief_support.find filters by campus_id, so campus B should get empty results
         mock_db.grief_support.find.return_value.to_list = AsyncMock(return_value=[])
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[])
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest_b = await generate_daily_digest_for_campus("campus_b", "Campus B")
 
         assert digest_b["stats"]["grief_due"] == 0
@@ -1495,7 +1490,6 @@ class TestMultiCampusDigestIsolation:
         mock_db = make_mock_db()
 
         # Track what the members.find query looks like
-        original_find = mock_db.members.find
 
         def tracking_find(query, *args, **kwargs):
             call_args_list.append(query)
@@ -1505,7 +1499,7 @@ class TestMultiCampusDigestIsolation:
 
         mock_db.members.find = tracking_find
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             await generate_daily_digest_for_campus("campus_xyz", "Campus XYZ")
 
         # At least one members.find call should filter by campus_id
@@ -1516,6 +1510,7 @@ class TestMultiCampusDigestIsolation:
 # ---------------------------------------------------------------------------
 # At-risk member detection edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestAtRiskMemberDetection:
     """Tests for at-risk member logic within digest generation"""
@@ -1535,7 +1530,7 @@ class TestAtRiskMemberDetection:
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[member])
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["at_risk"] >= 1
@@ -1555,7 +1550,7 @@ class TestAtRiskMemberDetection:
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[member])
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["at_risk"] >= 1
@@ -1564,7 +1559,7 @@ class TestAtRiskMemberDetection:
     @pytest.mark.unit
     async def test_recently_contacted_member_not_at_risk(self):
         """Members contacted within 30 days should NOT be at-risk"""
-        recent = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+        recent = (datetime.now(UTC) - timedelta(days=5)).isoformat()
         member = {
             "id": "m1",
             "name": "Recent Contact Person",
@@ -1576,7 +1571,7 @@ class TestAtRiskMemberDetection:
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[member])
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert "Recent Contact Person" not in digest["message"]
@@ -1597,7 +1592,7 @@ class TestAtRiskMemberDetection:
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[member])
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert "At Risk No Phone" not in digest["message"]
@@ -1611,24 +1606,26 @@ class TestAtRiskMemberDetection:
         """
         members = []
         for i in range(15):
-            members.append({
-                "id": f"risk-{i}",
-                "name": f"Risky Member {i}",
-                "phone": f"+62810000{i:05d}",
-                "last_contact_date": None,
-            })
+            members.append(
+                {
+                    "id": f"risk-{i}",
+                    "name": f"Risky Member {i}",
+                    "phone": f"+62810000{i:05d}",
+                    "last_contact_date": None,
+                }
+            )
 
         mock_db = make_mock_db()
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=members)
         mock_db.members.find_one = AsyncMock(return_value=None)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest1 = await generate_daily_digest_for_campus("c1", "Campus")
 
         # Reset mock to simulate second run
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=members)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest2 = await generate_daily_digest_for_campus("c1", "Campus")
 
         # Same data, same day -> same message (deterministic randomization)
@@ -1653,7 +1650,7 @@ class TestAtRiskMemberDetection:
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[member])
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["at_risk"] >= 1
@@ -1673,7 +1670,7 @@ class TestAtRiskMemberDetection:
         mock_db.members.find.return_value.to_list = AsyncMock(return_value=[member])
         mock_db.members.find_one = AsyncMock(return_value=member)
 
-        with patch('scheduler.db', mock_db):
+        with patch("scheduler.db", mock_db):
             digest = await generate_daily_digest_for_campus("c1", "Campus")
 
         assert digest["stats"]["at_risk"] >= 1
@@ -1682,6 +1679,7 @@ class TestAtRiskMemberDetection:
 # ---------------------------------------------------------------------------
 # Timezone correctness validation
 # ---------------------------------------------------------------------------
+
 
 class TestTimezoneCorrectness:
     """Validate that Jakarta timezone is used consistently throughout scheduler"""
@@ -1702,12 +1700,12 @@ class TestTimezoneCorrectness:
         This demonstrates the bug: using UTC midnight would miss 7 hours.
         """
         jakarta_midnight = datetime(2026, 3, 29, 0, 0, 0, tzinfo=JAKARTA_TZ)
-        utc_equivalent = jakarta_midnight.astimezone(timezone.utc)
+        utc_equivalent = jakarta_midnight.astimezone(UTC)
 
         assert utc_equivalent.day == 28
         assert utc_equivalent.hour == 17
 
-        utc_midnight = datetime(2026, 3, 29, 0, 0, 0, tzinfo=timezone.utc)
+        utc_midnight = datetime(2026, 3, 29, 0, 0, 0, tzinfo=UTC)
         jakarta_equivalent = utc_midnight.astimezone(JAKARTA_TZ)
         assert jakarta_equivalent.hour == 7
 
@@ -1722,10 +1720,7 @@ class TestTimezoneCorrectness:
         captured_tz = []
 
         mock_db = make_mock_db()
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "type": "automation",
-            "data": {"digestTime": "08:00"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"type": "automation", "data": {"digestTime": "08:00"}})
 
         async def capture_query(query):
             today_start = query["created_at"]["$gte"]
@@ -1734,10 +1729,11 @@ class TestTimezoneCorrectness:
 
         mock_db.notification_logs.count_documents = capture_query
 
-        with patch('scheduler.db', mock_db), \
-             patch('scheduler.asyncio.sleep', new_callable=AsyncMock), \
-             patch('scheduler.now_jakarta') as mock_now:
-
+        with (
+            patch("scheduler.db", mock_db),
+            patch("scheduler.asyncio.sleep", new_callable=AsyncMock),
+            patch("scheduler.now_jakarta") as mock_now,
+        ):
             fake_now = datetime(2026, 3, 29, 10, 0, 0, tzinfo=JAKARTA_TZ)
             mock_now.return_value = fake_now
 
@@ -1745,7 +1741,7 @@ class TestTimezoneCorrectness:
 
         assert len(captured_tz) == 1
         tz = captured_tz[0]
-        assert tz != timezone.utc
+        assert tz != UTC
         dt_test = datetime(2026, 1, 1, tzinfo=tz)
         assert dt_test.utcoffset() == timedelta(hours=7)
 
@@ -1755,7 +1751,7 @@ class TestTimezoneCorrectness:
         Explicitly verify today_jakarta() returns the Jakarta date,
         which can differ from the UTC date by up to 1 day.
         """
-        with patch('scheduler.now_jakarta') as mock_now:
+        with patch("scheduler.now_jakarta") as mock_now:
             # 2026-03-29 02:00 Jakarta = 2026-03-28 19:00 UTC
             # Jakarta date should be 29, UTC date is 28
             fake_now = datetime(2026, 3, 29, 2, 0, 0, tzinfo=JAKARTA_TZ)

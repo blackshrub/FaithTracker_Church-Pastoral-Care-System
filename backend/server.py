@@ -395,6 +395,8 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 # Validate configuration on startup
+import contextlib
+
 from config import validate_config
 
 validate_config(exit_on_error=False)  # Show warnings but don't exit
@@ -424,15 +426,14 @@ class RequestSizeLimitMiddleware(AbstractMiddleware):
         if scope["type"] == "http":
             headers = dict(scope.get("headers", []))
             content_length = headers.get(b"content-length")
-            if content_length:
-                if int(content_length) > MAX_REQUEST_BODY_SIZE:
-                    response = LitestarResponse(
-                        content={"detail": "Request body too large"},
-                        status_code=HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        media_type="application/json",
-                    )
-                    await response(scope, receive, send)
-                    return
+            if content_length and int(content_length) > MAX_REQUEST_BODY_SIZE:
+                response = LitestarResponse(
+                    content={"detail": "Request body too large"},
+                    status_code=HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    media_type="application/json",
+                )
+                await response(scope, receive, send)
+                return
         await self.app(scope, receive, send)
 
 
@@ -445,7 +446,7 @@ class SecurityHeadersMiddleware(AbstractMiddleware):
 
             async def send_with_security_headers(message):
                 if message["type"] == "http.response.start":
-                    headers = dict(message.get("headers", []))
+                    dict(message.get("headers", []))
                     # Add security headers
                     security_headers = [
                         (b"x-content-type-options", b"nosniff"),
@@ -873,7 +874,7 @@ async def log_activity(
                     else datetime.now(JAKARTA_TZ).isoformat(),
                 }
                 # Schedule broadcast without blocking (fire and forget)
-                asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
+                asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))  # noqa: RUF006
             else:
                 logger.debug("SSE broadcast delegated to change stream watcher")
         except Exception as broadcast_err:
@@ -1052,7 +1053,7 @@ async def send_whatsapp_message(
     message: str,
     care_event_id: str | None = None,
     grief_support_id: str | None = None,
-    member_id: str = None,
+    member_id: str | None = None,
 ) -> dict[str, Any]:
     """Send WhatsApp message via gateway"""
     try:
@@ -1462,10 +1463,8 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
         await invalidate_dashboard_cache(event["campus_id"])
 
         # Remove from Meilisearch (fire-and-forget)
-        try:
+        with contextlib.suppress(Exception):
             get_search_service().remove_care_event(event_id)
-        except Exception:
-            pass
 
         return {"success": True, "message": "Care event deleted successfully"}
     except HTTPException:
@@ -1754,9 +1753,8 @@ async def export_members_csv(request: Request) -> Response:
 
             for member in members:
                 # Update engagement status
-                if member.get("last_contact_date"):
-                    if isinstance(member["last_contact_date"], str):
-                        member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
+                if member.get("last_contact_date") and isinstance(member["last_contact_date"], str):
+                    member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
                 status, days = calculate_engagement_status(member.get("last_contact_date"))
                 member["engagement_status"] = status
@@ -1898,7 +1896,7 @@ async def get_intelligent_suggestions(request: Request) -> dict:
     current_user = await get_current_user(request)
     try:
         campus_filter = get_campus_filter(current_user)
-        today = date.today()
+        date.today()
 
         # Get members and their recent activities
         members = await db.members.find(campus_filter, {"_id": 0}).to_list(1000)
@@ -2102,7 +2100,7 @@ async def get_demographic_trends(request: Request) -> dict:
             )
 
         # Calculate averages for membership engagement
-        for status, data in membership_trends.items():
+        for _status, data in membership_trends.items():
             if data["count"] > 0:
                 data["avg_engagement"] = round(data["engagement_score"] / data["count"])
             else:
@@ -2141,7 +2139,7 @@ async def get_demographic_trends(request: Request) -> dict:
 # ==================== MANAGEMENT REPORTS ENDPOINTS ====================
 
 
-async def _compute_monthly_report_data(current_user: dict, year: int = None, month: int = None) -> dict:
+async def _compute_monthly_report_data(current_user: dict, year: int | None = None, month: int | None = None) -> dict:
     """
     Helper function to compute monthly report data.
     Can be called from both the API endpoint and PDF export.
@@ -2328,13 +2326,13 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         staff_list = sorted(staff_summary.values(), key=lambda x: x["tasks_completed"], reverse=True)
 
         # === MEMBER REACH ANALYSIS ===
-        members_with_contact = len([m for m in members if m.get("last_contact_date")])
+        len([m for m in members if m.get("last_contact_date")])
         members_contacted_this_month = len(
-            set(
+            {
                 a.get("member_id")
                 for a in activities_this_month
                 if a.get("action_type", "").lower() == "complete_task" and a.get("member_id")
-            )
+            }
         )
         member_reach_rate = round(members_contacted_this_month / total_members * 100, 1) if total_members > 0 else 0
 
@@ -2342,7 +2340,7 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         # When a grief/loss event is recorded, it means the initial visit has been done
         # The 6 followup stages are additional visits on top of the initial one
         grief_events = [e for e in events_this_month if e.get("event_type") == "grief_loss"]
-        grief_families_supported = len(set(e.get("member_id") for e in grief_events))
+        grief_families_supported = len({e.get("member_id") for e in grief_events})
 
         # Count touchpoints: initial visits (1 per grief event) + completed followup stages
         grief_initial_visits = len(grief_events)  # Each recorded event = 1 initial visit done
@@ -2361,7 +2359,7 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         # When an accident/illness event is recorded, it means the initial hospital visit has been done
         # The 3 followup stages are additional visits on top of the initial one
         hospital_events = [e for e in events_this_month if e.get("event_type") == "accident_illness"]
-        hospital_patients = len(set(e.get("member_id") for e in hospital_events))
+        hospital_patients = len({e.get("member_id") for e in hospital_events})
 
         # Count visits: initial visits (1 per hospital event) + completed followup stages
         hospital_initial_visits = len(hospital_events)  # Each recorded event = 1 initial visit done
@@ -2900,7 +2898,7 @@ async def get_staff_performance_report(
         staff_list = []
         total_tasks_completed = sum(s["tasks_completed"] for s in staff_data.values())
 
-        for user_id, staff in staff_data.items():
+        for _user_id, staff in staff_data.items():
             staff["members_contacted"] = len(staff["members_contacted"])
             staff["active_days"] = len(staff["active_days"])
 
@@ -3036,7 +3034,7 @@ async def get_staff_performance_report(
 @get("/reports/yearly-summary")
 async def get_yearly_summary_report(
     request: Request,
-    year: int = None,
+    year: int | None = None,
 ) -> dict:
     """
     Annual summary report for year-end review and planning.
@@ -4012,7 +4010,7 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
 
                 # Convert distinct values to list
                 if metadata["type"] in ["string", "boolean"]:
-                    distinct_list = sorted(list(metadata["distinct_values"]))
+                    distinct_list = sorted(metadata["distinct_values"])
                     if len(distinct_list) > 0 and len(distinct_list) <= 20:  # Only if reasonable number
                         field_info["distinct_values"] = distinct_list
 
@@ -4366,30 +4364,24 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                             rule_matches = member_value not in filter_value
                     elif operator in ["greater_than", "less_than", "between"]:
                         try:
-                            if "date_of_birth" in field_name or "birth" in field_name:
-                                if member_value:
-                                    birth_date = (
-                                        date.fromisoformat(member_value)
-                                        if isinstance(member_value, str)
-                                        else member_value
-                                    )
-                                    age = (date.today() - birth_date).days // 365
-                                    member_value = age
+                            if ("date_of_birth" in field_name or "birth" in field_name) and member_value:
+                                birth_date = (
+                                    date.fromisoformat(member_value) if isinstance(member_value, str) else member_value
+                                )
+                                age = (date.today() - birth_date).days // 365
+                                member_value = age
                             if operator == "greater_than":
                                 rule_matches = float(member_value) > float(filter_value)
                             elif operator == "less_than":
                                 rule_matches = float(member_value) < float(filter_value)
-                            elif operator == "between":
-                                if isinstance(filter_value, list) and len(filter_value) == 2:
-                                    rule_matches = (
-                                        float(filter_value[0]) <= float(member_value) <= float(filter_value[1])
-                                    )
+                            elif operator == "between" and isinstance(filter_value, list) and len(filter_value) == 2:
+                                rule_matches = float(filter_value[0]) <= float(member_value) <= float(filter_value[1])
                         except (ValueError, TypeError):
                             rule_matches = False
                     elif operator == "is_true":
-                        rule_matches = member_value == True or member_value == "true"
+                        rule_matches = member_value or member_value == "true"
                     elif operator == "is_false":
-                        rule_matches = member_value == False or member_value == "false"
+                        rule_matches = not member_value or member_value == "false"
 
                     if not rule_matches:
                         matches_all_rules = False
@@ -4408,12 +4400,10 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
             # Process each filtered core member
             for core_member in filtered_members:
                 core_id = core_member.get("id")
-                match_method = None
 
                 # Try matching in order of preference
                 existing = existing_map.get(core_id)
                 if existing:
-                    match_method = "id"
                     stats["matched_by_id"] += 1
                 else:
                     core_name = core_member.get("full_name") or core_member.get("name")
@@ -4425,14 +4415,12 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                         key = (norm_core_name, norm_core_phone)
                         existing = name_phone_map.get(key)
                         if existing:
-                            match_method = "name_phone"
                             stats["matched_by_name_phone"] += 1
                             logger.info(f"Matched '{core_name}' by name+phone (new ID: {core_id})")
 
                     if not existing and norm_core_name:
                         existing = name_map.get(norm_core_name)
                         if existing:
-                            match_method = "name_only"
                             stats["matched_by_name_only"] += 1
                             logger.info(f"Matched '{core_name}' by name only (new ID: {core_id})")
 
@@ -4546,7 +4534,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                         await db.care_events.insert_one(birthday_event)
 
             # Archive members not in filtered list
-            filtered_core_ids = set(m.get("id") for m in filtered_members)
+            filtered_core_ids = {m.get("id") for m in filtered_members}
             for existing_member in existing_members:
                 external_id = existing_member.get("external_member_id")
                 if external_id and external_id not in filtered_core_ids and not existing_member.get("is_archived"):
@@ -4794,10 +4782,8 @@ async def get_cached_core_token(campus_id: str, config: dict) -> str:
 
     # Check if we have a valid cached token
     cached = _core_api_token_cache.get(campus_id)
-    if cached:
-        # Token valid if expires_at is more than 5 minutes from now
-        if cached["expires_at"] > datetime.now(UTC) + timedelta(minutes=5):
-            return cached["token"]
+    if cached and cached["expires_at"] > datetime.now(UTC) + timedelta(minutes=5):
+        return cached["token"]
 
     # Need to login and get a new token
     api_path_prefix = config.get("api_path_prefix", "/api")
@@ -5775,16 +5761,14 @@ async def on_startup() -> None:
                         )
                         # Set flag to avoid re-indexing on subsequent restarts
                         if redis_client:
-                            try:
+                            with contextlib.suppress(Exception):
                                 await redis_client.set("ft:meilisearch:indexed", "1")
-                            except Exception:
-                                pass
                     else:
                         logger.info("Meilisearch already indexed (skipping bulk index)")
                 except Exception as e:
                     logger.warning(f"Background Meilisearch indexing failed: {e}")
 
-            asyncio.create_task(_background_index())
+            asyncio.create_task(_background_index())  # noqa: RUF006
         else:
             logger.warning("Meilisearch unavailable - search will use MongoDB fallback")
     except Exception as e:

@@ -6,53 +6,54 @@ Targets uncovered lines: helper functions, middleware, encryption, timezones,
 settings endpoints, sync, setup wizard, SSE, reports, etc.
 """
 
-import pytest
+import asyncio
+import hashlib
+import hmac
+import json
 import os
 import sys
 import uuid
-import json
-import io
-import csv
-import hashlib
-import hmac
-import asyncio
-from datetime import datetime, timezone, timedelta, date
-from unittest.mock import MagicMock, AsyncMock, patch, PropertyMock
+from datetime import UTC, date, datetime, timedelta
 from enum import Enum
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Set env vars BEFORE any imports that read them
-os.environ.update({
-    'MONGO_URL': 'mongodb://mock:27017',
-    'DB_NAME': 'faithtracker_test',
-    'JWT_SECRET_KEY': 'test-secret-key-1234567890abcdef1234567890abcdef',
-    'ENCRYPTION_KEY': 'cc7F8DmC4HF2hXLZxWIwZPitOgPS9Ybza0pl2_U0luQ=',
-    'DRAGONFLY_URL': 'redis://mock:6379',
-    'FRONTEND_URL': 'http://localhost:3000',
-    'ALLOWED_ORIGINS': 'http://localhost:3000',
-    'ENVIRONMENT': 'development',
-})
+os.environ.update(
+    {
+        "MONGO_URL": "mongodb://mock:27017",
+        "DB_NAME": "faithtracker_test",
+        "JWT_SECRET_KEY": "test-secret-key-1234567890abcdef1234567890abcdef",
+        "ENCRYPTION_KEY": "cc7F8DmC4HF2hXLZxWIwZPitOgPS9Ybza0pl2_U0luQ=",
+        "DRAGONFLY_URL": "redis://mock:6379",
+        "FRONTEND_URL": "http://localhost:3000",
+        "ALLOWED_ORIGINS": "http://localhost:3000",
+        "ENVIRONMENT": "development",
+    }
+)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import bcrypt
 import jwt as pyjwt
-from bson import ObjectId, Decimal128, Binary, Regex
-import msgspec
-from msgspec import Struct, UNSET
+from bson import Binary, Decimal128, ObjectId, Regex
+from msgspec import UNSET
 
 # ==================== TEST CONSTANTS ====================
 
-TEST_SECRET = os.environ['JWT_SECRET_KEY']
+TEST_SECRET = os.environ["JWT_SECRET_KEY"]
 TEST_CAMPUS_ID = str(uuid.uuid4())
 TEST_CAMPUS_ID_2 = str(uuid.uuid4())
 TEST_USER_ID = str(uuid.uuid4())
 TEST_MEMBER_ID = str(uuid.uuid4())
 TEST_EVENT_ID = str(uuid.uuid4())
 
-HASHED_PASSWORD = bcrypt.hashpw(b"TestPassword123!", bcrypt.gensalt()).decode('utf-8')
+HASHED_PASSWORD = bcrypt.hashpw(b"TestPassword123!", bcrypt.gensalt()).decode("utf-8")
 
 
 # ==================== MOCK HELPERS ====================
+
 
 def _make_mock_cursor(data=None):
     cursor = MagicMock()
@@ -141,7 +142,7 @@ def _make_member(**overrides):
         "campus_id": TEST_CAMPUS_ID,
         "engagement_status": "active",
         "days_since_last_contact": 5,
-        "last_contact_date": datetime.now(timezone.utc).isoformat(),
+        "last_contact_date": datetime.now(UTC).isoformat(),
         "is_archived": False,
         "birth_date": "1990-05-15",
         "age": 35,
@@ -169,7 +170,7 @@ def _make_care_event(**overrides):
 def _make_token(user_id=TEST_USER_ID, secret=TEST_SECRET, **extra):
     payload = {
         "sub": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        "exp": datetime.now(UTC) + timedelta(hours=24),
         **extra,
     }
     return pyjwt.encode(payload, secret, algorithm="HS256")
@@ -186,7 +187,7 @@ def _mock_request(user=None, headers=None, body=None, json_data=None, scope=None
     if headers:
         h.update(headers)
     req.headers = h
-    req.body = AsyncMock(return_value=body or b'{}')
+    req.body = AsyncMock(return_value=body or b"{}")
     req.json = AsyncMock(return_value=json_data or {})
     req.method = "GET"
     req.url = MagicMock()
@@ -198,6 +199,7 @@ def _mock_request(user=None, headers=None, body=None, json_data=None, scope=None
 @pytest.fixture(autouse=True)
 def _reset_caches():
     from utils import invalidate_cache
+
     invalidate_cache()
     yield
 
@@ -206,11 +208,22 @@ def _reset_caches():
 def mock_db():
     db = MagicMock()
     for collection_name in [
-        'users', 'members', 'campuses', 'care_events', 'settings',
-        'activity_logs', 'notification_logs', 'grief_support',
-        'accident_followup', 'financial_aid_schedules', 'sync_configs',
-        'sync_logs', 'webhook_logs', 'user_preferences', 'dashboard_cache',
-        'pastoral_notes',
+        "users",
+        "members",
+        "campuses",
+        "care_events",
+        "settings",
+        "activity_logs",
+        "notification_logs",
+        "grief_support",
+        "accident_followup",
+        "financial_aid_schedules",
+        "sync_configs",
+        "sync_logs",
+        "webhook_logs",
+        "user_preferences",
+        "dashboard_cache",
+        "pastoral_notes",
     ]:
         coll = MagicMock()
         coll.find_one = AsyncMock(return_value=None)
@@ -241,11 +254,12 @@ def setup_server(mock_db):
 
 # ==================== 1. msgspec_enc_hook TESTS ====================
 
+
 class TestMsgspecEncHook:
     """Test custom msgspec encoder hook."""
 
     def test_encodes_datetime(self, setup_server):
-        dt = datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 6, 15, 10, 30, 0, tzinfo=UTC)
         result = setup_server.msgspec_enc_hook(dt)
         assert result == dt.isoformat()
 
@@ -266,9 +280,10 @@ class TestMsgspecEncHook:
 
     def test_encodes_binary(self, setup_server):
         import base64
+
         b = Binary(b"hello world")
         result = setup_server.msgspec_enc_hook(b)
-        assert result == base64.b64encode(b"hello world").decode('utf-8')
+        assert result == base64.b64encode(b"hello world").decode("utf-8")
 
     def test_encodes_regex(self, setup_server):
         r = Regex("^test.*$")
@@ -282,22 +297,25 @@ class TestMsgspecEncHook:
 
     def test_encodes_bytes(self, setup_server):
         import base64
+
         b = b"raw bytes"
         result = setup_server.msgspec_enc_hook(b)
-        assert result == base64.b64encode(b).decode('utf-8')
+        assert result == base64.b64encode(b).decode("utf-8")
 
     def test_encodes_enum(self, setup_server):
         class TestEnum(Enum):
             VALUE = "test_value"
+
         result = setup_server.msgspec_enc_hook(TestEnum.VALUE)
         assert result == "test_value"
 
     def test_raises_for_unsupported_type(self, setup_server):
         with pytest.raises(NotImplementedError, match="not JSON serializable"):
-            setup_server.msgspec_enc_hook(set([1, 2, 3]))
+            setup_server.msgspec_enc_hook({1, 2, 3})
 
 
 # ==================== 2. to_mongo_doc TESTS ====================
+
 
 class TestToMongoDoc:
     """Test Struct to MongoDB dict conversion."""
@@ -308,7 +326,7 @@ class TestToMongoDoc:
         assert "unset_key" not in result
 
     def test_preserves_datetime_in_dict(self, setup_server):
-        dt = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, tzinfo=UTC)
         result = setup_server.to_mongo_doc({"created_at": dt})
         assert result["created_at"] == dt
 
@@ -319,6 +337,7 @@ class TestToMongoDoc:
 
     def test_converts_enum_values(self, setup_server):
         from enums import EventType
+
         result = setup_server.to_mongo_doc({"event_type": EventType.BIRTHDAY})
         assert result["event_type"] == "birthday"
 
@@ -329,12 +348,13 @@ class TestToMongoDoc:
 
     def test_handles_list_items(self, setup_server):
         from enums import GriefStage
+
         items = {"stages": [GriefStage.ONE_WEEK, GriefStage.TWO_WEEKS]}
         result = setup_server.to_mongo_doc(items)
         assert result["stages"] == ["1_week", "2_weeks"]
 
     def test_handles_list_with_datetimes(self, setup_server):
-        dt = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, tzinfo=UTC)
         items = {"dates": [dt]}
         result = setup_server.to_mongo_doc(items)
         assert result["dates"] == [dt]
@@ -351,6 +371,7 @@ class TestToMongoDoc:
 
 
 # ==================== 3. encrypt/decrypt password TESTS ====================
+
 
 class TestEncryption:
     """Test Fernet encryption roundtrip."""
@@ -377,74 +398,76 @@ class TestEncryption:
 
 # ==================== 4. safe_error_detail TESTS ====================
 
+
 class TestSafeErrorDetail:
     """Test error message sanitization."""
 
     def test_development_mode_shows_full_error(self, setup_server):
-        with patch.dict(os.environ, {'ENVIRONMENT': 'development'}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "development"}):
             result = setup_server.safe_error_detail(Exception("Detailed error"), 500)
             assert result == "Detailed error"
 
     def test_production_mode_hides_details(self, setup_server):
-        with patch.dict(os.environ, {'ENVIRONMENT': 'production'}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}):
             result = setup_server.safe_error_detail(Exception("Sensitive info"), 500)
             assert "Sensitive info" not in result
             assert "internal error" in result.lower()
 
     def test_production_400_error(self, setup_server):
-        with patch.dict(os.environ, {'ENVIRONMENT': 'production'}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}):
             result = setup_server.safe_error_detail(Exception("bad"), 400)
             assert result == "Invalid request"
 
     def test_production_404_error(self, setup_server):
-        with patch.dict(os.environ, {'ENVIRONMENT': 'production'}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}):
             result = setup_server.safe_error_detail(Exception("missing"), 404)
             assert result == "Resource not found"
 
 
 # ==================== 5. validate_image_magic_bytes TESTS ====================
 
+
 class TestValidateImageMagicBytes:
     """Test image file header validation."""
 
     def test_valid_jpeg(self, setup_server):
-        content = b'\xff\xd8\xff\xe0' + b'\x00' * 100
+        content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
         valid, mime = setup_server.validate_image_magic_bytes(content)
         assert valid is True
-        assert mime == 'image/jpeg'
+        assert mime == "image/jpeg"
 
     def test_valid_png(self, setup_server):
-        content = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+        content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
         valid, mime = setup_server.validate_image_magic_bytes(content)
         assert valid is True
-        assert mime == 'image/png'
+        assert mime == "image/png"
 
     def test_valid_gif87a(self, setup_server):
-        content = b'GIF87a' + b'\x00' * 100
+        content = b"GIF87a" + b"\x00" * 100
         valid, mime = setup_server.validate_image_magic_bytes(content)
         assert valid is True
-        assert mime == 'image/gif'
+        assert mime == "image/gif"
 
     def test_valid_gif89a(self, setup_server):
-        content = b'GIF89a' + b'\x00' * 100
+        content = b"GIF89a" + b"\x00" * 100
         valid, mime = setup_server.validate_image_magic_bytes(content)
         assert valid is True
-        assert mime == 'image/gif'
+        assert mime == "image/gif"
 
     def test_valid_webp(self, setup_server):
-        content = b'RIFF\x00\x00\x00\x00WEBP' + b'\x00' * 100
+        content = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 100
         valid, mime = setup_server.validate_image_magic_bytes(content)
         assert valid is True
-        assert mime == 'image/webp'
+        assert mime == "image/webp"
 
     def test_invalid_format(self, setup_server):
-        content = b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09'
+        content = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09"
         valid, msg = setup_server.validate_image_magic_bytes(content)
         assert valid is False
         assert "Invalid image format" in msg
 
     def test_file_too_small(self, setup_server):
-        content = b'\xff\xd8'
+        content = b"\xff\xd8"
         valid, msg = setup_server.validate_image_magic_bytes(content)
         assert valid is False
         assert "too small" in msg
@@ -452,30 +475,25 @@ class TestValidateImageMagicBytes:
 
 # ==================== 6. generate_grief_timeline TESTS ====================
 
+
 class TestGenerateGriefTimeline:
     """Test grief support auto-timeline generation."""
 
     def test_generates_6_stages(self, setup_server):
         mourning_date = date(2024, 1, 1)
-        timeline = setup_server.generate_grief_timeline(
-            mourning_date, "event-123", "member-456"
-        )
+        timeline = setup_server.generate_grief_timeline(mourning_date, "event-123", "member-456")
         assert len(timeline) == 6
 
     def test_stages_have_correct_dates(self, setup_server):
         mourning_date = date(2024, 1, 1)
-        timeline = setup_server.generate_grief_timeline(
-            mourning_date, "event-123", "member-456"
-        )
+        timeline = setup_server.generate_grief_timeline(mourning_date, "event-123", "member-456")
         expected_offsets = [7, 14, 30, 90, 180, 365]
         for i, stage in enumerate(timeline):
             expected_date = (mourning_date + timedelta(days=expected_offsets[i])).isoformat()
             assert stage["scheduled_date"] == expected_date
 
     def test_stages_have_required_fields(self, setup_server):
-        timeline = setup_server.generate_grief_timeline(
-            date(2024, 1, 1), "evt-1", "mem-1"
-        )
+        timeline = setup_server.generate_grief_timeline(date(2024, 1, 1), "evt-1", "mem-1")
         for stage in timeline:
             assert "id" in stage
             assert "care_event_id" in stage
@@ -487,12 +505,15 @@ class TestGenerateGriefTimeline:
 
     def test_stages_have_correct_stage_names(self, setup_server):
         from enums import GriefStage
-        timeline = setup_server.generate_grief_timeline(
-            date(2024, 1, 1), "evt-1", "mem-1"
-        )
+
+        timeline = setup_server.generate_grief_timeline(date(2024, 1, 1), "evt-1", "mem-1")
         expected_stages = [
-            GriefStage.ONE_WEEK, GriefStage.TWO_WEEKS, GriefStage.ONE_MONTH,
-            GriefStage.THREE_MONTHS, GriefStage.SIX_MONTHS, GriefStage.ONE_YEAR
+            GriefStage.ONE_WEEK,
+            GriefStage.TWO_WEEKS,
+            GriefStage.ONE_MONTH,
+            GriefStage.THREE_MONTHS,
+            GriefStage.SIX_MONTHS,
+            GriefStage.ONE_YEAR,
         ]
         for i, stage in enumerate(timeline):
             assert stage["stage"] == expected_stages[i]
@@ -500,43 +521,37 @@ class TestGenerateGriefTimeline:
 
 # ==================== 7. generate_accident_followup_timeline TESTS ====================
 
+
 class TestGenerateAccidentFollowupTimeline:
     """Test accident/illness follow-up timeline generation."""
 
     def test_generates_3_stages(self, setup_server):
         event_date = date(2024, 3, 1)
-        timeline = setup_server.generate_accident_followup_timeline(
-            event_date, "evt-1", "mem-1", TEST_CAMPUS_ID
-        )
+        timeline = setup_server.generate_accident_followup_timeline(event_date, "evt-1", "mem-1", TEST_CAMPUS_ID)
         assert len(timeline) == 3
 
     def test_stages_have_correct_dates(self, setup_server):
         event_date = date(2024, 3, 1)
-        timeline = setup_server.generate_accident_followup_timeline(
-            event_date, "evt-1", "mem-1", TEST_CAMPUS_ID
-        )
+        timeline = setup_server.generate_accident_followup_timeline(event_date, "evt-1", "mem-1", TEST_CAMPUS_ID)
         expected_offsets = [3, 7, 14]
         for i, stage in enumerate(timeline):
             expected_date = (event_date + timedelta(days=expected_offsets[i])).isoformat()
             assert stage["scheduled_date"] == expected_date
 
     def test_stages_have_correct_names(self, setup_server):
-        timeline = setup_server.generate_accident_followup_timeline(
-            date(2024, 3, 1), "evt-1", "mem-1", TEST_CAMPUS_ID
-        )
+        timeline = setup_server.generate_accident_followup_timeline(date(2024, 3, 1), "evt-1", "mem-1", TEST_CAMPUS_ID)
         expected_names = ["first_followup", "second_followup", "final_followup"]
         for i, stage in enumerate(timeline):
             assert stage["stage"] == expected_names[i]
 
     def test_stages_include_campus_id(self, setup_server):
-        timeline = setup_server.generate_accident_followup_timeline(
-            date(2024, 3, 1), "evt-1", "mem-1", TEST_CAMPUS_ID
-        )
+        timeline = setup_server.generate_accident_followup_timeline(date(2024, 3, 1), "evt-1", "mem-1", TEST_CAMPUS_ID)
         for stage in timeline:
             assert stage["campus_id"] == TEST_CAMPUS_ID
 
 
 # ==================== 8. calculate_engagement_status_async TESTS ====================
+
 
 class TestCalculateEngagementStatusAsync:
     """Test async engagement status calculation."""
@@ -551,7 +566,7 @@ class TestCalculateEngagementStatusAsync:
     @pytest.mark.asyncio
     async def test_recent_contact_returns_active(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
-        recent = datetime.now(timezone.utc) - timedelta(days=5)
+        recent = datetime.now(UTC) - timedelta(days=5)
         status, days = await setup_server.calculate_engagement_status_async(recent)
         assert status.value == "active"
         assert days == 5
@@ -559,48 +574,47 @@ class TestCalculateEngagementStatusAsync:
     @pytest.mark.asyncio
     async def test_old_contact_returns_at_risk(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
-        old = datetime.now(timezone.utc) - timedelta(days=70)
-        status, days = await setup_server.calculate_engagement_status_async(old)
+        old = datetime.now(UTC) - timedelta(days=70)
+        status, _days = await setup_server.calculate_engagement_status_async(old)
         assert status.value == "at_risk"
 
     @pytest.mark.asyncio
     async def test_very_old_contact_returns_disconnected(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
-        very_old = datetime.now(timezone.utc) - timedelta(days=100)
-        status, days = await setup_server.calculate_engagement_status_async(very_old)
+        very_old = datetime.now(UTC) - timedelta(days=100)
+        status, _days = await setup_server.calculate_engagement_status_async(very_old)
         assert status.value == "disconnected"
 
     @pytest.mark.asyncio
     async def test_string_date_input(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
-        recent_str = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
-        status, days = await setup_server.calculate_engagement_status_async(recent_str)
+        recent_str = (datetime.now(UTC) - timedelta(days=3)).isoformat()
+        status, _days = await setup_server.calculate_engagement_status_async(recent_str)
         assert status.value == "active"
 
     @pytest.mark.asyncio
     async def test_invalid_string_date(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
-        status, days = await setup_server.calculate_engagement_status_async("not-a-date")
+        status, _days = await setup_server.calculate_engagement_status_async("not-a-date")
         assert status.value == "disconnected"
 
     @pytest.mark.asyncio
     async def test_naive_datetime_handled(self, setup_server, mock_db):
         mock_db.settings.find_one = AsyncMock(return_value=None)
         naive = datetime.now() - timedelta(days=3)  # No tzinfo
-        status, days = await setup_server.calculate_engagement_status_async(naive)
+        status, _days = await setup_server.calculate_engagement_status_async(naive)
         assert status.value == "active"
 
     @pytest.mark.asyncio
     async def test_custom_thresholds(self, setup_server, mock_db):
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "data": {"atRiskDays": 10, "disconnectedDays": 20}
-        })
-        contact = datetime.now(timezone.utc) - timedelta(days=15)
-        status, days = await setup_server.calculate_engagement_status_async(contact)
+        mock_db.settings.find_one = AsyncMock(return_value={"data": {"atRiskDays": 10, "disconnectedDays": 20}})
+        contact = datetime.now(UTC) - timedelta(days=15)
+        status, _days = await setup_server.calculate_engagement_status_async(contact)
         assert status.value == "at_risk"
 
 
 # ==================== 9. _get_engagement_settings_cached TESTS ====================
+
 
 class TestGetEngagementSettingsCached:
     """Test engagement settings with caching."""
@@ -614,9 +628,7 @@ class TestGetEngagementSettingsCached:
 
     @pytest.mark.asyncio
     async def test_returns_db_settings(self, setup_server, mock_db):
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "data": {"atRiskDays": 30, "disconnectedDays": 60}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"data": {"atRiskDays": 30, "disconnectedDays": 60}})
         result = await setup_server._get_engagement_settings_cached()
         assert result["atRiskDays"] == 30
         assert result["disconnectedDays"] == 60
@@ -631,6 +643,7 @@ class TestGetEngagementSettingsCached:
 
 # ==================== 10. get_writeoff_settings TESTS ====================
 
+
 class TestGetWriteoffSettings:
     """Test write-off settings retrieval."""
 
@@ -643,9 +656,9 @@ class TestGetWriteoffSettings:
 
     @pytest.mark.asyncio
     async def test_returns_db_settings(self, setup_server, mock_db):
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "data": {"birthday": 14, "financial_aid": 7, "accident_illness": 21, "grief_support": 21}
-        })
+        mock_db.settings.find_one = AsyncMock(
+            return_value={"data": {"birthday": 14, "financial_aid": 7, "accident_illness": 21, "grief_support": 21}}
+        )
         result = await setup_server.get_writeoff_settings()
         assert result["birthday"] == 14
 
@@ -658,12 +671,14 @@ class TestGetWriteoffSettings:
 
 # ==================== 11. log_activity TESTS ====================
 
+
 class TestLogActivity:
     """Test activity logging and SSE broadcast."""
 
     @pytest.mark.asyncio
     async def test_logs_activity_successfully(self, setup_server, mock_db):
         from enums import ActivityActionType
+
         mock_db.activity_logs.insert_one = AsyncMock(return_value=_make_insert_result())
 
         await setup_server.log_activity(
@@ -679,6 +694,7 @@ class TestLogActivity:
     @pytest.mark.asyncio
     async def test_log_activity_does_not_fail_on_error(self, setup_server, mock_db):
         from enums import ActivityActionType
+
         mock_db.activity_logs.insert_one = AsyncMock(side_effect=Exception("DB error"))
 
         # Should not raise
@@ -691,6 +707,7 @@ class TestLogActivity:
 
 
 # ==================== 12. get_member_or_404 TESTS ====================
+
 
 class TestGetMemberOr404:
     """Test member retrieval with 404 handling."""
@@ -706,6 +723,7 @@ class TestGetMemberOr404:
     async def test_raises_404_when_not_found(self, setup_server, mock_db):
         mock_db.members.find_one = AsyncMock(return_value=None)
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_member_or_404("nonexistent")
         assert exc_info.value.status_code == 404
@@ -719,6 +737,7 @@ class TestGetMemberOr404:
 
 
 # ==================== 13. get_care_event_or_404 TESTS ====================
+
 
 class TestGetCareEventOr404:
     """Test care event retrieval with 404 handling."""
@@ -734,12 +753,14 @@ class TestGetCareEventOr404:
     async def test_raises_404_when_not_found(self, setup_server, mock_db):
         mock_db.care_events.find_one = AsyncMock(return_value=None)
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_care_event_or_404("nonexistent")
         assert exc_info.value.status_code == 404
 
 
 # ==================== 14. get_campus_or_404 TESTS ====================
+
 
 class TestGetCampusOr404:
     """Test campus retrieval with 404 handling."""
@@ -755,12 +776,14 @@ class TestGetCampusOr404:
     async def test_raises_404_when_not_found(self, setup_server, mock_db):
         mock_db.campuses.find_one = AsyncMock(return_value=None)
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_campus_or_404("nonexistent")
         assert exc_info.value.status_code == 404
 
 
 # ==================== 15. send_whatsapp_message TESTS ====================
+
 
 class TestSendWhatsappMessage:
     """Test WhatsApp message sending."""
@@ -770,18 +793,14 @@ class TestSendWhatsappMessage:
         mock_db.settings.find_one = AsyncMock(return_value=None)
         with patch.dict(os.environ, {}, clear=False):
             # Remove WHATSAPP_GATEWAY_URL if present
-            os.environ.pop('WHATSAPP_GATEWAY_URL', None)
-            result = await setup_server.send_whatsapp_message(
-                "+6281234567890", "Hello", member_id="mem-1"
-            )
+            os.environ.pop("WHATSAPP_GATEWAY_URL", None)
+            result = await setup_server.send_whatsapp_message("+6281234567890", "Hello", member_id="mem-1")
             assert result["success"] is False
             assert "error" in result
 
     @pytest.mark.asyncio
     async def test_successful_send(self, setup_server, mock_db):
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "data": {"whatsappGateway": "http://wa-gateway:3001"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"data": {"whatsappGateway": "http://wa-gateway:3001"}})
         mock_db.notification_logs.insert_one = AsyncMock(return_value=_make_insert_result())
 
         mock_response = MagicMock()
@@ -790,32 +809,27 @@ class TestSendWhatsappMessage:
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(return_value=mock_response)
 
-        with patch('services.http_client.get_http_client', new_callable=AsyncMock, return_value=mock_client):
-            result = await setup_server.send_whatsapp_message(
-                "+6281234567890", "Hello", member_id="mem-1"
-            )
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
+            result = await setup_server.send_whatsapp_message("+6281234567890", "Hello", member_id="mem-1")
             assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_failed_send_with_member_id(self, setup_server, mock_db):
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "data": {"whatsappGateway": "http://wa-gateway:3001"}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"data": {"whatsappGateway": "http://wa-gateway:3001"}})
         mock_db.notification_logs.insert_one = AsyncMock(return_value=_make_insert_result())
 
-        with patch('httpx.AsyncClient') as mock_client_cls:
+        with patch("httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(side_effect=Exception("Connection failed"))
             mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            result = await setup_server.send_whatsapp_message(
-                "+6281234567890", "Hello", member_id="mem-1"
-            )
+            result = await setup_server.send_whatsapp_message("+6281234567890", "Hello", member_id="mem-1")
             assert result["success"] is False
 
 
 # ==================== 16. invalidate_dashboard_cache TESTS ====================
+
 
 class TestInvalidateDashboardCache:
     """Test dashboard cache invalidation."""
@@ -835,6 +849,7 @@ class TestInvalidateDashboardCache:
 
 
 # ==================== 17. get_campus_timezone TESTS ====================
+
 
 class TestGetCampusTimezone:
     """Test campus timezone retrieval with caching."""
@@ -870,7 +885,6 @@ class TestGetCampusTimezone:
 
     @pytest.mark.asyncio
     async def test_uses_cache_on_second_call(self, setup_server, mock_db):
-        import time
         setup_server._timezone_cache.clear()
         mock_db.campuses.find_one = AsyncMock(return_value={"timezone": "UTC"})
 
@@ -885,6 +899,7 @@ class TestGetCampusTimezone:
 
 
 # ==================== 18. get_date_in_timezone TESTS ====================
+
 
 class TestGetDateInTimezone:
     """Test date conversion to specific timezone."""
@@ -905,6 +920,7 @@ class TestGetDateInTimezone:
 
 # ==================== 19. is_valid_timezone TESTS ====================
 
+
 class TestIsValidTimezone:
     """Test timezone validation."""
 
@@ -920,6 +936,7 @@ class TestIsValidTimezone:
 
 # ==================== 20. now_jakarta / to_jakarta / get_jakarta_date_str TESTS ====================
 
+
 class TestTimezoneHelpers:
     """Test timezone helper functions."""
 
@@ -928,7 +945,7 @@ class TestTimezoneHelpers:
         assert result.tzinfo is not None
 
     def test_to_jakarta_converts_utc(self, setup_server):
-        utc_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        utc_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
         result = setup_server.to_jakarta(utc_time)
         assert result.hour == 7  # UTC+7
 
@@ -946,12 +963,14 @@ class TestTimezoneHelpers:
 
 # ==================== 21. Login rate limiting TESTS ====================
 
+
 class TestLoginRateLimiting:
     """Test brute force protection (DragonflyDB-backed)."""
 
     @pytest.mark.asyncio
     async def test_first_attempt_allowed(self, setup_server):
         from dependencies import check_login_rate_limit, init_redis
+
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         init_redis(mock_redis)
@@ -962,7 +981,8 @@ class TestLoginRateLimiting:
 
     @pytest.mark.asyncio
     async def test_record_failed_login(self, setup_server):
-        from dependencies import record_failed_login, init_redis
+        from dependencies import init_redis, record_failed_login
+
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
@@ -976,13 +996,10 @@ class TestLoginRateLimiting:
 
     @pytest.mark.asyncio
     async def test_lockout_after_max_attempts(self, setup_server):
-        from dependencies import check_login_rate_limit, init_redis, LOGIN_MAX_ATTEMPTS
-        now = datetime.now(timezone.utc)
-        record = json.dumps({
-            "attempts": LOGIN_MAX_ATTEMPTS,
-            "last_attempt": now.isoformat(),
-            "locked_until": None
-        })
+        from dependencies import LOGIN_MAX_ATTEMPTS, check_login_rate_limit, init_redis
+
+        now = datetime.now(UTC)
+        record = json.dumps({"attempts": LOGIN_MAX_ATTEMPTS, "last_attempt": now.isoformat(), "locked_until": None})
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=record)
         mock_redis.set = AsyncMock()
@@ -995,6 +1012,7 @@ class TestLoginRateLimiting:
     @pytest.mark.asyncio
     async def test_clear_login_attempts(self, setup_server):
         from dependencies import clear_login_attempts, init_redis
+
         mock_redis = AsyncMock()
         mock_redis.delete = AsyncMock()
         init_redis(mock_redis)
@@ -1006,6 +1024,7 @@ class TestLoginRateLimiting:
     async def test_no_redis_fails_open(self, setup_server):
         """When redis is unavailable, rate limiting is skipped (fail open)."""
         from dependencies import check_login_rate_limit, init_redis
+
         init_redis(None)
         allowed, msg = await check_login_rate_limit("127.0.0.1", "test@test.com")
         assert allowed is True
@@ -1014,29 +1033,29 @@ class TestLoginRateLimiting:
     @pytest.mark.asyncio
     async def test_lockout_expired_allows_access(self, setup_server):
         from dependencies import check_login_rate_limit, init_redis
-        expired_lockout = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
-        record = json.dumps({
-            "attempts": 5,
-            "last_attempt": (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat(),
-            "locked_until": expired_lockout
-        })
+
+        expired_lockout = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+        record = json.dumps(
+            {
+                "attempts": 5,
+                "last_attempt": (datetime.now(UTC) - timedelta(minutes=20)).isoformat(),
+                "locked_until": expired_lockout,
+            }
+        )
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=record)
         mock_redis.delete = AsyncMock()
         init_redis(mock_redis)
-        allowed, msg = await check_login_rate_limit("127.0.0.1", "expired@test.com")
+        allowed, _msg = await check_login_rate_limit("127.0.0.1", "expired@test.com")
         assert allowed is True
         init_redis(None)
 
     @pytest.mark.asyncio
     async def test_record_failed_resets_outside_window(self, setup_server):
-        from dependencies import record_failed_login, init_redis
-        old_time = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
-        existing = json.dumps({
-            "attempts": 3,
-            "last_attempt": old_time,
-            "locked_until": None
-        })
+        from dependencies import init_redis, record_failed_login
+
+        old_time = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+        existing = json.dumps({"attempts": 3, "last_attempt": old_time, "locked_until": None})
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=existing)
         mock_redis.set = AsyncMock()
@@ -1049,11 +1068,13 @@ class TestLoginRateLimiting:
 
 # ==================== 22. _get_client_ip TESTS ====================
 
+
 class TestGetClientIp:
     """Test client IP extraction from request."""
 
     def test_from_x_forwarded_for(self, setup_server):
         from dependencies import get_client_ip
+
         req = MagicMock()
         req.headers = {"x-forwarded-for": "203.0.113.50, 70.41.3.18"}
         req.scope = {}
@@ -1062,6 +1083,7 @@ class TestGetClientIp:
 
     def test_from_x_real_ip(self, setup_server):
         from dependencies import get_client_ip
+
         req = MagicMock()
         req.headers = {"x-real-ip": "10.0.0.1"}
         req.scope = {}
@@ -1070,6 +1092,7 @@ class TestGetClientIp:
 
     def test_from_scope_client(self, setup_server):
         from dependencies import get_client_ip
+
         req = MagicMock()
         req.headers = {}
         req.scope = {"client": ("192.168.1.1", 12345)}
@@ -1078,6 +1101,7 @@ class TestGetClientIp:
 
     def test_unknown_when_no_client(self, setup_server):
         from dependencies import get_client_ip
+
         req = MagicMock()
         req.headers = {}
         req.scope = {}
@@ -1086,6 +1110,7 @@ class TestGetClientIp:
 
 
 # ==================== 23. get_campus_filter TESTS ====================
+
 
 class TestGetCampusFilter:
     """Test campus filter generation for multi-tenancy."""
@@ -1113,6 +1138,7 @@ class TestGetCampusFilter:
 
 # ==================== 24. verify_password / get_password_hash TESTS ====================
 
+
 class TestPasswordHashing:
     """Test bcrypt password hashing."""
 
@@ -1128,6 +1154,7 @@ class TestPasswordHashing:
 
 # ==================== 25. create_access_token TESTS ====================
 
+
 class TestCreateAccessToken:
     """Test JWT token creation."""
 
@@ -1137,10 +1164,7 @@ class TestCreateAccessToken:
         assert payload["sub"] == "user-123"
 
     def test_custom_expiration(self, setup_server):
-        token = setup_server.create_access_token(
-            {"sub": "user-123"},
-            expires_delta=timedelta(minutes=5)
-        )
+        token = setup_server.create_access_token({"sub": "user-123"}, expires_delta=timedelta(minutes=5))
         payload = pyjwt.decode(token, TEST_SECRET, algorithms=["HS256"])
         assert payload["sub"] == "user-123"
 
@@ -1152,6 +1176,7 @@ class TestCreateAccessToken:
 
 # ==================== 26. get_current_user TESTS ====================
 
+
 class TestGetCurrentUser:
     """Test JWT-based user authentication."""
 
@@ -1160,6 +1185,7 @@ class TestGetCurrentUser:
         req = MagicMock()
         req.headers = {}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_current_user(req)
         assert exc_info.value.status_code == 401
@@ -1169,6 +1195,7 @@ class TestGetCurrentUser:
         req = MagicMock()
         req.headers = {"Authorization": "Bearer "}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_current_user(req)
         assert exc_info.value.status_code == 401
@@ -1178,6 +1205,7 @@ class TestGetCurrentUser:
         req = MagicMock()
         req.headers = {"Authorization": "Bearer invalid-token"}
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_current_user(req)
         assert exc_info.value.status_code == 401
@@ -1190,6 +1218,7 @@ class TestGetCurrentUser:
         mock_db.users.find_one = AsyncMock(return_value=None)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_current_user(req)
         assert exc_info.value.status_code == 401
@@ -1207,20 +1236,19 @@ class TestGetCurrentUser:
 
     @pytest.mark.asyncio
     async def test_token_without_sub_claim(self, setup_server, mock_db):
-        token = pyjwt.encode(
-            {"exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-            TEST_SECRET, algorithm="HS256"
-        )
+        token = pyjwt.encode({"exp": datetime.now(UTC) + timedelta(hours=1)}, TEST_SECRET, algorithm="HS256")
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_current_user(req)
         assert exc_info.value.status_code == 401
 
 
 # ==================== 27. get_current_admin / get_full_admin TESTS ====================
+
 
 class TestAdminChecks:
     """Test admin role verification."""
@@ -1256,6 +1284,7 @@ class TestAdminChecks:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_current_admin(req)
         assert exc_info.value.status_code == 403
@@ -1269,12 +1298,14 @@ class TestAdminChecks:
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_full_admin(req)
         assert exc_info.value.status_code == 403
 
 
 # ==================== 28. global_exception_handler TESTS ====================
+
 
 class TestGlobalExceptionHandler:
     """Test the global exception handler."""
@@ -1285,7 +1316,7 @@ class TestGlobalExceptionHandler:
         req.url = MagicMock()
         req.url.path = "/api/test"
 
-        with patch.dict(os.environ, {'ENVIRONMENT': 'development'}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "development"}):
             response = setup_server.global_exception_handler(req, Exception("Test error"))
             assert response.status_code == 500
 
@@ -1295,12 +1326,13 @@ class TestGlobalExceptionHandler:
         req.url = MagicMock()
         req.url.path = "/api/test"
 
-        with patch.dict(os.environ, {'ENVIRONMENT': 'production'}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}):
             response = setup_server.global_exception_handler(req, Exception("Secret"))
             assert response.status_code == 500
 
     def test_handles_http_exception(self, setup_server):
         from litestar.exceptions import HTTPException
+
         req = MagicMock()
         req.method = "GET"
         req.url = MagicMock()
@@ -1312,6 +1344,7 @@ class TestGlobalExceptionHandler:
 
     def test_handles_validation_exception(self, setup_server):
         from litestar.exceptions import ValidationException
+
         req = MagicMock()
         req.method = "POST"
         req.url = MagicMock()
@@ -1323,6 +1356,7 @@ class TestGlobalExceptionHandler:
 
 
 # ==================== 29. CustomMsgspecResponse TESTS ====================
+
 
 class TestCustomMsgspecResponse:
     """Test custom response class."""
@@ -1341,24 +1375,28 @@ class TestCustomMsgspecResponse:
 
 # ==================== 30. JSONFormatter TESTS ====================
 
+
 class TestJSONFormatter:
     """Test JSON log formatter."""
 
     def test_formats_log_record(self, setup_server):
         import logging
+
         formatter = setup_server.JSONFormatter()
-        record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py",
-            lineno=1, msg="Test message", args=None, exc_info=None
+        logging.LogRecord(
+            name="test", level=logging.INFO, pathname="test.py", lineno=1, msg="Test message", args=None, exc_info=None
         )
         # The format method contains a datetime in log_obj which needs default=str
         # Patch json module inside server.py to add default=str
         import server as srv
+
         original_json_dumps = json.dumps
+
         def safe_dumps(obj, **kwargs):
-            kwargs.setdefault('default', str)
+            kwargs.setdefault("default", str)
             return original_json_dumps(obj, **kwargs)
-        with patch.object(srv, 'json_lib', create=True):
+
+        with patch.object(srv, "json_lib", create=True):
             pass
         # Just verify the formatter class is properly structured (covers __init__)
         assert callable(formatter.format)
@@ -1366,15 +1404,22 @@ class TestJSONFormatter:
 
     def test_formats_with_exception(self, setup_server):
         import logging
+
         formatter = setup_server.JSONFormatter()
         try:
             raise ValueError("test error")
         except ValueError:
             import sys as _sys
+
             exc_info = _sys.exc_info()
         record = logging.LogRecord(
-            name="test", level=logging.ERROR, pathname="test.py",
-            lineno=1, msg="Error occurred", args=None, exc_info=exc_info
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=1,
+            msg="Error occurred",
+            args=None,
+            exc_info=exc_info,
         )
         # Verify the exception formatting works (formatException is inherited)
         exc_text = formatter.formatException(record.exc_info)
@@ -1383,6 +1428,7 @@ class TestJSONFormatter:
 
 
 # ==================== 31. static_config_response TESTS ====================
+
 
 class TestStaticConfigResponse:
     """Test static config response with ETag."""
@@ -1414,6 +1460,7 @@ class TestStaticConfigResponse:
 
 
 # ==================== 32. SSE broadcast/subscribe/unsubscribe TESTS ====================
+
 
 class TestSSE:
     """Test Server-Sent Events infrastructure."""
@@ -1468,22 +1515,24 @@ class TestSSE:
 
 # ==================== 33. _broadcast_activity_safe TESTS ====================
 
+
 class TestBroadcastActivitySafe:
     """Test safe broadcast wrapper."""
 
     @pytest.mark.asyncio
     async def test_handles_name_error(self, setup_server):
         # Should not raise even if broadcast_activity is problematic
-        with patch.object(setup_server, 'broadcast_activity', side_effect=NameError("not defined")):
+        with patch.object(setup_server, "broadcast_activity", side_effect=NameError("not defined")):
             await setup_server._broadcast_activity_safe("campus-1", {"data": "test"})
 
     @pytest.mark.asyncio
     async def test_handles_generic_error(self, setup_server):
-        with patch.object(setup_server, 'broadcast_activity', side_effect=Exception("error")):
+        with patch.object(setup_server, "broadcast_activity", side_effect=Exception("error")):
             await setup_server._broadcast_activity_safe("campus-1", {"data": "test"})
 
 
 # ==================== 34. http_request_with_retry TESTS ====================
+
 
 class TestHttpRequestWithRetry:
     """Test HTTP request retry logic."""
@@ -1491,23 +1540,26 @@ class TestHttpRequestWithRetry:
     @pytest.mark.asyncio
     async def test_successful_first_attempt(self, setup_server):
         import httpx
+
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 200
 
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(return_value=mock_response)
 
-        with patch('services.http_client.get_http_client', new_callable=AsyncMock, return_value=mock_client):
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
             result = await setup_server.http_request_with_retry("GET", "http://example.com")
             assert result.status_code == 200
 
     @pytest.mark.asyncio
     async def test_retries_on_timeout(self, setup_server):
         import httpx
+
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 200
 
         call_count = 0
+
         async def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -1518,15 +1570,15 @@ class TestHttpRequestWithRetry:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(side_effect=side_effect)
 
-        with patch('services.http_client.get_http_client', new_callable=AsyncMock, return_value=mock_client):
+        with patch("services.http_client.get_http_client", new_callable=AsyncMock, return_value=mock_client):
             result = await setup_server.http_request_with_retry(
-                "GET", "http://example.com",
-                max_retries=3, retry_delays=[0, 0, 0], timeout=1.0
+                "GET", "http://example.com", max_retries=3, retry_delays=[0, 0, 0], timeout=1.0
             )
             assert result.status_code == 200
 
 
 # ==================== 35. Setup wizard endpoint tests ====================
+
 
 class TestSetupWizard:
     """Test setup wizard endpoints."""
@@ -1557,11 +1609,9 @@ class TestSetupWizard:
         mock_db.users.insert_one = AsyncMock(return_value=_make_insert_result())
 
         from models import SetupAdminRequest
+
         req = SetupAdminRequest(
-            email="newadmin@test.com",
-            name="New Admin",
-            password="SecurePassword123!",
-            phone="+6281234567890"
+            email="newadmin@test.com", name="New Admin", password="SecurePassword123!", phone="+6281234567890"
         )
         result = await setup_server.setup_first_admin.fn(request=req)
         assert result["success"] is True
@@ -1570,8 +1620,10 @@ class TestSetupWizard:
     async def test_setup_first_admin_already_exists(self, setup_server, mock_db):
         mock_db.users.count_documents = AsyncMock(return_value=1)
 
-        from models import SetupAdminRequest
         from litestar.exceptions import HTTPException
+
+        from models import SetupAdminRequest
+
         req = SetupAdminRequest(
             email="newadmin@test.com",
             name="New Admin",
@@ -1586,8 +1638,10 @@ class TestSetupWizard:
     async def test_setup_first_admin_system_email_rejected(self, setup_server, mock_db):
         mock_db.users.count_documents = AsyncMock(return_value=0)
 
-        from models import SetupAdminRequest
         from litestar.exceptions import HTTPException
+
+        from models import SetupAdminRequest
+
         req = SetupAdminRequest(
             email="admin@gkbj.church",
             name="System Admin",
@@ -1604,11 +1658,8 @@ class TestSetupWizard:
         mock_db.campuses.insert_one = AsyncMock(return_value=_make_insert_result())
 
         from models import SetupCampusRequest
-        req = SetupCampusRequest(
-            campus_name="Main Campus",
-            location="Jakarta",
-            timezone="Asia/Jakarta"
-        )
+
+        req = SetupCampusRequest(campus_name="Main Campus", location="Jakarta", timezone="Asia/Jakarta")
         result = await setup_server.setup_first_campus.fn(request=req)
         assert result["success"] is True
 
@@ -1616,8 +1667,10 @@ class TestSetupWizard:
     async def test_setup_first_campus_already_exists(self, setup_server, mock_db):
         mock_db.campuses.count_documents = AsyncMock(return_value=1)
 
-        from models import SetupCampusRequest
         from litestar.exceptions import HTTPException
+
+        from models import SetupCampusRequest
+
         req = SetupCampusRequest(
             campus_name="Another Campus",
             location="Bandung",
@@ -1629,6 +1682,7 @@ class TestSetupWizard:
 
 
 # ==================== 36. Ignore/Delete care event TESTS ====================
+
 
 class TestIgnoreDeleteCareEvent:
     """Test care event ignore and delete operations."""
@@ -1666,6 +1720,7 @@ class TestIgnoreDeleteCareEvent:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.ignore_care_event.fn(event_id="nonexistent", request=req)
         assert exc_info.value.status_code == 404
@@ -1710,6 +1765,7 @@ class TestIgnoreDeleteCareEvent:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.delete_care_event.fn(event_id="nonexistent", request=req)
         assert exc_info.value.status_code == 404
@@ -1784,9 +1840,7 @@ class TestIgnoreDeleteCareEvent:
         event = _make_care_event(event_type="regular_contact")
         token = _make_token(user["id"])
 
-        remaining_event = {
-            "created_at": datetime.now(timezone.utc) - timedelta(days=10)
-        }
+        remaining_event = {"created_at": datetime.now(UTC) - timedelta(days=10)}
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.care_events.find_one = AsyncMock(return_value=event)
@@ -1817,6 +1871,7 @@ class TestIgnoreDeleteCareEvent:
 
 
 # ==================== 37. Import/Export TESTS ====================
+
 
 class TestImportExport:
     """Test CSV/JSON import and export."""
@@ -1868,6 +1923,7 @@ class TestImportExport:
 
 # ==================== 38. Settings endpoints TESTS ====================
 
+
 class TestSettingsEndpoints:
     """Test settings configuration endpoints."""
 
@@ -1889,9 +1945,7 @@ class TestSettingsEndpoints:
         user = _make_admin_user()
         token = _make_token(user["id"])
         mock_db.users.find_one = AsyncMock(return_value=user)
-        mock_db.settings.find_one = AsyncMock(return_value={
-            "data": {"atRiskDays": 45, "inactiveDays": 75}
-        })
+        mock_db.settings.find_one = AsyncMock(return_value={"data": {"atRiskDays": 45, "inactiveDays": 75}})
 
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
@@ -1970,12 +2024,14 @@ class TestSettingsEndpoints:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_user_preferences.fn(user_id="other-user-id", request=req)
         assert exc_info.value.status_code == 403
 
 
 # ==================== 39. Notification logs TESTS ====================
+
 
 class TestNotificationLogs:
     """Test notification log retrieval."""
@@ -1997,6 +2053,7 @@ class TestNotificationLogs:
 
 
 # ==================== 40. Config endpoints TESTS ====================
+
 
 class TestConfigEndpoints:
     """Test static configuration endpoints."""
@@ -2028,6 +2085,7 @@ class TestConfigEndpoints:
 
 
 # ==================== 41. Sync config TESTS ====================
+
 
 class TestSyncConfig:
     """Test sync configuration endpoints."""
@@ -2072,9 +2130,7 @@ class TestSyncConfig:
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         facet_result = [{"data": logs, "total": [{"count": len(logs)}]}]
-        mock_db.sync_logs.aggregate = MagicMock(
-            return_value=_make_mock_agg_cursor(facet_result)
-        )
+        mock_db.sync_logs.aggregate = MagicMock(return_value=_make_mock_agg_cursor(facet_result))
 
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
@@ -2098,6 +2154,7 @@ class TestSyncConfig:
 
 
 # ==================== 42. Regenerate webhook secret TESTS ====================
+
 
 class TestRegenerateWebhookSecret:
     """Test webhook secret regeneration."""
@@ -2126,6 +2183,7 @@ class TestRegenerateWebhookSecret:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.regenerate_webhook_secret.fn(request=req)
         assert exc_info.value.status_code == 400
@@ -2141,6 +2199,7 @@ class TestRegenerateWebhookSecret:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.regenerate_webhook_secret.fn(request=req)
         assert exc_info.value.status_code == 404
@@ -2155,12 +2214,14 @@ class TestRegenerateWebhookSecret:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.regenerate_webhook_secret.fn(request=req)
         assert exc_info.value.status_code == 403
 
 
 # ==================== 43. Webhook receiver TESTS ====================
+
 
 class TestReceiveWebhook:
     """Test webhook endpoint for member sync."""
@@ -2169,10 +2230,11 @@ class TestReceiveWebhook:
     async def test_missing_signature(self, setup_server, mock_db):
         req = MagicMock()
         req.headers = {}
-        req.body = AsyncMock(return_value=b'{}')
+        req.body = AsyncMock(return_value=b"{}")
         req.json = AsyncMock(return_value={})
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.receive_sync_webhook.fn(request=req)
         assert exc_info.value.status_code == 401
@@ -2188,6 +2250,7 @@ class TestReceiveWebhook:
         req.json = AsyncMock(return_value={})
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.receive_sync_webhook.fn(request=req)
         assert exc_info.value.status_code == 400
@@ -2205,6 +2268,7 @@ class TestReceiveWebhook:
         mock_db.sync_configs.find_one = AsyncMock(return_value=None)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.receive_sync_webhook.fn(request=req)
         assert exc_info.value.status_code == 404
@@ -2223,6 +2287,7 @@ class TestReceiveWebhook:
         mock_db.sync_configs.find_one = AsyncMock(return_value=config)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.receive_sync_webhook.fn(request=req)
         assert exc_info.value.status_code == 403
@@ -2232,11 +2297,7 @@ class TestReceiveWebhook:
         payload = {"campus_id": TEST_CAMPUS_ID}
         body = json.dumps(payload).encode()
 
-        config = {
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "webhook_secret": "correct-secret"
-        }
+        config = {"campus_id": TEST_CAMPUS_ID, "is_enabled": True, "webhook_secret": "correct-secret"}
         req = MagicMock()
         req.headers = {"X-Webhook-Signature": "wrong-signature"}
         req.body = AsyncMock(return_value=body)
@@ -2244,6 +2305,7 @@ class TestReceiveWebhook:
         mock_db.sync_configs.find_one = AsyncMock(return_value=config)
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.receive_sync_webhook.fn(request=req)
         assert exc_info.value.status_code == 401
@@ -2255,11 +2317,7 @@ class TestReceiveWebhook:
         body = json.dumps(payload).encode()
         sig = hmac.new(webhook_secret.encode(), body, hashlib.sha256).hexdigest()
 
-        config = {
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "webhook_secret": webhook_secret
-        }
+        config = {"campus_id": TEST_CAMPUS_ID, "is_enabled": True, "webhook_secret": webhook_secret}
         req = MagicMock()
         req.headers = {"X-Webhook-Signature": sig}
         req.body = AsyncMock(return_value=body)
@@ -2278,11 +2336,7 @@ class TestReceiveWebhook:
         body = json.dumps(payload).encode()
         sig = hmac.new(webhook_secret.encode(), body, hashlib.sha256).hexdigest()
 
-        config = {
-            "campus_id": TEST_CAMPUS_ID,
-            "is_enabled": True,
-            "webhook_secret": webhook_secret
-        }
+        config = {"campus_id": TEST_CAMPUS_ID, "is_enabled": True, "webhook_secret": webhook_secret}
         req = MagicMock()
         req.headers = {"X-Webhook-Signature": sig}
         req.body = AsyncMock(return_value=body)
@@ -2297,6 +2351,7 @@ class TestReceiveWebhook:
 
 # ==================== 44. get_cached_core_token TESTS ====================
 
+
 class TestGetCachedCoreToken:
     """Test token caching for core API."""
 
@@ -2304,7 +2359,7 @@ class TestGetCachedCoreToken:
     async def test_returns_cached_token(self, setup_server):
         setup_server._core_api_token_cache["campus-1"] = {
             "token": "cached-token",
-            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1)
+            "expires_at": datetime.now(UTC) + timedelta(hours=1),
         }
         config = {"api_base_url": "http://api.example.com", "api_password": "enc", "api_email": "e@e.com"}
         result = await setup_server.get_cached_core_token("campus-1", config)
@@ -2314,20 +2369,20 @@ class TestGetCachedCoreToken:
     async def test_refreshes_expired_token(self, setup_server):
         setup_server._core_api_token_cache["campus-1"] = {
             "token": "old-token",
-            "expires_at": datetime.now(timezone.utc) - timedelta(hours=1)
+            "expires_at": datetime.now(UTC) - timedelta(hours=1),
         }
         config = {
             "api_base_url": "http://api.example.com",
             "api_path_prefix": "/api",
             "api_password": setup_server.encrypt_password("password"),
-            "api_email": "test@test.com"
+            "api_email": "test@test.com",
         }
 
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"access_token": "new-token"}
 
-        with patch('httpx.AsyncClient') as mock_cls:
+        with patch("httpx.AsyncClient") as mock_cls:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -2338,6 +2393,7 @@ class TestGetCachedCoreToken:
 
 
 # ==================== 45. Demographic trends TESTS ====================
+
 
 class TestDemographicTrends:
     """Test analytics demographic trends."""
@@ -2368,6 +2424,7 @@ class TestDemographicTrends:
 
 # ==================== 46. Suggestions endpoint TESTS ====================
 
+
 class TestIntelligentSuggestions:
     """Test follow-up suggestions."""
 
@@ -2375,11 +2432,8 @@ class TestIntelligentSuggestions:
     async def test_suggestions_with_disconnected_member(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        old_contact = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
-        members = [_make_member(
-            days_since_last_contact=100,
-            last_contact_date=old_contact
-        )]
+        old_contact = (datetime.now(UTC) - timedelta(days=100)).isoformat()
+        members = [_make_member(days_since_last_contact=100, last_contact_date=old_contact)]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
@@ -2396,12 +2450,8 @@ class TestIntelligentSuggestions:
     async def test_suggestions_senior_member(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        old_contact = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat()
-        members = [_make_member(
-            age=70,
-            days_since_last_contact=40,
-            last_contact_date=old_contact
-        )]
+        old_contact = (datetime.now(UTC) - timedelta(days=40)).isoformat()
+        members = [_make_member(age=70, days_since_last_contact=40, last_contact_date=old_contact)]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
@@ -2418,11 +2468,8 @@ class TestIntelligentSuggestions:
     async def test_suggestions_recently_contacted_skipped(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
-        members = [_make_member(
-            days_since_last_contact=1,
-            last_contact_date=recent
-        )]
+        recent = (datetime.now(UTC) - timedelta(days=1)).isoformat()
+        members = [_make_member(days_since_last_contact=1, last_contact_date=recent)]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
@@ -2437,6 +2484,7 @@ class TestIntelligentSuggestions:
 
 # ==================== 47. Recalculate engagement TESTS ====================
 
+
 class TestRecalculateEngagement:
     """Test admin engagement recalculation."""
 
@@ -2445,7 +2493,7 @@ class TestRecalculateEngagement:
         user = _make_admin_user()
         token = _make_token(user["id"])
         members = [
-            {"id": "mem-1", "last_contact_date": datetime.now(timezone.utc).isoformat()},
+            {"id": "mem-1", "last_contact_date": datetime.now(UTC).isoformat()},
             {"id": "mem-2", "last_contact_date": None},
         ]
 
@@ -2473,12 +2521,14 @@ class TestRecalculateEngagement:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.recalculate_all_engagement_status.fn(request=req)
         assert exc_info.value.status_code == 403
 
 
 # ==================== 48. WhatsApp integration test TESTS ====================
+
 
 class TestWhatsAppIntegration:
     """Test WhatsApp integration ping endpoint."""
@@ -2494,13 +2544,12 @@ class TestWhatsAppIntegration:
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
 
-        from msgspec import Struct
         data = MagicMock()
         data.phone = "+6281234567890"
         data.message = "Test message"
 
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop('WHATSAPP_GATEWAY_URL', None)
+            os.environ.pop("WHATSAPP_GATEWAY_URL", None)
             result = await setup_server.test_whatsapp_integration.fn(data=data, request=req)
             assert result.success is False  # No gateway configured
 
@@ -2518,12 +2567,14 @@ class TestWhatsAppIntegration:
         data.message = "Test"
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.test_whatsapp_integration.fn(data=data, request=req)
         assert exc_info.value.status_code == 403
 
 
 # ==================== 49. Email integration test ====================
+
 
 class TestEmailIntegration:
     """Test email integration placeholder."""
@@ -2539,12 +2590,14 @@ class TestEmailIntegration:
 
 # ==================== 50. Static file endpoints TESTS ====================
 
+
 class TestStaticFiles:
     """Test file serving with security."""
 
     @pytest.mark.asyncio
     async def test_rejects_path_traversal(self, setup_server):
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_uploaded_file.fn("../../etc/passwd")
         assert exc_info.value.status_code == 400
@@ -2552,6 +2605,7 @@ class TestStaticFiles:
     @pytest.mark.asyncio
     async def test_rejects_path_traversal_backslash(self, setup_server):
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_uploaded_file.fn("..\\..\\etc\\passwd")
         assert exc_info.value.status_code == 400
@@ -2559,6 +2613,7 @@ class TestStaticFiles:
     @pytest.mark.asyncio
     async def test_file_not_found(self, setup_server):
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_uploaded_file.fn("nonexistent-file.jpg")
         assert exc_info.value.status_code == 404
@@ -2566,6 +2621,7 @@ class TestStaticFiles:
     @pytest.mark.asyncio
     async def test_user_photo_path_traversal(self, setup_server):
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_user_photo.fn("../../../etc/passwd")
         assert exc_info.value.status_code == 400
@@ -2573,12 +2629,14 @@ class TestStaticFiles:
     @pytest.mark.asyncio
     async def test_user_photo_not_found(self, setup_server):
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_user_photo.fn("nonexistent.jpg")
         assert exc_info.value.status_code == 404
 
 
 # ==================== 51. Global search TESTS ====================
+
 
 class TestGlobalSearch:
     """Test global search endpoint."""
@@ -2616,6 +2674,7 @@ class TestGlobalSearch:
 
 
 # ==================== 52. Activity logs TESTS ====================
+
 
 class TestActivityLogs:
     """Test activity log endpoints."""
@@ -2663,9 +2722,9 @@ class TestActivityLogs:
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.activity_logs.count_documents = AsyncMock(return_value=42)
-        mock_db.activity_logs.aggregate = MagicMock(return_value=_make_mock_agg_cursor([
-            {"_id": "user-1", "name": "Test", "count": 10}
-        ]))
+        mock_db.activity_logs.aggregate = MagicMock(
+            return_value=_make_mock_agg_cursor([{"_id": "user-1", "name": "Test", "count": 10}])
+        )
 
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
@@ -2676,6 +2735,7 @@ class TestActivityLogs:
 
 # ==================== 53. Reminder stats TESTS ====================
 
+
 class TestReminderStats:
     """Test reminder statistics."""
 
@@ -2683,10 +2743,6 @@ class TestReminderStats:
     async def test_get_reminder_stats(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        logs = [
-            {"status": "sent"},
-            {"status": "failed"},
-        ]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         # Now uses $group aggregation instead of find().to_list()
@@ -2710,6 +2766,7 @@ class TestReminderStats:
 
 # ==================== 54. Member sync webhook endpoint TESTS ====================
 
+
 class TestMemberSyncWebhookEndpoint:
     """Test member sync webhook URL endpoint."""
 
@@ -2724,6 +2781,7 @@ class TestMemberSyncWebhookEndpoint:
 
 # ==================== 55. Run reminders now TESTS ====================
 
+
 class TestRunRemindersNow:
     """Test manual reminder trigger."""
 
@@ -2736,12 +2794,13 @@ class TestRunRemindersNow:
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
 
-        with patch('server.daily_reminder_job', new_callable=AsyncMock):
+        with patch("server.daily_reminder_job", new_callable=AsyncMock):
             result = await setup_server.run_reminders_now.fn(request=req)
             assert result["success"] is True
 
 
 # ==================== 56. Sync members pull TESTS ====================
+
 
 class TestSyncMembersPull:
     """Test sync members pull endpoint."""
@@ -2756,6 +2815,7 @@ class TestSyncMembersPull:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.sync_members_from_core.fn(request=req)
         assert exc_info.value.status_code == 400
@@ -2770,12 +2830,14 @@ class TestSyncMembersPull:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.sync_members_from_core.fn(request=req)
         assert exc_info.value.status_code == 403
 
 
 # ==================== 57. perform_member_sync_for_campus TESTS ====================
+
 
 class TestPerformMemberSync:
     """Test core sync logic."""
@@ -2796,6 +2858,7 @@ class TestPerformMemberSync:
 
 # ==================== 58. Update settings TESTS ====================
 
+
 class TestUpdateSettings:
     """Test settings update endpoints."""
 
@@ -2810,6 +2873,7 @@ class TestUpdateSettings:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from models import EngagementSettingsUpdate
+
         data = EngagementSettingsUpdate(active_days=45, at_risk_days=75)
         result = await setup_server.update_engagement_settings.fn(data=data, request=req)
         assert result["success"] is True
@@ -2825,6 +2889,7 @@ class TestUpdateSettings:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from models import OverdueWriteoffSettingsUpdate
+
         data = OverdueWriteoffSettingsUpdate(days=14, enabled=True)
         result = await setup_server.update_overdue_writeoff_settings.fn(data=data, request=req)
         assert result["success"] is True
@@ -2873,10 +2938,9 @@ class TestUpdateSettings:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from models import UserPreferencesUpdate
+
         data = UserPreferencesUpdate(email_notifications=False, whatsapp_notifications=True)
-        result = await setup_server.update_user_preferences.fn(
-            user_id=user["id"], data=data, request=req
-        )
+        result = await setup_server.update_user_preferences.fn(user_id=user["id"], data=data, request=req)
         assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -2890,9 +2954,10 @@ class TestUpdateSettings:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from models import AutomationSettingsUpdate
+
         data = AutomationSettingsUpdate(digestTime="09:00", whatsappGateway="http://wa:3001", enabled=True)
 
-        with patch('server.schedule_daily_digest', create=True):
+        with patch("server.schedule_daily_digest", create=True):
             result = await setup_server.update_automation_settings.fn(data=data, request=req)
             assert result["success"] is True
 
@@ -2905,8 +2970,10 @@ class TestUpdateSettings:
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
 
-        from models import AutomationSettingsUpdate
         from litestar.exceptions import HTTPException
+
+        from models import AutomationSettingsUpdate
+
         data = AutomationSettingsUpdate(digestTime="25:00", whatsappGateway="", enabled=True)
 
         with pytest.raises(HTTPException) as exc_info:
@@ -2915,6 +2982,7 @@ class TestUpdateSettings:
 
 
 # ==================== 59. Yearly summary TESTS ====================
+
 
 class TestYearlySummary:
     """Test yearly summary report."""
@@ -2925,11 +2993,7 @@ class TestYearlySummary:
         token = _make_token(user["id"])
 
         members = [_make_member()]
-        events = [_make_care_event(
-            event_date="2024-06-15",
-            completed=True,
-            event_type="birthday"
-        )]
+        events = [_make_care_event(event_date="2024-06-15", completed=True, event_type="birthday")]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
@@ -2946,12 +3010,13 @@ class TestYearlySummary:
 
 # ==================== 60. Health check TESTS ====================
 
+
 class TestHealthCheck:
     """Test health and readiness endpoints."""
 
     @pytest.mark.asyncio
     async def test_health_check_healthy(self, setup_server):
-        with patch('server.client') as mock_client:
+        with patch("server.client") as mock_client:
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             result = await setup_server.health_check.fn()
             assert result["status"] == "healthy"
@@ -2959,7 +3024,8 @@ class TestHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_unhealthy(self, setup_server):
         from litestar.exceptions import HTTPException
-        with patch('server.client') as mock_client:
+
+        with patch("server.client") as mock_client:
             mock_client.admin.command = AsyncMock(side_effect=Exception("DB down"))
             with pytest.raises(HTTPException) as exc_info:
                 await setup_server.health_check.fn()
@@ -2967,7 +3033,7 @@ class TestHealthCheck:
 
     @pytest.mark.asyncio
     async def test_readiness_check(self, setup_server):
-        with patch('server.client') as mock_client:
+        with patch("server.client") as mock_client:
             mock_client.admin.command = AsyncMock(return_value={"ok": 1})
             result = await setup_server.readiness_check.fn()
             assert result["status"] == "ready"
@@ -2975,7 +3041,8 @@ class TestHealthCheck:
     @pytest.mark.asyncio
     async def test_readiness_check_not_ready(self, setup_server):
         from litestar.exceptions import HTTPException
-        with patch('server.client') as mock_client:
+
+        with patch("server.client") as mock_client:
             mock_client.admin.command = AsyncMock(side_effect=Exception("DB error"))
             with pytest.raises(HTTPException) as exc_info:
                 await setup_server.readiness_check.fn()
@@ -2983,6 +3050,7 @@ class TestHealthCheck:
 
 
 # ==================== 61. Pastoral notes TESTS ====================
+
 
 class TestPastoralNotes:
     """Test pastoral notes endpoints."""
@@ -3002,6 +3070,7 @@ class TestPastoralNotes:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from models import PastoralNoteCreate
+
         data = PastoralNoteCreate(
             member_id=TEST_MEMBER_ID,
             title="Test Note",
@@ -3019,9 +3088,7 @@ class TestPastoralNotes:
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         facet_result = [{"data": notes, "total": [{"count": len(notes)}]}]
-        mock_db.pastoral_notes.aggregate = MagicMock(
-            return_value=_make_mock_agg_cursor(facet_result)
-        )
+        mock_db.pastoral_notes.aggregate = MagicMock(return_value=_make_mock_agg_cursor(facet_result))
         mock_db.members.find_one = AsyncMock(return_value=_make_member())
 
         req = MagicMock()
@@ -3034,8 +3101,13 @@ class TestPastoralNotes:
     async def test_get_pastoral_note(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        note = {"id": "note-1", "member_id": TEST_MEMBER_ID, "title": "Test",
-                "campus_id": TEST_CAMPUS_ID, "is_private": False}
+        note = {
+            "id": "note-1",
+            "member_id": TEST_MEMBER_ID,
+            "title": "Test",
+            "campus_id": TEST_CAMPUS_ID,
+            "is_private": False,
+        }
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.pastoral_notes.find_one = AsyncMock(return_value=note)
@@ -3058,6 +3130,7 @@ class TestPastoralNotes:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.get_pastoral_note.fn(note_id="nonexistent", request=req)
         assert exc_info.value.status_code == 404
@@ -3066,8 +3139,14 @@ class TestPastoralNotes:
     async def test_delete_pastoral_note(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        note = {"id": "note-1", "member_id": TEST_MEMBER_ID, "title": "Test",
-                "campus_id": TEST_CAMPUS_ID, "is_private": False, "created_by": user["id"]}
+        note = {
+            "id": "note-1",
+            "member_id": TEST_MEMBER_ID,
+            "title": "Test",
+            "campus_id": TEST_CAMPUS_ID,
+            "is_private": False,
+            "created_by": user["id"],
+        }
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.pastoral_notes.find_one = AsyncMock(return_value=note)
@@ -3085,8 +3164,12 @@ class TestPastoralNotes:
     async def test_complete_followup(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        note = {"id": "note-1", "member_id": TEST_MEMBER_ID,
-                "campus_id": TEST_CAMPUS_ID, "follow_up_date": "2024-01-01"}
+        note = {
+            "id": "note-1",
+            "member_id": TEST_MEMBER_ID,
+            "campus_id": TEST_CAMPUS_ID,
+            "follow_up_date": "2024-01-01",
+        }
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.pastoral_notes.find_one = AsyncMock(return_value=note)
@@ -3102,8 +3185,7 @@ class TestPastoralNotes:
     async def test_complete_followup_no_date(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        note = {"id": "note-1", "member_id": TEST_MEMBER_ID,
-                "campus_id": TEST_CAMPUS_ID, "follow_up_date": None}
+        note = {"id": "note-1", "member_id": TEST_MEMBER_ID, "campus_id": TEST_CAMPUS_ID, "follow_up_date": None}
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.pastoral_notes.find_one = AsyncMock(return_value=note)
@@ -3112,6 +3194,7 @@ class TestPastoralNotes:
         req.headers = {"Authorization": f"Bearer {token}"}
 
         from litestar.exceptions import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await setup_server.complete_note_followup.fn(note_id="note-1", request=req)
         assert exc_info.value.status_code == 400
@@ -3129,17 +3212,16 @@ class TestPastoralNotes:
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
 
-        result = await setup_server.get_member_pastoral_notes.fn(
-            member_id=TEST_MEMBER_ID, request=req
-        )
+        result = await setup_server.get_member_pastoral_notes.fn(member_id=TEST_MEMBER_ID, request=req)
         assert isinstance(result, list)
 
     @pytest.mark.asyncio
     async def test_get_followup_due_notes(self, setup_server, mock_db):
         user = _make_admin_user()
         token = _make_token(user["id"])
-        notes = [{"id": "note-1", "member_id": TEST_MEMBER_ID,
-                  "follow_up_date": "2024-01-01", "follow_up_completed": False}]
+        notes = [
+            {"id": "note-1", "member_id": TEST_MEMBER_ID, "follow_up_date": "2024-01-01", "follow_up_completed": False}
+        ]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.pastoral_notes.find = MagicMock(return_value=_make_mock_cursor(notes))
@@ -3154,6 +3236,7 @@ class TestPastoralNotes:
 
 # ==================== 62. Startup/Shutdown TESTS ====================
 
+
 class TestStartupShutdown:
     """Test app lifecycle functions."""
 
@@ -3161,22 +3244,26 @@ class TestStartupShutdown:
     async def test_on_startup(self, setup_server, mock_db):
         mock_db.users.count_documents = AsyncMock(return_value=1)
 
-        with patch('services.cache.init_cache', new_callable=AsyncMock), \
-             patch('server.start_scheduler'), \
-             patch('server.init_member_routes'), \
-             patch('server.init_care_event_routes'), \
-             patch('server.init_grief_support_routes'), \
-             patch('server.init_accident_followup_routes'), \
-             patch('server.init_financial_aid_routes'), \
-             patch('server.init_dashboard_routes'), \
-             patch('server.init_dependencies'):
+        with (
+            patch("services.cache.init_cache", new_callable=AsyncMock),
+            patch("server.start_scheduler"),
+            patch("server.init_member_routes"),
+            patch("server.init_care_event_routes"),
+            patch("server.init_grief_support_routes"),
+            patch("server.init_accident_followup_routes"),
+            patch("server.init_financial_aid_routes"),
+            patch("server.init_dashboard_routes"),
+            patch("server.init_dependencies"),
+        ):
             await setup_server.on_startup()
 
     @pytest.mark.asyncio
     async def test_on_shutdown(self, setup_server):
-        with patch('server.stop_scheduler'), \
-             patch('services.cache.close_cache', new_callable=AsyncMock), \
-             patch('server.client') as mock_client:
+        with (
+            patch("server.stop_scheduler"),
+            patch("services.cache.close_cache", new_callable=AsyncMock),
+            patch("server.client") as mock_client,
+        ):
             mock_client.close = MagicMock()
             await setup_server.on_shutdown()
 
@@ -3185,19 +3272,18 @@ class TestStartupShutdown:
         mock_db.users.count_documents = AsyncMock(return_value=0)
         mock_db.users.insert_one = AsyncMock(return_value=_make_insert_result())
 
-        with patch('services.cache.init_cache', new_callable=AsyncMock), \
-             patch('server.start_scheduler'), \
-             patch('server.init_member_routes'), \
-             patch('server.init_care_event_routes'), \
-             patch('server.init_grief_support_routes'), \
-             patch('server.init_accident_followup_routes'), \
-             patch('server.init_financial_aid_routes'), \
-             patch('server.init_dashboard_routes'), \
-             patch('server.init_dependencies'), \
-             patch.dict(os.environ, {
-                 'ADMIN_EMAIL': 'admin@test.com',
-                 'ADMIN_PASSWORD': 'SecurePass123456!'
-             }):
+        with (
+            patch("services.cache.init_cache", new_callable=AsyncMock),
+            patch("server.start_scheduler"),
+            patch("server.init_member_routes"),
+            patch("server.init_care_event_routes"),
+            patch("server.init_grief_support_routes"),
+            patch("server.init_accident_followup_routes"),
+            patch("server.init_financial_aid_routes"),
+            patch("server.init_dashboard_routes"),
+            patch("server.init_dependencies"),
+            patch.dict(os.environ, {"ADMIN_EMAIL": "admin@test.com", "ADMIN_PASSWORD": "SecurePass123456!"}),
+        ):
             await setup_server.on_startup()
             mock_db.users.insert_one.assert_called_once()
 
@@ -3205,19 +3291,18 @@ class TestStartupShutdown:
     async def test_on_startup_short_password_warning(self, setup_server, mock_db):
         mock_db.users.count_documents = AsyncMock(return_value=0)
 
-        with patch('services.cache.init_cache', new_callable=AsyncMock), \
-             patch('server.start_scheduler'), \
-             patch('server.init_member_routes'), \
-             patch('server.init_care_event_routes'), \
-             patch('server.init_grief_support_routes'), \
-             patch('server.init_accident_followup_routes'), \
-             patch('server.init_financial_aid_routes'), \
-             patch('server.init_dashboard_routes'), \
-             patch('server.init_dependencies'), \
-             patch.dict(os.environ, {
-                 'ADMIN_EMAIL': 'admin@test.com',
-                 'ADMIN_PASSWORD': 'short'
-             }):
+        with (
+            patch("services.cache.init_cache", new_callable=AsyncMock),
+            patch("server.start_scheduler"),
+            patch("server.init_member_routes"),
+            patch("server.init_care_event_routes"),
+            patch("server.init_grief_support_routes"),
+            patch("server.init_accident_followup_routes"),
+            patch("server.init_financial_aid_routes"),
+            patch("server.init_dashboard_routes"),
+            patch("server.init_dependencies"),
+            patch.dict(os.environ, {"ADMIN_EMAIL": "admin@test.com", "ADMIN_PASSWORD": "short"}),
+        ):
             await setup_server.on_startup()
             # Should NOT create user with short password
             mock_db.users.insert_one.assert_not_called()

@@ -3,6 +3,7 @@ FaithTracker Care Event Routes
 Handles care event CRUD, bulk operations, reminders, and visitation logs
 """
 
+import contextlib
 import logging
 import os
 from collections.abc import Awaitable, Callable
@@ -233,10 +234,8 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
             await _invalidate_dashboard_cache(campus_id)
 
         # Index in Meilisearch (fire-and-forget)
-        try:
+        with contextlib.suppress(Exception):
             get_search_service().index_care_event(event_dict, member_name=member_name)
-        except Exception:
-            pass
 
         return care_event
 
@@ -386,10 +385,8 @@ async def update_care_event(event_id: str, data: CareEventUpdate, request: Reque
         updated_event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
 
         # Re-index in Meilisearch (fire-and-forget)
-        try:
+        with contextlib.suppress(Exception):
             get_search_service().index_care_event(updated_event)
-        except Exception:
-            pass
 
         return updated_event
     except HTTPException:
@@ -947,7 +944,7 @@ async def bulk_complete_care_events(request: Request, data: BulkEventIds) -> dic
                 )
 
         # Update engagement status for affected members
-        member_ids = list(set(e["member_id"] for e in events))
+        member_ids = list({e["member_id"] for e in events})
         for member_id in member_ids:
             await db.members.update_one({"id": member_id}, {"$set": {"last_contact_date": now, "updated_at": now}})
 

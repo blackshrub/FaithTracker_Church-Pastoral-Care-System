@@ -49,18 +49,18 @@ DEFAULT_UPCOMING_DAYS = 7
 
 # ==================== FILE UPLOAD LIMITS ====================
 # Size limits in bytes
-MAX_IMAGE_SIZE = 10 * 1024 * 1024      # 10 MB for images
-MAX_CSV_SIZE = 5 * 1024 * 1024         # 5 MB for CSV imports
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB for images
+MAX_CSV_SIZE = 5 * 1024 * 1024  # 5 MB for CSV imports
 MAX_REQUEST_BODY_SIZE = 15 * 1024 * 1024  # 15 MB max request body
 
 # ==================== IMAGE VALIDATION ====================
 # Magic bytes for allowed image types (security: validate file content, not just Content-Type)
 IMAGE_MAGIC_BYTES = {
-    b'\xff\xd8\xff': 'image/jpeg',           # JPEG
-    b'\x89PNG\r\n\x1a\n': 'image/png',       # PNG
-    b'GIF87a': 'image/gif',                   # GIF87a
-    b'GIF89a': 'image/gif',                   # GIF89a
-    b'RIFF': 'image/webp',                    # WebP (partial check)
+    b"\xff\xd8\xff": "image/jpeg",  # JPEG
+    b"\x89PNG\r\n\x1a\n": "image/png",  # PNG
+    b"GIF87a": "image/gif",  # GIF87a
+    b"GIF89a": "image/gif",  # GIF89a
+    b"RIFF": "image/webp",  # WebP (partial check)
 }
 
 # ==================== CACHE SETTINGS ====================

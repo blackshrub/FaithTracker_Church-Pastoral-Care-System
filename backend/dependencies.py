@@ -2,18 +2,19 @@
 FaithTracker Dependencies - Shared dependencies for route modules
 """
 
+import json
+import logging
+import os
+from datetime import UTC, datetime, timedelta
+
+import bcrypt
+import jwt
 from litestar import Request
 from litestar.exceptions import HTTPException
 from litestar.status_codes import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
-import jwt
-import bcrypt
-import os
-import json
-import logging
-from datetime import datetime, timezone, timedelta
 
-from enums import UserRole
 from constants import JWT_TOKEN_EXPIRE_HOURS
+from enums import UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +52,11 @@ async def get_current_user(request: Request) -> dict:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
-    
+
     token = auth_header[7:]
     if not token or not token.strip():
         raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Token is empty or invalid")
-    
+
     try:
         payload = jwt.decode(token, _secret_key, algorithms=[_algorithm])
         user_id = payload.get("sub")
@@ -63,7 +64,7 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
     except jwt.PyJWTError:
         raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
-    
+
     db = get_db()
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if user is None:
@@ -99,29 +100,24 @@ def get_campus_filter(current_user: dict) -> dict:
 
 # ==================== AUTH HELPERS ====================
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a bcrypt hash."""
-    return bcrypt.checkpw(
-        plain_password.encode('utf-8'),
-        hashed_password.encode('utf-8')
-    )
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt."""
-    return bcrypt.hashpw(
-        password.encode('utf-8'),
-        bcrypt.gensalt()
-    ).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
+        expire = datetime.now(UTC) + timedelta(hours=JWT_TOKEN_EXPIRE_HOURS)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, _secret_key, algorithm=_algorithm)
     return encoded_jwt
@@ -132,7 +128,7 @@ def safe_error_detail(e: Exception, status_code: int = 500) -> str:
     Return a safe error message for production.
     In development, returns the full error for debugging.
     """
-    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+    if os.environ.get("ENVIRONMENT", "development") == "production":
         return GENERIC_ERROR_MESSAGES.get(status_code, "An error occurred")
     else:
         return str(e)
@@ -185,7 +181,7 @@ async def check_login_rate_limit(ip: str, email: str) -> tuple[bool, str | None]
         data = await _redis.get(key)
         if data:
             record = json.loads(data)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             # Check if account is locked
             if record.get("locked_until"):
@@ -220,7 +216,7 @@ async def record_failed_login(ip: str, email: str) -> None:
         return
 
     key = f"ft:login:{ip}:{email.lower()}"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     try:
         data = await _redis.get(key)
@@ -236,11 +232,7 @@ async def record_failed_login(ip: str, email: str) -> None:
                 record["attempts"] = 1
             record["last_attempt"] = now.isoformat()
         else:
-            record = {
-                "attempts": 1,
-                "last_attempt": now.isoformat(),
-                "locked_until": None
-            }
+            record = {"attempts": 1, "last_attempt": now.isoformat(), "locked_until": None}
 
         await _redis.set(key, json.dumps(record), ex=_LOGIN_KEY_TTL_SECONDS)
 

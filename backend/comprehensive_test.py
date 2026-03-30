@@ -5,12 +5,11 @@ Tests EVERY endpoint and functionality systematically
 """
 
 import asyncio
-import httpx
-import json
 import sys
-from datetime import datetime, date, timedelta
-from typing import Optional
 import uuid
+from datetime import datetime
+
+import httpx
 
 # Configuration
 BASE_URL = "http://localhost:8001"
@@ -18,12 +17,7 @@ ADMIN_EMAIL = "admin@gkbj.church"
 ADMIN_PASSWORD = "admin123"
 
 # Test results tracking
-results = {
-    "passed": 0,
-    "failed": 0,
-    "errors": [],
-    "warnings": []
-}
+results = {"passed": 0, "failed": 0, "errors": [], "warnings": []}
 
 # Colors for terminal output
 GREEN = "\033[92m"
@@ -33,25 +27,30 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
 
+
 def log_pass(test_name: str, details: str = ""):
     results["passed"] += 1
     print(f"{GREEN}✓ PASS{RESET} {test_name} {details}")
+
 
 def log_fail(test_name: str, error: str):
     results["failed"] += 1
     results["errors"].append({"test": test_name, "error": error})
     print(f"{RED}✗ FAIL{RESET} {test_name}: {error}")
 
+
 def log_warn(test_name: str, warning: str):
     results["warnings"].append({"test": test_name, "warning": warning})
     print(f"{YELLOW}⚠ WARN{RESET} {test_name}: {warning}")
 
-def log_section(title: str):
-    print(f"\n{BOLD}{BLUE}{'='*60}{RESET}")
-    print(f"{BOLD}{BLUE}{title}{RESET}")
-    print(f"{BOLD}{BLUE}{'='*60}{RESET}")
 
-async def get_auth_token(client: httpx.AsyncClient) -> Optional[str]:
+def log_section(title: str):
+    print(f"\n{BOLD}{BLUE}{'=' * 60}{RESET}")
+    print(f"{BOLD}{BLUE}{title}{RESET}")
+    print(f"{BOLD}{BLUE}{'=' * 60}{RESET}")
+
+
+async def get_auth_token(client: httpx.AsyncClient) -> str | None:
     """Get authentication token"""
     try:
         # First get campus ID for full_admin login
@@ -63,12 +62,7 @@ async def get_auth_token(client: httpx.AsyncClient) -> Optional[str]:
                 campus_id = campuses[0]["id"]
 
         response = await client.post(
-            f"{BASE_URL}/auth/login",
-            json={
-                "email": ADMIN_EMAIL,
-                "password": ADMIN_PASSWORD,
-                "campus_id": campus_id
-            }
+            f"{BASE_URL}/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD, "campus_id": campus_id}
         )
         if response.status_code in [200, 201]:
             return response.json().get("access_token")
@@ -77,6 +71,7 @@ async def get_auth_token(client: httpx.AsyncClient) -> Optional[str]:
     except Exception as e:
         print(f"Auth error: {e}")
         return None
+
 
 async def test_health_endpoints(client: httpx.AsyncClient):
     """Test health and readiness endpoints"""
@@ -101,6 +96,7 @@ async def test_health_endpoints(client: httpx.AsyncClient):
             log_fail("GET /ready", f"Unexpected response: {r.text}")
     except Exception as e:
         log_fail("GET /ready", str(e))
+
 
 async def test_auth_endpoints(client: httpx.AsyncClient, token: str):
     """Test authentication endpoints"""
@@ -133,6 +129,7 @@ async def test_auth_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /users", str(e))
 
+
 async def test_campus_endpoints(client: httpx.AsyncClient, token: str):
     """Test campus management endpoints"""
     log_section("CAMPUS MANAGEMENT ENDPOINTS")
@@ -150,13 +147,14 @@ async def test_campus_endpoints(client: httpx.AsyncClient, token: str):
                 # Get specific campus
                 r2 = await client.get(f"{BASE_URL}/campuses/{campus_id}", headers=headers)
                 if r2.status_code == 200:
-                    log_pass(f"GET /campuses/{{id}}", f"- {r2.json().get('campus_name')}")
+                    log_pass("GET /campuses/{id}", f"- {r2.json().get('campus_name')}")
                 else:
-                    log_fail(f"GET /campuses/{{id}}", f"Status {r2.status_code}")
+                    log_fail("GET /campuses/{id}", f"Status {r2.status_code}")
         else:
             log_fail("GET /campuses", f"Status {r.status_code}: {r.text}")
     except Exception as e:
         log_fail("GET /campuses", str(e))
+
 
 async def test_member_endpoints(client: httpx.AsyncClient, token: str, campus_id: str):
     """Test member management endpoints"""
@@ -215,7 +213,7 @@ async def test_member_endpoints(client: httpx.AsyncClient, token: str, campus_id
             r = await client.get(f"{BASE_URL}/members/{test_member_id}", headers=headers)
             if r.status_code == 200:
                 member = r.json()
-                log_pass(f"GET /members/{{id}}", f"- {member.get('name')}")
+                log_pass("GET /members/{id}", f"- {member.get('name')}")
             else:
                 log_fail("GET /members/{id}", f"Status {r.status_code}")
         except Exception as e:
@@ -239,7 +237,7 @@ async def test_member_endpoints(client: httpx.AsyncClient, token: str, campus_id
             "campus_id": campus_id,  # Required field
             "phone": f"+628{uuid.uuid4().hex[:10]}",
             "address": "Test Address",
-            "notes": "Created by automated test"
+            "notes": "Created by automated test",
         }
         r = await client.post(f"{BASE_URL}/members", json=test_member_data, headers=headers)
         if r.status_code in [200, 201]:
@@ -271,6 +269,7 @@ async def test_member_endpoints(client: httpx.AsyncClient, token: str, campus_id
             log_fail("POST /members", f"Status {r.status_code}: {r.text}")
     except Exception as e:
         log_fail("POST /members", str(e))
+
 
 async def test_care_event_endpoints(client: httpx.AsyncClient, token: str):
     """Test care event endpoints"""
@@ -307,6 +306,7 @@ async def test_care_event_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /care-events/hospital/due-followup", str(e))
 
+
 async def test_dashboard_endpoints(client: httpx.AsyncClient, token: str):
     """Test dashboard endpoints"""
     log_section("DASHBOARD ENDPOINTS")
@@ -339,7 +339,7 @@ async def test_dashboard_endpoints(client: httpx.AsyncClient, token: str):
     try:
         r = await client.get(f"{BASE_URL}/dashboard/upcoming", headers=headers)
         if r.status_code == 200:
-            log_pass("GET /dashboard/upcoming", f"- Retrieved")
+            log_pass("GET /dashboard/upcoming", "- Retrieved")
         else:
             log_fail("GET /dashboard/upcoming", f"Status {r.status_code}")
     except Exception as e:
@@ -349,7 +349,7 @@ async def test_dashboard_endpoints(client: httpx.AsyncClient, token: str):
     try:
         r = await client.get(f"{BASE_URL}/dashboard/grief-active", headers=headers)
         if r.status_code == 200:
-            log_pass("GET /dashboard/grief-active", f"- Retrieved")
+            log_pass("GET /dashboard/grief-active", "- Retrieved")
         else:
             log_fail("GET /dashboard/grief-active", f"Status {r.status_code}")
     except Exception as e:
@@ -359,11 +359,12 @@ async def test_dashboard_endpoints(client: httpx.AsyncClient, token: str):
     try:
         r = await client.get(f"{BASE_URL}/dashboard/recent-activity", headers=headers)
         if r.status_code == 200:
-            log_pass("GET /dashboard/recent-activity", f"- Retrieved")
+            log_pass("GET /dashboard/recent-activity", "- Retrieved")
         else:
             log_fail("GET /dashboard/recent-activity", f"Status {r.status_code}")
     except Exception as e:
         log_fail("GET /dashboard/recent-activity", str(e))
+
 
 async def test_grief_support_endpoints(client: httpx.AsyncClient, token: str):
     """Test grief support endpoints"""
@@ -382,6 +383,7 @@ async def test_grief_support_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /grief-support", str(e))
 
+
 async def test_accident_followup_endpoints(client: httpx.AsyncClient, token: str):
     """Test accident followup endpoints"""
     log_section("ACCIDENT FOLLOWUP ENDPOINTS")
@@ -398,6 +400,7 @@ async def test_accident_followup_endpoints(client: httpx.AsyncClient, token: str
             log_fail("GET /accident-followup", f"Status {r.status_code}: {r.text}")
     except Exception as e:
         log_fail("GET /accident-followup", str(e))
+
 
 async def test_financial_aid_endpoints(client: httpx.AsyncClient, token: str):
     """Test financial aid endpoints"""
@@ -445,6 +448,7 @@ async def test_financial_aid_endpoints(client: httpx.AsyncClient, token: str):
             log_fail("GET /financial-aid-schedules/due-today", f"Status {r.status_code}")
     except Exception as e:
         log_fail("GET /financial-aid-schedules/due-today", str(e))
+
 
 async def test_analytics_endpoints(client: httpx.AsyncClient, token: str):
     """Test analytics endpoints"""
@@ -502,6 +506,7 @@ async def test_analytics_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /analytics/demographic-trends", str(e))
 
+
 async def test_reports_endpoints(client: httpx.AsyncClient, token: str):
     """Test reports endpoints"""
     log_section("REPORTS ENDPOINTS")
@@ -547,6 +552,7 @@ async def test_reports_endpoints(client: httpx.AsyncClient, token: str):
             log_fail("GET /reports/yearly-summary", f"Status {r.status_code}")
     except Exception as e:
         log_fail("GET /reports/yearly-summary", str(e))
+
 
 async def test_settings_endpoints(client: httpx.AsyncClient, token: str):
     """Test settings endpoints"""
@@ -604,6 +610,7 @@ async def test_settings_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /settings/accident-followup", str(e))
 
+
 async def test_config_endpoints(client: httpx.AsyncClient, token: str):
     """Test configuration endpoints"""
     log_section("CONFIGURATION ENDPOINTS")
@@ -620,7 +627,7 @@ async def test_config_endpoints(client: httpx.AsyncClient, token: str):
         "/config/months",
         "/config/frequency-types",
         "/config/membership-statuses",
-        "/config/all"
+        "/config/all",
     ]
 
     for config in configs:
@@ -632,6 +639,7 @@ async def test_config_endpoints(client: httpx.AsyncClient, token: str):
                 log_fail(f"GET {config}", f"Status {r.status_code}")
         except Exception as e:
             log_fail(f"GET {config}", str(e))
+
 
 async def test_import_export_endpoints(client: httpx.AsyncClient, token: str):
     """Test import/export endpoints"""
@@ -659,6 +667,7 @@ async def test_import_export_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /export/care-events/csv", str(e))
 
+
 async def test_notification_endpoints(client: httpx.AsyncClient, token: str):
     """Test notification endpoints"""
     log_section("NOTIFICATION ENDPOINTS")
@@ -685,6 +694,7 @@ async def test_notification_endpoints(client: httpx.AsyncClient, token: str):
             log_fail("GET /reminders/stats", f"Status {r.status_code}")
     except Exception as e:
         log_fail("GET /reminders/stats", str(e))
+
 
 async def test_activity_log_endpoints(client: httpx.AsyncClient, token: str):
     """Test activity log endpoints"""
@@ -714,6 +724,7 @@ async def test_activity_log_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /activity-logs/summary", str(e))
 
+
 async def test_search_endpoint(client: httpx.AsyncClient, token: str):
     """Test search endpoint"""
     log_section("SEARCH ENDPOINT")
@@ -729,6 +740,7 @@ async def test_search_endpoint(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /search?q=test", str(e))
 
+
 async def test_suggestions_endpoint(client: httpx.AsyncClient, token: str):
     """Test suggestions endpoint"""
     log_section("SUGGESTIONS ENDPOINT")
@@ -743,6 +755,7 @@ async def test_suggestions_endpoint(client: httpx.AsyncClient, token: str):
             log_fail("GET /suggestions/follow-up", f"Status {r.status_code}")
     except Exception as e:
         log_fail("GET /suggestions/follow-up", str(e))
+
 
 async def test_sync_endpoints(client: httpx.AsyncClient, token: str):
     """Test sync configuration endpoints"""
@@ -772,6 +785,7 @@ async def test_sync_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /sync/logs", str(e))
 
+
 async def test_setup_endpoints(client: httpx.AsyncClient, token: str):
     """Test setup endpoints"""
     log_section("SETUP ENDPOINTS")
@@ -788,6 +802,7 @@ async def test_setup_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("GET /setup/status", str(e))
 
+
 async def test_sse_endpoints(client: httpx.AsyncClient, token: str):
     """Test SSE (Server-Sent Events) endpoints"""
     log_section("SSE ENDPOINTS")
@@ -801,6 +816,7 @@ async def test_sse_endpoints(client: httpx.AsyncClient, token: str):
             log_fail("GET /stream/test", f"Status {r.status_code}")
     except Exception as e:
         log_fail("GET /stream/test", str(e))
+
 
 async def test_integrations_endpoints(client: httpx.AsyncClient, token: str):
     """Test integrations endpoints"""
@@ -818,12 +834,13 @@ async def test_integrations_endpoints(client: httpx.AsyncClient, token: str):
     except Exception as e:
         log_fail("POST /integrations/ping/whatsapp", str(e))
 
+
 async def run_all_tests():
     """Run all tests"""
-    print(f"\n{BOLD}{'='*60}{RESET}")
+    print(f"\n{BOLD}{'=' * 60}{RESET}")
     print(f"{BOLD}FAITHTRACKER COMPREHENSIVE FUNCTIONALITY TEST SUITE{RESET}")
     print(f"{BOLD}Started at: {datetime.now().isoformat()}{RESET}")
-    print(f"{BOLD}{'='*60}{RESET}")
+    print(f"{BOLD}{'=' * 60}{RESET}")
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Get campus ID first (needed for member creation)
@@ -861,9 +878,9 @@ async def run_all_tests():
         await test_integrations_endpoints(client, token)
 
     # Print summary
-    print(f"\n{BOLD}{'='*60}{RESET}")
+    print(f"\n{BOLD}{'=' * 60}{RESET}")
     print(f"{BOLD}TEST SUMMARY{RESET}")
-    print(f"{BOLD}{'='*60}{RESET}")
+    print(f"{BOLD}{'=' * 60}{RESET}")
     print(f"{GREEN}Passed: {results['passed']}{RESET}")
     print(f"{RED}Failed: {results['failed']}{RESET}")
     print(f"{YELLOW}Warnings: {len(results['warnings'])}{RESET}")
@@ -887,6 +904,7 @@ async def run_all_tests():
 
     # Return exit code
     return 0 if results["failed"] == 0 else 1
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(run_all_tests())
