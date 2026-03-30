@@ -6,114 +6,137 @@ Handles all API endpoints, authentication, database operations, and business log
 Framework: Litestar + msgspec (migrated from FastAPI + Pydantic)
 """
 
-from litestar import Litestar, Router, get, post, put, patch, delete, Request, Response
-from litestar.di import Provide
-from litestar.exceptions import HTTPException, NotAuthorizedException, PermissionDeniedException
-from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_413_REQUEST_ENTITY_TOO_LARGE, HTTP_429_TOO_MANY_REQUESTS, HTTP_500_INTERNAL_SERVER_ERROR
-from litestar.datastructures import UploadFile, State
-from litestar.params import Parameter, Body
-from litestar.response import Response as LitestarResponse, File as LitestarFile, Stream
-from litestar.middleware.base import AbstractMiddleware, DefineMiddleware
-from litestar.middleware.compression import CompressionMiddleware
-from litestar.middleware.rate_limit import RateLimitConfig
-from litestar.config.cors import CORSConfig
-from litestar.openapi import OpenAPIConfig
-from litestar.connection import ASGIConnection
-from litestar.handlers.base import BaseRouteHandler
+import asyncio
+import base64
+import hashlib
+import hmac
+import logging
+import os
+import secrets
+import uuid
+from datetime import UTC, date, datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
 import msgspec
 import msgspec.json
-from msgspec import Struct, field, UNSET, UnsetType
-from typing import Annotated
-from bson import ObjectId, Decimal128, Binary, Regex
-from bson.errors import InvalidId
-import base64
+from bson import Binary, Decimal128, ObjectId, Regex
 from dotenv import load_dotenv
+from litestar import Litestar, Request, Response, delete, get, post, put
+from litestar.config.cors import CORSConfig
+from litestar.datastructures import UploadFile
+from litestar.exceptions import HTTPException, PermissionDeniedException
+from litestar.middleware.base import AbstractMiddleware, DefineMiddleware
+from litestar.middleware.rate_limit import RateLimitConfig
+from litestar.openapi import OpenAPIConfig
+from litestar.params import Body, Parameter
+from litestar.response import File as LitestarFile
+from litestar.response import Response as LitestarResponse
+from litestar.response import Stream
+from litestar.status_codes import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+    HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+)
 from motor.motor_asyncio import AsyncIOMotorClient
+from msgspec import UNSET, Struct
 from pymongo import UpdateOne
-import os
-import logging
-import secrets
-import hmac
-import hashlib
-from pathlib import Path
-from typing import List, Optional, Dict, Any, Union
-from enum import Enum
-import uuid
-from datetime import datetime, timezone, timedelta, date
-from zoneinfo import ZoneInfo
-import asyncio
-import re
+
+from constants import (
+    ACCIDENT_FINAL_FOLLOWUP_DAYS,
+    ACCIDENT_FIRST_FOLLOWUP_DAYS,
+    ACCIDENT_SECOND_FOLLOWUP_DAYS,
+    API_MAX_RETRIES,
+    API_RETRY_DELAYS,
+    API_RETRY_TIMEOUT,
+    DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS,
+    DEFAULT_REMINDER_DAYS_BIRTHDAY,
+    DEFAULT_REMINDER_DAYS_FINANCIAL_AID,
+    DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT,
+    ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
+    ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
+    ENGAGEMENT_NO_CONTACT_DAYS,
+    GRIEF_ONE_MONTH_DAYS,
+    GRIEF_ONE_WEEK_DAYS,
+    GRIEF_ONE_YEAR_DAYS,
+    GRIEF_SIX_MONTHS_DAYS,
+    GRIEF_THREE_MONTHS_DAYS,
+    GRIEF_TWO_WEEKS_DAYS,
+    IMAGE_MAGIC_BYTES,
+    JWT_TOKEN_EXPIRE_HOURS,
+    MAX_CSV_SIZE,
+    MAX_LIMIT,
+    MAX_REQUEST_BODY_SIZE,
+)
+from dependencies import init_dependencies
 
 # Import extracted enums and constants
 from enums import (
-    EngagementStatus, EventType, GriefStage, AidType,
-    NotificationChannel, NotificationStatus, UserRole,
-    ScheduleFrequency, WeekDay, ActivityActionType, NoteCategory
-)
-from constants import (
-    ENGAGEMENT_AT_RISK_DAYS_DEFAULT, ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
-    ENGAGEMENT_NO_CONTACT_DAYS, GRIEF_ONE_WEEK_DAYS, GRIEF_TWO_WEEKS_DAYS,
-    GRIEF_ONE_MONTH_DAYS, GRIEF_THREE_MONTHS_DAYS, GRIEF_SIX_MONTHS_DAYS,
-    GRIEF_ONE_YEAR_DAYS, ACCIDENT_FIRST_FOLLOWUP_DAYS, ACCIDENT_SECOND_FOLLOWUP_DAYS,
-    ACCIDENT_FINAL_FOLLOWUP_DAYS, DEFAULT_REMINDER_DAYS_BIRTHDAY,
-    DEFAULT_REMINDER_DAYS_CHILDBIRTH, DEFAULT_REMINDER_DAYS_FINANCIAL_AID,
-    DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS, DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT,
-    JWT_TOKEN_EXPIRE_HOURS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_PAGE_NUMBER,
-    MAX_LIMIT, DEFAULT_ANALYTICS_DAYS, DEFAULT_UPCOMING_DAYS, MAX_IMAGE_SIZE,
-    MAX_CSV_SIZE, MAX_REQUEST_BODY_SIZE, IMAGE_MAGIC_BYTES,
-    API_MAX_RETRIES, API_RETRY_DELAYS, API_RETRY_TIMEOUT
+    ActivityActionType,
+    EngagementStatus,
+    EventType,
+    GriefStage,
+    NoteCategory,
+    NotificationChannel,
+    NotificationStatus,
+    UserRole,
 )
 from models import (
-    # UUID utilities
-    is_valid_uuid, generate_uuid, UUID_PATTERN,
+    ActivityLog,
+    AutomationSettingsUpdate,
+    Campus,
     # Campus models
-    CampusCreate, Campus,
-    # Member models
-    MemberCreate, MemberUpdate, Member,
-    # Care event models
-    VisitationLogEntry, CareEventCreate, CareEventUpdate, CareEvent,
-    # Setup models
-    SetupAdminRequest, SetupCampusRequest, AdditionalVisitRequest,
-    # Grief/accident models
-    GriefSupport, AccidentFollowup,
-    # Notification models
-    NotificationLog,
+    EngagementSettingsUpdate,
     # Financial aid models
-    FinancialAidSchedule, FinancialAidScheduleCreate,
-    # Settings models
-    AutomationSettingsUpdate, OverdueWriteoffSettingsUpdate,
-    EngagementSettingsUpdate, UserPreferencesUpdate,
+    Member,
+    # Member models
+    NotificationLog,
+    OverdueWriteoffSettingsUpdate,
     # Pastoral notes models
-    PastoralNoteCreate, PastoralNoteUpdate,
-    # User models
-    UserCreate, UserUpdate, UserLogin, User, UserResponse, TokenResponse,
-    # Activity log models
-    ActivityLog, ActivityLogResponse,
+    PastoralNoteCreate,
+    PastoralNoteUpdate,
+    # Setup models
+    SetupAdminRequest,
+    SetupCampusRequest,
     # Sync models
-    SyncConfig, SyncConfigCreate, SyncLog,
+    SyncConfigCreate,
+    SyncLog,
+    User,
+    # User models
+    UserPreferencesUpdate,
+    generate_uuid,
 )
+from routes.accident_followup import init_accident_followup_routes
+from routes.accident_followup import route_handlers as accident_followup_route_handlers
+from routes.auth import route_handlers as auth_route_handlers
+from routes.campus import route_handlers as campus_route_handlers
+from routes.care_events import init_care_event_routes
+from routes.care_events import route_handlers as care_event_route_handlers
+from routes.dashboard import init_dashboard_routes
+from routes.dashboard import route_handlers as dashboard_route_handlers
+from routes.financial_aid import init_financial_aid_routes
+from routes.financial_aid import route_handlers as financial_aid_route_handlers
+from routes.grief_support import init_grief_support_routes
+from routes.grief_support import route_handlers as grief_support_route_handlers
+from routes.members import init_member_routes
+from routes.members import route_handlers as member_route_handlers
+from services.search import get_search_service
 from utils import (
     # Validation
-    EMAIL_PATTERN, PHONE_PATTERN,
-    PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH,
-    escape_regex, validate_email, validate_phone, validate_password_strength,
+    calculate_engagement_status,
+    escape_regex,
+    # Cache
+    get_from_cache,
+    invalidate_cache,
     # Phone normalization
     normalize_phone_number,
-    # Engagement calculation
-    calculate_engagement_status,
-    # Cache
-    get_from_cache, set_in_cache, invalidate_cache,
+    set_in_cache,
 )
-from dependencies import init_dependencies
-from routes.campus import route_handlers as campus_route_handlers
-from routes.auth import route_handlers as auth_route_handlers
-from routes.members import route_handlers as member_route_handlers, init_member_routes
-from routes.care_events import route_handlers as care_event_route_handlers, init_care_event_routes
-from routes.grief_support import route_handlers as grief_support_route_handlers, init_grief_support_routes
-from routes.accident_followup import route_handlers as accident_followup_route_handlers, init_accident_followup_routes
-from routes.financial_aid import route_handlers as financial_aid_route_handlers, init_financial_aid_routes
-from routes.dashboard import route_handlers as dashboard_route_handlers, init_dashboard_routes
-from services.search import get_search_service
 
 
 # Custom msgspec response class for proper BSON/MongoDB type serialization
@@ -139,13 +162,13 @@ def msgspec_enc_hook(obj):
         # Convert to float for JSON; use str(obj.to_decimal()) if precision is critical
         return float(obj.to_decimal())
     if isinstance(obj, Binary):
-        return base64.b64encode(obj).decode('utf-8')
+        return base64.b64encode(obj).decode("utf-8")
     if isinstance(obj, Regex):
         return obj.pattern
     if isinstance(obj, uuid.UUID):
         return str(obj)
     if isinstance(obj, bytes):
-        return base64.b64encode(obj).decode('utf-8')
+        return base64.b64encode(obj).decode("utf-8")
     if isinstance(obj, Enum):
         return obj.value
     raise NotImplementedError(f"Object of type {type(obj)} is not JSON serializable")
@@ -190,11 +213,18 @@ def to_mongo_doc(obj, _original_obj=None) -> dict:
             elif isinstance(v, dict):
                 result[k] = to_mongo_doc(v)
             elif isinstance(v, list):
-                result[k] = [to_mongo_doc(item) if isinstance(item, (dict, Struct)) else
-                            item if isinstance(item, datetime) else
-                            item.isoformat() if isinstance(item, date) else
-                            item.value if isinstance(item, Enum) else item
-                            for item in v]
+                result[k] = [
+                    to_mongo_doc(item)
+                    if isinstance(item, (dict, Struct))
+                    else item
+                    if isinstance(item, datetime)
+                    else item.isoformat()
+                    if isinstance(item, date)
+                    else item.value
+                    if isinstance(item, Enum)
+                    else item
+                    for item in v
+                ]
             else:
                 result[k] = v
         return result
@@ -207,6 +237,7 @@ def to_mongo_doc(obj, _original_obj=None) -> dict:
 
 class CustomMsgspecResponse(Response):
     """Custom Response using msgspec for fast JSON serialization with BSON type support."""
+
     media_type = "application/json"
 
     def render(self, content) -> bytes:
@@ -216,58 +247,62 @@ class CustomMsgspecResponse(Response):
 # Jakarta timezone (UTC+7)
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
 
+
 # PDF report generation (lazy import to avoid startup issues)
 def get_pdf_generator():
     from pdf_report import generate_monthly_report_pdf
+
     return generate_monthly_report_pdf
+
 
 # Configure logging - structured JSON in production, human-readable in development
 import sys
 
+
 class JSONFormatter(logging.Formatter):
     """JSON log formatter for production - easier to parse and search"""
+
     def format(self, record):
         import json
+
         log_obj = {
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
-            "line": record.lineno
+            "line": record.lineno,
         }
         if record.exc_info:
             log_obj["exception"] = self.formatException(record.exc_info)
         return json.dumps(log_obj)
 
+
 # Configure logging based on environment
 log_level = logging.INFO
 log_handler = logging.StreamHandler(sys.stdout)
 
-if os.environ.get('ENVIRONMENT', 'development') == 'production':
+if os.environ.get("ENVIRONMENT", "development") == "production":
     # Structured JSON logging for production (easier to parse, search, aggregate)
     log_handler.setFormatter(JSONFormatter())
 else:
     # Human-readable format for development
-    log_handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    ))
+    log_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
 
 logging.basicConfig(level=log_level, handlers=[log_handler])
 logger = logging.getLogger(__name__)
 
 # Credential encryption for security
 from cryptography.fernet import Fernet
-import base64
 
 # Get encryption key from environment (REQUIRED in production)
-ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
+ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY")
 if not ENCRYPTION_KEY:
-    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+    if os.environ.get("ENVIRONMENT", "development") == "production":
         raise RuntimeError(
             "ENCRYPTION_KEY environment variable is required in production. "
-            "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
         )
     else:
         # Generate a key for development only
@@ -276,9 +311,11 @@ if not ENCRYPTION_KEY:
 
 cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
 
+
 def encrypt_password(password: str) -> str:
     """Encrypt password for storage"""
     return cipher_suite.encrypt(password.encode()).decode()
+
 
 def decrypt_password(encrypted: str) -> str | None:
     """Decrypt password for use. Returns None if decryption fails."""
@@ -289,21 +326,27 @@ def decrypt_password(encrypted: str) -> str | None:
         logger.warning("Failed to decrypt password - may be corrupted or using wrong key")
         return None
 
+
 def now_jakarta():
     """Get current time in Jakarta timezone"""
     return datetime.now(JAKARTA_TZ)
+
 
 def to_jakarta(dt):
     """Convert datetime to Jakarta timezone"""
     if dt.tzinfo is None:
         # Assume UTC if no timezone
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(JAKARTA_TZ)
+
 
 def get_jakarta_date_str():
     """Get current date in Jakarta as YYYY-MM-DD string"""
-    return now_jakarta().strftime('%Y-%m-%d')
+    return now_jakarta().strftime("%Y-%m-%d")
+
+
 import httpx
+
 
 async def http_request_with_retry(
     method: str,
@@ -311,13 +354,14 @@ async def http_request_with_retry(
     max_retries: int = API_MAX_RETRIES,
     retry_delays: list = API_RETRY_DELAYS,
     timeout: float = API_RETRY_TIMEOUT,
-    **kwargs
+    **kwargs,
 ) -> httpx.Response:
     """
     Make an HTTP request with automatic retry on transient failures.
     Uses shared connection pool. Per-request timeout override via timeout parameter.
     """
     from services.http_client import get_http_client
+
     last_error = None
     for attempt in range(max_retries):
         try:
@@ -328,31 +372,35 @@ async def http_request_with_retry(
             last_error = e
             if attempt < max_retries - 1:
                 delay = retry_delays[min(attempt, len(retry_delays) - 1)]
-                logger.warning(f"HTTP {method} {url} failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s...")
+                logger.warning(
+                    f"HTTP {method} {url} failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s..."
+                )
                 await asyncio.sleep(delay)
             else:
                 logger.error(f"HTTP {method} {url} failed after {max_retries} attempts: {e}")
                 raise
     raise last_error
 
-from PIL import Image
-import io
+
 import csv
-import json as json_lib
+import io
+
+import bcrypt
 import jwt
 from jwt.exceptions import InvalidTokenError as JWTError  # PyJWT (no ecdsa vulnerability)
-import bcrypt
-from scheduler import start_scheduler, stop_scheduler, daily_reminder_job
+
+from scheduler import daily_reminder_job, start_scheduler, stop_scheduler
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
 # Validate configuration on startup
 from config import validate_config
+
 validate_config(exit_on_error=False)  # Show warnings but don't exit
 
 # MongoDB connection with optimized pooling for production
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(
     mongo_url,
     maxPoolSize=50,  # Maximum number of connections in the pool
@@ -362,14 +410,16 @@ client = AsyncIOMotorClient(
     connectTimeoutMS=10000,  # Timeout for new connections
     socketTimeoutMS=45000,  # Timeout for socket operations
 )
-db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
+db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
 
 # NOTE: Litestar app will be created at the end of the file after all routes are defined
 # Middleware and app configuration will be done there
 
+
 # Request size limit middleware for Litestar
 class RequestSizeLimitMiddleware(AbstractMiddleware):
     """Limit request body size to prevent memory exhaustion attacks"""
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             headers = dict(scope.get("headers", []))
@@ -379,17 +429,20 @@ class RequestSizeLimitMiddleware(AbstractMiddleware):
                     response = LitestarResponse(
                         content={"detail": "Request body too large"},
                         status_code=HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        media_type="application/json"
+                        media_type="application/json",
                     )
                     await response(scope, receive, send)
                     return
         await self.app(scope, receive, send)
 
+
 # Security headers middleware - prevents XSS, clickjacking, MIME sniffing attacks
 class SecurityHeadersMiddleware(AbstractMiddleware):
     """Add security headers to all responses"""
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
+
             async def send_with_security_headers(message):
                 if message["type"] == "http.response.start":
                     headers = dict(message.get("headers", []))
@@ -405,9 +458,11 @@ class SecurityHeadersMiddleware(AbstractMiddleware):
                     existing_headers.extend(security_headers)
                     message = {**message, "headers": existing_headers}
                 await send(message)
+
             await self.app(scope, receive, send_with_security_headers)
         else:
             await self.app(scope, receive, send)
+
 
 # Request ID + Response Time middleware - adds tracing and performance headers
 class RequestTraceMiddleware(AbstractMiddleware):
@@ -417,9 +472,11 @@ class RequestTraceMiddleware(AbstractMiddleware):
                   Accepts client-provided X-Request-ID or generates a new one.
     X-Response-Time: Time taken to process the request in milliseconds.
     """
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             import time
+
             start_time = time.perf_counter()
 
             # Extract or generate request ID
@@ -441,9 +498,11 @@ class RequestTraceMiddleware(AbstractMiddleware):
                     existing_headers.extend(trace_headers)
                     message = {**message, "headers": existing_headers}
                 await send(message)
+
             await self.app(scope, receive, send_with_trace_headers)
         else:
             await self.app(scope, receive, send)
+
 
 # ==================== SAFE ERROR HANDLING ====================
 
@@ -456,16 +515,18 @@ GENERIC_ERROR_MESSAGES = {
     500: "An internal error occurred. Please try again later.",
 }
 
+
 def safe_error_detail(e: Exception, status_code: int = 500) -> str:
     """
     Return a safe error message for production.
     In development, returns the full error for debugging.
     """
-    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+    if os.environ.get("ENVIRONMENT", "development") == "production":
         return GENERIC_ERROR_MESSAGES.get(status_code, "An error occurred")
     else:
         # In development, include the error message for debugging
         return str(e)
+
 
 # Global exception handler for Litestar (will be registered with app)
 def global_exception_handler(request: Request, exc: Exception) -> LitestarResponse:
@@ -474,55 +535,46 @@ def global_exception_handler(request: Request, exc: Exception) -> LitestarRespon
     This catches any unhandled exceptions not caught by endpoint-level handlers.
     """
     import json
+
     from litestar.exceptions import ValidationException
 
     # Log request details for validation errors (to debug 400 errors)
     if isinstance(exc, ValidationException):
         # Log the validation error details
-        detail_str = str(exc.detail) if hasattr(exc, 'detail') else str(exc)
+        detail_str = str(exc.detail) if hasattr(exc, "detail") else str(exc)
         logger.warning(f"[VALIDATION] {request.method} {request.url.path} failed: {detail_str}")
 
         # Try to get additional info from the exception
-        if hasattr(exc, 'extra') and exc.extra:
+        if hasattr(exc, "extra") and exc.extra:
             logger.warning(f"[VALIDATION] Extra info: {exc.extra}")
 
         content = json.dumps({"detail": f"Validation failed for {request.method} {request.url.path}"})
-        return LitestarResponse(
-            content=content,
-            status_code=HTTP_400_BAD_REQUEST,
-            media_type="application/json"
-        )
+        return LitestarResponse(content=content, status_code=HTTP_400_BAD_REQUEST, media_type="application/json")
 
     # Handle HTTP exceptions properly - return their status code and message
     if isinstance(exc, HTTPException):
         content = json.dumps({"detail": exc.detail})
-        return LitestarResponse(
-            content=content,
-            status_code=exc.status_code,
-            media_type="application/json"
-        )
+        return LitestarResponse(content=content, status_code=exc.status_code, media_type="application/json")
 
     # Log the full error for debugging
-    logger.error(f"Unhandled exception: {type(exc).__name__}: {str(exc)}")
+    logger.error(f"Unhandled exception: {type(exc).__name__}: {exc!s}")
 
     # Return a safe error message
-    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+    if os.environ.get("ENVIRONMENT", "development") == "production":
         content = json.dumps({"detail": "An internal error occurred. Please try again later."})
     else:
         # In development, include more details
         content = json.dumps({"detail": str(exc), "type": type(exc).__name__})
 
-    return LitestarResponse(
-        content=content,
-        status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-        media_type="application/json"
-    )
+    return LitestarResponse(content=content, status_code=HTTP_500_INTERNAL_SERVER_ERROR, media_type="application/json")
+
 
 # Route handlers list (will be collected and passed to Litestar app)
-route_handlers: List[Any] = []
+route_handlers: list[Any] = []
 
 # ==================== IMAGE VALIDATION ====================
 # (Enums and constants now imported from enums.py and constants.py)
+
 
 def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
     """
@@ -537,10 +589,11 @@ def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
             return True, mime_type
 
     # Special check for WebP (RIFF....WEBP)
-    if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
-        return True, 'image/webp'
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return True, "image/webp"
 
     return False, "Invalid image format. Allowed: JPEG, PNG, GIF, WebP"
+
 
 # ==================== VALIDATION UTILITIES ====================
 # (Validation functions now imported from utils.py)
@@ -548,12 +601,12 @@ def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
 # ==================== AUTH CONFIGURATION ====================
 
 # JWT Secret Key (REQUIRED - no default for security)
-SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
 if not SECRET_KEY:
-    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+    if os.environ.get("ENVIRONMENT", "development") == "production":
         raise RuntimeError(
             "JWT_SECRET_KEY environment variable is required. "
-            "Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            'Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
         )
     else:
         # Generate a key for development only - will change on restart
@@ -563,29 +616,27 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = JWT_TOKEN_EXPIRE_HOURS * 60
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a bcrypt hash."""
-    return bcrypt.checkpw(
-        plain_password.encode('utf-8'),
-        hashed_password.encode('utf-8')
-    )
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
 
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt."""
-    return bcrypt.hashpw(
-        password.encode('utf-8'),
-        bcrypt.gensalt()
-    ).decode('utf-8')
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
 
 async def get_current_user(request: Request) -> dict:
     """Extract and validate JWT token from Authorization header.
@@ -632,25 +683,27 @@ async def get_current_user(request: Request) -> dict:
         )
     return user
 
+
 async def get_current_admin(request: Request) -> dict:
     """Get current user and verify admin role."""
     current_user = await get_current_user(request)
-    if current_user.get("role") not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value, "full_admin", "campus_admin"]:
-        raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
-        )
+    if current_user.get("role") not in [
+        UserRole.FULL_ADMIN.value,
+        UserRole.CAMPUS_ADMIN.value,
+        "full_admin",
+        "campus_admin",
+    ]:
+        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return current_user
+
 
 async def get_full_admin(request: Request) -> dict:
     """Get current user and verify full admin role."""
     current_user = await get_current_user(request)
     if current_user.get("role") not in [UserRole.FULL_ADMIN.value, "full_admin"]:
-        raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
-            detail="Full admin privileges required"
-        )
+        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Full admin privileges required")
     return current_user
+
 
 def get_campus_filter(current_user: dict):
     """Get campus filter for queries based on user role"""
@@ -664,11 +717,13 @@ def get_campus_filter(current_user: dict):
         # User has no campus - return impossible filter to prevent data leaks
         return {"campus_id": {"$exists": False, "$eq": "IMPOSSIBLE_VALUE"}}
 
+
 # ==================== MODELS ====================
 # (All models now imported from models.py)
 
 # ==================== UTILITY FUNCTIONS ====================
 # (Cache functions now imported from utils.py)
+
 
 async def _get_engagement_settings_cached():
     """Get engagement threshold settings from database (cached for 10 minutes) - internal helper"""
@@ -680,15 +735,25 @@ async def _get_engagement_settings_cached():
     try:
         settings = await db.settings.find_one({"key": "engagement_thresholds"}, {"_id": 0})
         if settings:
-            result = settings.get("data", {"atRiskDays": ENGAGEMENT_AT_RISK_DAYS_DEFAULT, "disconnectedDays": ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT})
+            result = settings.get(
+                "data",
+                {
+                    "atRiskDays": ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
+                    "disconnectedDays": ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
+                },
+            )
         else:
-            result = {"atRiskDays": ENGAGEMENT_AT_RISK_DAYS_DEFAULT, "disconnectedDays": ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT}
+            result = {
+                "atRiskDays": ENGAGEMENT_AT_RISK_DAYS_DEFAULT,
+                "disconnectedDays": ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT,
+            }
 
         set_in_cache(cache_key, result)
         return result
     except Exception as e:
-        logger.warning(f"Failed to get engagement settings: {str(e)}, using defaults")
+        logger.warning(f"Failed to get engagement settings: {e!s}, using defaults")
         return {"atRiskDays": ENGAGEMENT_AT_RISK_DAYS_DEFAULT, "disconnectedDays": ENGAGEMENT_DISCONNECTED_DAYS_DEFAULT}
+
 
 async def get_writeoff_settings():
     """Get overdue write-off threshold settings from database (cached for 10 minutes)"""
@@ -701,7 +766,7 @@ async def get_writeoff_settings():
         "birthday": DEFAULT_REMINDER_DAYS_BIRTHDAY,
         "financial_aid": DEFAULT_REMINDER_DAYS_FINANCIAL_AID,
         "accident_illness": DEFAULT_REMINDER_DAYS_ACCIDENT_ILLNESS,
-        "grief_support": DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT
+        "grief_support": DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT,
     }
 
     try:
@@ -714,10 +779,11 @@ async def get_writeoff_settings():
         set_in_cache(cache_key, result)
         return result
     except Exception as e:
-        logger.warning(f"Failed to get writeoff settings: {str(e)}, using defaults")
+        logger.warning(f"Failed to get writeoff settings: {e!s}, using defaults")
         return default_settings
 
-async def calculate_engagement_status_async(last_contact: Optional[datetime]) -> tuple[EngagementStatus, int]:
+
+async def calculate_engagement_status_async(last_contact: datetime | None) -> tuple[EngagementStatus, int]:
     """Calculate engagement status using configurable thresholds"""
     settings = await _get_engagement_settings_cached()
     at_risk_days = settings.get("atRiskDays", ENGAGEMENT_AT_RISK_DAYS_DEFAULT)
@@ -725,7 +791,7 @@ async def calculate_engagement_status_async(last_contact: Optional[datetime]) ->
 
     if not last_contact:
         return EngagementStatus.DISCONNECTED, ENGAGEMENT_NO_CONTACT_DAYS
-    
+
     # Handle string dates
     if isinstance(last_contact, str):
         try:
@@ -735,9 +801,9 @@ async def calculate_engagement_status_async(last_contact: Optional[datetime]) ->
 
     # Make timezone-aware if needed
     if last_contact.tzinfo is None:
-        last_contact = last_contact.replace(tzinfo=timezone.utc)
+        last_contact = last_contact.replace(tzinfo=UTC)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     days_since = (now - last_contact).days
 
     if days_since < at_risk_days:
@@ -747,19 +813,21 @@ async def calculate_engagement_status_async(last_contact: Optional[datetime]) ->
     else:
         return EngagementStatus.DISCONNECTED, days_since
 
+
 # calculate_engagement_status (sync) and normalize_phone_number now imported from utils.py
+
 
 async def log_activity(
     campus_id: str,
     user_id: str,
     user_name: str,
     action_type: ActivityActionType,
-    member_id: Optional[str] = None,
-    member_name: Optional[str] = None,
-    care_event_id: Optional[str] = None,
-    event_type: Optional[EventType] = None,
-    notes: Optional[str] = None,
-    user_photo_url: Optional[str] = None
+    member_id: str | None = None,
+    member_name: str | None = None,
+    care_event_id: str | None = None,
+    event_type: EventType | None = None,
+    notes: str | None = None,
+    user_photo_url: str | None = None,
 ):
     """Log user activity for accountability tracking and broadcast to SSE subscribers"""
     try:
@@ -773,7 +841,7 @@ async def log_activity(
             member_name=member_name,
             care_event_id=care_event_id,
             event_type=event_type,
-            notes=notes
+            notes=notes,
         )
         await db.activity_logs.insert_one(to_mongo_doc(activity))
         logger.info(f"Activity logged: {user_name} - {action_type} - {member_name}")
@@ -786,6 +854,7 @@ async def log_activity(
         # back to the manual broadcast path.
         try:
             from services.change_stream import is_change_stream_active
+
             if not is_change_stream_active():
                 activity_data = {
                     "id": activity.id,
@@ -793,25 +862,28 @@ async def log_activity(
                     "user_id": user_id,
                     "user_name": user_name,
                     "user_photo_url": user_photo_url,
-                    "action_type": action_type.value if hasattr(action_type, 'value') else action_type,
+                    "action_type": action_type.value if hasattr(action_type, "value") else action_type,
                     "member_id": member_id,
                     "member_name": member_name,
                     "care_event_id": care_event_id,
-                    "event_type": event_type.value if event_type and hasattr(event_type, 'value') else event_type,
+                    "event_type": event_type.value if event_type and hasattr(event_type, "value") else event_type,
                     "notes": notes,
-                    "timestamp": activity.created_at.isoformat() if activity.created_at else datetime.now(JAKARTA_TZ).isoformat()
+                    "timestamp": activity.created_at.isoformat()
+                    if activity.created_at
+                    else datetime.now(JAKARTA_TZ).isoformat(),
                 }
                 # Schedule broadcast without blocking (fire and forget)
                 asyncio.create_task(_broadcast_activity_safe(campus_id, activity_data))
             else:
                 logger.debug("SSE broadcast delegated to change stream watcher")
         except Exception as broadcast_err:
-            logger.debug(f"SSE broadcast skipped: {str(broadcast_err)}")
+            logger.debug(f"SSE broadcast skipped: {broadcast_err!s}")
 
     except Exception as e:
-        logger.error(f"Error logging activity: {str(e)}")
+        logger.error(f"Error logging activity: {e!s}")
         # Don't fail the main operation if logging fails
         pass
+
 
 async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
     """Broadcast activity via DragonflyDB pub/sub for cross-worker delivery.
@@ -828,6 +900,7 @@ async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
     # Primary: publish to DragonflyDB for cross-worker delivery
     try:
         from services.cache import get_redis_client
+
         redis_client = get_redis_client()
         if redis_client:
             channel = f"ft:{campus_id}:activity"
@@ -842,11 +915,13 @@ async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
     except NameError:
         pass  # broadcast_activity not yet defined during module load
     except Exception as e:
-        logger.debug(f"SSE broadcast error: {str(e)}")
+        logger.debug(f"SSE broadcast error: {e!s}")
+
 
 # ==================== HELPER FUNCTIONS ====================
 
-async def get_member_or_404(member_id: str, projection: Optional[dict] = None) -> dict:
+
+async def get_member_or_404(member_id: str, projection: dict | None = None) -> dict:
     """
     Get member by ID or raise 404 HTTPException
 
@@ -866,7 +941,8 @@ async def get_member_or_404(member_id: str, projection: Optional[dict] = None) -
         raise HTTPException(status_code=404, detail="Member not found")
     return member
 
-async def get_care_event_or_404(event_id: str, projection: Optional[dict] = None) -> dict:
+
+async def get_care_event_or_404(event_id: str, projection: dict | None = None) -> dict:
     """
     Get care event by ID or raise 404 HTTPException
 
@@ -886,6 +962,7 @@ async def get_care_event_or_404(event_id: str, projection: Optional[dict] = None
         raise HTTPException(status_code=404, detail="Care event not found")
     return event
 
+
 async def get_campus_or_404(campus_id: str) -> dict:
     """
     Get campus by ID or raise 404 HTTPException
@@ -904,7 +981,10 @@ async def get_campus_or_404(campus_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Campus not found")
     return campus
 
-def generate_accident_followup_timeline(event_date: date, care_event_id: str, member_id: str, campus_id: str) -> List[Dict[str, Any]]:
+
+def generate_accident_followup_timeline(
+    event_date: date, care_event_id: str, member_id: str, campus_id: str
+) -> list[dict[str, Any]]:
     """Generate 3-stage accident/illness follow-up timeline"""
     # Get settings from localStorage or use defaults
     stages = [
@@ -912,7 +992,7 @@ def generate_accident_followup_timeline(event_date: date, care_event_id: str, me
         ("second_followup", ACCIDENT_SECOND_FOLLOWUP_DAYS),
         ("final_followup", ACCIDENT_FINAL_FOLLOWUP_DAYS),
     ]
-    
+
     timeline = []
     for stage, days_offset in stages:
         scheduled_date = event_date + timedelta(days=days_offset)
@@ -927,14 +1007,15 @@ def generate_accident_followup_timeline(event_date: date, care_event_id: str, me
             "completed_at": None,
             "notes": None,
             "reminder_sent": False,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
         }
         timeline.append(followup_stage)
-    
+
     return timeline
 
-def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: str) -> List[Dict[str, Any]]:
+
+def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: str) -> list[dict[str, Any]]:
     """Generate 6-stage grief support timeline"""
     stages = [
         (GriefStage.ONE_WEEK, GRIEF_ONE_WEEK_DAYS),
@@ -944,7 +1025,7 @@ def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: 
         (GriefStage.SIX_MONTHS, GRIEF_SIX_MONTHS_DAYS),
         (GriefStage.ONE_YEAR, GRIEF_ONE_YEAR_DAYS),
     ]
-    
+
     timeline = []
     for stage, days_offset in stages:
         scheduled_date = mourning_date + timedelta(days=days_offset)
@@ -958,15 +1039,21 @@ def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: 
             "completed_at": None,
             "notes": None,
             "reminder_sent": False,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
         }
         timeline.append(grief_support)
-    
+
     return timeline
 
-async def send_whatsapp_message(phone: str, message: str, care_event_id: Optional[str] = None,
-                                grief_support_id: Optional[str] = None, member_id: str = None) -> Dict[str, Any]:
+
+async def send_whatsapp_message(
+    phone: str,
+    message: str,
+    care_event_id: str | None = None,
+    grief_support_id: str | None = None,
+    member_id: str = None,
+) -> dict[str, Any]:
     """Send WhatsApp message via gateway"""
     try:
         # Read from database settings first, fall back to environment variable
@@ -975,26 +1062,26 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
         if settings and settings.get("data", {}).get("whatsappGateway"):
             whatsapp_url = settings["data"]["whatsappGateway"]
         if not whatsapp_url:
-            whatsapp_url = os.environ.get('WHATSAPP_GATEWAY_URL')
+            whatsapp_url = os.environ.get("WHATSAPP_GATEWAY_URL")
         if not whatsapp_url:
             raise Exception("WhatsApp gateway URL not configured")
-        
+
         # Normalize phone number to international format
         phone_normalized = normalize_phone_number(phone)
-        phone_formatted = phone_normalized if phone_normalized.endswith('@s.whatsapp.net') else f"{phone_normalized}@s.whatsapp.net"
-        
-        payload = {
-            "phone": phone_formatted,
-            "message": message
-        }
-        
+        phone_formatted = (
+            phone_normalized if phone_normalized.endswith("@s.whatsapp.net") else f"{phone_normalized}@s.whatsapp.net"
+        )
+
+        payload = {"phone": phone_formatted, "message": message}
+
         from services.http_client import get_http_client
+
         client = await get_http_client()
         response = await client.post(f"{whatsapp_url}/send/message", json=payload)
         response_data = response.json()
 
         # Log notification
-        status = NotificationStatus.SENT if response_data.get('code') == 'SUCCESS' else NotificationStatus.FAILED
+        status = NotificationStatus.SENT if response_data.get("code") == "SUCCESS" else NotificationStatus.FAILED
 
         log_entry = NotificationLog(
             care_event_id=care_event_id,
@@ -1004,18 +1091,18 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
             recipient=phone_formatted,
             message=message,
             status=status,
-            response_data=response_data
+            response_data=response_data,
         )
 
         await db.notification_logs.insert_one(to_mongo_doc(log_entry))
 
         return {
             "success": status == NotificationStatus.SENT,
-            "message_id": response_data.get('results', {}).get('message_id'),
-            "response": response_data
+            "message_id": response_data.get("results", {}).get("message_id"),
+            "response": response_data,
         }
     except Exception as e:
-        logger.error(f"WhatsApp send error: {str(e)}")
+        logger.error(f"WhatsApp send error: {e!s}")
         # Log failed attempt
         if member_id:
             log_entry = NotificationLog(
@@ -1026,14 +1113,12 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
                 recipient=phone,
                 message=message,
                 status=NotificationStatus.FAILED,
-                response_data={"error": str(e)}
+                response_data={"error": str(e)},
             )
             await db.notification_logs.insert_one(to_mongo_doc(log_entry))
-        
-        return {
-            "success": False,
-            "error": str(e)
-        }
+
+        return {"success": False, "error": str(e)}
+
 
 # ==================== CAMPUS ENDPOINTS ====================
 # (Moved to routes/campus.py)
@@ -1044,20 +1129,21 @@ async def send_whatsapp_message(phone: str, message: str, care_event_id: Optiona
 # ==================== MEMBER ENDPOINTS ====================
 # (Moved to routes/members.py)
 
+
 async def invalidate_dashboard_cache(campus_id: str):
     """Invalidate dashboard cache for a specific campus - call after any data change"""
     try:
         # Get campus timezone to determine today's date
         campus_tz = await get_campus_timezone(campus_id)
         today_date = get_date_in_timezone(campus_tz)
-        
+
         # Delete today's cache
         cache_key = f"dashboard_reminders_{campus_id}_{today_date}"
         await db.dashboard_cache.delete_one({"cache_key": cache_key})
-        
+
         logger.info(f"Dashboard cache invalidated for campus {campus_id}")
     except Exception as e:
-        logger.error(f"Error invalidating dashboard cache: {str(e)}")
+        logger.error(f"Error invalidating dashboard cache: {e!s}")
 
 
 # Timezone cache to avoid repeated DB lookups
@@ -1067,13 +1153,16 @@ TIMEZONE_CACHE_TTL = 600  # 10 minutes
 # Valid timezones set for validation
 try:
     from zoneinfo import available_timezones
+
     VALID_TIMEZONES = available_timezones()
 except ImportError:
     VALID_TIMEZONES = {"Asia/Jakarta", "UTC", "America/New_York", "Europe/London"}
 
+
 def is_valid_timezone(tz_str: str) -> bool:
     """Validate timezone string"""
     return tz_str in VALID_TIMEZONES
+
 
 async def get_campus_timezone(campus_id: str) -> str:
     """Get campus timezone setting (cached for 10 minutes)"""
@@ -1095,8 +1184,9 @@ async def get_campus_timezone(campus_id: str) -> str:
         _timezone_cache[campus_id] = (tz, time.time())
         return tz
     except Exception as e:
-        logger.warning(f"Failed to get campus timezone: {str(e)}, using default")
+        logger.warning(f"Failed to get campus timezone: {e!s}, using default")
         return "Asia/Jakarta"
+
 
 def get_date_in_timezone(timezone_str: str) -> str:
     """Get current date in specified timezone as YYYY-MM-DD string"""
@@ -1106,10 +1196,10 @@ def get_date_in_timezone(timezone_str: str) -> str:
             logger.warning(f"Invalid timezone '{timezone_str}', using Asia/Jakarta")
             timezone_str = "Asia/Jakarta"
         tz = ZoneInfo(timezone_str)
-        return datetime.now(tz).strftime('%Y-%m-%d')
+        return datetime.now(tz).strftime("%Y-%m-%d")
     except Exception as e:
-        logger.warning(f"Failed to get date in timezone: {str(e)}, using Jakarta")
-        return datetime.now(ZoneInfo("Asia/Jakarta")).strftime('%Y-%m-%d')
+        logger.warning(f"Failed to get date in timezone: {e!s}, using Jakarta")
+        return datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d")
 
 
 @post("/care-events/{event_id:str}/ignore")
@@ -1133,13 +1223,15 @@ async def ignore_care_event(event_id: str, request: Request) -> dict:
         # Update event to mark as ignored
         await db.care_events.update_one(
             {"id": event_id},
-            {"$set": {
-                "ignored": True,
-                "ignored_at": datetime.now(timezone.utc),
-                "ignored_by": current_user.get("id"),
-                "ignored_by_name": current_user.get("name"),
-                "updated_at": datetime.now(timezone.utc)
-            }}
+            {
+                "$set": {
+                    "ignored": True,
+                    "ignored_at": datetime.now(UTC),
+                    "ignored_by": current_user.get("id"),
+                    "ignored_by_name": current_user.get("name"),
+                    "updated_at": datetime.now(UTC),
+                }
+            },
         )
 
         # Log activity
@@ -1153,9 +1245,9 @@ async def ignore_care_event(event_id: str, request: Request) -> dict:
             care_event_id=event_id,
             event_type=EventType(event["event_type"]),
             notes=f"Ignored {event['event_type']} task",
-            user_photo_url=current_user.get("photo_url")
+            user_photo_url=current_user.get("photo_url"),
         )
-        
+
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(event["campus_id"])
 
@@ -1172,8 +1264,9 @@ async def ignore_care_event(event_id: str, request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error ignoring care event: {str(e)}")
+        logger.error(f"Error ignoring care event: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @delete("/care-events/{event_id:str}", status_code=200)
 async def delete_care_event(event_id: str, request: Request) -> dict:
@@ -1190,51 +1283,39 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
         event = await db.care_events.find_one(query, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
-        
+
         member_id = event["member_id"]
         event_type = event.get("event_type")
-        
+
         # If deleting a timeline event created from followup completion, reset the stage
         if event_type in ["grief_loss", "accident_illness"]:
             # Check if this timeline event is linked to a grief stage
             if event.get("grief_stage_id"):
                 await db.grief_support.update_one(
                     {"id": event["grief_stage_id"]},
-                    {"$set": {
-                        "completed": False,
-                        "completed_at": None,
-                        "ignored": False,
-                        "ignored_at": None
-                    }}
+                    {"$set": {"completed": False, "completed_at": None, "ignored": False, "ignored_at": None}},
                 )
-            
+
             # Check if this timeline event is linked to an accident stage
             elif event.get("accident_stage_id"):
                 await db.accident_followup.update_one(
                     {"id": event["accident_stage_id"]},
-                    {"$set": {
-                        "completed": False,
-                        "completed_at": None,
-                        "ignored": False,
-                        "ignored_at": None
-                    }}
+                    {"$set": {"completed": False, "completed_at": None, "ignored": False, "ignored_at": None}},
                 )
-        
+
         # If deleting a birthday completion timeline event, reset the birthday event
         if event_type == "regular_contact" and "Birthday" in event.get("title", ""):
             # Find the birthday event for this member
             birthday_event = await db.care_events.find_one(
-                {"member_id": member_id, "event_type": "birthday"},
-                {"_id": 0}
+                {"member_id": member_id, "event_type": "birthday"}, {"_id": 0}
             )
             if birthday_event:
                 await db.care_events.update_one(
-                    {"id": birthday_event["id"]},
-                    {"$set": {"completed": False, "updated_at": datetime.now(timezone.utc)}}
+                    {"id": birthday_event["id"]}, {"$set": {"completed": False, "updated_at": datetime.now(UTC)}}
                 )
                 # Also delete the activity log associated with the original birthday event completion
                 await db.activity_logs.delete_many({"care_event_id": birthday_event["id"]})
-        
+
         # Delete the care event
         result = await db.care_events.delete_one({"id": event_id})
         if result.deleted_count == 0:
@@ -1242,7 +1323,9 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
 
         # Delete activity logs related to this care event
         activity_delete_result = await db.activity_logs.delete_many({"care_event_id": event_id})
-        logger.info(f"[DELETE EVENT] Deleted {activity_delete_result.deleted_count} activity logs for care_event_id={event_id}")
+        logger.info(
+            f"[DELETE EVENT] Deleted {activity_delete_result.deleted_count} activity logs for care_event_id={event_id}"
+        )
 
         # Delete notification logs related to this care event
         await db.notification_logs.delete_many({"care_event_id": event_id})
@@ -1251,8 +1334,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
         if event_type == "grief_loss":
             # Get all grief stages
             grief_stages = await db.grief_support.find(
-                {"care_event_id": event_id},
-                {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
+                {"care_event_id": event_id}, {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
             ).to_list(MAX_LIMIT)
 
             # Get timeline entries created from these stages (to delete their activity logs)
@@ -1260,8 +1342,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
             if stage_ids:
                 # Get IDs of timeline entries before deleting them
                 timeline_entries = await db.care_events.find(
-                    {"grief_stage_id": {"$in": stage_ids}},
-                    {"_id": 0, "id": 1}
+                    {"grief_stage_id": {"$in": stage_ids}}, {"_id": 0, "id": 1}
                 ).to_list(MAX_LIMIT)
                 timeline_entry_ids = [e["id"] for e in timeline_entries]
 
@@ -1275,12 +1356,11 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
 
             # Delete grief support stages
             await db.grief_support.delete_many({"care_event_id": event_id})
-            
+
         elif event_type == "accident_illness":
             # Get all accident stages
             accident_stages = await db.accident_followup.find(
-                {"care_event_id": event_id},
-                {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
+                {"care_event_id": event_id}, {"_id": 0, "id": 1, "member_id": 1, "stage": 1}
             ).to_list(MAX_LIMIT)
 
             # Get timeline entries created from these stages (to delete their activity logs)
@@ -1288,8 +1368,7 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
             if stage_ids:
                 # Get IDs of timeline entries before deleting them
                 timeline_entries = await db.care_events.find(
-                    {"accident_stage_id": {"$in": stage_ids}},
-                    {"_id": 0, "id": 1}
+                    {"accident_stage_id": {"$in": stage_ids}}, {"_id": 0, "id": 1}
                 ).to_list(MAX_LIMIT)
                 timeline_entry_ids = [e["id"] for e in timeline_entries]
 
@@ -1303,35 +1382,40 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
 
             # Delete accident followup stages
             await db.accident_followup.delete_many({"care_event_id": event_id})
-        
+
         # Recalculate member's last contact date from remaining NON-BIRTHDAY events
         # Birthday events don't count as contact unless completed (marked as contacted)
-        remaining_events = await db.care_events.find(
-            {
-                "member_id": member_id,
-                "$or": [
-                    {"event_type": {"$ne": "birthday"}},  # Non-birthday events
-                    {"event_type": "birthday", "completed": True}  # Completed birthday events
-                ]
-            },
-            {"_id": 0, "created_at": 1}
-        ).sort("created_at", -1).limit(1).to_list(1)
-        
+        remaining_events = (
+            await db.care_events.find(
+                {
+                    "member_id": member_id,
+                    "$or": [
+                        {"event_type": {"$ne": "birthday"}},  # Non-birthday events
+                        {"event_type": "birthday", "completed": True},  # Completed birthday events
+                    ],
+                },
+                {"_id": 0, "created_at": 1},
+            )
+            .sort("created_at", -1)
+            .limit(1)
+            .to_list(1)
+        )
+
         if remaining_events:
             # Update to most recent remaining event
             last_event = remaining_events[0]
             new_last_contact = last_event["created_at"]
-            
+
             # Calculate new engagement status
             if isinstance(new_last_contact, str):
                 last_contact_dt = datetime.fromisoformat(new_last_contact)
             else:
                 last_contact_dt = new_last_contact
-                
+
             if last_contact_dt.tzinfo is None:
-                last_contact_dt = last_contact_dt.replace(tzinfo=timezone.utc)
-            
-            days_since = (datetime.now(timezone.utc) - last_contact_dt).days
+                last_contact_dt = last_contact_dt.replace(tzinfo=UTC)
+
+            days_since = (datetime.now(UTC) - last_contact_dt).days
 
             # Use configurable engagement thresholds (not hardcoded)
             eng_settings = await _get_engagement_settings_cached()
@@ -1344,32 +1428,36 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 engagement_status = "at_risk"
             else:
                 engagement_status = "disconnected"
-                
+
             await db.members.update_one(
                 {"id": member_id},
-                {"$set": {
-                    "last_contact_date": new_last_contact,
-                    "days_since_last_contact": days_since,
-                    "engagement_status": engagement_status,
-                    "updated_at": datetime.now(timezone.utc)
-                }}
+                {
+                    "$set": {
+                        "last_contact_date": new_last_contact,
+                        "days_since_last_contact": days_since,
+                        "engagement_status": engagement_status,
+                        "updated_at": datetime.now(UTC),
+                    }
+                },
             )
         else:
             # No remaining events - reset to never contacted
             await db.members.update_one(
                 {"id": member_id},
-                {"$set": {
-                    "last_contact_date": None,
-                    "days_since_last_contact": 999,
-                    "engagement_status": "disconnected",
-                    "updated_at": datetime.now(timezone.utc)
-                }}
+                {
+                    "$set": {
+                        "last_contact_date": None,
+                        "days_since_last_contact": 999,
+                        "engagement_status": "disconnected",
+                        "updated_at": datetime.now(UTC),
+                    }
+                },
             )
-        
+
         # Also delete related grief support stages and accident followup stages
         await db.grief_support.delete_many({"care_event_id": event_id})
         await db.accident_followup.delete_many({"care_event_id": event_id})
-        
+
         # Invalidate dashboard cache
         await invalidate_dashboard_cache(event["campus_id"])
 
@@ -1383,19 +1471,18 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting care event: {str(e)}")
+        logger.error(f"Error deleting care event: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 # NOTE: Financial aid endpoints moved to routes/financial_aid.py
 
 # ==================== API SYNC ENDPOINTS ====================
 
+
 @post("/sync/members/from-api")
 async def sync_members_from_external_api(
-    api_url: str,
-    api_key: Optional[str] = None,
-    campus_id: Optional[str] = None,
-    request: Request = None
+    api_url: str, api_key: str | None = None, campus_id: str | None = None, request: Request = None
 ) -> dict:
     """Continuously sync members from external API with archiving"""
     current_admin = await get_current_admin(request)
@@ -1406,114 +1493,111 @@ async def sync_members_from_external_api(
             response = await client.get(api_url, headers=headers)
             external_members = response.json()
 
-        sync_campus_id = campus_id or current_admin.get('campus_id')
+        sync_campus_id = campus_id or current_admin.get("campus_id")
         synced_count = 0
         updated_count = 0
         archived_count = 0
         errors = []
-        
+
         # Track external IDs from API
         external_ids = set()
-        
+
         for ext_member in external_members:
             try:
-                ext_id = str(ext_member.get('id'))
+                ext_id = str(ext_member.get("id"))
                 external_ids.add(ext_id)
-                
+
                 # Check if member exists by external_member_id
-                existing = await db.members.find_one(
-                    {"external_member_id": ext_id},
-                    {"_id": 0}
-                )
-                
+                existing = await db.members.find_one({"external_member_id": ext_id}, {"_id": 0})
+
                 if existing:
                     # Update existing member with latest data
                     update_data = {
-                        "name": ext_member.get('name'),
-                        "phone": ext_member.get('phone'),
-                        "email": ext_member.get('email'),
-                        "updated_at": datetime.now(timezone.utc)
+                        "name": ext_member.get("name"),
+                        "phone": ext_member.get("phone"),
+                        "email": ext_member.get("email"),
+                        "updated_at": datetime.now(UTC),
                     }
-                    
+
                     # If member was archived, un-archive them
                     if existing.get("is_archived"):
                         update_data["is_archived"] = False
                         update_data["archived_at"] = None
                         update_data["archived_reason"] = None
-                    
+
                     # Update other fields if provided
-                    if ext_member.get('birth_date'):
-                        update_data["birth_date"] = ext_member.get('birth_date')
-                    if ext_member.get('address'):
-                        update_data["address"] = ext_member.get('address')
-                    if ext_member.get('membership_status'):
-                        update_data["membership_status"] = ext_member.get('membership_status')
-                    if ext_member.get('category'):
-                        update_data["category"] = ext_member.get('category')
-                    if ext_member.get('gender'):
-                        update_data["gender"] = ext_member.get('gender')
-                    
-                    await db.members.update_one(
-                        {"id": existing["id"]},
-                        {"$set": update_data}
-                    )
+                    if ext_member.get("birth_date"):
+                        update_data["birth_date"] = ext_member.get("birth_date")
+                    if ext_member.get("address"):
+                        update_data["address"] = ext_member.get("address")
+                    if ext_member.get("membership_status"):
+                        update_data["membership_status"] = ext_member.get("membership_status")
+                    if ext_member.get("category"):
+                        update_data["category"] = ext_member.get("category")
+                    if ext_member.get("gender"):
+                        update_data["gender"] = ext_member.get("gender")
+
+                    await db.members.update_one({"id": existing["id"]}, {"$set": update_data})
                     updated_count += 1
                 else:
                     # Create new member
                     member = Member(
-                        name=ext_member.get('name'),
-                        phone=ext_member.get('phone'),
+                        name=ext_member.get("name"),
+                        phone=ext_member.get("phone"),
                         campus_id=sync_campus_id,
                         external_member_id=ext_id,
-                        birth_date=ext_member.get('birth_date'),
-                        address=ext_member.get('address'),
-                        membership_status=ext_member.get('membership_status'),
-                        category=ext_member.get('category'),
-                        gender=ext_member.get('gender')
+                        birth_date=ext_member.get("birth_date"),
+                        address=ext_member.get("address"),
+                        membership_status=ext_member.get("membership_status"),
+                        category=ext_member.get("category"),
+                        gender=ext_member.get("gender"),
                     )
                     await db.members.insert_one(to_mongo_doc(member))
-                
+
                 synced_count += 1
             except Exception as e:
-                errors.append(f"Error syncing {ext_member.get('name')}: {str(e)}")
-        
+                errors.append(f"Error syncing {ext_member.get('name')}: {e!s}")
+
         # Archive members that exist in our DB but not in external API source
         # (Only for members with external_member_id from this source)
         existing_external_members = await db.members.find(
             {
                 "campus_id": sync_campus_id,
                 "external_member_id": {"$exists": True, "$ne": None},
-                "is_archived": {"$ne": True}
+                "is_archived": {"$ne": True},
             },
-            {"_id": 0, "id": 1, "name": 1, "external_member_id": 1}
+            {"_id": 0, "id": 1, "name": 1, "external_member_id": 1},
         ).to_list(MAX_LIMIT)
-        
+
         for member in existing_external_members:
             if member["external_member_id"] not in external_ids:
                 # Member no longer in external source - archive them
                 await db.members.update_one(
                     {"id": member["id"]},
-                    {"$set": {
-                        "is_archived": True,
-                        "archived_at": datetime.now(timezone.utc),
-                        "archived_reason": "Removed from external API source",
-                        "updated_at": datetime.now(timezone.utc)
-                    }}
+                    {
+                        "$set": {
+                            "is_archived": True,
+                            "archived_at": datetime.now(UTC),
+                            "archived_reason": "Removed from external API source",
+                            "updated_at": datetime.now(UTC),
+                        }
+                    },
                 )
                 archived_count += 1
                 logger.info(f"Archived member {member['name']} - no longer in external source")
-        
+
         return {
             "success": True,
             "synced_count": synced_count,
             "updated_count": updated_count,
             "archived_count": archived_count,
             "total_received": len(external_members),
-            "errors": errors
+            "errors": errors,
         }
     except Exception as e:
-        logger.error(f"API sync error: {str(e)}")
+        logger.error(f"API sync error: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/sync/members/webhook")
 async def member_sync_webhook(request: Request) -> dict:
@@ -1521,10 +1605,12 @@ async def member_sync_webhook(request: Request) -> dict:
     return {
         "webhook_url": f"{os.environ.get('BACKEND_URL', 'http://localhost:8001')}/api/sync/members/from-api",
         "method": "POST",
-        "description": "External system can POST member data here for continuous sync"
+        "description": "External system can POST member data here for continuous sync",
     }
 
+
 # ==================== IMPORT/EXPORT ENDPOINTS ====================
+
 
 @post("/import/members/csv")
 async def import_members_csv(request: Request, data: UploadFile) -> Response:
@@ -1540,9 +1626,11 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
         # Read and validate file size
         contents = await file.read()
         if len(contents) > MAX_CSV_SIZE:
-            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_CSV_SIZE // (1024*1024)} MB.")
+            raise HTTPException(
+                status_code=400, detail=f"File too large. Maximum size is {MAX_CSV_SIZE // (1024 * 1024)} MB."
+            )
 
-        decoded = contents.decode('utf-8')
+        decoded = contents.decode("utf-8")
         reader = csv.DictReader(io.StringIO(decoded))
 
         imported_count = 0
@@ -1552,17 +1640,17 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
             try:
                 # Create member from CSV row with campus_id for multi-tenancy
                 member = Member(
-                    name=row.get('name', ''),
-                    phone=row.get('phone', ''),
-                    external_member_id=row.get('external_member_id'),
-                    notes=row.get('notes'),
-                    campus_id=campus_id
+                    name=row.get("name", ""),
+                    phone=row.get("phone", ""),
+                    external_member_id=row.get("external_member_id"),
+                    notes=row.get("notes"),
+                    campus_id=campus_id,
                 )
 
                 await db.members.insert_one(to_mongo_doc(member))
                 imported_count += 1
             except Exception as e:
-                errors.append(f"Row error: {str(e)}")
+                errors.append(f"Row error: {e!s}")
 
         # Log the import activity
         await log_activity(
@@ -1570,22 +1658,19 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
             user_id=current_user["id"],
             user_name=current_user.get("name", ""),
             action_type=ActivityActionType.CREATE_MEMBER,
-            notes=f"Imported {imported_count} members from CSV"
+            notes=f"Imported {imported_count} members from CSV",
         )
 
-        return {
-            "success": True,
-            "imported_count": imported_count,
-            "errors": errors
-        }
+        return {"success": True, "imported_count": imported_count, "errors": errors}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error importing CSV: {str(e)}")
+        logger.error(f"Error importing CSV: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 @post("/import/members/json")
-async def import_members_json(data: List[Dict[str, Any]] = Body(), request: Request = None) -> dict:
+async def import_members_json(data: list[dict[str, Any]] = Body(), request: Request = None) -> dict:
     """Import members from JSON array"""
     current_user = await get_current_user(request)
     try:
@@ -1600,17 +1685,17 @@ async def import_members_json(data: List[Dict[str, Any]] = Body(), request: Requ
         for member_data in data:
             try:
                 member = Member(
-                    name=member_data.get('name', ''),
-                    phone=member_data.get('phone', ''),
-                    external_member_id=member_data.get('external_member_id'),
-                    notes=member_data.get('notes'),
-                    campus_id=campus_id
+                    name=member_data.get("name", ""),
+                    phone=member_data.get("phone", ""),
+                    external_member_id=member_data.get("external_member_id"),
+                    notes=member_data.get("notes"),
+                    campus_id=campus_id,
                 )
 
                 await db.members.insert_one(to_mongo_doc(member))
                 imported_count += 1
             except Exception as e:
-                errors.append(f"Member error: {str(e)}")
+                errors.append(f"Member error: {e!s}")
 
         # Log the import activity
         await log_activity(
@@ -1618,19 +1703,16 @@ async def import_members_json(data: List[Dict[str, Any]] = Body(), request: Requ
             user_id=current_user["id"],
             user_name=current_user.get("name", ""),
             action_type=ActivityActionType.CREATE_MEMBER,
-            notes=f"Imported {imported_count} members from JSON"
+            notes=f"Imported {imported_count} members from JSON",
         )
 
-        return {
-            "success": True,
-            "imported_count": imported_count,
-            "errors": errors
-        }
+        return {"success": True, "imported_count": imported_count, "errors": errors}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error importing JSON: {str(e)}")
+        logger.error(f"Error importing JSON: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/export/members/csv")
 async def export_members_csv(request: Request) -> Response:
@@ -1643,44 +1725,60 @@ async def export_members_csv(request: Request) -> Response:
 
         # Only fetch fields needed for export (reduces data transfer by ~70%)
         projection = {
-            "_id": 0, "id": 1, "name": 1, "phone": 1, "external_member_id": 1,
-            "last_contact_date": 1, "engagement_status": 1, "days_since_last_contact": 1, "notes": 1
+            "_id": 0,
+            "id": 1,
+            "name": 1,
+            "phone": 1,
+            "external_member_id": 1,
+            "last_contact_date": 1,
+            "engagement_status": 1,
+            "days_since_last_contact": 1,
+            "notes": 1,
         }
         members = await db.members.find(query, projection).to_list(10000)
-        
+
         output = io.StringIO()
         if members:
-            fieldnames = ['id', 'name', 'phone', 'external_member_id',
-                         'last_contact_date', 'engagement_status', 'days_since_last_contact', 'notes']
+            fieldnames = [
+                "id",
+                "name",
+                "phone",
+                "external_member_id",
+                "last_contact_date",
+                "engagement_status",
+                "days_since_last_contact",
+                "notes",
+            ]
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
-            
+
             for member in members:
                 # Update engagement status
-                if member.get('last_contact_date'):
-                    if isinstance(member['last_contact_date'], str):
-                        member['last_contact_date'] = datetime.fromisoformat(member['last_contact_date'])
-                
-                status, days = calculate_engagement_status(member.get('last_contact_date'))
-                member['engagement_status'] = status
-                member['days_since_last_contact'] = days
-                
+                if member.get("last_contact_date"):
+                    if isinstance(member["last_contact_date"], str):
+                        member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
+
+                status, days = calculate_engagement_status(member.get("last_contact_date"))
+                member["engagement_status"] = status
+                member["days_since_last_contact"] = days
+
                 # Convert dates to strings
-                if member.get('last_contact_date'):
-                    member['last_contact_date'] = member['last_contact_date'].isoformat()
-                
-                writer.writerow({k: member.get(k, '') for k in fieldnames})
-        
+                if member.get("last_contact_date"):
+                    member["last_contact_date"] = member["last_contact_date"].isoformat()
+
+                writer.writerow({k: member.get(k, "") for k in fieldnames})
+
         output.seek(0)
         csv_content = output.getvalue()
         return Response(
             content=csv_content,
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=members.csv"}
+            headers={"Content-Disposition": "attachment; filename=members.csv"},
         )
     except Exception as e:
-        logger.error(f"Error exporting members CSV: {str(e)}")
+        logger.error(f"Error exporting members CSV: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/export/care-events/csv")
 async def export_care_events_csv(request: Request) -> Response:
@@ -1690,47 +1788,69 @@ async def export_care_events_csv(request: Request) -> Response:
         campus_filter = get_campus_filter(current_user)
         # Only fetch fields needed for export (reduces data transfer by ~75%)
         projection = {
-            "_id": 0, "id": 1, "member_id": 1, "event_type": 1, "event_date": 1,
-            "title": 1, "description": 1, "completed": 1, "aid_type": 1,
-            "aid_amount": 1, "hospital_name": 1
+            "_id": 0,
+            "id": 1,
+            "member_id": 1,
+            "event_type": 1,
+            "event_date": 1,
+            "title": 1,
+            "description": 1,
+            "completed": 1,
+            "aid_type": 1,
+            "aid_amount": 1,
+            "hospital_name": 1,
         }
         events = await db.care_events.find(campus_filter, projection).to_list(10000)
-        
+
         output = io.StringIO()
         if events:
-            fieldnames = ['id', 'member_id', 'event_type', 'event_date', 'title', 'description', 
-                         'completed', 'aid_type', 'aid_amount', 'hospital_name']
+            fieldnames = [
+                "id",
+                "member_id",
+                "event_type",
+                "event_date",
+                "title",
+                "description",
+                "completed",
+                "aid_type",
+                "aid_amount",
+                "hospital_name",
+            ]
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
-            
+
             for event in events:
                 # Convert dates
-                if event.get('event_date'):
-                    event['event_date'] = str(event['event_date'])
-                
-                writer.writerow({k: event.get(k, '') for k in fieldnames})
-        
+                if event.get("event_date"):
+                    event["event_date"] = str(event["event_date"])
+
+                writer.writerow({k: event.get(k, "") for k in fieldnames})
+
         output.seek(0)
         csv_content = output.getvalue()
         return Response(
             content=csv_content,
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=care_events.csv"}
+            headers={"Content-Disposition": "attachment; filename=care_events.csv"},
         )
     except Exception as e:
-        logger.error(f"Error exporting care events CSV: {str(e)}")
+        logger.error(f"Error exporting care events CSV: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 # ==================== INTEGRATION TEST ENDPOINTS ====================
+
 
 class WhatsAppTestRequest(Struct):
     phone: str
     message: str
 
+
 class WhatsAppTestResponse(Struct):
     success: bool
     message: str
     details: dict | None = None
+
 
 @post("/integrations/ping/whatsapp")
 async def test_whatsapp_integration(data: WhatsAppTestRequest, request: Request) -> dict:
@@ -1741,25 +1861,20 @@ async def test_whatsapp_integration(data: WhatsAppTestRequest, request: Request)
     try:
         result = await send_whatsapp_message(data.phone, data.message, member_id="test")
 
-        if result['success']:
+        if result["success"]:
             return WhatsAppTestResponse(
-                success=True,
-                message=f"✅ WhatsApp message sent successfully to {data.phone}!",
-                details=result
+                success=True, message=f"✅ WhatsApp message sent successfully to {data.phone}!", details=result
             )
         else:
             return WhatsAppTestResponse(
                 success=False,
                 message=f"❌ Failed to send WhatsApp message: {result.get('error', 'Unknown error')}",
-                details=result
+                details=result,
             )
     except Exception as e:
-        logger.error(f"WhatsApp integration error: {str(e)}")
-        return WhatsAppTestResponse(
-            success=False,
-            message=f"❌ Error: {str(e)}",
-            details={"error": str(e)}
-        )
+        logger.error(f"WhatsApp integration error: {e!s}")
+        return WhatsAppTestResponse(success=False, message=f"❌ Error: {e!s}", details={"error": str(e)})
+
 
 @get("/integrations/ping/email")
 async def test_email_integration(request: Request) -> dict:
@@ -1770,10 +1885,12 @@ async def test_email_integration(request: Request) -> dict:
     return {
         "success": False,
         "message": "📧 Email integration pending provider configuration. Currently WhatsApp-only mode.",
-        "pending_provider": True
+        "pending_provider": True,
     }
 
+
 # ==================== AUTO-SUGGESTIONS ENDPOINTS ====================
+
 
 @get("/suggestions/follow-up")
 async def get_intelligent_suggestions(request: Request) -> dict:
@@ -1791,20 +1908,20 @@ async def get_intelligent_suggestions(request: Request) -> dict:
         events_by_member = {}  # member_id -> list of events
         financial_aid_members = set()  # members with financial aid events
         for event in recent_events:
-            mid = event.get('member_id')
+            mid = event.get("member_id")
             if mid:
                 if mid not in events_by_member:
                     events_by_member[mid] = []
                 events_by_member[mid].append(event)
-                if event.get('event_type') == 'financial_aid':
+                if event.get("event_type") == "financial_aid":
                     financial_aid_members.add(mid)
 
         suggestions = []
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         for member in members:
-            last_contact = member.get('last_contact_date')
-            days_since = member.get('days_since_last_contact', 999)
+            last_contact = member.get("last_contact_date")
+            days_since = member.get("days_since_last_contact", 999)
 
             # Skip members contacted in last 48 hours (recently contacted)
             if last_contact:
@@ -1815,7 +1932,7 @@ async def get_intelligent_suggestions(request: Request) -> dict:
 
                 # Ensure both dates are timezone-aware for comparison
                 if last_contact_date.tzinfo is None:
-                    last_contact_date = last_contact_date.replace(tzinfo=timezone.utc)
+                    last_contact_date = last_contact_date.replace(tzinfo=UTC)
 
                 # If contacted in last 2 days, don't suggest
                 if (now_utc - last_contact_date).days <= 2:
@@ -1823,74 +1940,85 @@ async def get_intelligent_suggestions(request: Request) -> dict:
 
             # AI-powered suggestions based on patterns
             if days_since > 90:
-                suggestions.append({
-                    "member_id": member['id'],
-                    "member_name": member['name'],
-                    "member_phone": member['phone'],
-                    "member_photo_url": member.get('photo_url'),
-                    "priority": "high",
-                    "suggestion": "Urgent reconnection needed",
-                    "reason": f"No contact for {days_since} days - risk of disconnection",
-                    "recommended_action": "Personal visit or phone call",
-                    "urgency_score": min(100, days_since)
-                })
-            elif member.get('age', 0) > 65 and days_since > 30:
-                suggestions.append({
-                    "member_id": member['id'],
-                    "member_name": member['name'],
-                    "member_phone": member['phone'],
-                    "member_photo_url": member.get('photo_url'),
-                    "priority": "medium",
-                    "suggestion": "Senior care check-in",
-                    "reason": f"Senior member, {days_since} days since contact",
-                    "recommended_action": "Health and wellness check",
-                    "urgency_score": days_since + 20  # Boost for seniors
-                })
-            elif member.get('membership_status') == 'Visitor' and days_since > 14:
-                suggestions.append({
-                    "member_id": member['id'],
-                    "member_name": member['name'],
-                    "member_phone": member['phone'],
-                    "member_photo_url": member.get('photo_url'),
-                    "priority": "medium",
-                    "suggestion": "Visitor follow-up",
-                    "reason": "New visitor needs welcoming contact",
-                    "recommended_action": "Welcome visit or invitation to activities",
-                    "urgency_score": days_since + 10
-                })
-            elif member['id'] in financial_aid_members and days_since > 60:
+                suggestions.append(
+                    {
+                        "member_id": member["id"],
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url"),
+                        "priority": "high",
+                        "suggestion": "Urgent reconnection needed",
+                        "reason": f"No contact for {days_since} days - risk of disconnection",
+                        "recommended_action": "Personal visit or phone call",
+                        "urgency_score": min(100, days_since),
+                    }
+                )
+            elif member.get("age", 0) > 65 and days_since > 30:
+                suggestions.append(
+                    {
+                        "member_id": member["id"],
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url"),
+                        "priority": "medium",
+                        "suggestion": "Senior care check-in",
+                        "reason": f"Senior member, {days_since} days since contact",
+                        "recommended_action": "Health and wellness check",
+                        "urgency_score": days_since + 20,  # Boost for seniors
+                    }
+                )
+            elif member.get("membership_status") == "Visitor" and days_since > 14:
+                suggestions.append(
+                    {
+                        "member_id": member["id"],
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url"),
+                        "priority": "medium",
+                        "suggestion": "Visitor follow-up",
+                        "reason": "New visitor needs welcoming contact",
+                        "recommended_action": "Welcome visit or invitation to activities",
+                        "urgency_score": days_since + 10,
+                    }
+                )
+            elif member["id"] in financial_aid_members and days_since > 60:
                 # O(1) lookup instead of O(n) array scan
-                suggestions.append({
-                    "member_id": member['id'],
-                    "member_name": member['name'],
-                    "member_phone": member['phone'],
-                    "member_photo_url": member.get('photo_url'),
-                    "priority": "medium",
-                    "suggestion": "Financial aid follow-up",
-                    "reason": "Previous aid recipient, check on progress",
-                    "recommended_action": "Follow-up on aid effectiveness",
-                    "urgency_score": days_since + 15
-                })
-            elif member.get('marital_status') == 'Single' and member.get('age', 0) > 25 and days_since > 45:
-                suggestions.append({
-                    "member_id": member['id'],
-                    "member_name": member['name'],
-                    "member_phone": member['phone'],
-                    "member_photo_url": member.get('photo_url'),
-                    "priority": "low",
-                    "suggestion": "Single adult engagement",
-                    "reason": "Single adult may need community connection",
-                    "recommended_action": "Invite to small groups or social activities",
-                    "urgency_score": days_since
-                })
+                suggestions.append(
+                    {
+                        "member_id": member["id"],
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url"),
+                        "priority": "medium",
+                        "suggestion": "Financial aid follow-up",
+                        "reason": "Previous aid recipient, check on progress",
+                        "recommended_action": "Follow-up on aid effectiveness",
+                        "urgency_score": days_since + 15,
+                    }
+                )
+            elif member.get("marital_status") == "Single" and member.get("age", 0) > 25 and days_since > 45:
+                suggestions.append(
+                    {
+                        "member_id": member["id"],
+                        "member_name": member["name"],
+                        "member_phone": member["phone"],
+                        "member_photo_url": member.get("photo_url"),
+                        "priority": "low",
+                        "suggestion": "Single adult engagement",
+                        "reason": "Single adult may need community connection",
+                        "recommended_action": "Invite to small groups or social activities",
+                        "urgency_score": days_since,
+                    }
+                )
 
         # Sort by urgency score and return top suggestions
-        suggestions.sort(key=lambda x: x['urgency_score'], reverse=True)
+        suggestions.sort(key=lambda x: x["urgency_score"], reverse=True)
         return suggestions[:20]  # Top 20 suggestions
-        
+
     except Exception as e:
-        logger.error(f"Error generating suggestions: {str(e)}")
+        logger.error(f"Error generating suggestions: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/analytics/demographic-trends")
 async def get_demographic_trends(request: Request) -> dict:
@@ -1901,107 +2029,117 @@ async def get_demographic_trends(request: Request) -> dict:
         campus_filter = get_campus_filter(current_user)
         members = await db.members.find(campus_filter, {"_id": 0}).to_list(1000)
         events = await db.care_events.find({**campus_filter}, {"_id": 0}).to_list(2000)
-        
+
         # Age group analysis
         age_groups = {
-            'Children (0-12)': {'count': 0, 'care_events': 0},
-            'Teenagers (13-17)': {'count': 0, 'care_events': 0},
-            'Young Adults (18-30)': {'count': 0, 'care_events': 0},
-            'Adults (31-60)': {'count': 0, 'care_events': 0},
-            'Seniors (60+)': {'count': 0, 'care_events': 0}
+            "Children (0-12)": {"count": 0, "care_events": 0},
+            "Teenagers (13-17)": {"count": 0, "care_events": 0},
+            "Young Adults (18-30)": {"count": 0, "care_events": 0},
+            "Adults (31-60)": {"count": 0, "care_events": 0},
+            "Seniors (60+)": {"count": 0, "care_events": 0},
         }
-        
+
         # Membership trends - dynamically collected from actual data
         membership_trends = {}
 
         # Care needs by demographics
         care_needs = {
-            'Financial aid by age': {},
-            'Grief support by age': {},
-            'Medical needs by age': {},
-            'Engagement by membership': {}
+            "Financial aid by age": {},
+            "Grief support by age": {},
+            "Medical needs by age": {},
+            "Engagement by membership": {},
         }
 
         for member in members:
-            age = member.get('age') or 0  # Handle None explicitly
+            age = member.get("age") or 0  # Handle None explicitly
             # Use membership_status, fallback to category if empty (external sync pattern)
-            membership = member.get('membership_status') or member.get('category') or 'Unknown'
-            days_since_contact = member.get('days_since_last_contact') or 999
+            membership = member.get("membership_status") or member.get("category") or "Unknown"
+            days_since_contact = member.get("days_since_last_contact") or 999
 
             # Initialize membership trend entry if not exists
             if membership not in membership_trends:
-                membership_trends[membership] = {'count': 0, 'engagement_score': 0}
+                membership_trends[membership] = {"count": 0, "engagement_score": 0}
 
             # Age group classification
             if age <= 12:
-                age_group = 'Children (0-12)'
+                age_group = "Children (0-12)"
             elif age <= 17:
-                age_group = 'Teenagers (13-17)'
+                age_group = "Teenagers (13-17)"
             elif age <= 30:
-                age_group = 'Young Adults (18-30)'
+                age_group = "Young Adults (18-30)"
             elif age <= 60:
-                age_group = 'Adults (31-60)'
+                age_group = "Adults (31-60)"
             else:
-                age_group = 'Seniors (60+)'
-            
-            age_groups[age_group]['count'] += 1
-            
+                age_group = "Seniors (60+)"
+
+            age_groups[age_group]["count"] += 1
+
             # Engagement scoring (inverse of days since contact)
             engagement_score = max(0, 100 - days_since_contact)
 
             # Membership trends - dynamically added above
-            membership_trends[membership]['count'] += 1
-            membership_trends[membership]['engagement_score'] += engagement_score
-            
+            membership_trends[membership]["count"] += 1
+            membership_trends[membership]["engagement_score"] += engagement_score
+
             # Care event analysis for this member
-            member_events = [e for e in events if e['member_id'] == member['id']]
-            age_groups[age_group]['care_events'] += len(member_events)
-            
+            member_events = [e for e in events if e["member_id"] == member["id"]]
+            age_groups[age_group]["care_events"] += len(member_events)
+
             # Care needs analysis
-            financial_events = len([e for e in member_events if e.get('event_type') == 'financial_aid'])
-            grief_events = len([e for e in member_events if e.get('event_type') == 'grief_loss'])
-            medical_events = len([e for e in member_events if e.get('event_type') == 'accident_illness'])
-            
-            age_key = f"{age//10*10}s"  # 20s, 30s, 40s, etc.
-            care_needs['Financial aid by age'][age_key] = care_needs['Financial aid by age'].get(age_key, 0) + financial_events
-            care_needs['Grief support by age'][age_key] = care_needs['Grief support by age'].get(age_key, 0) + grief_events
-            care_needs['Medical needs by age'][age_key] = care_needs['Medical needs by age'].get(age_key, 0) + medical_events
-        
+            financial_events = len([e for e in member_events if e.get("event_type") == "financial_aid"])
+            grief_events = len([e for e in member_events if e.get("event_type") == "grief_loss"])
+            medical_events = len([e for e in member_events if e.get("event_type") == "accident_illness"])
+
+            age_key = f"{age // 10 * 10}s"  # 20s, 30s, 40s, etc.
+            care_needs["Financial aid by age"][age_key] = (
+                care_needs["Financial aid by age"].get(age_key, 0) + financial_events
+            )
+            care_needs["Grief support by age"][age_key] = (
+                care_needs["Grief support by age"].get(age_key, 0) + grief_events
+            )
+            care_needs["Medical needs by age"][age_key] = (
+                care_needs["Medical needs by age"].get(age_key, 0) + medical_events
+            )
+
         # Calculate averages for membership engagement
         for status, data in membership_trends.items():
-            if data['count'] > 0:
-                data['avg_engagement'] = round(data['engagement_score'] / data['count'])
+            if data["count"] > 0:
+                data["avg_engagement"] = round(data["engagement_score"] / data["count"])
             else:
-                data['avg_engagement'] = 0
-        
+                data["avg_engagement"] = 0
+
         # Generate insights
         insights = []
-        
+
         # Age-based insights
-        highest_count_group = max(age_groups.items(), key=lambda x: x[1]['count'])
-        highest_care_group = max(age_groups.items(), key=lambda x: x[1]['care_events'])
-        
+        highest_count_group = max(age_groups.items(), key=lambda x: x[1]["count"])
+        highest_care_group = max(age_groups.items(), key=lambda x: x[1]["care_events"])
+
         insights.append(f"Largest demographic: {highest_count_group[0]} ({highest_count_group[1]['count']} members)")
         insights.append(f"Most care needed: {highest_care_group[0]} ({highest_care_group[1]['care_events']} events)")
-        
+
         # Membership insights
-        lowest_engagement = min(membership_trends.items(), key=lambda x: x[1]['avg_engagement'])
-        insights.append(f"Lowest engagement: {lowest_engagement[0]} (avg score: {lowest_engagement[1]['avg_engagement']})")
-        
+        lowest_engagement = min(membership_trends.items(), key=lambda x: x[1]["avg_engagement"])
+        insights.append(
+            f"Lowest engagement: {lowest_engagement[0]} (avg score: {lowest_engagement[1]['avg_engagement']})"
+        )
+
         return {
             "age_groups": [{"name": k, **v} for k, v in age_groups.items()],
             "membership_trends": [{"status": k, **v} for k, v in membership_trends.items()],
             "care_needs": care_needs,
             "insights": insights,
             "total_members": len(members),
-            "analysis_date": today.isoformat()
+            "analysis_date": today.isoformat(),
         }
-        
+
     except Exception as e:
-        logger.error(f"Error analyzing demographic trends: {str(e)}")
+        logger.error(f"Error analyzing demographic trends: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 # ==================== MANAGEMENT REPORTS ENDPOINTS ====================
+
 
 async def _compute_monthly_report_data(current_user: dict, year: int = None, month: int = None) -> dict:
     """
@@ -2033,44 +2171,54 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         # Fetch all data in parallel
         members = await db.members.find(
             {**campus_filter, "is_archived": {"$ne": True}},
-            {"_id": 0, "id": 1, "name": 1, "engagement_status": 1, "days_since_last_contact": 1,
-             "last_contact_date": 1, "gender": 1, "age": 1, "category": 1, "membership_status": 1}
+            {
+                "_id": 0,
+                "id": 1,
+                "name": 1,
+                "engagement_status": 1,
+                "days_since_last_contact": 1,
+                "last_contact_date": 1,
+                "gender": 1,
+                "age": 1,
+                "category": 1,
+                "membership_status": 1,
+            },
         ).to_list(2000)
 
         # Care events this month
-        events_this_month = await db.care_events.find({
-            **campus_filter,
-            "event_date": {
-                "$gte": start_date.strftime("%Y-%m-%d"),
-                "$lt": end_date.strftime("%Y-%m-%d")
-            }
-        }, {"_id": 0}).to_list(5000)
+        events_this_month = await db.care_events.find(
+            {
+                **campus_filter,
+                "event_date": {"$gte": start_date.strftime("%Y-%m-%d"), "$lt": end_date.strftime("%Y-%m-%d")},
+            },
+            {"_id": 0},
+        ).to_list(5000)
 
         # Care events previous month for comparison
-        events_prev_month = await db.care_events.find({
-            **campus_filter,
-            "event_date": {
-                "$gte": prev_start.strftime("%Y-%m-%d"),
-                "$lt": prev_end.strftime("%Y-%m-%d")
-            }
-        }, {"_id": 0}).to_list(5000)
+        events_prev_month = await db.care_events.find(
+            {
+                **campus_filter,
+                "event_date": {"$gte": prev_start.strftime("%Y-%m-%d"), "$lt": prev_end.strftime("%Y-%m-%d")},
+            },
+            {"_id": 0},
+        ).to_list(5000)
 
         # Activity logs this month (staff actions)
         # Use datetime objects for comparison since created_at is stored as ISODate
-        activities_this_month = await db.activity_logs.find({
-            **campus_filter,
-            "created_at": {"$gte": start_date, "$lt": end_date}
-        }, {"_id": 0}).to_list(10000)
+        activities_this_month = await db.activity_logs.find(
+            {**campus_filter, "created_at": {"$gte": start_date, "$lt": end_date}}, {"_id": 0}
+        ).to_list(10000)
 
-        activities_prev_month = await db.activity_logs.find({
-            **campus_filter,
-            "created_at": {"$gte": prev_start, "$lt": prev_end}
-        }, {"_id": 0}).to_list(10000)
+        activities_prev_month = await db.activity_logs.find(
+            {**campus_filter, "created_at": {"$gte": prev_start, "$lt": prev_end}}, {"_id": 0}
+        ).to_list(10000)
 
         # Financial aid this month
         financial_events = [e for e in events_this_month if e.get("event_type") == "financial_aid"]
         financial_total = sum(e.get("aid_amount", 0) or 0 for e in financial_events)
-        financial_prev = sum(e.get("aid_amount", 0) or 0 for e in events_prev_month if e.get("event_type") == "financial_aid")
+        financial_prev = sum(
+            e.get("aid_amount", 0) or 0 for e in events_prev_month if e.get("event_type") == "financial_aid"
+        )
 
         # === EXECUTIVE SUMMARY ===
         total_members = len(members)
@@ -2113,32 +2261,41 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         week_num = 1
         while current_week_start < end_date:
             week_end = min(current_week_start + timedelta(days=7), end_date)
+
             # Handle both datetime objects and ISO strings for created_at
             def get_activity_datetime(a):
                 created_at = a.get("created_at")
                 if isinstance(created_at, datetime):
                     # Ensure timezone-aware (MongoDB stores as UTC)
                     if created_at.tzinfo is None:
-                        created_at = created_at.replace(tzinfo=timezone.utc)
+                        created_at = created_at.replace(tzinfo=UTC)
                     return created_at
                 if isinstance(created_at, str) and created_at:
                     try:
                         dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
                         if dt.tzinfo is None:
-                            dt = dt.replace(tzinfo=timezone.utc)
+                            dt = dt.replace(tzinfo=UTC)
                         return dt
                     except ValueError:
                         return None
                 return None
-            week_activities = [a for a in activities_this_month
-                            if (dt := get_activity_datetime(a)) and current_week_start <= dt < week_end]
-            week_events_completed = len([a for a in week_activities if a.get("action_type", "").lower() == "complete_task"])
-            engagement_trend.append({
-                "week": f"Week {week_num}",
-                "start": current_week_start.strftime("%b %d"),
-                "contacts_made": week_events_completed,
-                "activities": len(week_activities)
-            })
+
+            week_activities = [
+                a
+                for a in activities_this_month
+                if (dt := get_activity_datetime(a)) and current_week_start <= dt < week_end
+            ]
+            week_events_completed = len(
+                [a for a in week_activities if a.get("action_type", "").lower() == "complete_task"]
+            )
+            engagement_trend.append(
+                {
+                    "week": f"Week {week_num}",
+                    "start": current_week_start.strftime("%b %d"),
+                    "contacts_made": week_events_completed,
+                    "activities": len(week_activities),
+                }
+            )
             current_week_start = week_end
             week_num += 1
 
@@ -2153,7 +2310,7 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                     "tasks_completed": 0,
                     "tasks_created": 0,
                     "members_contacted": set(),
-                    "total_actions": 0
+                    "total_actions": 0,
                 }
             staff_summary[user_id]["total_actions"] += 1
             action_type = a.get("action_type", "").lower()
@@ -2172,8 +2329,13 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
 
         # === MEMBER REACH ANALYSIS ===
         members_with_contact = len([m for m in members if m.get("last_contact_date")])
-        members_contacted_this_month = len(set(a.get("member_id") for a in activities_this_month
-                                               if a.get("action_type", "").lower() == "complete_task" and a.get("member_id")))
+        members_contacted_this_month = len(
+            set(
+                a.get("member_id")
+                for a in activities_this_month
+                if a.get("action_type", "").lower() == "complete_task" and a.get("member_id")
+            )
+        )
         member_reach_rate = round(members_contacted_this_month / total_members * 100, 1) if total_members > 0 else 0
 
         # === GRIEF SUPPORT ANALYSIS ===
@@ -2189,10 +2351,9 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         # Get completed followup stages for these grief events
         grief_followup_completed = 0
         if grief_event_ids:
-            grief_followup_completed = await db.grief_support.count_documents({
-                "care_event_id": {"$in": grief_event_ids},
-                "completed": True
-            })
+            grief_followup_completed = await db.grief_support.count_documents(
+                {"care_event_id": {"$in": grief_event_ids}, "completed": True}
+            )
 
         grief_total_touchpoints = grief_initial_visits + grief_followup_completed
 
@@ -2209,10 +2370,9 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         # Get completed followup stages for these hospital events
         hospital_followup_completed = 0
         if hospital_event_ids:
-            hospital_followup_completed = await db.accident_followup.count_documents({
-                "care_event_id": {"$in": hospital_event_ids},
-                "completed": True
-            })
+            hospital_followup_completed = await db.accident_followup.count_documents(
+                {"care_event_id": {"$in": hospital_event_ids}, "completed": True}
+            )
 
         hospital_visits = hospital_initial_visits + hospital_followup_completed
 
@@ -2225,15 +2385,15 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
         # (not future birthdays that haven't occurred yet)
 
         # Get all birthday events for members in this campus
-        all_birthday_events = await db.care_events.find({
-            **campus_filter,
-            "event_type": "birthday"
-        }, {"_id": 0, "member_id": 1, "event_date": 1, "completed": 1, "completed_at": 1, "ignored": 1}).to_list(5000)
+        all_birthday_events = await db.care_events.find(
+            {**campus_filter, "event_type": "birthday"},
+            {"_id": 0, "member_id": 1, "event_date": 1, "completed": 1, "completed_at": 1, "ignored": 1},
+        ).to_list(5000)
 
         # Determine cutoff day for birthdays
         # For current month: only count birthdays up to today
         # For past months: count all birthdays in that month
-        is_current_month = (report_year == today.year and report_month == today.month)
+        is_current_month = report_year == today.year and report_month == today.month
         cutoff_day = today.day if is_current_month else 31  # 31 means include all days
 
         # Filter to birthdays that fall in the report month (by month only, regardless of year)
@@ -2289,25 +2449,31 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                 "previous": prev_completion_rate,
                 "change": round(completion_rate - prev_completion_rate, 1),
                 "target": 85,
-                "status": "good" if completion_rate >= 85 else "warning" if completion_rate >= 70 else "critical"
+                "status": "good" if completion_rate >= 85 else "warning" if completion_rate >= 70 else "critical",
             },
             "member_engagement_rate": {
                 "current": round(active_members / total_members * 100, 1) if total_members > 0 else 0,
                 "at_risk_percentage": round(at_risk_members / total_members * 100, 1) if total_members > 0 else 0,
                 "inactive_percentage": round(inactive_members / total_members * 100, 1) if total_members > 0 else 0,
-                "disconnected_percentage": round(disconnected_members / total_members * 100, 1) if total_members > 0 else 0,
+                "disconnected_percentage": round(disconnected_members / total_members * 100, 1)
+                if total_members > 0
+                else 0,
                 "at_risk_count": at_risk_members,
                 "inactive_count": inactive_members,
                 "disconnected_count": disconnected_members,
                 "target": 80,
-                "status": "good" if active_members / total_members >= 0.8 else "warning" if active_members / total_members >= 0.6 else "critical"
+                "status": "good"
+                if active_members / total_members >= 0.8
+                else "warning"
+                if active_members / total_members >= 0.6
+                else "critical",
             },
             "member_reach_rate": {
                 "current": member_reach_rate,
                 "members_contacted": members_contacted_this_month,
                 "total_members": total_members,
                 "target": 30,
-                "status": "good" if member_reach_rate >= 30 else "warning" if member_reach_rate >= 15 else "critical"
+                "status": "good" if member_reach_rate >= 30 else "warning" if member_reach_rate >= 15 else "critical",
             },
             "birthday_completion_rate": {
                 "current": birthday_completion_rate,
@@ -2316,13 +2482,17 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                 "pending": birthdays_pending,
                 "total": len(birthday_events),
                 "target": 95,
-                "status": "good" if birthday_completion_rate >= 95 else "warning" if birthday_completion_rate >= 80 else "critical"
+                "status": "good"
+                if birthday_completion_rate >= 95
+                else "warning"
+                if birthday_completion_rate >= 80
+                else "critical",
             },
             "average_response_time_days": {
                 "value": 0,  # Would need more data to calculate
                 "target": 3,
-                "status": "good"
-            }
+                "status": "good",
+            },
         }
 
         # === STRATEGIC INSIGHTS ===
@@ -2331,36 +2501,46 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
 
         # Engagement insights
         if inactive_members > total_members * 0.2:
-            insights.append({
-                "type": "warning",
-                "category": "Engagement",
-                "message": f"{inactive_members} members ({round(inactive_members/total_members*100)}%) are disconnected and need re-engagement"
-            })
-            recommendations.append("Launch a re-engagement campaign targeting disconnected members with personal outreach")
+            insights.append(
+                {
+                    "type": "warning",
+                    "category": "Engagement",
+                    "message": f"{inactive_members} members ({round(inactive_members / total_members * 100)}%) are disconnected and need re-engagement",
+                }
+            )
+            recommendations.append(
+                "Launch a re-engagement campaign targeting disconnected members with personal outreach"
+            )
 
         if at_risk_members > total_members * 0.15:
-            insights.append({
-                "type": "warning",
-                "category": "Engagement",
-                "message": f"{at_risk_members} members are at-risk of becoming inactive"
-            })
+            insights.append(
+                {
+                    "type": "warning",
+                    "category": "Engagement",
+                    "message": f"{at_risk_members} members are at-risk of becoming inactive",
+                }
+            )
             recommendations.append("Prioritize at-risk members for immediate follow-up before they become inactive")
 
         # Care delivery insights
         if completion_rate < 70:
-            insights.append({
-                "type": "critical",
-                "category": "Care Delivery",
-                "message": f"Care completion rate ({completion_rate}%) is below target. {pending_events} tasks still pending."
-            })
+            insights.append(
+                {
+                    "type": "critical",
+                    "category": "Care Delivery",
+                    "message": f"Care completion rate ({completion_rate}%) is below target. {pending_events} tasks still pending.",
+                }
+            )
             recommendations.append("Review pending tasks and redistribute workload among staff")
 
         if ignored_events > total_events * 0.1:
-            insights.append({
-                "type": "warning",
-                "category": "Care Delivery",
-                "message": f"{ignored_events} care events were ignored ({round(ignored_events/total_events*100)}% of total)"
-            })
+            insights.append(
+                {
+                    "type": "warning",
+                    "category": "Care Delivery",
+                    "message": f"{ignored_events} care events were ignored ({round(ignored_events / total_events * 100)}% of total)",
+                }
+            )
             recommendations.append("Review ignored events to understand why and improve care protocols")
 
         # Staff workload insights
@@ -2368,67 +2548,85 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
             max_tasks = staff_list[0]["tasks_completed"] if staff_list else 0
             min_tasks = staff_list[-1]["tasks_completed"] if staff_list else 0
             if max_tasks > 0 and min_tasks < max_tasks * 0.3:
-                insights.append({
-                    "type": "warning",
-                    "category": "Staff Workload",
-                    "message": f"Significant workload imbalance: top performer completed {max_tasks} tasks, lowest completed {min_tasks}"
-                })
+                insights.append(
+                    {
+                        "type": "warning",
+                        "category": "Staff Workload",
+                        "message": f"Significant workload imbalance: top performer completed {max_tasks} tasks, lowest completed {min_tasks}",
+                    }
+                )
                 recommendations.append("Review task assignment process to ensure equitable distribution")
 
         # Birthday ministry - only show warning if there are pending or if completion rate is low
         if birthdays_pending > 0:
-            insights.append({
-                "type": "warning",
-                "category": "Birthday Ministry",
-                "message": f"{birthdays_pending} birthday(s) still pending action"
-            })
+            insights.append(
+                {
+                    "type": "warning",
+                    "category": "Birthday Ministry",
+                    "message": f"{birthdays_pending} birthday(s) still pending action",
+                }
+            )
             recommendations.append("Follow up on pending birthday celebrations")
         elif birthday_completion_rate < 80 and len(birthday_events) > 0:
             # Only warn about low completion rate if some were ignored (not just pending)
             if birthdays_ignored > 0:
-                insights.append({
-                    "type": "info",
-                    "category": "Birthday Ministry",
-                    "message": f"{birthdays_celebrated} celebrated, {birthdays_ignored} skipped out of {len(birthday_events)} birthdays ({birthday_completion_rate}% celebrated)"
-                })
+                insights.append(
+                    {
+                        "type": "info",
+                        "category": "Birthday Ministry",
+                        "message": f"{birthdays_celebrated} celebrated, {birthdays_ignored} skipped out of {len(birthday_events)} birthdays ({birthday_completion_rate}% celebrated)",
+                    }
+                )
             else:
-                insights.append({
-                    "type": "warning",
-                    "category": "Birthday Ministry",
-                    "message": f"Only {birthdays_celebrated} of {len(birthday_events)} birthdays were celebrated ({birthday_completion_rate}%)"
-                })
-                recommendations.append("Improve birthday reminder system and assign dedicated birthday outreach volunteers")
+                insights.append(
+                    {
+                        "type": "warning",
+                        "category": "Birthday Ministry",
+                        "message": f"Only {birthdays_celebrated} of {len(birthday_events)} birthdays were celebrated ({birthday_completion_rate}%)",
+                    }
+                )
+                recommendations.append(
+                    "Improve birthday reminder system and assign dedicated birthday outreach volunteers"
+                )
 
         # Financial aid
         if financial_total > 0:
-            insights.append({
-                "type": "info",
-                "category": "Financial Aid",
-                "message": f"Rp {financial_total:,.0f} distributed to {len(financial_events)} recipients this month"
-            })
+            insights.append(
+                {
+                    "type": "info",
+                    "category": "Financial Aid",
+                    "message": f"Rp {financial_total:,.0f} distributed to {len(financial_events)} recipients this month",
+                }
+            )
 
         # Grief support
         if grief_families_supported > 0:
-            insights.append({
-                "type": "info",
-                "category": "Grief Support",
-                "message": f"Supporting {grief_families_supported} families through grief with {len(grief_events)} follow-up touchpoints"
-            })
+            insights.append(
+                {
+                    "type": "info",
+                    "category": "Grief Support",
+                    "message": f"Supporting {grief_families_supported} families through grief with {len(grief_events)} follow-up touchpoints",
+                }
+            )
 
         # Positive insights
         if completion_rate >= 85:
-            insights.append({
-                "type": "success",
-                "category": "Care Delivery",
-                "message": f"Excellent care completion rate of {completion_rate}%! Team is performing well."
-            })
+            insights.append(
+                {
+                    "type": "success",
+                    "category": "Care Delivery",
+                    "message": f"Excellent care completion rate of {completion_rate}%! Team is performing well.",
+                }
+            )
 
         if member_reach_rate >= 30:
-            insights.append({
-                "type": "success",
-                "category": "Member Reach",
-                "message": f"Good member reach: {members_contacted_this_month} members ({member_reach_rate}%) contacted this month"
-            })
+            insights.append(
+                {
+                    "type": "success",
+                    "category": "Member Reach",
+                    "message": f"Good member reach: {members_contacted_this_month} members ({member_reach_rate}%) contacted this month",
+                }
+            )
 
         # === COMPARISON WITH PREVIOUS MONTH ===
         comparison = {
@@ -2436,23 +2634,23 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                 "current": total_events,
                 "previous": prev_total,
                 "change": total_events - prev_total,
-                "change_percent": round((total_events - prev_total) / prev_total * 100, 1) if prev_total > 0 else 0
+                "change_percent": round((total_events - prev_total) / prev_total * 100, 1) if prev_total > 0 else 0,
             },
             "completion_rate": {
                 "current": completion_rate,
                 "previous": prev_completion_rate,
-                "change": round(completion_rate - prev_completion_rate, 1)
+                "change": round(completion_rate - prev_completion_rate, 1),
             },
             "total_activities": {
                 "current": len(activities_this_month),
                 "previous": len(activities_prev_month),
-                "change": len(activities_this_month) - len(activities_prev_month)
+                "change": len(activities_this_month) - len(activities_prev_month),
             },
             "financial_aid": {
                 "current": financial_total,
                 "previous": financial_prev,
-                "change": financial_total - financial_prev
-            }
+                "change": financial_total - financial_prev,
+            },
         }
 
         return {
@@ -2462,7 +2660,7 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                 "month_name": start_date.strftime("%B"),
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "end_date": (end_date - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "generated_at": today.isoformat()
+                "generated_at": today.isoformat(),
             },
             "executive_summary": {
                 "total_members": total_members,
@@ -2476,15 +2674,11 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                 "ignored_events": ignored_events,
                 "completion_rate": completion_rate,
                 "financial_aid_total": financial_total,
-                "financial_aid_recipients": len(financial_events)
+                "financial_aid_recipients": len(financial_events),
             },
             "kpis": kpis,
             "care_breakdown": [
-                {
-                    "event_type": k,
-                    "label": k.replace("_", " ").title(),
-                    **v
-                } for k, v in care_by_type.items()
+                {"event_type": k, "label": k.replace("_", " ").title(), **v} for k, v in care_by_type.items()
             ],
             "engagement_trend": engagement_trend,
             "staff_summary": staff_list[:10],  # Top 10 staff
@@ -2493,41 +2687,38 @@ async def _compute_monthly_report_data(current_user: dict, year: int = None, mon
                     "families_supported": grief_families_supported,
                     "total_touchpoints": grief_total_touchpoints,
                     "initial_visits": grief_initial_visits,
-                    "followups_completed": grief_followup_completed
+                    "followups_completed": grief_followup_completed,
                 },
                 "hospital_visits": {
                     "patients_visited": hospital_patients,
                     "total_visits": hospital_visits,
                     "initial_visits": hospital_initial_visits,
-                    "followups_completed": hospital_followup_completed
+                    "followups_completed": hospital_followup_completed,
                 },
                 "birthday_ministry": {
                     "total_birthdays": len(birthday_events),
                     "celebrated": birthdays_celebrated,
                     "ignored": birthdays_ignored,
                     "pending": birthdays_pending,
-                    "completion_rate": birthday_completion_rate
+                    "completion_rate": birthday_completion_rate,
                 },
-                "financial_aid": {
-                    "total_amount": financial_total,
-                    "recipients": len(financial_events)
-                }
+                "financial_aid": {"total_amount": financial_total, "recipients": len(financial_events)},
             },
             "comparison": comparison,
             "insights": insights,
-            "recommendations": recommendations
+            "recommendations": recommendations,
         }
 
     except Exception as e:
-        logger.error(f"Error generating monthly report: {str(e)}")
+        logger.error(f"Error generating monthly report: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @get("/reports/monthly")
 async def get_monthly_management_report(
     request: Request,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
+    year: int | None = None,
+    month: int | None = None,
 ) -> dict:
     """
     Comprehensive monthly management report for church leadership.
@@ -2540,8 +2731,8 @@ async def get_monthly_management_report(
 @get("/reports/monthly/pdf")
 async def export_monthly_report_pdf(
     request: Request,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
+    year: int | None = None,
+    month: int | None = None,
 ) -> Response:
     """
     Export monthly management report as a professionally formatted PDF.
@@ -2555,10 +2746,7 @@ async def export_monthly_report_pdf(
         # Get campus name for the header
         campus_name = "GKBJ"  # Default
         if current_user.get("campus_id"):
-            campus = await db.campuses.find_one(
-                {"id": current_user["campus_id"]},
-                {"_id": 0, "campus_name": 1}
-            )
+            campus = await db.campuses.find_one({"id": current_user["campus_id"]}, {"_id": 0, "campus_name": 1})
             if campus:
                 campus_name = campus.get("campus_name", "GKBJ")
 
@@ -2568,7 +2756,9 @@ async def export_monthly_report_pdf(
 
         # Create filename
         period = report_data.get("report_period", {})
-        filename = f"Pastoral_Care_Report_{period.get('month_name', 'Monthly')}_{period.get('year', datetime.now().year)}.pdf"
+        filename = (
+            f"Pastoral_Care_Report_{period.get('month_name', 'Monthly')}_{period.get('year', datetime.now().year)}.pdf"
+        )
 
         # Return PDF bytes directly using Litestar's Response
         return Response(
@@ -2576,20 +2766,20 @@ async def export_monthly_report_pdf(
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Length": str(len(pdf_bytes))
-            }
+                "Content-Length": str(len(pdf_bytes)),
+            },
         )
 
     except Exception as e:
-        logger.error(f"Error generating PDF report: {str(e)}")
+        logger.error(f"Error generating PDF report: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @get("/reports/staff-performance")
 async def get_staff_performance_report(
     request: Request,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
+    year: int | None = None,
+    month: int | None = None,
 ) -> dict:
     """
     Detailed staff performance report for workload balancing and recognition.
@@ -2612,16 +2802,14 @@ async def get_staff_performance_report(
 
         # Get all staff/users for this campus
         users = await db.users.find(
-            {**campus_filter, "is_active": True},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1, "photo_url": 1}
+            {**campus_filter, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1, "photo_url": 1}
         ).to_list(100)
 
         # Get all activity logs for the month
         # Use datetime objects for comparison (not ISO strings) since created_at is stored as ISODate
-        activities = await db.activity_logs.find({
-            **campus_filter,
-            "created_at": {"$gte": start_date, "$lt": end_date}
-        }, {"_id": 0}).to_list(20000)
+        activities = await db.activity_logs.find(
+            {**campus_filter, "created_at": {"$gte": start_date, "$lt": end_date}}, {"_id": 0}
+        ).to_list(20000)
 
         # Note: Staff performance is derived from activity_logs (which use ISODate),
         # not care_events (which store completed_at as strings). This ensures accurate data.
@@ -2647,7 +2835,7 @@ async def get_staff_performance_report(
                 "daily_activity": {},
                 "total_actions": 0,
                 "whatsapp_sent": 0,
-                "active_days": set()
+                "active_days": set(),
             }
 
         # Process activity logs
@@ -2671,7 +2859,7 @@ async def get_staff_performance_report(
                     "daily_activity": {},
                     "total_actions": 0,
                     "whatsapp_sent": 0,
-                    "active_days": set()
+                    "active_days": set(),
                 }
 
             staff = staff_data[user_id]
@@ -2717,20 +2905,20 @@ async def get_staff_performance_report(
             staff["active_days"] = len(staff["active_days"])
 
             # Calculate percentage of total work
-            staff["work_share_percent"] = round(
-                staff["tasks_completed"] / total_tasks_completed * 100, 1
-            ) if total_tasks_completed > 0 else 0
+            staff["work_share_percent"] = (
+                round(staff["tasks_completed"] / total_tasks_completed * 100, 1) if total_tasks_completed > 0 else 0
+            )
 
             # Calculate productivity score (tasks per active day)
-            staff["productivity_score"] = round(
-                staff["tasks_completed"] / staff["active_days"], 1
-            ) if staff["active_days"] > 0 else 0
+            staff["productivity_score"] = (
+                round(staff["tasks_completed"] / staff["active_days"], 1) if staff["active_days"] > 0 else 0
+            )
 
             # Calculate task completion ratio
             total_assigned = staff["tasks_completed"] + staff["tasks_ignored"]
-            staff["completion_ratio"] = round(
-                staff["tasks_completed"] / total_assigned * 100, 1
-            ) if total_assigned > 0 else 100
+            staff["completion_ratio"] = (
+                round(staff["tasks_completed"] / total_assigned * 100, 1) if total_assigned > 0 else 100
+            )
 
             # Workload status
             avg_tasks = total_tasks_completed / len(staff_data) if len(staff_data) > 0 else 0
@@ -2753,24 +2941,40 @@ async def get_staff_performance_report(
             "total_staff": len(staff_list),
             "active_staff": len([s for s in staff_list if s["total_actions"] > 0]),
             "total_tasks_completed": total_tasks_completed,
-            "total_members_contacted": len(set().union(*[set() if isinstance(s["members_contacted"], int) else s["members_contacted"] for s in staff_data.values()])),
+            "total_members_contacted": len(
+                set().union(
+                    *[
+                        set() if isinstance(s["members_contacted"], int) else s["members_contacted"]
+                        for s in staff_data.values()
+                    ]
+                )
+            ),
             "average_tasks_per_staff": round(total_tasks_completed / len(staff_list), 1) if staff_list else 0,
-            "median_tasks": sorted(tasks_completed_list)[len(tasks_completed_list)//2] if tasks_completed_list else 0,
+            "median_tasks": sorted(tasks_completed_list)[len(tasks_completed_list) // 2] if tasks_completed_list else 0,
             "max_tasks": max(tasks_completed_list) if tasks_completed_list else 0,
             "min_tasks": min(tasks_completed_list) if tasks_completed_list else 0,
             "overworked_count": len([s for s in staff_list if s["workload_status"] == "overworked"]),
             "underworked_count": len([s for s in staff_list if s["workload_status"] == "underworked"]),
-            "balanced_count": len([s for s in staff_list if s["workload_status"] == "balanced"])
+            "balanced_count": len([s for s in staff_list if s["workload_status"] == "balanced"]),
         }
 
         # Workload distribution analysis
         workload_distribution = {
-            "overworked": [{"name": s["user_name"], "tasks": s["tasks_completed"]}
-                         for s in staff_list if s["workload_status"] == "overworked"],
-            "underworked": [{"name": s["user_name"], "tasks": s["tasks_completed"], "active_days": s["active_days"]}
-                          for s in staff_list if s["workload_status"] == "underworked"],
-            "balanced": [{"name": s["user_name"], "tasks": s["tasks_completed"]}
-                        for s in staff_list if s["workload_status"] == "balanced"]
+            "overworked": [
+                {"name": s["user_name"], "tasks": s["tasks_completed"]}
+                for s in staff_list
+                if s["workload_status"] == "overworked"
+            ],
+            "underworked": [
+                {"name": s["user_name"], "tasks": s["tasks_completed"], "active_days": s["active_days"]}
+                for s in staff_list
+                if s["workload_status"] == "underworked"
+            ],
+            "balanced": [
+                {"name": s["user_name"], "tasks": s["tasks_completed"]}
+                for s in staff_list
+                if s["workload_status"] == "balanced"
+            ],
         }
 
         # Generate recommendations
@@ -2778,48 +2982,54 @@ async def get_staff_performance_report(
 
         if team_stats["overworked_count"] > 0:
             overworked_names = ", ".join([s["name"] for s in workload_distribution["overworked"]])
-            recommendations.append({
-                "type": "workload",
-                "priority": "high",
-                "message": f"Redistribute tasks from overworked staff: {overworked_names}",
-                "action": "Review task assignment and consider hiring or training more staff"
-            })
+            recommendations.append(
+                {
+                    "type": "workload",
+                    "priority": "high",
+                    "message": f"Redistribute tasks from overworked staff: {overworked_names}",
+                    "action": "Review task assignment and consider hiring or training more staff",
+                }
+            )
 
         if team_stats["underworked_count"] > 0:
             underworked_names = ", ".join([s["name"] for s in workload_distribution["underworked"]])
-            recommendations.append({
-                "type": "workload",
-                "priority": "medium",
-                "message": f"Increase task assignment for: {underworked_names}",
-                "action": "Assign more pastoral care responsibilities or provide additional training"
-            })
+            recommendations.append(
+                {
+                    "type": "workload",
+                    "priority": "medium",
+                    "message": f"Increase task assignment for: {underworked_names}",
+                    "action": "Assign more pastoral care responsibilities or provide additional training",
+                }
+            )
 
         # Top performers
         top_performers = staff_list[:3] if len(staff_list) >= 3 else staff_list
         if top_performers and top_performers[0]["tasks_completed"] > 0:
-            recommendations.append({
-                "type": "recognition",
-                "priority": "info",
-                "message": f"Top performer: {top_performers[0]['user_name']} with {top_performers[0]['tasks_completed']} tasks completed",
-                "action": "Consider recognition or have them mentor other staff members"
-            })
+            recommendations.append(
+                {
+                    "type": "recognition",
+                    "priority": "info",
+                    "message": f"Top performer: {top_performers[0]['user_name']} with {top_performers[0]['tasks_completed']} tasks completed",
+                    "action": "Consider recognition or have them mentor other staff members",
+                }
+            )
 
         return {
             "report_period": {
                 "year": report_year,
                 "month": report_month,
                 "month_name": start_date.strftime("%B"),
-                "generated_at": today.isoformat()
+                "generated_at": today.isoformat(),
             },
             "team_stats": team_stats,
             "staff_performance": staff_list,
             "workload_distribution": workload_distribution,
             "top_performers": top_performers,
-            "recommendations": recommendations
+            "recommendations": recommendations,
         }
 
     except Exception as e:
-        logger.error(f"Error generating staff performance report: {str(e)}")
+        logger.error(f"Error generating staff performance report: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -2844,17 +3054,17 @@ async def get_yearly_summary_report(
         # Get all members
         members = await db.members.find(
             {**campus_filter, "is_archived": {"$ne": True}},
-            {"_id": 0, "id": 1, "engagement_status": 1, "created_at": 1}
+            {"_id": 0, "id": 1, "engagement_status": 1, "created_at": 1},
         ).to_list(5000)
 
         # Get all care events for the year
-        events = await db.care_events.find({
-            **campus_filter,
-            "event_date": {
-                "$gte": start_date.strftime("%Y-%m-%d"),
-                "$lt": end_date.strftime("%Y-%m-%d")
-            }
-        }, {"_id": 0}).to_list(50000)
+        events = await db.care_events.find(
+            {
+                **campus_filter,
+                "event_date": {"$gte": start_date.strftime("%Y-%m-%d"), "$lt": end_date.strftime("%Y-%m-%d")},
+            },
+            {"_id": 0},
+        ).to_list(50000)
 
         # Monthly breakdown
         monthly_data = []
@@ -2865,19 +3075,24 @@ async def get_yearly_summary_report(
             else:
                 month_end = datetime(report_year, month + 1, 1, tzinfo=JAKARTA_TZ)
 
-            month_events = [e for e in events
-                          if month_start.strftime("%Y-%m-%d") <= e.get("event_date", "") < month_end.strftime("%Y-%m-%d")]
+            month_events = [
+                e
+                for e in events
+                if month_start.strftime("%Y-%m-%d") <= e.get("event_date", "") < month_end.strftime("%Y-%m-%d")
+            ]
 
             completed = len([e for e in month_events if e.get("completed")])
             total = len(month_events)
 
-            monthly_data.append({
-                "month": month,
-                "month_name": month_start.strftime("%B"),
-                "total_events": total,
-                "completed_events": completed,
-                "completion_rate": round(completed / total * 100, 1) if total > 0 else 0
-            })
+            monthly_data.append(
+                {
+                    "month": month,
+                    "month_name": month_start.strftime("%B"),
+                    "total_events": total,
+                    "completed_events": completed,
+                    "completion_rate": round(completed / total * 100, 1) if total > 0 else 0,
+                }
+            )
 
         # Year totals
         total_events = len(events)
@@ -2898,28 +3113,25 @@ async def get_yearly_summary_report(
                 care_totals[etype]["completed"] += 1
 
         return {
-            "report_period": {
-                "year": report_year,
-                "generated_at": today.isoformat()
-            },
+            "report_period": {"year": report_year, "generated_at": today.isoformat()},
             "yearly_totals": {
                 "total_members": len(members),
                 "total_care_events": total_events,
                 "completed_events": completed_events,
                 "completion_rate": round(completed_events / total_events * 100, 1) if total_events > 0 else 0,
                 "total_financial_aid": total_financial_aid,
-                "financial_aid_recipients": len(financial_events)
+                "financial_aid_recipients": len(financial_events),
             },
             "monthly_breakdown": monthly_data,
             "care_by_type": [
-                {"event_type": k, "label": k.replace("_", " ").title(), **v}
-                for k, v in care_totals.items()
-            ]
+                {"event_type": k, "label": k.replace("_", " ").title(), **v} for k, v in care_totals.items()
+            ],
         }
 
     except Exception as e:
-        logger.error(f"Error generating yearly summary: {str(e)}")
+        logger.error(f"Error generating yearly summary: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 # ==================== CONFIGURATION ENDPOINTS (For Mobile App) ====================
 # Pre-computed static configs (cached at module level - zero database/computation cost)
@@ -2931,7 +3143,7 @@ _CACHED_AID_TYPES = [
     {"value": "housing", "label": "Housing Assistance", "icon": "🏠"},
     {"value": "food", "label": "Food Support", "icon": "🍞"},
     {"value": "funeral_costs", "label": "Funeral Costs", "icon": "⚱️"},
-    {"value": "other", "label": "Other", "icon": "📋"}
+    {"value": "other", "label": "Other", "icon": "📋"},
 ]
 
 _CACHED_EVENT_TYPES = [
@@ -2941,7 +3153,7 @@ _CACHED_EVENT_TYPES = [
     {"value": "new_house", "label": "New House", "icon": "🏠"},
     {"value": "accident_illness", "label": "Accident/Illness", "icon": "🚑"},
     {"value": "financial_aid", "label": "Financial Aid", "icon": "💰"},
-    {"value": "regular_contact", "label": "Regular Contact", "icon": "📞"}
+    {"value": "regular_contact", "label": "Regular Contact", "icon": "📞"},
 ]
 
 _CACHED_RELATIONSHIP_TYPES = [
@@ -2950,19 +3162,19 @@ _CACHED_RELATIONSHIP_TYPES = [
     {"value": "child", "label": "Child"},
     {"value": "sibling", "label": "Sibling"},
     {"value": "friend", "label": "Friend"},
-    {"value": "other", "label": "Other"}
+    {"value": "other", "label": "Other"},
 ]
 
 _CACHED_USER_ROLES = [
     {"value": "full_admin", "label": "Full Administrator", "description": "Access all campuses"},
     {"value": "campus_admin", "label": "Campus Administrator", "description": "Manage one campus"},
-    {"value": "pastor", "label": "Pastor", "description": "Pastoral care staff"}
+    {"value": "pastor", "label": "Pastor", "description": "Pastoral care staff"},
 ]
 
 _CACHED_ENGAGEMENT_STATUSES = [
     {"value": "active", "label": "Active", "color": "green", "description": "Recent contact"},
     {"value": "at_risk", "label": "At Risk", "color": "amber", "description": "30-59 days no contact"},
-    {"value": "disconnected", "label": "Disconnected", "color": "red", "description": "90+ days no contact"}
+    {"value": "disconnected", "label": "Disconnected", "color": "red", "description": "90+ days no contact"},
 ]
 
 
@@ -2972,6 +3184,7 @@ def static_config_response(data: list, request: Request = None) -> LitestarRespo
     E-Tag enables 304 Not Modified responses, saving bandwidth on repeated requests.
     """
     import json
+
     # Generate E-Tag from content hash
     content_str = json.dumps(data, sort_keys=True, default=str)
     etag = f'"{hashlib.md5(content_str.encode()).hexdigest()}"'
@@ -2980,19 +3193,15 @@ def static_config_response(data: list, request: Request = None) -> LitestarRespo
     if request:
         if_none_match = request.headers.get("if-none-match")
         if if_none_match and if_none_match == etag:
-            return LitestarResponse(
-                content=None,
-                status_code=304,
-                headers={"ETag": etag}
-            )
+            return LitestarResponse(content=None, status_code=304, headers={"ETag": etag})
 
     return LitestarResponse(
         content=data,
         headers={
             "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
             "Vary": "Accept-Encoding",
-            "ETag": etag
-        }
+            "ETag": etag,
+        },
     )
 
 
@@ -3001,77 +3210,98 @@ async def get_aid_types(request: Request) -> dict:
     """Get all financial aid types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response(_CACHED_AID_TYPES, request)
 
+
 @get("/config/event-types")
 async def get_event_types(request: Request) -> dict:
     """Get all care event types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response(_CACHED_EVENT_TYPES, request)
+
 
 @get("/config/relationship-types")
 async def get_relationship_types(request: Request) -> dict:
     """Get grief relationship types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response(_CACHED_RELATIONSHIP_TYPES, request)
 
+
 @get("/config/user-roles")
 async def get_user_roles(request: Request) -> dict:
     """Get user role types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response(_CACHED_USER_ROLES, request)
+
 
 @get("/config/engagement-statuses")
 async def get_engagement_statuses(request: Request) -> dict:
     """Get engagement status types (cached with E-Tag + HTTP cache headers)"""
     return static_config_response(_CACHED_ENGAGEMENT_STATUSES, request)
 
+
 @get("/config/weekdays")
 async def get_weekdays(request: Request) -> dict:
     """Get weekday options (cached with E-Tag + HTTP cache headers)"""
-    return static_config_response([
-        {"value": "monday", "label": "Monday", "short": "Mon"},
-        {"value": "tuesday", "label": "Tuesday", "short": "Tue"},
-        {"value": "wednesday", "label": "Wednesday", "short": "Wed"},
-        {"value": "thursday", "label": "Thursday", "short": "Thu"},
-        {"value": "friday", "label": "Friday", "short": "Fri"},
-        {"value": "saturday", "label": "Saturday", "short": "Sat"},
-        {"value": "sunday", "label": "Sunday", "short": "Sun"}
-    ], request)
+    return static_config_response(
+        [
+            {"value": "monday", "label": "Monday", "short": "Mon"},
+            {"value": "tuesday", "label": "Tuesday", "short": "Tue"},
+            {"value": "wednesday", "label": "Wednesday", "short": "Wed"},
+            {"value": "thursday", "label": "Thursday", "short": "Thu"},
+            {"value": "friday", "label": "Friday", "short": "Fri"},
+            {"value": "saturday", "label": "Saturday", "short": "Sat"},
+            {"value": "sunday", "label": "Sunday", "short": "Sun"},
+        ],
+        request,
+    )
+
 
 @get("/config/months")
 async def get_months(request: Request) -> dict:
     """Get month options (cached with E-Tag + HTTP cache headers)"""
-    return static_config_response([
-        {"value": 1, "label": "January", "short": "Jan"},
-        {"value": 2, "label": "February", "short": "Feb"},
-        {"value": 3, "label": "March", "short": "Mar"},
-        {"value": 4, "label": "April", "short": "Apr"},
-        {"value": 5, "label": "May", "short": "May"},
-        {"value": 6, "label": "June", "short": "Jun"},
-        {"value": 7, "label": "July", "short": "Jul"},
-        {"value": 8, "label": "August", "short": "Aug"},
-        {"value": 9, "label": "September", "short": "Sep"},
-        {"value": 10, "label": "October", "short": "Oct"},
-        {"value": 11, "label": "November", "short": "Nov"},
-        {"value": 12, "label": "December", "short": "Dec"}
-    ], request)
+    return static_config_response(
+        [
+            {"value": 1, "label": "January", "short": "Jan"},
+            {"value": 2, "label": "February", "short": "Feb"},
+            {"value": 3, "label": "March", "short": "Mar"},
+            {"value": 4, "label": "April", "short": "Apr"},
+            {"value": 5, "label": "May", "short": "May"},
+            {"value": 6, "label": "June", "short": "Jun"},
+            {"value": 7, "label": "July", "short": "Jul"},
+            {"value": 8, "label": "August", "short": "Aug"},
+            {"value": 9, "label": "September", "short": "Sep"},
+            {"value": 10, "label": "October", "short": "Oct"},
+            {"value": 11, "label": "November", "short": "Nov"},
+            {"value": 12, "label": "December", "short": "Dec"},
+        ],
+        request,
+    )
+
 
 @get("/config/frequency-types")
 async def get_frequency_types(request: Request) -> dict:
     """Get financial aid frequency types (cached with E-Tag + HTTP cache headers)"""
-    return static_config_response([
-        {"value": "one_time", "label": "One-time Payment", "description": "Single payment (already given)"},
-        {"value": "weekly", "label": "Weekly Schedule", "description": "Future weekly payments"},
-        {"value": "monthly", "label": "Monthly Schedule", "description": "Future monthly payments"},
-        {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"}
-    ], request)
+    return static_config_response(
+        [
+            {"value": "one_time", "label": "One-time Payment", "description": "Single payment (already given)"},
+            {"value": "weekly", "label": "Weekly Schedule", "description": "Future weekly payments"},
+            {"value": "monthly", "label": "Monthly Schedule", "description": "Future monthly payments"},
+            {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"},
+        ],
+        request,
+    )
+
 
 @get("/config/membership-statuses")
 async def get_membership_statuses(request: Request) -> dict:
     """Get membership status types (cached with E-Tag + HTTP cache headers)"""
-    return static_config_response([
-        {"value": "Member", "label": "Member", "active": True},
-        {"value": "Non Member", "label": "Non Member", "active": False},
-        {"value": "Visitor", "label": "Visitor", "active": False},
-        {"value": "Sympathizer", "label": "Sympathizer", "active": False},
-        {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False}
-    ], request)
+    return static_config_response(
+        [
+            {"value": "Member", "label": "Member", "active": True},
+            {"value": "Non Member", "label": "Non Member", "active": False},
+            {"value": "Visitor", "label": "Visitor", "active": False},
+            {"value": "Sympathizer", "label": "Sympathizer", "active": False},
+            {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False},
+        ],
+        request,
+    )
+
 
 @get("/config/all")
 async def get_all_config(request: Request) -> dict:
@@ -3097,7 +3327,7 @@ async def get_all_config(request: Request) -> dict:
                 {"value": "thursday", "label": "Thursday", "short": "Thu"},
                 {"value": "friday", "label": "Friday", "short": "Fri"},
                 {"value": "saturday", "label": "Saturday", "short": "Sat"},
-                {"value": "sunday", "label": "Sunday", "short": "Sun"}
+                {"value": "sunday", "label": "Sunday", "short": "Sun"},
             ],
             "months": [
                 {"value": 1, "label": "January", "short": "Jan"},
@@ -3111,54 +3341,68 @@ async def get_all_config(request: Request) -> dict:
                 {"value": 9, "label": "September", "short": "Sep"},
                 {"value": 10, "label": "October", "short": "Oct"},
                 {"value": 11, "label": "November", "short": "Nov"},
-                {"value": 12, "label": "December", "short": "Dec"}
+                {"value": 12, "label": "December", "short": "Dec"},
             ],
             "frequency_types": [
                 {"value": "one_time", "label": "One-time Payment", "description": "Single payment (already given)"},
                 {"value": "weekly", "label": "Weekly Schedule", "description": "Future weekly payments"},
                 {"value": "monthly", "label": "Monthly Schedule", "description": "Future monthly payments"},
-                {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"}
+                {"value": "annually", "label": "Annual Schedule", "description": "Future annual payments"},
             ],
             "membership_statuses": [
                 {"value": "Member", "label": "Member", "active": True},
                 {"value": "Non Member", "label": "Non Member", "active": False},
                 {"value": "Visitor", "label": "Visitor", "active": False},
                 {"value": "Sympathizer", "label": "Sympathizer", "active": False},
-                {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False}
+                {"value": "Member (Inactive)", "label": "Member (Inactive)", "active": False},
             ],
             "settings": {
-                "engagement": engagement_settings.get("data", {"atRiskDays": 60, "inactiveDays": 90}) if engagement_settings else {"atRiskDays": 60, "inactiveDays": 90},
-                "grief_stages": grief_settings.get("data", [
+                "engagement": engagement_settings.get("data", {"atRiskDays": 60, "inactiveDays": 90})
+                if engagement_settings
+                else {"atRiskDays": 60, "inactiveDays": 90},
+                "grief_stages": grief_settings.get(
+                    "data",
+                    [
+                        {"stage": "1_week", "days": 7, "name": "1 Week After"},
+                        {"stage": "2_weeks", "days": 14, "name": "2 Weeks After"},
+                        {"stage": "1_month", "days": 30, "name": "1 Month After"},
+                        {"stage": "3_months", "days": 90, "name": "3 Months After"},
+                        {"stage": "6_months", "days": 180, "name": "6 Months After"},
+                        {"stage": "1_year", "days": 365, "name": "1 Year After"},
+                    ],
+                )
+                if grief_settings
+                else [
                     {"stage": "1_week", "days": 7, "name": "1 Week After"},
                     {"stage": "2_weeks", "days": 14, "name": "2 Weeks After"},
                     {"stage": "1_month", "days": 30, "name": "1 Month After"},
                     {"stage": "3_months", "days": 90, "name": "3 Months After"},
                     {"stage": "6_months", "days": 180, "name": "6 Months After"},
-                    {"stage": "1_year", "days": 365, "name": "1 Year After"}
-                ]) if grief_settings else [
-                    {"stage": "1_week", "days": 7, "name": "1 Week After"},
-                    {"stage": "2_weeks", "days": 14, "name": "2 Weeks After"},
-                    {"stage": "1_month", "days": 30, "name": "1 Month After"},
-                    {"stage": "3_months", "days": 90, "name": "3 Months After"},
-                    {"stage": "6_months", "days": 180, "name": "6 Months After"},
-                    {"stage": "1_year", "days": 365, "name": "1 Year After"}
+                    {"stage": "1_year", "days": 365, "name": "1 Year After"},
                 ],
-                "accident_followup": accident_settings.get("data", [
+                "accident_followup": accident_settings.get(
+                    "data",
+                    [
+                        {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
+                        {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
+                        {"stage": "final_followup", "days": 14, "name": "Final Follow-up"},
+                    ],
+                )
+                if accident_settings
+                else [
                     {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
                     {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
-                    {"stage": "final_followup", "days": 14, "name": "Final Follow-up"}
-                ]) if accident_settings else [
-                    {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
-                    {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
-                    {"stage": "final_followup", "days": 14, "name": "Final Follow-up"}
-                ]
-            }
+                    {"stage": "final_followup", "days": 14, "name": "Final Follow-up"},
+                ],
+            },
         }
     except Exception as e:
-        logger.error(f"Error getting all config: {str(e)}")
+        logger.error(f"Error getting all config: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 # ==================== SETTINGS CONFIGURATION ENDPOINTS ====================
+
 
 @post("/admin/recalculate-engagement")
 async def recalculate_all_engagement_status(request: Request) -> dict:
@@ -3175,53 +3419,47 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
 
         # Get members scoped to user's campus for multi-tenancy
         campus_filter = get_campus_filter(current_user)
-        members = await db.members.find({**campus_filter}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(MAX_LIMIT)
-        
+        members = await db.members.find({**campus_filter}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(
+            MAX_LIMIT
+        )
+
         stats = {"active": 0, "at_risk": 0, "disconnected": 0}
         operations = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for member in members:
-            status, days = calculate_engagement_status(
-                member.get("last_contact_date"),
-                at_risk_days,
-                disconnected_days
+            status, days = calculate_engagement_status(member.get("last_contact_date"), at_risk_days, disconnected_days)
+            operations.append(
+                UpdateOne(
+                    {"id": member["id"]},
+                    {"$set": {"engagement_status": status, "days_since_last_contact": days, "updated_at": now}},
+                )
             )
-            operations.append(UpdateOne(
-                {"id": member["id"]},
-                {"$set": {
-                    "engagement_status": status,
-                    "days_since_last_contact": days,
-                    "updated_at": now
-                }}
-            ))
             stats[status] = stats.get(status, 0) + 1
 
         updated_count = 0
         if operations:
             result = await db.members.bulk_write(operations)
             updated_count = result.modified_count
-        
+
         # Clear dashboard cache for all campuses
         await db.dashboard_cache.delete_many({})
-        
+
         logger.info(f"Recalculated engagement for {updated_count} members")
-        
+
         return {
             "success": True,
             "updated_count": updated_count,
             "stats": stats,
-            "thresholds": {
-                "at_risk_days": at_risk_days,
-                "disconnected_days": disconnected_days
-            }
+            "thresholds": {"at_risk_days": at_risk_days, "disconnected_days": disconnected_days},
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error recalculating engagement: {str(e)}")
+        logger.error(f"Error recalculating engagement: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/settings/engagement")
 async def get_engagement_settings(request: Request) -> dict:
@@ -3231,14 +3469,12 @@ async def get_engagement_settings(request: Request) -> dict:
         settings = await db.settings.find_one({"type": "engagement"}, {"_id": 0})
         if not settings:
             # Return defaults
-            return {
-                "atRiskDays": 60,
-                "inactiveDays": 90
-            }
+            return {"atRiskDays": 60, "inactiveDays": 90}
         return settings.get("data", {"atRiskDays": 60, "inactiveDays": 90})
     except Exception as e:
-        logger.error(f"Error getting engagement settings: {str(e)}")
+        logger.error(f"Error getting engagement settings: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @put("/settings/engagement")
 async def update_engagement_settings(data: EngagementSettingsUpdate, request: Request) -> dict:
@@ -3247,13 +3483,15 @@ async def update_engagement_settings(data: EngagementSettingsUpdate, request: Re
     try:
         await db.settings.update_one(
             {"type": "engagement"},
-            {"$set": {
-                "type": "engagement",
-                "data": to_mongo_doc(data),
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": current_admin["id"]
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "engagement",
+                    "data": to_mongo_doc(data),
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": current_admin["id"],
+                }
+            },
+            upsert=True,
         )
 
         # Invalidate engagement settings cache
@@ -3261,8 +3499,9 @@ async def update_engagement_settings(data: EngagementSettingsUpdate, request: Re
 
         return {"success": True, "message": "Engagement settings updated"}
     except Exception as e:
-        logger.error(f"Error updating engagement settings: {str(e)}")
+        logger.error(f"Error updating engagement settings: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/settings/automation")
 async def get_automation_settings(request: Request) -> dict:
@@ -3275,16 +3514,13 @@ async def get_automation_settings(request: Request) -> dict:
             return {
                 "digestTime": "08:00",
                 "whatsappGateway": os.environ.get("WHATSAPP_GATEWAY_URL", ""),
-                "enabled": True
+                "enabled": True,
             }
-        return settings.get("data", {
-            "digestTime": "08:00",
-            "whatsappGateway": "",
-            "enabled": True
-        })
+        return settings.get("data", {"digestTime": "08:00", "whatsappGateway": "", "enabled": True})
     except Exception as e:
-        logger.error(f"Error getting automation settings: {str(e)}")
+        logger.error(f"Error getting automation settings: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @put("/settings/automation")
 async def update_automation_settings(data: AutomationSettingsUpdate, request: Request) -> dict:
@@ -3303,51 +3539,57 @@ async def update_automation_settings(data: AutomationSettingsUpdate, request: Re
 
         await db.settings.update_one(
             {"type": "automation"},
-            {"$set": {
-                "type": "automation",
-                "data": {
-                    "digestTime": digest_time,
-                    "whatsappGateway": data.whatsappGateway,
-                    "enabled": data.enabled
-                },
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": current_admin["id"]
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "automation",
+                    "data": {
+                        "digestTime": digest_time,
+                        "whatsappGateway": data.whatsappGateway,
+                        "enabled": data.enabled,
+                    },
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": current_admin["id"],
+                }
+            },
+            upsert=True,
         )
 
         # Reschedule the daily digest job with new time
         try:
             from scheduler import schedule_daily_digest
+
             hour, minute = map(int, digest_time.split(":"))
             schedule_daily_digest(hour, minute)
-            logger.info(f"Automation settings updated by {current_admin['email']}: digestTime={digest_time} - scheduler updated")
+            logger.info(
+                f"Automation settings updated by {current_admin['email']}: digestTime={digest_time} - scheduler updated"
+            )
         except Exception as sched_err:
-            logger.warning(f"Could not update scheduler: {str(sched_err)} - restart may be needed")
+            logger.warning(f"Could not update scheduler: {sched_err!s} - restart may be needed")
 
         return {"success": True, "message": "Automation settings updated and applied"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating automation settings: {str(e)}")
+        logger.error(f"Error updating automation settings: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/settings/overdue_writeoff")
 async def get_overdue_writeoff_settings(request: Request) -> dict:
     """Get overdue write-off threshold settings"""
     try:
         settings = await db.settings.find_one({"key": "overdue_writeoff"}, {"_id": 0})
-        return settings if settings else {
-            "key": "overdue_writeoff", 
-            "data": {
-                "birthday": 7,
-                "financial_aid": 0,
-                "accident_illness": 14,
-                "grief_support": 14
+        return (
+            settings
+            if settings
+            else {
+                "key": "overdue_writeoff",
+                "data": {"birthday": 7, "financial_aid": 0, "accident_illness": 14, "grief_support": 14},
             }
-        }
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @put("/settings/overdue_writeoff")
 async def update_overdue_writeoff_settings(data: OverdueWriteoffSettingsUpdate, request: Request) -> dict:
@@ -3356,13 +3598,15 @@ async def update_overdue_writeoff_settings(data: OverdueWriteoffSettingsUpdate, 
     try:
         await db.settings.update_one(
             {"key": "overdue_writeoff"},
-            {"$set": {
-                "key": "overdue_writeoff",
-                "data": {"days": data.days, "enabled": data.enabled},
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": current_admin["id"]
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "key": "overdue_writeoff",
+                    "data": {"days": data.days, "enabled": data.enabled},
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": current_admin["id"],
+                }
+            },
+            upsert=True,
         )
 
         # Invalidate writeoff settings cache
@@ -3373,6 +3617,7 @@ async def update_overdue_writeoff_settings(data: OverdueWriteoffSettingsUpdate, 
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/settings/grief-stages")
 async def get_grief_stages(request: Request) -> dict:
@@ -3388,12 +3633,13 @@ async def get_grief_stages(request: Request) -> dict:
                 {"stage": "1_month", "days": 30, "name": "1 Month After"},
                 {"stage": "3_months", "days": 90, "name": "3 Months After"},
                 {"stage": "6_months", "days": 180, "name": "6 Months After"},
-                {"stage": "1_year", "days": 365, "name": "1 Year After"}
+                {"stage": "1_year", "days": 365, "name": "1 Year After"},
             ]
         return settings.get("data", [])
     except Exception as e:
-        logger.error(f"Error getting grief stages: {str(e)}")
+        logger.error(f"Error getting grief stages: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @put("/settings/grief-stages")
 async def update_grief_stages(data: list = Body(), request: Request = None) -> dict:
@@ -3402,18 +3648,21 @@ async def update_grief_stages(data: list = Body(), request: Request = None) -> d
     try:
         await db.settings.update_one(
             {"type": "grief_stages"},
-            {"$set": {
-                "type": "grief_stages",
-                "data": data,
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": current_admin["id"]
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "grief_stages",
+                    "data": data,
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": current_admin["id"],
+                }
+            },
+            upsert=True,
         )
         return {"success": True, "message": "Grief stages configuration updated"}
     except Exception as e:
-        logger.error(f"Error updating grief stages: {str(e)}")
+        logger.error(f"Error updating grief stages: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/settings/accident-followup")
 async def get_accident_followup(request: Request) -> dict:
@@ -3426,12 +3675,13 @@ async def get_accident_followup(request: Request) -> dict:
             return [
                 {"stage": "first_followup", "days": 3, "name": "First Follow-up"},
                 {"stage": "second_followup", "days": 7, "name": "Second Follow-up"},
-                {"stage": "final_followup", "days": 14, "name": "Final Follow-up"}
+                {"stage": "final_followup", "days": 14, "name": "Final Follow-up"},
             ]
         return settings.get("data", [])
     except Exception as e:
-        logger.error(f"Error getting accident followup settings: {str(e)}")
+        logger.error(f"Error getting accident followup settings: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @put("/settings/accident-followup")
 async def update_accident_followup(data: list = Body(), request: Request = None) -> dict:
@@ -3440,18 +3690,21 @@ async def update_accident_followup(data: list = Body(), request: Request = None)
     try:
         await db.settings.update_one(
             {"type": "accident_followup"},
-            {"$set": {
-                "type": "accident_followup",
-                "data": data,
-                "updated_at": datetime.now(timezone.utc),
-                "updated_by": current_admin["id"]
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "type": "accident_followup",
+                    "data": data,
+                    "updated_at": datetime.now(UTC),
+                    "updated_by": current_admin["id"],
+                }
+            },
+            upsert=True,
         )
         return {"success": True, "message": "Accident follow-up configuration updated"}
     except Exception as e:
-        logger.error(f"Error updating accident followup settings: {str(e)}")
+        logger.error(f"Error updating accident followup settings: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/settings/user-preferences/{user_id:str}")
 async def get_user_preferences(user_id: str, request: Request) -> dict:
@@ -3465,8 +3718,9 @@ async def get_user_preferences(user_id: str, request: Request) -> dict:
             return {"language": "id"}  # Default Indonesian
         return prefs.get("data", {"language": "id"})
     except Exception as e:
-        logger.error(f"Error getting user preferences: {str(e)}")
+        logger.error(f"Error getting user preferences: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @put("/settings/user-preferences/{user_id:str}")
 async def update_user_preferences(user_id: str, data: UserPreferencesUpdate, request: Request) -> dict:
@@ -3477,45 +3731,42 @@ async def update_user_preferences(user_id: str, data: UserPreferencesUpdate, req
     try:
         await db.user_preferences.update_one(
             {"user_id": user_id},
-            {"$set": {
-                "user_id": user_id,
-                "data": to_mongo_doc(data),
-                "updated_at": datetime.now(timezone.utc)
-            }},
-            upsert=True
+            {"$set": {"user_id": user_id, "data": to_mongo_doc(data), "updated_at": datetime.now(UTC)}},
+            upsert=True,
         )
         return {"success": True, "message": "User preferences updated"}
     except Exception as e:
-        logger.error(f"Error updating user preferences: {str(e)}")
+        logger.error(f"Error updating user preferences: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 # ==================== NOTIFICATION LOGS ENDPOINTS ====================
+
 
 @get("/notification-logs")
 async def get_notification_logs(
     request: Request,
     limit: int = Parameter(default=100, le=500),
-    status: Optional[NotificationStatus] = None,
+    status: NotificationStatus | None = None,
 ) -> dict:
     """Get notification logs with filtering"""
     current_user = await get_current_user(request)
     try:
         query = get_campus_filter(current_user)
-        
+
         if status:
             query["status"] = status
-        
-        logs = await db.notification_logs.find(
-            query,
-            {"_id": 0}
-        ).sort("created_at", -1).limit(limit).to_list(limit)
-        
+
+        logs = await db.notification_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+
         return logs
     except Exception as e:
-        logger.error(f"Error getting notification logs: {str(e)}")
+        logger.error(f"Error getting notification logs: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 # ==================== AUTOMATED REMINDERS ENDPOINTS ====================
+
 
 @post("/reminders/run-now")
 async def run_reminders_now(request: Request) -> dict:
@@ -3526,11 +3777,12 @@ async def run_reminders_now(request: Request) -> dict:
         await daily_reminder_job()
         return {"success": True, "message": "Automated reminders executed successfully"}
     except Exception as e:
-        logger.error(f"Error running reminders: {str(e)}")
+        logger.error(f"Error running reminders: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # ==================== SYNC ENDPOINTS ====================
+
 
 @post("/sync/config")
 async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
@@ -3538,20 +3790,20 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
     current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can configure sync")
-    
+
     try:
         campus_id = current_user.get("campus_id")
         if not campus_id and current_user["role"] == UserRole.FULL_ADMIN.value:
             raise HTTPException(status_code=400, detail="Please select a campus first")
-        
+
         # Check if config exists
         existing = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
-        
+
         # Normalize api_path_prefix (ensure it starts with / if not empty, no trailing /)
         api_path_prefix = data.api_path_prefix.strip()
-        if api_path_prefix and not api_path_prefix.startswith('/'):
-            api_path_prefix = '/' + api_path_prefix
-        api_path_prefix = api_path_prefix.rstrip('/')
+        if api_path_prefix and not api_path_prefix.startswith("/"):
+            api_path_prefix = "/" + api_path_prefix
+        api_path_prefix = api_path_prefix.rstrip("/")
 
         # Handle password: if masked (********), use existing; otherwise use new plaintext
         if data.api_password == "********":
@@ -3568,16 +3820,19 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
         core_church_id = None
         try:
             import httpx
-            base_url = data.api_base_url.rstrip('/')
+
+            base_url = data.api_base_url.rstrip("/")
             async with httpx.AsyncClient(timeout=10.0) as client:
                 if password_for_login:
                     login_response = await client.post(
                         f"{base_url}{api_path_prefix}/auth/login",
-                        json={"email": data.api_email, "password": password_for_login}
+                        json={"email": data.api_email, "password": password_for_login},
                     )
                     if login_response.status_code == 200:
                         login_data = login_response.json()
-                        core_church_id = login_data.get("user", {}).get("church_id") or login_data.get("church", {}).get("id")
+                        core_church_id = login_data.get("user", {}).get("church_id") or login_data.get(
+                            "church", {}
+                        ).get("id")
         except Exception:
             pass  # If we can't get church_id, continue without it
 
@@ -3585,7 +3840,7 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
             "campus_id": campus_id,
             "core_church_id": core_church_id,
             "sync_method": data.sync_method,
-            "api_base_url": data.api_base_url.rstrip('/'),
+            "api_base_url": data.api_base_url.rstrip("/"),
             "api_path_prefix": api_path_prefix,
             "api_email": data.api_email,
             "api_password": password_to_store,  # Use determined password
@@ -3595,32 +3850,29 @@ async def save_sync_config(data: SyncConfigCreate, request: Request) -> dict:
             "filter_mode": data.filter_mode,
             "filter_rules": data.filter_rules or [],
             "is_enabled": data.is_enabled,
-            "updated_at": datetime.now(timezone.utc)
+            "updated_at": datetime.now(UTC),
         }
-        
+
         if existing:
             # Preserve existing webhook_secret
             sync_config_data["webhook_secret"] = existing.get("webhook_secret", secrets.token_hex(32))
             sync_config_data["id"] = existing["id"]
-            
+
             # Update existing
-            await db.sync_configs.update_one(
-                {"campus_id": campus_id},
-                {"$set": sync_config_data}
-            )
+            await db.sync_configs.update_one({"campus_id": campus_id}, {"$set": sync_config_data})
         else:
             # Create new with generated webhook secret
             sync_config_data["id"] = generate_uuid()
             sync_config_data["webhook_secret"] = secrets.token_hex(32)
-            sync_config_data["created_at"] = datetime.now(timezone.utc)
+            sync_config_data["created_at"] = datetime.now(UTC)
             await db.sync_configs.insert_one(sync_config_data)
 
         return {"success": True, "message": "Sync configuration saved"}
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error saving sync config: {str(e)}")
+        logger.error(f"Error saving sync config: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -3630,37 +3882,29 @@ async def regenerate_webhook_secret(request: Request) -> dict:
     current_user = await get_current_user(request)
     if current_user["role"] not in [UserRole.FULL_ADMIN.value, UserRole.CAMPUS_ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only administrators can regenerate webhook secret")
-    
+
     try:
         campus_id = current_user.get("campus_id")
         if not campus_id:
             raise HTTPException(status_code=400, detail="Please select a campus first")
-        
+
         # Generate new secret
         new_secret = secrets.token_hex(32)
-        
+
         # Update config
         result = await db.sync_configs.update_one(
-            {"campus_id": campus_id},
-            {"$set": {
-                "webhook_secret": new_secret,
-                "updated_at": datetime.now(timezone.utc)
-            }}
+            {"campus_id": campus_id}, {"$set": {"webhook_secret": new_secret, "updated_at": datetime.now(UTC)}}
         )
-        
+
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Sync configuration not found")
-        
-        return {
-            "success": True,
-            "message": "Webhook secret regenerated successfully",
-            "new_secret": new_secret
-        }
-    
+
+        return {"success": True, "message": "Webhook secret regenerated successfully", "new_secret": new_secret}
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error regenerating webhook secret: {str(e)}")
+        logger.error(f"Error regenerating webhook secret: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -3679,10 +3923,10 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
 
         # Normalize api_path_prefix
         api_path_prefix = data.api_path_prefix.strip()
-        if api_path_prefix and not api_path_prefix.startswith('/'):
-            api_path_prefix = '/' + api_path_prefix
-        api_path_prefix = api_path_prefix.rstrip('/')
-        base_url = data.api_base_url.rstrip('/')
+        if api_path_prefix and not api_path_prefix.startswith("/"):
+            api_path_prefix = "/" + api_path_prefix
+        api_path_prefix = api_path_prefix.rstrip("/")
+        base_url = data.api_base_url.rstrip("/")
 
         # Handle password: if masked (********), fetch from database; otherwise use plaintext
         if data.api_password == "********":
@@ -3699,8 +3943,7 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
         # Login to core API
         async with httpx.AsyncClient(timeout=30.0) as client:
             login_response = await client.post(
-                f"{base_url}{api_path_prefix}/auth/login",
-                json={"email": data.api_email, "password": password_to_use}
+                f"{base_url}{api_path_prefix}/auth/login", json={"email": data.api_email, "password": password_to_use}
             )
 
             if login_response.status_code != 200:
@@ -3710,35 +3953,34 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
 
             # Fetch members (limit to 100 for analysis)
             members_response = await client.get(
-                f"{base_url}{api_path_prefix}/members/",
-                headers={"Authorization": f"Bearer {token}"}
+                f"{base_url}{api_path_prefix}/members/", headers={"Authorization": f"Bearer {token}"}
             )
-            
+
             if members_response.status_code != 200:
                 raise HTTPException(status_code=400, detail="Failed to fetch members from core API")
-            
+
             members = members_response.json()[:100]  # Analyze first 100 members
-            
+
             if len(members) == 0:
                 return {"fields": [], "message": "No members found in core system"}
-            
+
             # Analyze fields
             field_metadata = {}
-            
+
             for member in members:
                 for field_name, field_value in member.items():
                     if field_name in ["id", "church_id", "campus_id", "_id"]:
                         continue  # Skip system fields
-                    
+
                     if field_name not in field_metadata:
                         field_metadata[field_name] = {
                             "name": field_name,
                             "type": None,
                             "distinct_values": set(),
                             "has_null": False,
-                            "sample_value": field_value
+                            "sample_value": field_value,
                         }
-                    
+
                     # Determine field type
                     if field_value is None:
                         field_metadata[field_name]["has_null"] = True
@@ -3756,7 +3998,7 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
                             # Collect distinct values for string fields (max 50 unique values)
                             if len(field_metadata[field_name]["distinct_values"]) < 50:
                                 field_metadata[field_name]["distinct_values"].add(field_value)
-            
+
             # Convert to list and process distinct values
             fields = []
             for field_name, metadata in field_metadata.items():
@@ -3765,31 +4007,32 @@ async def discover_fields_from_core(data: SyncConfigCreate, request: Request) ->
                     "label": field_name.replace("_", " ").title(),
                     "type": metadata["type"],
                     "sample_value": metadata["sample_value"],
-                    "has_null": metadata["has_null"]
+                    "has_null": metadata["has_null"],
                 }
-                
+
                 # Convert distinct values to list
                 if metadata["type"] in ["string", "boolean"]:
                     distinct_list = sorted(list(metadata["distinct_values"]))
                     if len(distinct_list) > 0 and len(distinct_list) <= 20:  # Only if reasonable number
                         field_info["distinct_values"] = distinct_list
-                
+
                 fields.append(field_info)
-            
+
             # Sort fields by name
             fields.sort(key=lambda x: x["name"])
-            
+
             return {
                 "fields": fields,
                 "sample_count": len(members),
-                "message": f"Discovered {len(fields)} fields from {len(members)} sample members"
+                "message": f"Discovered {len(fields)} fields from {len(members)} sample members",
             }
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error discovering fields: {str(e)}")
+        logger.error(f"Error discovering fields: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/sync/config")
 async def get_sync_config(request: Request) -> dict:
@@ -3799,18 +4042,19 @@ async def get_sync_config(request: Request) -> dict:
         campus_id = current_user.get("campus_id")
         if not campus_id:
             return None
-        
+
         config = await db.sync_configs.find_one({"campus_id": campus_id}, {"_id": 0})
         if config:
             # Don't return actual password to frontend, but keep webhook_secret
             config["api_password"] = "********" if config.get("api_password") else ""
             # Keep webhook_secret for display (user needs to configure it in core system)
-        
+
         return config
-    
+
     except Exception as e:
-        logger.error(f"Error getting sync config: {str(e)}")
+        logger.error(f"Error getting sync config: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @post("/sync/test-connection")
 async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict:
@@ -3824,20 +4068,20 @@ async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict
 
         # Normalize paths
         api_path_prefix = data.api_path_prefix.strip()
-        if api_path_prefix and not api_path_prefix.startswith('/'):
-            api_path_prefix = '/' + api_path_prefix
-        api_path_prefix = api_path_prefix.rstrip('/')
-        base_url = data.api_base_url.rstrip('/')
+        if api_path_prefix and not api_path_prefix.startswith("/"):
+            api_path_prefix = "/" + api_path_prefix
+        api_path_prefix = api_path_prefix.rstrip("/")
+        base_url = data.api_base_url.rstrip("/")
 
         # Normalize login endpoint
-        login_endpoint = getattr(data, 'api_login_endpoint', '/auth/login').strip()
-        if login_endpoint and not login_endpoint.startswith('/'):
-            login_endpoint = '/' + login_endpoint
+        login_endpoint = getattr(data, "api_login_endpoint", "/auth/login").strip()
+        if login_endpoint and not login_endpoint.startswith("/"):
+            login_endpoint = "/" + login_endpoint
 
         # Normalize members endpoint
-        members_endpoint = getattr(data, 'api_members_endpoint', '/members/').strip()
-        if members_endpoint and not members_endpoint.startswith('/'):
-            members_endpoint = '/' + members_endpoint
+        members_endpoint = getattr(data, "api_members_endpoint", "/members/").strip()
+        if members_endpoint and not members_endpoint.startswith("/"):
+            members_endpoint = "/" + members_endpoint
 
         # Test login - send as 'email' key even if it's not email format (core API requirement)
         login_url = f"{base_url}{api_path_prefix}{login_endpoint}"
@@ -3856,10 +4100,7 @@ async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict
             # Password is plaintext from frontend
             password_to_use = data.api_password
         async with httpx.AsyncClient(timeout=30.0) as client:
-            login_response = await client.post(
-                login_url,
-                json={"email": data.api_email, "password": password_to_use}
-            )
+            login_response = await client.post(login_url, json={"email": data.api_email, "password": password_to_use})
 
             if login_response.status_code != 200:
                 error_detail = login_response.text
@@ -3869,49 +4110,39 @@ async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict
                 except ValueError:
                     pass
 
-                return {
-                    "success": False,
-                    "message": f"Login failed: {error_detail}"
-                }
+                return {"success": False, "message": f"Login failed: {error_detail}"}
 
             token = login_response.json().get("access_token")
             if not token:
-                return {
-                    "success": False,
-                    "message": "No access token received"
-                }
+                return {"success": False, "message": "No access token received"}
 
             # Test members endpoint - fetch with pagination to get actual total
             members_url = f"{base_url}{api_path_prefix}{members_endpoint}"
-            
+
             # Try to get total count by fetching with pagination
             total_members = 0
             offset = 0
             page_size = 100
-            
+
             while True:
                 members_response = await client.get(
-                    f"{members_url}?limit={page_size}&skip={offset}",
-                    headers={"Authorization": f"Bearer {token}"}
+                    f"{members_url}?limit={page_size}&skip={offset}", headers={"Authorization": f"Bearer {token}"}
                 )
-                
+
                 if members_response.status_code != 200:
-                    return {
-                        "success": False,
-                        "message": f"Members API failed: {members_response.text}"
-                    }
-                
+                    return {"success": False, "message": f"Members API failed: {members_response.text}"}
+
                 batch = members_response.json()
-                
+
                 # Handle both response formats
                 if isinstance(batch, dict):
-                    if 'pagination' in batch and 'total' in batch['pagination']:
+                    if "pagination" in batch and "total" in batch["pagination"]:
                         # Has pagination metadata - use total
-                        total_members = batch['pagination']['total']
+                        total_members = batch["pagination"]["total"]
                         break
-                    elif 'data' in batch:
+                    elif "data" in batch:
                         # Paginated but count ourselves
-                        batch_members = batch['data']
+                        batch_members = batch["data"]
                         total_members += len(batch_members)
                         if len(batch_members) < page_size:
                             break
@@ -3923,31 +4154,26 @@ async def test_sync_connection(data: SyncConfigCreate, request: Request) -> dict
                         break
                 else:
                     break
-                
+
                 offset += page_size
-                
+
                 # Safety limit
                 if offset > 10000:
                     total_members = f"{total_members}+ (stopped at 10,000)"
                     break
-            
+
             return {
                 "success": True,
                 "message": f"Connection successful! Core system has {total_members} total members. Sync will fetch all.",
-                "member_count": total_members
+                "member_count": total_members,
             }
-    
+
     except httpx.TimeoutException:
-        return {
-            "success": False,
-            "message": "Connection timeout. Please check the API URL."
-        }
+        return {"success": False, "message": "Connection timeout. Please check the API URL."}
     except Exception as e:
-        logger.error(f"Error testing sync connection: {str(e)}")
-        return {
-            "success": False,
-            "message": f"Connection error: {str(e)}"
-        }
+        logger.error(f"Error testing sync connection: {e!s}")
+        return {"success": False, "message": f"Connection error: {e!s}"}
+
 
 async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manual") -> dict:
     """
@@ -3968,20 +4194,16 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
         return {"success": False, "error": "Sync is not configured or enabled for this campus"}
 
     # Create sync log
-    sync_log = SyncLog(
-        campus_id=campus_id,
-        sync_type=sync_type,
-        status="in_progress"
-    )
+    sync_log = SyncLog(campus_id=campus_id, sync_type=sync_type, status="in_progress")
     await db.sync_logs.insert_one(to_mongo_doc(sync_log))
     sync_log_id = sync_log.id
 
-    start_time = datetime.now(timezone.utc)
+    start_time = datetime.now(UTC)
 
     try:
         # Get api_path_prefix with fallback for existing configs
-        api_path_prefix = config.get('api_path_prefix', '/api')
-        base_url = config['api_base_url'].rstrip('/')
+        api_path_prefix = config.get("api_path_prefix", "/api")
+        base_url = config["api_base_url"].rstrip("/")
 
         # Login to core API
         decrypted_pwd = decrypt_password(config["api_password"])
@@ -4000,7 +4222,9 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                 except (httpx.ConnectError, httpx.TimeoutException) as e:
                     if attempt < API_MAX_RETRIES - 1:
                         delay = API_RETRY_DELAYS[min(attempt, len(API_RETRY_DELAYS) - 1)]
-                        logger.warning(f"Sync login failed (attempt {attempt + 1}/{API_MAX_RETRIES}): {e}. Retrying in {delay}s...")
+                        logger.warning(
+                            f"Sync login failed (attempt {attempt + 1}/{API_MAX_RETRIES}): {e}. Retrying in {delay}s..."
+                        )
                         await asyncio.sleep(delay)
                     else:
                         raise Exception(f"Sync login failed after {API_MAX_RETRIES} attempts: {e}")
@@ -4020,37 +4244,42 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                 members_response = None
                 for attempt in range(API_MAX_RETRIES):
                     try:
-                        members_response = await client.get(
-                            members_url,
-                            headers={"Authorization": f"Bearer {token}"}
-                        )
+                        members_response = await client.get(members_url, headers={"Authorization": f"Bearer {token}"})
                         break
                     except (httpx.ConnectError, httpx.TimeoutException) as e:
                         if attempt < API_MAX_RETRIES - 1:
                             delay = API_RETRY_DELAYS[min(attempt, len(API_RETRY_DELAYS) - 1)]
-                            logger.warning(f"Sync fetch failed (attempt {attempt + 1}/{API_MAX_RETRIES}): {e}. Retrying in {delay}s...")
+                            logger.warning(
+                                f"Sync fetch failed (attempt {attempt + 1}/{API_MAX_RETRIES}): {e}. Retrying in {delay}s..."
+                            )
                             await asyncio.sleep(delay)
                         else:
                             raise Exception(f"Sync fetch failed after {API_MAX_RETRIES} attempts: {e}")
 
                 if members_response.status_code != 200:
                     if members_response.status_code == 500:
-                        raise Exception(f"External API server error (500). The FaithFlow server ({base_url}) is experiencing issues.")
+                        raise Exception(
+                            f"External API server error (500). The FaithFlow server ({base_url}) is experiencing issues."
+                        )
                     elif members_response.status_code == 401:
                         raise Exception("Authentication expired. Please check your API credentials.")
                     elif members_response.status_code == 403:
-                        raise Exception("Access denied. Your API account may not have permission to access member data.")
+                        raise Exception(
+                            "Access denied. Your API account may not have permission to access member data."
+                        )
                     else:
-                        raise Exception(f"Failed to fetch members (HTTP {members_response.status_code}): {members_response.text}")
+                        raise Exception(
+                            f"Failed to fetch members (HTTP {members_response.status_code}): {members_response.text}"
+                        )
 
                 batch = members_response.json()
 
                 # Handle both array response and paginated response
-                if isinstance(batch, dict) and 'data' in batch:
-                    batch_members = batch['data']
+                if isinstance(batch, dict) and "data" in batch:
+                    batch_members = batch["data"]
                     all_members.extend(batch_members)
-                    pagination = batch.get('pagination', {})
-                    if not pagination.get('has_more', False):
+                    pagination = batch.get("pagination", {})
+                    if not pagination.get("has_more", False):
                         break
                 elif isinstance(batch, list):
                     all_members.extend(batch)
@@ -4061,7 +4290,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
 
                 offset += page_size
                 if offset > 10000:
-                    logger.warning(f"Reached safety limit of 10000 members")
+                    logger.warning("Reached safety limit of 10000 members")
                     break
 
             core_members = all_members
@@ -4076,7 +4305,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                 "unarchived": 0,
                 "matched_by_id": 0,
                 "matched_by_name_phone": 0,
-                "matched_by_name_only": 0
+                "matched_by_name_only": 0,
             }
 
             # Get existing members
@@ -4139,7 +4368,11 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                         try:
                             if "date_of_birth" in field_name or "birth" in field_name:
                                 if member_value:
-                                    birth_date = date.fromisoformat(member_value) if isinstance(member_value, str) else member_value
+                                    birth_date = (
+                                        date.fromisoformat(member_value)
+                                        if isinstance(member_value, str)
+                                        else member_value
+                                    )
                                     age = (date.today() - birth_date).days // 365
                                     member_value = age
                             if operator == "greater_than":
@@ -4148,7 +4381,9 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                                 rule_matches = float(member_value) < float(filter_value)
                             elif operator == "between":
                                 if isinstance(filter_value, list) and len(filter_value) == 2:
-                                    rule_matches = float(filter_value[0]) <= float(member_value) <= float(filter_value[1])
+                                    rule_matches = (
+                                        float(filter_value[0]) <= float(member_value) <= float(filter_value[1])
+                                    )
                         except (ValueError, TypeError):
                             rule_matches = False
                     elif operator == "is_true":
@@ -4203,30 +4438,38 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
 
                 # Prepare member data
                 membership_status = (
-                    core_member.get("membership_status") or
-                    core_member.get("membershipStatus") or
-                    core_member.get("member_type") or
-                    core_member.get("memberType") or
-                    core_member.get("type") or
-                    core_member.get("status")
+                    core_member.get("membership_status")
+                    or core_member.get("membershipStatus")
+                    or core_member.get("member_type")
+                    or core_member.get("memberType")
+                    or core_member.get("type")
+                    or core_member.get("status")
                 )
                 category = (
-                    core_member.get("member_status") or
-                    core_member.get("memberStatus") or
-                    core_member.get("category") or
-                    core_member.get("group") or
-                    core_member.get("classification")
+                    core_member.get("member_status")
+                    or core_member.get("memberStatus")
+                    or core_member.get("category")
+                    or core_member.get("group")
+                    or core_member.get("classification")
                 )
 
                 member_data = {
                     "external_member_id": core_id,
                     "name": core_member.get("full_name") or core_member.get("name"),
-                    "phone": normalize_phone_number(core_member.get("phone", "")) if core_member.get("phone") else (normalize_phone_number(core_member.get("phone_whatsapp", "")) if core_member.get("phone_whatsapp") else None),
-                    "birth_date": core_member.get("date_of_birth") or core_member.get("birthDate") or core_member.get("birth_date"),
+                    "phone": normalize_phone_number(core_member.get("phone", ""))
+                    if core_member.get("phone")
+                    else (
+                        normalize_phone_number(core_member.get("phone_whatsapp", ""))
+                        if core_member.get("phone_whatsapp")
+                        else None
+                    ),
+                    "birth_date": core_member.get("date_of_birth")
+                    or core_member.get("birthDate")
+                    or core_member.get("birth_date"),
                     "gender": core_member.get("gender"),
                     "membership_status": membership_status,
                     "category": category,
-                    "updated_at": datetime.now(timezone.utc)
+                    "updated_at": datetime.now(UTC),
                 }
 
                 # Calculate age
@@ -4243,11 +4486,11 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
 
                 # Handle photo URL
                 external_photo_url = (
-                    core_member.get("photo_url") or
-                    core_member.get("photo") or
-                    core_member.get("image_url") or
-                    core_member.get("avatar_url") or
-                    core_member.get("profile_photo")
+                    core_member.get("photo_url")
+                    or core_member.get("photo")
+                    or core_member.get("image_url")
+                    or core_member.get("avatar_url")
+                    or core_member.get("profile_photo")
                 )
                 if external_photo_url and isinstance(external_photo_url, str) and external_photo_url.startswith("http"):
                     member_data["photo_url"] = external_photo_url
@@ -4257,7 +4500,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                 if existing:
                     if not is_active and not existing.get("is_archived"):
                         member_data["is_archived"] = True
-                        member_data["archived_at"] = datetime.now(timezone.utc)
+                        member_data["archived_at"] = datetime.now(UTC)
                         member_data["archived_reason"] = "Deactivated in core system"
                         stats["archived"] += 1
                     elif is_active and existing.get("is_archived"):
@@ -4268,10 +4511,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                     else:
                         stats["updated"] += 1
 
-                    await db.members.update_one(
-                        {"id": existing["id"]},
-                        {"$set": member_data}
-                    )
+                    await db.members.update_one({"id": existing["id"]}, {"$set": member_data})
                 else:
                     new_member = {
                         "id": generate_uuid(),
@@ -4282,7 +4522,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                         "is_active": is_active,
                         "engagement_status": "active",
                         "days_since_last_contact": 999,
-                        "created_at": datetime.now(timezone.utc)
+                        "created_at": datetime.now(UTC),
                     }
                     await db.members.insert_one(new_member)
                     stats["created"] += 1
@@ -4300,8 +4540,8 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                             "description": "Annual birthday reminder",
                             "completed": False,
                             "ignored": False,
-                            "created_at": datetime.now(timezone.utc),
-                            "updated_at": datetime.now(timezone.utc)
+                            "created_at": datetime.now(UTC),
+                            "updated_at": datetime.now(UTC),
                         }
                         await db.care_events.insert_one(birthday_event)
 
@@ -4312,12 +4552,14 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                 if external_id and external_id not in filtered_core_ids and not existing_member.get("is_archived"):
                     await db.members.update_one(
                         {"id": existing_member["id"]},
-                        {"$set": {
-                            "is_archived": True,
-                            "archived_at": datetime.now(timezone.utc),
-                            "archived_reason": "No longer matches sync filter rules",
-                            "updated_at": datetime.now(timezone.utc)
-                        }}
+                        {
+                            "$set": {
+                                "is_archived": True,
+                                "archived_at": datetime.now(UTC),
+                                "archived_reason": "No longer matches sync filter rules",
+                                "updated_at": datetime.now(UTC),
+                            }
+                        },
                     )
                     stats["archived"] += 1
                     logger.info(f"Archived member {existing_member['name']} (no longer matches filter)")
@@ -4330,7 +4572,7 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
             )
 
             # Update sync config
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             duration = (end_time - start_time).total_seconds()
 
             match_details = []
@@ -4345,62 +4587,58 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
 
             await db.sync_configs.update_one(
                 {"campus_id": campus_id},
-                {"$set": {
-                    "last_sync_at": end_time,
-                    "last_sync_status": "success",
-                    "last_sync_message": sync_message
-                }}
+                {"$set": {"last_sync_at": end_time, "last_sync_status": "success", "last_sync_message": sync_message}},
             )
 
             # Update sync log
             await db.sync_logs.update_one(
                 {"id": sync_log_id},
-                {"$set": {
-                    "status": "success",
-                    "members_fetched": stats["fetched"],
-                    "members_created": stats["created"],
-                    "members_updated": stats["updated"],
-                    "members_archived": stats["archived"],
-                    "members_unarchived": stats["unarchived"],
-                    "matched_by_id": stats.get("matched_by_id", 0),
-                    "matched_by_name_phone": stats.get("matched_by_name_phone", 0),
-                    "matched_by_name_only": stats.get("matched_by_name_only", 0),
-                    "completed_at": end_time,
-                    "duration_seconds": duration
-                }}
+                {
+                    "$set": {
+                        "status": "success",
+                        "members_fetched": stats["fetched"],
+                        "members_created": stats["created"],
+                        "members_updated": stats["updated"],
+                        "members_archived": stats["archived"],
+                        "members_unarchived": stats["unarchived"],
+                        "matched_by_id": stats.get("matched_by_id", 0),
+                        "matched_by_name_phone": stats.get("matched_by_name_phone", 0),
+                        "matched_by_name_only": stats.get("matched_by_name_only", 0),
+                        "completed_at": end_time,
+                        "duration_seconds": duration,
+                    }
+                },
             )
 
             return {
                 "success": True,
                 "message": "Sync completed successfully",
                 "stats": stats,
-                "duration_seconds": duration
+                "duration_seconds": duration,
             }
 
     except Exception as sync_error:
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         duration = (end_time - start_time).total_seconds()
 
         await db.sync_configs.update_one(
             {"campus_id": campus_id},
-            {"$set": {
-                "last_sync_at": end_time,
-                "last_sync_status": "error",
-                "last_sync_message": str(sync_error)
-            }}
+            {"$set": {"last_sync_at": end_time, "last_sync_status": "error", "last_sync_message": str(sync_error)}},
         )
 
         await db.sync_logs.update_one(
             {"id": sync_log_id},
-            {"$set": {
-                "status": "error",
-                "error_message": str(sync_error),
-                "completed_at": end_time,
-                "duration_seconds": duration
-            }}
+            {
+                "$set": {
+                    "status": "error",
+                    "error_message": str(sync_error),
+                    "completed_at": end_time,
+                    "duration_seconds": duration,
+                }
+            },
         )
 
-        logger.error(f"Sync error for campus {campus_id}: {str(sync_error)}")
+        logger.error(f"Sync error for campus {campus_id}: {sync_error!s}")
         return {"success": False, "error": str(sync_error), "duration_seconds": duration}
 
 
@@ -4424,11 +4662,7 @@ async def sync_members_from_core(request: Request) -> dict:
 
 
 @get("/sync/logs")
-async def get_sync_logs(
-    request: Request,
-    limit: int = 5,
-    skip: int = 0
-) -> dict:
+async def get_sync_logs(request: Request, limit: int = 5, skip: int = 0) -> dict:
     """Get sync history logs with pagination"""
     try:
         current_user = await get_current_user(request)
@@ -4438,24 +4672,25 @@ async def get_sync_logs(
 
         # Single $facet query for both data and count
         from services.db_utils import paginated_query
+
         logs, total = await paginated_query(
-            db.sync_logs, {"campus_id": campus_id},
-            sort=[("started_at", -1)], skip=skip, limit=limit,
-            projection={"_id": 0}
+            db.sync_logs,
+            {"campus_id": campus_id},
+            sort=[("started_at", -1)],
+            skip=skip,
+            limit=limit,
+            projection={"_id": 0},
         )
 
-        return {
-            "logs": logs,
-            "total": total,
-            "has_more": skip + len(logs) < total
-        }
+        return {"logs": logs, "total": total, "has_more": skip + len(logs) < total}
 
     except Exception as e:
-        logger.error(f"Error getting sync logs: {str(e)}")
+        logger.error(f"Error getting sync logs: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # ==================== SETUP WIZARD ENDPOINTS ====================
+
 
 @post("/setup/admin")
 async def setup_first_admin(request: SetupAdminRequest) -> dict:
@@ -4465,10 +4700,9 @@ async def setup_first_admin(request: SetupAdminRequest) -> dict:
         DEFAULT_SYSTEM_ADMIN_EMAIL = "admin@gkbj.church"
 
         # Check if a non-default (church) admin already exists
-        church_admin_count = await db.users.count_documents({
-            "role": UserRole.FULL_ADMIN.value,
-            "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
-        })
+        church_admin_count = await db.users.count_documents(
+            {"role": UserRole.FULL_ADMIN.value, "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}}
+        )
 
         if church_admin_count > 0:
             raise HTTPException(status_code=400, detail="Church admin already exists")
@@ -4476,7 +4710,7 @@ async def setup_first_admin(request: SetupAdminRequest) -> dict:
         # Prevent creating another account with the default system admin email
         if request.email.lower() == DEFAULT_SYSTEM_ADMIN_EMAIL.lower():
             raise HTTPException(status_code=400, detail="Cannot use system admin email. Please use a different email.")
-        
+
         # Create first admin
         admin_user = User(
             email=request.email,
@@ -4484,18 +4718,19 @@ async def setup_first_admin(request: SetupAdminRequest) -> dict:
             role=UserRole.FULL_ADMIN,
             campus_id=None,
             phone=normalize_phone_number(request.phone) if request.phone else None,
-            hashed_password=get_password_hash(request.password)
+            hashed_password=get_password_hash(request.password),
         )
-        
+
         await db.users.insert_one(to_mongo_doc(admin_user))
-        
+
         return {"success": True, "message": "Admin account created"}
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating first admin: {str(e)}")
+        logger.error(f"Error creating first admin: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @post("/setup/campus")
 async def setup_first_campus(request: SetupCampusRequest) -> dict:
@@ -4504,13 +4739,11 @@ async def setup_first_campus(request: SetupCampusRequest) -> dict:
         # Guard: only allow campus creation during initial setup
         campus_count = await db.campuses.count_documents({})
         if campus_count > 0:
-            raise HTTPException(status_code=403, detail="Setup already complete. Use authenticated endpoint to add campuses.")
+            raise HTTPException(
+                status_code=403, detail="Setup already complete. Use authenticated endpoint to add campuses."
+            )
 
-        campus = Campus(
-            campus_name=request.campus_name,
-            location=request.location,
-            timezone=request.timezone
-        )
+        campus = Campus(campus_name=request.campus_name, location=request.location, timezone=request.timezone)
 
         await db.campuses.insert_one(to_mongo_doc(campus))
 
@@ -4522,8 +4755,9 @@ async def setup_first_campus(request: SetupCampusRequest) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating first campus: {str(e)}")
+        logger.error(f"Error creating first campus: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/setup/status")
 async def check_setup_status() -> dict:
@@ -4533,26 +4767,26 @@ async def check_setup_status() -> dict:
         DEFAULT_SYSTEM_ADMIN_EMAIL = "admin@gkbj.church"
 
         # Check for church admin (non-default admin)
-        church_admin_count = await db.users.count_documents({
-            "role": UserRole.FULL_ADMIN.value,
-            "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}
-        })
+        church_admin_count = await db.users.count_documents(
+            {"role": UserRole.FULL_ADMIN.value, "email": {"$ne": DEFAULT_SYSTEM_ADMIN_EMAIL}}
+        )
         campus_count = await db.campuses.count_documents({})
 
         return {
             "needs_setup": church_admin_count == 0 or campus_count == 0,
             "has_admin": church_admin_count > 0,
-            "has_campus": campus_count > 0
+            "has_campus": campus_count > 0,
         }
 
     except Exception as e:
-        logger.error(f"Error checking setup status: {str(e)}")
+        logger.error(f"Error checking setup status: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # Token cache for core API authentication (avoids rate limiting)
 # Format: {campus_id: {"token": str, "expires_at": datetime}}
 _core_api_token_cache: dict = {}
+
 
 async def get_cached_core_token(campus_id: str, config: dict) -> str:
     """Get or refresh cached token for core API authentication"""
@@ -4562,12 +4796,12 @@ async def get_cached_core_token(campus_id: str, config: dict) -> str:
     cached = _core_api_token_cache.get(campus_id)
     if cached:
         # Token valid if expires_at is more than 5 minutes from now
-        if cached["expires_at"] > datetime.now(timezone.utc) + timedelta(minutes=5):
+        if cached["expires_at"] > datetime.now(UTC) + timedelta(minutes=5):
             return cached["token"]
 
     # Need to login and get a new token
-    api_path_prefix = config.get('api_path_prefix', '/api')
-    base_url = config['api_base_url'].rstrip('/')
+    api_path_prefix = config.get("api_path_prefix", "/api")
+    base_url = config["api_base_url"].rstrip("/")
     decrypted_pwd = decrypt_password(config["api_password"])
 
     if not decrypted_pwd:
@@ -4575,8 +4809,7 @@ async def get_cached_core_token(campus_id: str, config: dict) -> str:
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         login_response = await client.post(
-            f"{base_url}{api_path_prefix}/auth/login",
-            json={"email": config["api_email"], "password": decrypted_pwd}
+            f"{base_url}{api_path_prefix}/auth/login", json={"email": config["api_email"], "password": decrypted_pwd}
         )
 
         if login_response.status_code != 200:
@@ -4585,10 +4818,7 @@ async def get_cached_core_token(campus_id: str, config: dict) -> str:
         token = login_response.json().get("access_token")
 
         # Cache token for 50 minutes (JWT usually expires in 60)
-        _core_api_token_cache[campus_id] = {
-            "token": token,
-            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=50)
-        }
+        _core_api_token_cache[campus_id] = {"token": token, "expires_at": datetime.now(UTC) + timedelta(minutes=50)}
 
         return token
 
@@ -4602,88 +4832,80 @@ async def receive_sync_webhook(request: Request) -> dict:
     try:
         # Get raw body for signature verification
         body = await request.body()
-        
+
         # Get signature from header
         signature = request.headers.get("X-Webhook-Signature")
         if not signature:
             raise HTTPException(status_code=401, detail="Missing webhook signature")
-        
+
         # Parse JSON body
         try:
             payload = await request.json()
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid JSON payload")
-        
+
         # Get campus_id from payload
         campus_id = payload.get("church_id") or payload.get("campus_id")
         if not campus_id:
             raise HTTPException(status_code=400, detail="Missing campus_id in payload")
-        
+
         # Get sync config for this campus by core church_id or campus_id
-        config = await db.sync_configs.find_one({
-            "$or": [
-                {"core_church_id": campus_id},
-                {"campus_id": campus_id}
-            ]
-        }, {"_id": 0})
+        config = await db.sync_configs.find_one(
+            {"$or": [{"core_church_id": campus_id}, {"campus_id": campus_id}]}, {"_id": 0}
+        )
         if not config:
             logger.warning(f"Webhook received for campus {campus_id} with no sync config")
             raise HTTPException(status_code=404, detail="Sync not configured for this campus")
-        
+
         if not config.get("is_enabled"):
             logger.warning(f"Webhook received for campus {campus_id} but sync is disabled")
             raise HTTPException(status_code=403, detail="Sync is disabled for this campus")
-        
+
         # Verify webhook signature using HMAC
         webhook_secret = config.get("webhook_secret", "")
-        expected_signature = hmac.new(
-            webhook_secret.encode(),
-            body,
-            hashlib.sha256
-        ).hexdigest()
-        
+        expected_signature = hmac.new(webhook_secret.encode(), body, hashlib.sha256).hexdigest()
+
         if not hmac.compare_digest(signature, expected_signature):
             logger.error(f"Invalid webhook signature for campus {campus_id}")
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
-        
+
         # Log webhook delivery
-        await db.webhook_logs.insert_one({
-            "id": generate_uuid(),
-            "campus_id": campus_id,
-            "event_type": payload.get("event_type"),
-            "member_id": payload.get("member_id"),
-            "payload": payload,
-            "signature_valid": True,
-            "received_at": datetime.now(timezone.utc)
-        })
-        
+        await db.webhook_logs.insert_one(
+            {
+                "id": generate_uuid(),
+                "campus_id": campus_id,
+                "event_type": payload.get("event_type"),
+                "member_id": payload.get("member_id"),
+                "payload": payload,
+                "signature_valid": True,
+                "received_at": datetime.now(UTC),
+            }
+        )
+
         # Process webhook based on event type
         event_type = payload.get("event_type")
         member_id = payload.get("member_id")
-        
+
         if event_type == "test" or event_type == "ping":
             # Test webhook - just confirm it works
             return {
                 "success": True,
                 "message": "Webhook test successful! FaithTracker is ready to receive member updates.",
-                "timestamp": datetime.now(timezone.utc)
+                "timestamp": datetime.now(UTC),
             }
         elif event_type in ["member.created", "member.updated", "member.deleted"]:
             # Sync this specific member immediately
             if not member_id:
-                return {
-                    "success": False,
-                    "message": "member_id required in webhook payload for member events"
-                }
-            
+                return {"success": False, "message": "member_id required in webhook payload for member events"}
+
             logger.info(f"Webhook {event_type} received for member {member_id}, syncing...")
 
             try:
                 import httpx
 
                 # Get api_path_prefix with fallback for existing configs
-                api_path_prefix = config.get('api_path_prefix', '/api')
-                base_url = config['api_base_url'].rstrip('/')
+                api_path_prefix = config.get("api_path_prefix", "/api")
+                base_url = config["api_base_url"].rstrip("/")
 
                 # Get cached token (avoids rate limiting)
                 token = await get_cached_core_token(campus_id, config)
@@ -4693,30 +4915,29 @@ async def receive_sync_webhook(request: Request) -> dict:
                         # Archive the member (scoped by campus_id for multi-tenancy)
                         await db.members.update_one(
                             {"external_member_id": member_id, "campus_id": config["campus_id"]},
-                            {"$set": {
-                                "is_archived": True,
-                                "archived_at": datetime.now(timezone.utc),
-                                "archived_reason": "Deleted in core system"
-                            }}
+                            {
+                                "$set": {
+                                    "is_archived": True,
+                                    "archived_at": datetime.now(UTC),
+                                    "archived_reason": "Deleted in core system",
+                                }
+                            },
                         )
                         logger.info(f"Archived member {member_id}")
-                        return {
-                            "success": True,
-                            "message": f"Member archived: {member_id}"
-                        }
+                        return {"success": True, "message": f"Member archived: {member_id}"}
                     else:
                         # Fetch specific member directly from core
                         member_response = await client.get(
                             f"{base_url}{api_path_prefix}/members/{member_id}",
-                            headers={"Authorization": f"Bearer {token}"}
+                            headers={"Authorization": f"Bearer {token}"},
                         )
-                        
+
                         if member_response.status_code != 200:
                             return {
                                 "success": False,
-                                "message": f"Member {member_id} not found in core system (status: {member_response.status_code})"
+                                "message": f"Member {member_id} not found in core system (status: {member_response.status_code})",
                             }
-                        
+
                         core_member = member_response.json()
 
                         # Prepare member data
@@ -4730,9 +4951,9 @@ async def receive_sync_webhook(request: Request) -> dict:
                             "birth_date": core_member.get("date_of_birth"),
                             "gender": core_member.get("gender"),
                             "category": core_member.get("member_status"),
-                            "updated_at": datetime.now(timezone.utc)
+                            "updated_at": datetime.now(UTC),
                         }
-                        
+
                         # Calculate age
                         if core_member.get("date_of_birth"):
                             try:
@@ -4750,16 +4971,13 @@ async def receive_sync_webhook(request: Request) -> dict:
                             # Use SeaweedFS URL directly - no need to download
                             member_data["photo_url"] = photo_url
                             logger.info(f"Using SeaweedFS photo URL for {core_member.get('full_name')}: {photo_url}")
-                        
+
                         # Check if member exists
                         existing = await db.members.find_one({"external_member_id": member_id}, {"_id": 0})
-                        
+
                         if existing:
                             # Update existing
-                            await db.members.update_one(
-                                {"id": existing["id"]},
-                                {"$set": member_data}
-                            )
+                            await db.members.update_one({"id": existing["id"]}, {"$set": member_data})
                             logger.info(f"Updated member {core_member.get('full_name')} via webhook")
                             action = "updated"
                         else:
@@ -4771,34 +4989,28 @@ async def receive_sync_webhook(request: Request) -> dict:
                                 "is_archived": not core_member.get("is_active", True),
                                 "engagement_status": "active",
                                 "days_since_last_contact": 999,
-                                "created_at": datetime.now(timezone.utc)
+                                "created_at": datetime.now(UTC),
                             }
                             await db.members.insert_one(new_member)
                             logger.info(f"Created member {core_member.get('full_name')} via webhook")
                             action = "created"
-                        
+
                         return {
                             "success": True,
                             "message": f"Member {action}: {core_member.get('full_name')}",
-                            "member_id": member_id
+                            "member_id": member_id,
                         }
-            
+
             except Exception as sync_error:
-                logger.error(f"Error syncing member from webhook: {str(sync_error)}")
-                return {
-                    "success": False,
-                    "message": f"Failed to sync member: {str(sync_error)}"
-                }
+                logger.error(f"Error syncing member from webhook: {sync_error!s}")
+                return {"success": False, "message": f"Failed to sync member: {sync_error!s}"}
         else:
-            return {
-                "success": True,
-                "message": f"Webhook received but event type {event_type} not handled"
-            }
-    
+            return {"success": True, "message": f"Webhook received but event type {event_type} not handled"}
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
+        logger.error(f"Error processing webhook: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -4813,10 +5025,7 @@ async def get_reminder_stats(request: Request) -> dict:
         # Count notifications sent today using aggregation (avoids fetching all docs)
         # Use datetime object for comparison since created_at is stored as ISODate
         log_query = {**campus_filter, "created_at": {"$gte": today_start}}
-        pipeline = [
-            {"$match": log_query},
-            {"$group": {"_id": "$status", "count": {"$sum": 1}}}
-        ]
+        pipeline = [{"$match": log_query}, {"$group": {"_id": "$status", "count": {"$sum": 1}}}]
         status_counts = await db.notification_logs.aggregate(pipeline).to_list(10)
         sent_count = next((r["count"] for r in status_counts if r["_id"] == "sent"), 0)
         failed_count = next((r["count"] for r in status_counts if r["_id"] == "failed"), 0)
@@ -4832,7 +5041,7 @@ async def get_reminder_stats(request: Request) -> dict:
             **campus_filter,
             "event_type": "birthday",
             "event_date": {"$gte": today.isoformat(), "$lte": future_date.isoformat()},
-            "completed": False
+            "completed": False,
         }
         birthdays_upcoming = await db.care_events.count_documents(birthday_query)
 
@@ -4840,13 +5049,15 @@ async def get_reminder_stats(request: Request) -> dict:
             "reminders_sent_today": sent_count,
             "reminders_failed_today": failed_count,
             "grief_stages_due_today": grief_due,
-            "birthdays_next_7_days": birthdays_upcoming
+            "birthdays_next_7_days": birthdays_upcoming,
         }
     except Exception as e:
-        logger.error(f"Error getting reminder stats: {str(e)}")
+        logger.error(f"Error getting reminder stats: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
+
 # ==================== STATIC FILES ====================
+
 
 @get("/uploads/{filename:str}")
 async def get_uploaded_file(filename: str) -> dict:
@@ -4866,6 +5077,7 @@ async def get_uploaded_file(filename: str) -> dict:
         raise HTTPException(status_code=404, detail="File not found")
     return LitestarFile(path=filepath)
 
+
 @get("/user-photos/{filename:str}")
 async def get_user_photo(filename: str) -> dict:
     """Serve user profile photos with path traversal protection"""
@@ -4884,7 +5096,9 @@ async def get_user_photo(filename: str) -> dict:
         raise HTTPException(status_code=404, detail="Photo not found")
     return LitestarFile(path=filepath)
 
+
 # ==================== SEARCH ENDPOINT ====================
+
 
 @get("/search")
 async def global_search(q: str, request: Request) -> dict:
@@ -4913,38 +5127,35 @@ async def global_search(q: str, request: Request) -> dict:
             **search_filter,
             "$or": [
                 {"name": {"$regex": safe_query, "$options": "i"}},
-                {"phone": {"$regex": safe_query, "$options": "i"}}
-            ]
+                {"phone": {"$regex": safe_query, "$options": "i"}},
+            ],
         }
-        
+
         members = await db.members.find(member_query, {"_id": 0}).limit(10).to_list(10)
-        
+
         # Search care events
         care_event_query = {
             **search_filter,
             "$or": [
                 {"title": {"$regex": safe_query, "$options": "i"}},
-                {"description": {"$regex": safe_query, "$options": "i"}}
-            ]
+                {"description": {"$regex": safe_query, "$options": "i"}},
+            ],
         }
-        
+
         care_events = await db.care_events.find(care_event_query, {"_id": 0}).limit(10).to_list(10)
-        
+
         # Enrich care events with member names
         for event in care_events:
             if event.get("member_id"):
                 member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0, "name": 1})
                 event["member_name"] = member["name"] if member else "Unknown"
-        
-        return {
-            "members": members,
-            "care_events": care_events
-        }
-    
+
+        return {"members": members, "care_events": care_events}
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in global search: {str(e)}")
+        logger.error(f"Error in global search: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -5072,20 +5283,21 @@ async def advanced_search(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in advanced search: {str(e)}")
+        logger.error(f"Error in advanced search: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 # ==================== ACTIVITY LOG ENDPOINTS ====================
 
+
 @get("/activity-logs")
 async def get_activity_logs(
     request: Request,
-    user_id: Optional[str] = None,
-    action_type: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    limit: int = 100
+    user_id: str | None = None,
+    action_type: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 100,
 ) -> dict:
     """
     Get activity logs with optional filters
@@ -5095,44 +5307,42 @@ async def get_activity_logs(
         current_user = await get_current_user(request)
         # Get user's campus
         campus_id = current_user.get("campus_id")
-        
+
         # Build query
         query = {}
         if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             query["campus_id"] = campus_id
-        
+
         # Filter by user
         if user_id:
             query["user_id"] = user_id
-        
+
         # Filter by action type
         if action_type:
             query["action_type"] = action_type
-        
+
         # Date range filter (default: last 30 days)
         if not start_date:
-            start_datetime = datetime.now(timezone.utc) - timedelta(days=30)
+            start_datetime = datetime.now(UTC) - timedelta(days=30)
         else:
-            start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        
+            start_datetime = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+
         if not end_date:
-            end_datetime = datetime.now(timezone.utc)
+            end_datetime = datetime.now(UTC)
         else:
-            end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-        
-        query["created_at"] = {
-            "$gte": start_datetime,
-            "$lte": end_datetime
-        }
-        
+            end_datetime = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+
+        query["created_at"] = {"$gte": start_datetime, "$lte": end_datetime}
+
         # Get logs
         logs = await db.activity_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-        
+
         return logs
-    
+
     except Exception as e:
-        logger.error(f"Error fetching activity logs: {str(e)}")
+        logger.error(f"Error fetching activity logs: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 @get("/activity-logs/summary")
 async def get_activity_summary(request: Request) -> dict:
@@ -5142,57 +5352,57 @@ async def get_activity_summary(request: Request) -> dict:
     try:
         current_user = await get_current_user(request)
         campus_id = current_user.get("campus_id")
-        
+
         query = {}
         if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
             query["campus_id"] = campus_id
-        
+
         # Last 30 days
-        start_datetime = datetime.now(timezone.utc) - timedelta(days=30)
+        start_datetime = datetime.now(UTC) - timedelta(days=30)
         query["created_at"] = {"$gte": start_datetime}
-        
+
         # Total activities
         total = await db.activity_logs.count_documents(query)
-        
+
         # Get unique users
         users_pipeline = [
             {"$match": query},
             {"$group": {"_id": "$user_id", "name": {"$first": "$user_name"}, "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}}
+            {"$sort": {"count": -1}},
         ]
-        
+
         users = await db.activity_logs.aggregate(users_pipeline).to_list(MAX_LIMIT)
-        
+
         # Count by action type
         actions_pipeline = [
             {"$match": query},
             {"$group": {"_id": "$action_type", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}}
+            {"$sort": {"count": -1}},
         ]
-        
+
         actions = await db.activity_logs.aggregate(actions_pipeline).to_list(MAX_LIMIT)
-        
+
         return {
             "total_activities": total,
             "active_users": len(users),
             "top_users": users[:5],
-            "action_breakdown": actions
+            "action_breakdown": actions,
         }
-    
+
     except Exception as e:
-        logger.error(f"Error fetching activity summary: {str(e)}")
+        logger.error(f"Error fetching activity summary: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
 
 # ==================== SSE REAL-TIME ACTIVITY STREAM ====================
 
 # In-memory event subscribers (keyed by campus_id) - used as fallback
 # when DragonflyDB is unavailable
 from asyncio import Queue
-from typing import Dict, Set
-import asyncio
 
-_activity_subscribers: Dict[str, Set[Queue]] = {}
+_activity_subscribers: dict[str, set[Queue]] = {}
 _subscriber_lock = asyncio.Lock()
+
 
 async def broadcast_activity(campus_id: str, activity: dict):
     """Broadcast an activity event to all in-memory subscribers for a campus.
@@ -5213,6 +5423,7 @@ async def broadcast_activity(campus_id: str, activity: dict):
                     except (asyncio.QueueEmpty, asyncio.QueueFull):
                         pass
 
+
 async def subscribe_to_activities(campus_id: str) -> Queue:
     """Subscribe to activity events for a campus (in-memory fallback)"""
     queue: Queue = Queue(maxsize=100)
@@ -5222,6 +5433,7 @@ async def subscribe_to_activities(campus_id: str) -> Queue:
         _activity_subscribers[campus_id].add(queue)
     return queue
 
+
 async def unsubscribe_from_activities(campus_id: str, queue: Queue):
     """Unsubscribe from activity events (in-memory fallback)"""
     async with _subscriber_lock:
@@ -5229,6 +5441,7 @@ async def unsubscribe_from_activities(campus_id: str, queue: Queue):
             _activity_subscribers[campus_id].discard(queue)
             if not _activity_subscribers[campus_id]:
                 del _activity_subscribers[campus_id]
+
 
 def activity_event_generator(campus_id: str, user_id: str):
     """Generate SSE events using DragonflyDB pub/sub with in-memory fallback.
@@ -5245,6 +5458,7 @@ def activity_event_generator(campus_id: str, user_id: str):
     async def _dragonfly_stream():
         """Stream events via DragonflyDB pub/sub (cross-worker)"""
         from services.cache import get_redis_client
+
         redis_client = get_redis_client()
         if not redis_client:
             return  # Signal caller to use fallback
@@ -5260,10 +5474,7 @@ def activity_event_generator(campus_id: str, user_id: str):
 
             while True:
                 try:
-                    message = await pubsub.get_message(
-                        ignore_subscribe_messages=True,
-                        timeout=heartbeat_interval
-                    )
+                    message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=heartbeat_interval)
                     if message and message["type"] == "message":
                         data = json.loads(message["data"])
                         # Don't send user's own activities back to them
@@ -5300,7 +5511,7 @@ def activity_event_generator(campus_id: str, user_id: str):
                         if activity.get("user_id") != user_id:
                             event_data = json.dumps(activity, default=str)
                             yield f"event: activity\ndata: {event_data}\n\n"
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
 
                 except asyncio.CancelledError:
@@ -5312,6 +5523,7 @@ def activity_event_generator(campus_id: str, user_id: str):
         """Try DragonflyDB pub/sub first, fall back to in-memory."""
         try:
             from services.cache import get_redis_client
+
             redis_client = get_redis_client()
             if redis_client:
                 # Test that we can actually connect for pub/sub
@@ -5327,8 +5539,9 @@ def activity_event_generator(campus_id: str, user_id: str):
 
     return _combined_stream()
 
+
 @get("/stream/activity")
-async def stream_activity(request: Request, token: Optional[str] = None) -> Stream:
+async def stream_activity(request: Request, token: str | None = None) -> Stream:
     """
     Server-Sent Events endpoint for real-time activity updates.
 
@@ -5370,7 +5583,7 @@ async def stream_activity(request: Request, token: Optional[str] = None) -> Stre
                 if user_doc:
                     current_user = user_doc
         except JWTError as e:
-            logger.warning(f"[SSE] Token decode error: {str(e)}")
+            logger.warning(f"[SSE] Token decode error: {e!s}")
             detail = "Token expired" if "expired" in str(e).lower() else "Invalid token"
             raise HTTPException(status_code=401, detail=detail)
 
@@ -5387,19 +5600,23 @@ async def stream_activity(request: Request, token: Optional[str] = None) -> Stre
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
-        }
+        },
     )
 
+
 # ==================== SSE TEST ENDPOINT ====================
+
 
 async def simple_sse_generator():
     """Simple SSE generator for testing"""
     import json
+
     yield f"event: connected\ndata: {json.dumps({'status': 'connected'})}\n\n"
 
     for i in range(10):
         await asyncio.sleep(2)
         yield f"event: heartbeat\ndata: {json.dumps({'count': i, 'timestamp': datetime.now(JAKARTA_TZ).isoformat()})}\n\n"
+
 
 @get("/stream/test")
 async def stream_test() -> Stream:
@@ -5411,10 +5628,12 @@ async def stream_test() -> Stream:
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-        }
+        },
     )
 
+
 # ==================== HEALTH CHECK ENDPOINTS ====================
+
 
 @get("/health")
 async def health_check() -> dict:
@@ -5424,52 +5643,49 @@ async def health_check() -> dict:
     """
     try:
         # Verify database connectivity
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         return {
             "status": "healthy",
             "service": "faithtracker-api",
             "database": "connected",
-            "timestamp": datetime.now(timezone.utc)
+            "timestamp": datetime.now(UTC),
         }
     except Exception as e:
-        logger.error(f"Health check failed - database unreachable: {str(e)}")
+        logger.error(f"Health check failed - database unreachable: {e!s}")
         raise HTTPException(
             status_code=503,
             detail={
                 "status": "unhealthy",
                 "service": "faithtracker-api",
                 "database": "disconnected",
-                "timestamp": datetime.now(timezone.utc)
-            }
+                "timestamp": datetime.now(UTC),
+            },
         )
+
 
 @get("/ready")
 async def readiness_check() -> dict:
     """Readiness probe - can the API handle requests? Checks database connectivity."""
     try:
         # Verify database connectivity with ping
-        await client.admin.command('ping')
-        return {
-            "status": "ready",
-            "database": "connected",
-            "timestamp": datetime.now(timezone.utc)
-        }
+        await client.admin.command("ping")
+        return {"status": "ready", "database": "connected", "timestamp": datetime.now(UTC)}
     except Exception as e:
-        logger.error(f"Readiness check failed: {str(e)}")
+        logger.error(f"Readiness check failed: {e!s}")
         raise HTTPException(
-            status_code=503,
-            detail={"status": "not_ready", "database": "disconnected", "error": str(e)}
+            status_code=503, detail={"status": "not_ready", "database": "disconnected", "error": str(e)}
         )
+
 
 # ==================== LITESTAR APP CONFIGURATION ====================
 
 # CORS Configuration for subdomain architecture
-cors_origins = os.environ.get('ALLOWED_ORIGINS', os.environ.get('FRONTEND_URL', ''))
-cors_origins_list = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
+cors_origins = os.environ.get("ALLOWED_ORIGINS", os.environ.get("FRONTEND_URL", ""))
+cors_origins_list = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
 
 # Security: Don't allow wildcard with credentials - this is a security risk
-if not cors_origins_list or cors_origins_list[0] == '*':
-    if os.environ.get('ENVIRONMENT', 'development') == 'production':
+if not cors_origins_list or cors_origins_list[0] == "*":
+    if os.environ.get("ENVIRONMENT", "development") == "production":
         logger.error(
             "ALLOWED_ORIGINS or FRONTEND_URL must be set in production. "
             "Wildcard CORS with credentials is a security risk."
@@ -5480,7 +5696,7 @@ if not cors_origins_list or cors_origins_list[0] == '*':
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://localhost:8001",
-            "http://127.0.0.1:8001"
+            "http://127.0.0.1:8001",
         ]
         logger.warning("CORS: Using development origins. Set ALLOWED_ORIGINS for production.")
 
@@ -5496,8 +5712,8 @@ cors_config = CORSConfig(
 # Lifecycle functions
 async def on_startup() -> None:
     """Initialize dependencies, cache, and create default admin if needed"""
-    from services.cache import init_cache, get_redis_client
     from dependencies import init_redis
+    from services.cache import get_redis_client, init_cache
 
     try:
         await init_cache()
@@ -5513,26 +5729,20 @@ async def on_startup() -> None:
     init_dependencies(db, SECRET_KEY)
     init_member_routes(invalidate_dashboard_cache, log_activity, msgspec_enc_hook, ROOT_DIR)
     init_care_event_routes(
-        invalidate_dashboard_cache, log_activity, send_whatsapp_message,
-        generate_grief_timeline, generate_accident_followup_timeline,
-        get_campus_timezone, get_date_in_timezone
+        invalidate_dashboard_cache,
+        log_activity,
+        send_whatsapp_message,
+        generate_grief_timeline,
+        generate_accident_followup_timeline,
+        get_campus_timezone,
+        get_date_in_timezone,
     )
     init_grief_support_routes(
-        invalidate_dashboard_cache, log_activity, send_whatsapp_message,
-        get_campus_timezone, get_date_in_timezone
+        invalidate_dashboard_cache, log_activity, send_whatsapp_message, get_campus_timezone, get_date_in_timezone
     )
-    init_accident_followup_routes(
-        invalidate_dashboard_cache, log_activity,
-        get_campus_timezone, get_date_in_timezone
-    )
-    init_financial_aid_routes(
-        invalidate_dashboard_cache, log_activity,
-        _get_engagement_settings_cached
-    )
-    init_dashboard_routes(
-        get_campus_timezone, get_date_in_timezone,
-        get_writeoff_settings
-    )
+    init_accident_followup_routes(invalidate_dashboard_cache, log_activity, get_campus_timezone, get_date_in_timezone)
+    init_financial_aid_routes(invalidate_dashboard_cache, log_activity, _get_engagement_settings_cached)
+    init_dashboard_routes(get_campus_timezone, get_date_in_timezone, get_writeoff_settings)
 
     # Initialize Meilisearch search service
     try:
@@ -5541,10 +5751,12 @@ async def on_startup() -> None:
         meili_ok = await search_svc.init_indexes()
         if meili_ok:
             logger.info("Meilisearch indexes initialized")
+
             # Background task: bulk-index existing data (skip if already done)
             async def _background_index():
                 try:
                     from services.cache import get_redis_client
+
                     redis_client = get_redis_client()
                     already_indexed = False
                     if redis_client:
@@ -5559,8 +5771,7 @@ async def on_startup() -> None:
                         members_count = await search_svc.bulk_index_members()
                         events_count = await search_svc.bulk_index_care_events()
                         logger.info(
-                            f"Meilisearch bulk indexing complete: "
-                            f"{members_count} members, {events_count} care events"
+                            f"Meilisearch bulk indexing complete: {members_count} members, {events_count} care events"
                         )
                         # Set flag to avoid re-indexing on subsequent restarts
                         if redis_client:
@@ -5582,9 +5793,9 @@ async def on_startup() -> None:
     try:
         admin_count = await db.users.count_documents({"role": UserRole.FULL_ADMIN.value})
         if admin_count == 0:
-            admin_email = os.environ.get('ADMIN_EMAIL')
-            admin_password = os.environ.get('ADMIN_PASSWORD')
-            admin_phone = os.environ.get('ADMIN_PHONE', '')
+            admin_email = os.environ.get("ADMIN_EMAIL")
+            admin_password = os.environ.get("ADMIN_PASSWORD")
+            admin_phone = os.environ.get("ADMIN_PHONE", "")
 
             if not admin_email or not admin_password:
                 logger.warning(
@@ -5594,8 +5805,7 @@ async def on_startup() -> None:
             else:
                 if len(admin_password) < 12:
                     logger.warning(
-                        "ADMIN_PASSWORD should be at least 12 characters for security. "
-                        "Admin user not created."
+                        "ADMIN_PASSWORD should be at least 12 characters for security. Admin user not created."
                     )
                 else:
                     default_admin = User(
@@ -5605,14 +5815,14 @@ async def on_startup() -> None:
                         campus_id=None,
                         phone=admin_phone,
                         hashed_password=get_password_hash(admin_password),
-                        is_active=True
+                        is_active=True,
                     )
                     await db.users.insert_one(to_mongo_doc(default_admin))
                     logger.info(f"Default full admin user created: {admin_email}")
 
         start_scheduler()
     except Exception as e:
-        logger.error(f"Error in startup: {str(e)}")
+        logger.error(f"Error in startup: {e!s}")
 
     # Start MongoDB Change Stream watcher for real-time SSE broadcasting.
     # This watches the activity_logs collection for new inserts and publishes
@@ -5620,8 +5830,9 @@ async def on_startup() -> None:
     # If MongoDB is standalone (no replica set), the watcher gracefully falls
     # back to no-op and the manual broadcast in log_activity() remains active.
     try:
-        from services.change_stream import start_change_stream_watcher
         from services.cache import get_redis_client as _get_redis_for_cs
+        from services.change_stream import start_change_stream_watcher
+
         watcher = await start_change_stream_watcher(db, _get_redis_for_cs())
         if watcher and watcher.is_running:
             logger.info("MongoDB Change Stream watcher active - SSE broadcast via change streams")
@@ -5641,6 +5852,7 @@ async def on_shutdown() -> None:
     # Stop change stream watcher before closing database/cache connections
     try:
         from services.change_stream import stop_change_stream_watcher
+
         await stop_change_stream_watcher()
     except Exception as e:
         logger.warning(f"Error stopping change stream watcher: {e}")
@@ -5658,8 +5870,8 @@ async def on_shutdown() -> None:
     client.close()
 
 
-
 # ==================== PASTORAL NOTES ENDPOINTS ====================
+
 
 @post("/pastoral-notes")
 async def create_pastoral_note(data: PastoralNoteCreate, request: Request) -> dict:
@@ -5675,16 +5887,21 @@ async def create_pastoral_note(data: PastoralNoteCreate, request: Request) -> di
 
     # Validate category if provided
     if data.category and data.category not in [c.value for c in NoteCategory]:
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=f"Invalid category. Must be one of: {[c.value for c in NoteCategory]}")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Invalid category. Must be one of: {[c.value for c in NoteCategory]}",
+        )
 
     # Validate follow_up_date format if provided
     if data.follow_up_date:
         try:
-            datetime.strptime(data.follow_up_date, '%Y-%m-%d')
+            datetime.strptime(data.follow_up_date, "%Y-%m-%d")
         except ValueError:
-            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid follow_up_date format. Use YYYY-MM-DD")
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST, detail="Invalid follow_up_date format. Use YYYY-MM-DD"
+            )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     note_id = generate_uuid()
 
     note_doc = {
@@ -5702,7 +5919,7 @@ async def create_pastoral_note(data: PastoralNoteCreate, request: Request) -> di
         "follow_up_date": data.follow_up_date,
         "follow_up_notes": data.follow_up_notes,
         "follow_up_completed": False,
-        "edit_history": []
+        "edit_history": [],
     }
 
     await db.pastoral_notes.insert_one(note_doc)
@@ -5715,7 +5932,7 @@ async def create_pastoral_note(data: PastoralNoteCreate, request: Request) -> di
         action_type=ActivityActionType.CREATE_PASTORAL_NOTE,
         member_id=data.member_id,
         member_name=member["name"],
-        notes=f"Created pastoral note: {data.title}"
+        notes=f"Created pastoral note: {data.title}",
     )
 
     note_doc.pop("_id", None)
@@ -5730,13 +5947,13 @@ async def list_pastoral_notes(
     include_private: bool = False,
     follow_up_due: bool = False,
     page: int = 1,
-    limit: int = 50
+    limit: int = 50,
 ) -> dict:
     """List pastoral notes with filtering options"""
     current_user = await get_current_user(request)
 
     # Build query
-    query: Dict[str, Any] = {}
+    query: dict[str, Any] = {}
 
     # Campus filtering
     if current_user["role"] != "full_admin":
@@ -5755,15 +5972,11 @@ async def list_pastoral_notes(
         query["$or"] = [
             {"is_private": False},
             {"is_private": {"$exists": False}},
-            {"created_by": current_user["id"]}  # Creator can always see their own
+            {"created_by": current_user["id"]},  # Creator can always see their own
         ]
     else:
         # Even with include_private=True, non-creators can't see others' private notes
-        query["$or"] = [
-            {"is_private": False},
-            {"is_private": {"$exists": False}},
-            {"created_by": current_user["id"]}
-        ]
+        query["$or"] = [{"is_private": False}, {"is_private": {"$exists": False}}, {"created_by": current_user["id"]}]
 
     # Follow-up due filtering (overdue or due today)
     if follow_up_due:
@@ -5776,17 +5989,17 @@ async def list_pastoral_notes(
 
     # Single $facet query for both data and count
     from services.db_utils import paginated_query
+
     notes, total = await paginated_query(
-        db.pastoral_notes, query, sort=[("created_at", -1)],
-        skip=skip, limit=limit, projection={"_id": 0}
+        db.pastoral_notes, query, sort=[("created_at", -1)], skip=skip, limit=limit, projection={"_id": 0}
     )
 
     # Enrich with member names (batch lookup to avoid N+1)
     member_ids = list({n["member_id"] for n in notes if n.get("member_id")})
     if member_ids:
-        members = await db.members.find(
-            {"id": {"$in": member_ids}}, {"_id": 0, "id": 1, "name": 1}
-        ).to_list(len(member_ids))
+        members = await db.members.find({"id": {"$in": member_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(
+            len(member_ids)
+        )
         member_map = {m["id"]: m for m in members}
     else:
         member_map = {}
@@ -5795,13 +6008,7 @@ async def list_pastoral_notes(
         m = member_map.get(note.get("member_id"), {})
         note["member_name"] = m.get("name", "Unknown")
 
-    return {
-        "items": notes,
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": (total + limit - 1) // limit
-    }
+    return {"items": notes, "total": total, "page": page, "limit": limit, "pages": (total + limit - 1) // limit}
 
 
 @get("/pastoral-notes/{note_id:str}")
@@ -5847,16 +6054,18 @@ async def update_pastoral_note(note_id: str, data: PastoralNoteUpdate, request: 
 
     # Validate category if provided
     if data.category is not None and data.category not in [c.value for c in NoteCategory] and data.category != "":
-        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=f"Invalid category")
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid category")
 
     # Validate follow_up_date format if provided
     if data.follow_up_date:
         try:
-            datetime.strptime(data.follow_up_date, '%Y-%m-%d')
+            datetime.strptime(data.follow_up_date, "%Y-%m-%d")
         except ValueError:
-            raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="Invalid follow_up_date format. Use YYYY-MM-DD")
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST, detail="Invalid follow_up_date format. Use YYYY-MM-DD"
+            )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Create history entry before updating
     history_entry = {
@@ -5868,7 +6077,7 @@ async def update_pastoral_note(note_id: str, data: PastoralNoteUpdate, request: 
         "previous_category": note.get("category"),
         "previous_is_private": note.get("is_private", False),
         "previous_follow_up_date": note.get("follow_up_date"),
-        "previous_follow_up_notes": note.get("follow_up_notes")
+        "previous_follow_up_notes": note.get("follow_up_notes"),
     }
 
     # Build update
@@ -5891,11 +6100,7 @@ async def update_pastoral_note(note_id: str, data: PastoralNoteUpdate, request: 
 
     # Update with history
     await db.pastoral_notes.update_one(
-        {"id": note_id},
-        {
-            "$set": update_fields,
-            "$push": {"edit_history": history_entry}
-        }
+        {"id": note_id}, {"$set": update_fields, "$push": {"edit_history": history_entry}}
     )
 
     # Get updated note
@@ -5910,7 +6115,7 @@ async def update_pastoral_note(note_id: str, data: PastoralNoteUpdate, request: 
         action_type=ActivityActionType.UPDATE_PASTORAL_NOTE,
         member_id=note["member_id"],
         member_name=member["name"] if member else "Unknown",
-        notes=f"Updated pastoral note: {updated_note.get('title')}"
+        notes=f"Updated pastoral note: {updated_note.get('title')}",
     )
 
     return updated_note
@@ -5930,7 +6135,11 @@ async def delete_pastoral_note(note_id: str, request: Request) -> dict:
         raise PermissionDeniedException("You don't have access to this note")
 
     # Check private note access - only creator or admin can delete
-    if note.get("is_private") and note.get("created_by") != current_user["id"] and current_user["role"] not in ["full_admin", "campus_admin"]:
+    if (
+        note.get("is_private")
+        and note.get("created_by") != current_user["id"]
+        and current_user["role"] not in ["full_admin", "campus_admin"]
+    ):
         raise PermissionDeniedException("Only the creator or admin can delete a private note")
 
     await db.pastoral_notes.delete_one({"id": note_id})
@@ -5944,7 +6153,7 @@ async def delete_pastoral_note(note_id: str, request: Request) -> dict:
         action_type=ActivityActionType.DELETE_PASTORAL_NOTE,
         member_id=note["member_id"],
         member_name=member["name"] if member else "Unknown",
-        notes=f"Deleted pastoral note: {note.get('title')}"
+        notes=f"Deleted pastoral note: {note.get('title')}",
     )
 
     return {"message": "Pastoral note deleted successfully"}
@@ -5967,8 +6176,7 @@ async def complete_note_followup(note_id: str, request: Request) -> dict:
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="This note has no follow-up scheduled")
 
     await db.pastoral_notes.update_one(
-        {"id": note_id},
-        {"$set": {"follow_up_completed": True, "updated_at": datetime.now(timezone.utc)}}
+        {"id": note_id}, {"$set": {"follow_up_completed": True, "updated_at": datetime.now(UTC)}}
     )
 
     return {"message": "Follow-up marked as completed"}
@@ -5989,17 +6197,10 @@ async def get_member_pastoral_notes(member_id: str, request: Request) -> list:
     # Query notes - filter private notes
     query = {
         "member_id": member_id,
-        "$or": [
-            {"is_private": False},
-            {"is_private": {"$exists": False}},
-            {"created_by": current_user["id"]}
-        ]
+        "$or": [{"is_private": False}, {"is_private": {"$exists": False}}, {"created_by": current_user["id"]}],
     }
 
-    notes = await db.pastoral_notes.find(
-        query,
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(500)
+    notes = await db.pastoral_notes.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
 
     return notes
 
@@ -6014,11 +6215,7 @@ async def get_notes_with_followup_due(request: Request) -> list:
     query = {
         "follow_up_date": {"$lte": today},
         "follow_up_completed": False,
-        "$or": [
-            {"is_private": False},
-            {"is_private": {"$exists": False}},
-            {"created_by": current_user["id"]}
-        ]
+        "$or": [{"is_private": False}, {"is_private": {"$exists": False}}, {"created_by": current_user["id"]}],
     }
 
     # Campus filtering
@@ -6058,7 +6255,6 @@ async def get_note_categories() -> list:
         {"value": "work", "label": "Pekerjaan", "label_en": "Work"},
         {"value": "other", "label": "Lainnya", "label_en": "Other"},
     ]
-
 
 
 # All route handlers - must be explicitly listed for Litestar
@@ -6164,7 +6360,6 @@ route_handlers = [
     get_member_pastoral_notes,
     get_notes_with_followup_due,
     get_note_categories,
-
     # Real-time SSE stream
     stream_activity,
     stream_test,
@@ -6183,11 +6378,11 @@ app = Litestar(
     on_startup=[on_startup],
     on_shutdown=[on_shutdown],
     middleware=[
-        DefineMiddleware(RequestTraceMiddleware),      # X-Request-ID + X-Response-Time headers
-        DefineMiddleware(SecurityHeadersMiddleware),    # Security headers (XSS, clickjacking protection)
+        DefineMiddleware(RequestTraceMiddleware),  # X-Request-ID + X-Response-Time headers
+        DefineMiddleware(SecurityHeadersMiddleware),  # Security headers (XSS, clickjacking protection)
         # Note: Compression handled by Angie at edge (Brotli/gzip)
-        DefineMiddleware(RequestSizeLimitMiddleware),   # Limit request body size
-        rate_limit_config.middleware,                   # Rate limiting
+        DefineMiddleware(RequestSizeLimitMiddleware),  # Limit request body size
+        rate_limit_config.middleware,  # Rate limiting
     ],
     openapi_config=OpenAPIConfig(
         title="FaithTracker API",

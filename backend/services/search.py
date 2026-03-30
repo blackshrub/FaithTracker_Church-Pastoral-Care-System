@@ -5,12 +5,11 @@ Multi-tenant via campus_id filtering on all queries.
 Graceful fallback: if Meilisearch is unavailable, returns empty results.
 """
 
-import os
 import logging
-from typing import Optional, Any
+import os
 
 import meilisearch
-from meilisearch.errors import MeilisearchError, MeilisearchApiError, MeilisearchCommunicationError
+from meilisearch.errors import MeilisearchCommunicationError, MeilisearchError
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,7 @@ class SearchService:
     """Meilisearch-backed search service with graceful fallback."""
 
     def __init__(self):
-        self._client: Optional[meilisearch.Client] = None
+        self._client: meilisearch.Client | None = None
         self._available = False
         self._db = None
 
@@ -189,7 +188,7 @@ class SearchService:
             logger.warning(f"Failed to index member {member.get('id')}: {e}")
             return False
 
-    def index_care_event(self, event: dict, member_name: Optional[str] = None) -> bool:
+    def index_care_event(self, event: dict, member_name: str | None = None) -> bool:
         """
         Index a single care event document. Call after create/update.
         If member_name is not provided, uses event's existing member_name field.
@@ -244,7 +243,7 @@ class SearchService:
 
     # ==================== BULK INDEXING ====================
 
-    async def bulk_index_members(self, campus_id: Optional[str] = None) -> int:
+    async def bulk_index_members(self, campus_id: str | None = None) -> int:
         """
         Bulk index all members (optionally filtered by campus_id).
         Returns number of documents indexed.
@@ -286,7 +285,7 @@ class SearchService:
             logger.warning(f"Error during bulk member indexing: {e}")
             return 0
 
-    async def bulk_index_care_events(self, campus_id: Optional[str] = None) -> int:
+    async def bulk_index_care_events(self, campus_id: str | None = None) -> int:
         """
         Bulk index all care events (optionally filtered by campus_id).
         Enriches events with member names.
@@ -403,7 +402,7 @@ class SearchService:
     def multi_search(
         self,
         query: str,
-        campus_id: Optional[str] = None,
+        campus_id: str | None = None,
         limit: int = 10,
     ) -> dict:
         """
@@ -467,7 +466,7 @@ class SearchService:
 
 # ==================== MODULE-LEVEL SINGLETON ====================
 
-_search_service: Optional[SearchService] = None
+_search_service: SearchService | None = None
 
 
 def get_search_service() -> SearchService:
@@ -479,6 +478,7 @@ def get_search_service() -> SearchService:
 
 
 # ==================== DOCUMENT PREPARATION HELPERS ====================
+
 
 def _prepare_member_doc(member: dict) -> dict:
     """Prepare a member document for Meilisearch indexing."""
@@ -499,7 +499,7 @@ def _prepare_member_doc(member: dict) -> dict:
     }
 
 
-def _prepare_care_event_doc(event: dict, member_name: Optional[str] = None) -> dict:
+def _prepare_care_event_doc(event: dict, member_name: str | None = None) -> dict:
     """Prepare a care event document for Meilisearch indexing."""
     return {
         "id": event.get("id", ""),

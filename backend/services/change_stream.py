@@ -26,10 +26,10 @@ can be disabled.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class ChangeStreamWatcher:
         """
         self._db = db
         self._redis_client = redis_client
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._running = False
         self._replica_set_available = False
 
@@ -78,7 +78,7 @@ class ChangeStreamWatcher:
             async with self._db.activity_logs.watch(
                 pipeline=[{"$match": {"operationType": "insert"}}],
                 max_await_time_ms=100,
-            ) as stream:
+            ):
                 # If we got here without error, change streams are supported
                 pass
             return True
@@ -100,11 +100,12 @@ class ChangeStreamWatcher:
             return self._redis_client
         try:
             from services.cache import get_redis_client
+
             return get_redis_client()
         except Exception:
             return None
 
-    async def _load_resume_token(self) -> Optional[dict]:
+    async def _load_resume_token(self) -> dict | None:
         """Load the last resume token from DragonflyDB for crash recovery.
 
         Resume tokens allow the watcher to pick up where it left off after
@@ -159,6 +160,7 @@ class ChangeStreamWatcher:
         # Fallback: in-memory broadcast (import here to avoid circular dependency)
         try:
             from server import broadcast_activity
+
             await broadcast_activity(campus_id, activity_data)
         except Exception as e:
             logger.debug(f"In-memory broadcast from change stream failed: {e}")
@@ -185,7 +187,7 @@ class ChangeStreamWatcher:
         elif created_at:
             timestamp = str(created_at)
         else:
-            timestamp = datetime.now(timezone.utc).isoformat()
+            timestamp = datetime.now(UTC).isoformat()
 
         return {
             "id": full_document.get("id", ""),
@@ -281,9 +283,7 @@ class ChangeStreamWatcher:
             except Exception as e:
                 if not self._running:
                     break
-                logger.warning(
-                    f"Change stream error (reconnecting in {backoff:.1f}s): {e}"
-                )
+                logger.warning(f"Change stream error (reconnecting in {backoff:.1f}s): {e}")
                 try:
                     await asyncio.sleep(backoff)
                 except asyncio.CancelledError:
@@ -331,10 +331,8 @@ class ChangeStreamWatcher:
         self._running = False
         if self._task and not self._task.done():
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             logger.info("Change stream watcher stopped gracefully")
 
     @property
@@ -349,10 +347,10 @@ class ChangeStreamWatcher:
 
 
 # Module-level singleton for convenience
-_watcher: Optional[ChangeStreamWatcher] = None
+_watcher: ChangeStreamWatcher | None = None
 
 
-async def start_change_stream_watcher(db, redis_client=None) -> Optional[ChangeStreamWatcher]:
+async def start_change_stream_watcher(db, redis_client=None) -> ChangeStreamWatcher | None:
     """Initialize and start the global change stream watcher.
 
     Args:
@@ -379,7 +377,7 @@ async def stop_change_stream_watcher() -> None:
         _watcher = None
 
 
-def get_change_stream_watcher() -> Optional[ChangeStreamWatcher]:
+def get_change_stream_watcher() -> ChangeStreamWatcher | None:
     """Get the global change stream watcher instance."""
     return _watcher
 

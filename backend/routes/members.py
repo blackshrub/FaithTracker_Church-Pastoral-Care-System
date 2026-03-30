@@ -3,53 +3,53 @@ FaithTracker Member Routes
 Handles member CRUD operations, photo uploads, and at-risk member listing
 """
 
-from litestar import get, post, put, delete, Request, Response
-from litestar.exceptions import HTTPException
-from litestar.datastructures import UploadFile
-from litestar.params import Parameter
-import msgspec
-import logging
 import io
-from datetime import datetime, timezone
+import logging
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Callable, Awaitable
+
+import msgspec
+from litestar import Request, Response, delete, get, post, put
+from litestar.datastructures import UploadFile
+from litestar.exceptions import HTTPException
+from litestar.params import Parameter
 from PIL import Image
 from pymongo import ReturnDocument
 
-from enums import EngagementStatus, UserRole, ActivityActionType
-from constants import MAX_PAGE_NUMBER, MAX_LIMIT, MAX_IMAGE_SIZE
-from models import (
-    Member, MemberCreate, MemberUpdate,
-    to_mongo_doc, is_valid_uuid
-)
-from utils import (
-    normalize_phone_number, validate_phone,
-    calculate_engagement_status, escape_regex,
-    validate_image_magic_bytes
-)
-from dependencies import (
-    get_db, get_current_user, get_campus_filter, safe_error_detail
-)
+from constants import MAX_IMAGE_SIZE, MAX_LIMIT, MAX_PAGE_NUMBER
+from dependencies import get_campus_filter, get_current_user, get_db, safe_error_detail
+from enums import ActivityActionType, EngagementStatus, UserRole
+from models import Member, MemberCreate, MemberUpdate, is_valid_uuid, to_mongo_doc
 from services.search import get_search_service
+from utils import (
+    calculate_engagement_status,
+    escape_regex,
+    normalize_phone_number,
+    validate_image_magic_bytes,
+    validate_phone,
+)
 
 logger = logging.getLogger(__name__)
 
 # Callbacks to server.py functions (set via init_member_routes)
-_invalidate_dashboard_cache: Optional[Callable[[str], Awaitable[None]]] = None
-_log_activity: Optional[Callable[..., Awaitable[None]]] = None
-_msgspec_enc_hook: Optional[Callable] = None
-_root_dir: Optional[str] = None
+_invalidate_dashboard_cache: Callable[[str], Awaitable[None]] | None = None
+_log_activity: Callable[..., Awaitable[None]] | None = None
+_msgspec_enc_hook: Callable | None = None
+_root_dir: str | None = None
 
 
 def _assert_initialized():
     """Verify all callbacks have been set. Call at the start of mutating handlers."""
     missing = [
-        name for name, val in [
+        name
+        for name, val in [
             ("_invalidate_dashboard_cache", _invalidate_dashboard_cache),
             ("_log_activity", _log_activity),
             ("_msgspec_enc_hook", _msgspec_enc_hook),
             ("_root_dir", _root_dir),
-        ] if val is None
+        ]
+        if val is None
     ]
     if missing:
         raise RuntimeError(
@@ -62,7 +62,7 @@ def init_member_routes(
     invalidate_dashboard_cache: Callable[[str], Awaitable[None]],
     log_activity: Callable[..., Awaitable[None]],
     msgspec_enc_hook: Callable,
-    root_dir: str
+    root_dir: str,
 ):
     """Initialize member routes with callbacks to server.py functions"""
     global _invalidate_dashboard_cache, _log_activity, _msgspec_enc_hook, _root_dir
@@ -73,6 +73,7 @@ def init_member_routes(
 
 
 # ==================== MEMBER ENDPOINTS ====================
+
 
 @post("/members")
 async def create_member(data: MemberCreate, request: Request) -> dict:
@@ -98,7 +99,7 @@ async def create_member(data: MemberCreate, request: Request) -> dict:
             blood_type=data.blood_type,
             marital_status=data.marital_status,
             membership_status=data.membership_status,
-            age=data.age
+            age=data.age,
         )
 
         member_dict = to_mongo_doc(member_obj)
@@ -116,7 +117,7 @@ async def create_member(data: MemberCreate, request: Request) -> dict:
 
         return {"id": member_obj.id, "name": member_obj.name, "campus_id": member_obj.campus_id}
     except Exception as e:
-        logger.error(f"Error creating member: {str(e)}")
+        logger.error(f"Error creating member: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -125,10 +126,10 @@ async def list_members(
     request: Request,
     page: int = Parameter(default=1, ge=1, le=MAX_PAGE_NUMBER),
     limit: int = Parameter(default=50, ge=1, le=MAX_LIMIT),
-    engagement_status: Optional[EngagementStatus] = None,
-    search: Optional[str] = None,
+    engagement_status: EngagementStatus | None = None,
+    search: str | None = None,
     show_archived: bool = False,
-    fields: Optional[str] = None,  # Comma-separated list of fields to return
+    fields: str | None = None,  # Comma-separated list of fields to return
 ) -> Response:
     """List all members with pagination"""
     current_user = await get_current_user(request)
@@ -150,7 +151,7 @@ async def list_members(
             safe_search = escape_regex(search)
             query["$or"] = [
                 {"name": {"$regex": safe_search, "$options": "i"}},  # Partial name match
-                {"phone": {"$regex": safe_search, "$options": "i"}}  # Partial phone match
+                {"phone": {"$regex": safe_search, "$options": "i"}},  # Partial phone match
             ]
 
         # Calculate skip for pagination
@@ -159,10 +160,25 @@ async def list_members(
         # Build projection based on fields parameter or use default
         if fields:
             # Parse comma-separated fields and build projection
-            allowed_fields = {"id", "name", "phone", "campus_id", "photo_url", "last_contact_date",
-                            "engagement_status", "days_since_last_contact", "is_archived",
-                            "external_member_id", "age", "gender", "category", "membership_status",
-                            "marital_status", "blood_type", "birth_date"}
+            allowed_fields = {
+                "id",
+                "name",
+                "phone",
+                "campus_id",
+                "photo_url",
+                "last_contact_date",
+                "engagement_status",
+                "days_since_last_contact",
+                "is_archived",
+                "external_member_id",
+                "age",
+                "gender",
+                "category",
+                "membership_status",
+                "marital_status",
+                "blood_type",
+                "birth_date",
+            }
             requested_fields = [f.strip() for f in fields.split(",")]
             projection = {"_id": 0}
             for field in requested_fields:
@@ -188,36 +204,36 @@ async def list_members(
                 "membership_status": 1,
                 "marital_status": 1,
                 "blood_type": 1,
-                "birth_date": 1
+                "birth_date": 1,
                 # Exclude: notes, address, archived_at, archived_reason, etc.
             }
 
         # Single $facet query for both data and count (replaces separate count_documents + find)
         from services.db_utils import paginated_query
+
         members, total = await paginated_query(
-            db.members, query, sort=[("name", 1)],
-            skip=skip, limit=limit, projection=projection
+            db.members, query, sort=[("name", 1)], skip=skip, limit=limit, projection=projection
         )
-        
+
         # Update engagement status for each member
         for member in members:
-            if member.get('last_contact_date'):
-                if isinstance(member['last_contact_date'], str):
-                    member['last_contact_date'] = datetime.fromisoformat(member['last_contact_date'])
+            if member.get("last_contact_date"):
+                if isinstance(member["last_contact_date"], str):
+                    member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
-            status, days = calculate_engagement_status(member.get('last_contact_date'))
-            member['engagement_status'] = status
-            member['days_since_last_contact'] = days
+            status, days = calculate_engagement_status(member.get("last_contact_date"))
+            member["engagement_status"] = status
+            member["days_since_last_contact"] = days
 
         # Return members array with X-Total-Count header for pagination
         return Response(
             content=msgspec.json.encode(members, enc_hook=_msgspec_enc_hook),
             media_type="application/json",
-            headers={"X-Total-Count": str(total)}
+            headers={"X-Total-Count": str(total)},
         )
-        
+
     except Exception as e:
-        logger.error(f"Error listing members: {str(e)}")
+        logger.error(f"Error listing members: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -241,30 +257,30 @@ async def list_at_risk_members(request: Request) -> list:
             "last_contact_date": 1,
             "engagement_status": 1,
             "days_since_last_contact": 1,
-            "external_member_id": 1
+            "external_member_id": 1,
         }
 
         members = await db.members.find(query, projection).to_list(1000)
 
         at_risk_members = []
         for member in members:
-            if member.get('last_contact_date'):
-                if isinstance(member['last_contact_date'], str):
-                    member['last_contact_date'] = datetime.fromisoformat(member['last_contact_date'])
+            if member.get("last_contact_date"):
+                if isinstance(member["last_contact_date"], str):
+                    member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
-            status, days = calculate_engagement_status(member.get('last_contact_date'))
-            member['engagement_status'] = status
-            member['days_since_last_contact'] = days
+            status, days = calculate_engagement_status(member.get("last_contact_date"))
+            member["engagement_status"] = status
+            member["days_since_last_contact"] = days
 
             if status in [EngagementStatus.AT_RISK, EngagementStatus.DISCONNECTED]:
                 at_risk_members.append(member)
 
         # Sort by days descending
-        at_risk_members.sort(key=lambda x: x['days_since_last_contact'], reverse=True)
+        at_risk_members.sort(key=lambda x: x["days_since_last_contact"], reverse=True)
 
         return at_risk_members
     except Exception as e:
-        logger.error(f"Error getting at-risk members: {str(e)}")
+        logger.error(f"Error getting at-risk members: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -284,19 +300,19 @@ async def get_member(member_id: str, request: Request) -> dict:
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 
-        if member.get('last_contact_date'):
-            if isinstance(member['last_contact_date'], str):
-                member['last_contact_date'] = datetime.fromisoformat(member['last_contact_date'])
+        if member.get("last_contact_date"):
+            if isinstance(member["last_contact_date"], str):
+                member["last_contact_date"] = datetime.fromisoformat(member["last_contact_date"])
 
-        status, days = calculate_engagement_status(member.get('last_contact_date'))
-        member['engagement_status'] = status
-        member['days_since_last_contact'] = days
+        status, days = calculate_engagement_status(member.get("last_contact_date"))
+        member["engagement_status"] = status
+        member["days_since_last_contact"] = days
 
         return member
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting member: {str(e)}")
+        logger.error(f"Error getting member: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -319,19 +335,16 @@ async def update_member(member_id: str, data: MemberUpdate, request: Request) ->
         update_data = {k: v for k, v in to_mongo_doc(data).items() if v is not None}
 
         # Validate and normalize phone number if provided
-        if 'phone' in update_data and update_data['phone']:
-            if not validate_phone(update_data['phone']):
+        if update_data.get("phone"):
+            if not validate_phone(update_data["phone"]):
                 raise HTTPException(status_code=400, detail="Invalid phone number format")
-            update_data['phone'] = normalize_phone_number(update_data['phone'])
+            update_data["phone"] = normalize_phone_number(update_data["phone"])
 
-        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["updated_at"] = datetime.now(UTC)
 
         # Use find_one_and_update for single roundtrip (optimized from 3 queries to 1)
         updated_member = await db.members.find_one_and_update(
-            query,
-            {"$set": update_data},
-            return_document=ReturnDocument.AFTER,
-            projection={"_id": 0}
+            query, {"$set": update_data}, return_document=ReturnDocument.AFTER, projection={"_id": 0}
         )
 
         if not updated_member:
@@ -351,7 +364,7 @@ async def update_member(member_id: str, data: MemberUpdate, request: Request) ->
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating member: {str(e)}")
+        logger.error(f"Error updating member: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -384,7 +397,9 @@ async def delete_member(member_id: str, request: Request) -> dict:
         await db.care_events.delete_many(cascade_filter)
         await db.grief_support.delete_many(cascade_filter)
         await db.accident_followup.delete_many(cascade_filter)
-        await db.activity_logs.delete_many({"member_id": member_id, "campus_id": member_campus_id} if member_campus_id else {"member_id": member_id})
+        await db.activity_logs.delete_many(
+            {"member_id": member_id, "campus_id": member_campus_id} if member_campus_id else {"member_id": member_id}
+        )
 
         # Log activity
         if _log_activity:
@@ -396,7 +411,7 @@ async def delete_member(member_id: str, request: Request) -> dict:
                 member_id=member_id,
                 member_name=member.get("name", "Unknown"),
                 notes=f"Deleted member {member.get('name', 'Unknown')}",
-                user_photo_url=current_user.get("photo_url")
+                user_photo_url=current_user.get("photo_url"),
             )
 
         # Invalidate dashboard cache since member count changed
@@ -413,7 +428,7 @@ async def delete_member(member_id: str, request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting member: {str(e)}")
+        logger.error(f"Error deleting member: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
@@ -438,7 +453,9 @@ async def upload_member_photo(member_id: str, request: Request, data: UploadFile
         # Read and validate file size
         contents = await file.read()
         if len(contents) > MAX_IMAGE_SIZE:
-            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_IMAGE_SIZE // (1024*1024)} MB.")
+            raise HTTPException(
+                status_code=400, detail=f"File too large. Maximum size is {MAX_IMAGE_SIZE // (1024 * 1024)} MB."
+            )
 
         # Security: Validate image by magic bytes (not just Content-Type which can be spoofed)
         is_valid, result = validate_image_magic_bytes(contents)
@@ -450,51 +467,49 @@ async def upload_member_photo(member_id: str, request: Request, data: UploadFile
             image = Image.open(io.BytesIO(contents))
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
-        
+
         # Optimize image: resize and compress
-        image = image.convert('RGB')
-        
+        image = image.convert("RGB")
+
         # Resize to multiple sizes for different contexts
         sizes = {
-            'thumbnail': (100, 100),  # For lists and small avatars
-            'medium': (300, 300),     # For profile views
-            'large': (600, 600)       # For detailed views
+            "thumbnail": (100, 100),  # For lists and small avatars
+            "medium": (300, 300),  # For profile views
+            "large": (600, 600),  # For detailed views
         }
-        
+
         base_filename = f"{member_id}"
         photo_urls = {}
-        
+
         for size_name, (width, height) in sizes.items():
             # Create optimized version
             resized = image.copy()
             resized.thumbnail((width, height), Image.Resampling.LANCZOS)
-            
+
             # Save with optimization (progressive JPEG for faster loading)
             filename = f"{base_filename}_{size_name}.jpg"
             filepath = Path(_root_dir or ".") / "uploads" / filename
             resized.save(filepath, "JPEG", quality=85, optimize=True, progressive=True)
-            
+
             photo_urls[size_name] = f"/uploads/{filename}"
-        
+
         # Update member record with optimized photo URLs
         await db.members.update_one(
             {"id": member_id},
-            {"$set": {
-                "photo_url": photo_urls['medium'],  # Default medium size
-                "photo_urls": photo_urls,  # All sizes available
-                "updated_at": datetime.now(timezone.utc)
-            }}
+            {
+                "$set": {
+                    "photo_url": photo_urls["medium"],  # Default medium size
+                    "photo_urls": photo_urls,  # All sizes available
+                    "updated_at": datetime.now(UTC),
+                }
+            },
         )
-        
-        return {
-            "success": True, 
-            "photo_urls": photo_urls,
-            "default_url": photo_urls['medium']
-        }
+
+        return {"success": True, "photo_urls": photo_urls, "default_url": photo_urls["medium"]}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error uploading photo: {str(e)}")
+        logger.error(f"Error uploading photo: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
