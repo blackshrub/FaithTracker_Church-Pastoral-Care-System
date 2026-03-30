@@ -115,9 +115,8 @@ export default defineConfig({
   build: {
     outDir: 'build', // Match CRA output directory for compatibility
     sourcemap: false,
-    // Use multiple CPU cores for faster builds
-    minify: 'esbuild',
-    // Use esbuild for CSS minification (LightningCSS doesn't support view-transition pseudo-elements)
+    // LightningCSS (Vite 8 default) can't handle view-transition pseudo-elements.
+    // Use esbuild for CSS minification as a workaround.
     cssMinify: 'esbuild',
     // Optimize chunk splitting for better caching
     rollupOptions: {
