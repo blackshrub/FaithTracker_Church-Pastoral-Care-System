@@ -196,20 +196,45 @@ jobs:
           cd backend
           pip install -r requirements.txt
 
+      - name: Initialize test database
+        env:
+          MONGO_URL: mongodb://localhost:27017/faithtracker_test
+          DB_NAME: faithtracker_test
+        run: |
+          cd backend
+          python init_db.py --admin-email admin@test.com --admin-password testpass123 --church-name "Test Church" || true
+          python create_indexes.py || true
+
       - name: Start backend server
         env:
-          MONGODB_URI: mongodb://localhost:27017/faithtracker_test
-          JWT_SECRET: test-secret-key-for-ci
+          MONGO_URL: mongodb://localhost:27017/faithtracker_test
+          DB_NAME: faithtracker_test
+          JWT_SECRET_KEY: test-secret-key-for-ci
           ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItY2k=
+          ENVIRONMENT: development
         run: |
           cd backend
           python -m uvicorn server:app --host 0.0.0.0 --port 8001 &
           sleep 10
+          curl -f http://localhost:8001/health || echo "Backend health check failed"
 
       - name: Install frontend dependencies
         run: |
           cd frontend
           yarn install --frozen-lockfile
+
+      - name: Build frontend
+        env:
+          VITE_BACKEND_URL: http://localhost:8001
+        run: |
+          cd frontend
+          yarn build
+
+      - name: Serve frontend
+        run: |
+          cd frontend
+          npx serve -s build -l 3000 &
+          sleep 3
 
       - name: Install Playwright browsers
         run: |
@@ -218,7 +243,7 @@ jobs:
 
       - name: Run E2E tests
         env:
-          VITE_BACKEND_URL: http://localhost:8001
+          BASE_URL: http://localhost:3000
           TEST_USER_EMAIL: admin@test.com
           TEST_USER_PASSWORD: testpass123
         run: |
