@@ -2853,12 +2853,13 @@ export const Dashboard = () => {
                                   triggerHaptic();
                                   try {
                                     let endpoint;
-                                    if (task.type === 'grief_support')
+                                    if (task.type === 'grief_support') {
                                       endpoint = `${API}/grief-support/${task.data.id}/complete`;
-                                    else if (task.type === 'accident_followup')
+                                    } else if (task.type === 'accident_followup') {
                                       endpoint = `${API}/accident-followup/${task.data.id}/complete`;
-                                    else if (task.type === 'birthday')
+                                    } else if (task.type === 'birthday') {
                                       endpoint = `${API}/care-events/${task.data.id}/complete`;
+                                    }
 
                                     // Debug: console.log('Upcoming complete:', task.type, endpoint, task.data);
 
@@ -2896,14 +2897,15 @@ export const Dashboard = () => {
                                   onClick={async () => {
                                     try {
                                       let endpoint;
-                                      if (task.type === 'grief_support')
+                                      if (task.type === 'grief_support') {
                                         endpoint = `${API}/grief-support/${task.data.id}/ignore`;
-                                      else if (task.type === 'accident_followup')
+                                      } else if (task.type === 'accident_followup') {
                                         endpoint = `${API}/accident-followup/${task.data.id}/ignore`;
-                                      else if (task.type === 'financial_aid')
+                                      } else if (task.type === 'financial_aid') {
                                         endpoint = `${API}/financial-aid-schedules/${task.data.id}/ignore`;
-                                      else if (task.type === 'birthday')
+                                      } else if (task.type === 'birthday') {
                                         endpoint = `${API}/care-events/${task.data.id}/ignore`;
+                                      }
 
                                       if (endpoint) {
                                         await api.post(endpoint.replace(API, ''));

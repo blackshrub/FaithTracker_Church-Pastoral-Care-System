@@ -15,7 +15,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
 // Mock dependencies before importing the hook
 vi.mock('sonner', () => ({
   toast: {
@@ -52,10 +51,11 @@ vi.mock('@/lib/offlineQueue', () => {
 });
 
 // Import after mocks are set up
+import { toast } from 'sonner';
+
 import { useOfflineSync, useOfflineMutation } from '@/hooks/useOfflineSync';
 import { offlineQueue } from '@/lib/offlineQueue';
 import api from '@/lib/api';
-import { toast } from 'sonner';
 
 // Helper: wrapper with QueryClientProvider
 function createWrapper() {
@@ -107,14 +107,18 @@ describe('useOfflineSync - online status', () => {
 
     expect(result.current.isOnline).toBe(true);
 
-    act(() => { goOffline(); });
+    act(() => {
+      goOffline();
+    });
 
     // useSyncExternalStore should pick up the change
     await waitFor(() => {
       expect(result.current.isOnline).toBe(false);
     });
 
-    act(() => { goOnline(); });
+    act(() => {
+      goOnline();
+    });
 
     await waitFor(() => {
       expect(result.current.isOnline).toBe(true);
@@ -165,7 +169,11 @@ describe('useOfflineSync - auto-sync on reconnect', () => {
   });
 
   it('does NOT sync when offline even with pending items', async () => {
-    Object.defineProperty(navigator, 'onLine', { value: false, writable: true, configurable: true });
+    Object.defineProperty(navigator, 'onLine', {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
     offlineQueue.getStats.mockResolvedValue({ pending: 5, failed: 0, completed: 0 });
 
     const wrapper = createWrapper();
@@ -173,7 +181,7 @@ describe('useOfflineSync - auto-sync on reconnect', () => {
 
     // sync should not have been called with the queue's sync function
     // (The hook's sync checks isOnline internally)
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     // The hook sync checks isOnline via isSyncingRef, so offlineQueue.sync may or may not be called
     // The key assertion is that no toast.success is shown
     expect(toast.success).not.toHaveBeenCalled();
@@ -183,7 +191,7 @@ describe('useOfflineSync - auto-sync on reconnect', () => {
 describe('useOfflineSync - sync function', () => {
   it('sets isSyncing during sync and resets after', async () => {
     offlineQueue.sync.mockImplementation(async () => {
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
       return { synced: 1, failed: 0 };
     });
 
@@ -244,7 +252,12 @@ describe('useOfflineSync - sync function', () => {
 
   it('prevents concurrent sync via isSyncingRef', async () => {
     let resolveSync;
-    offlineQueue.sync.mockImplementation(() => new Promise(r => { resolveSync = r; }));
+    offlineQueue.sync.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolveSync = r;
+        })
+    );
 
     const wrapper = createWrapper();
     const { result } = renderHook(() => useOfflineSync(), { wrapper });
@@ -252,7 +265,9 @@ describe('useOfflineSync - sync function', () => {
     // Start first sync
     let sync1Done = false;
     act(() => {
-      result.current.sync().then(() => { sync1Done = true; });
+      result.current.sync().then(() => {
+        sync1Done = true;
+      });
     });
 
     // Start second sync while first is in progress
@@ -267,7 +282,7 @@ describe('useOfflineSync - sync function', () => {
     // Complete first sync
     await act(async () => {
       resolveSync({ synced: 1, failed: 0 });
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
     });
   });
 });
@@ -298,7 +313,11 @@ describe('useOfflineSync - queueOperation', () => {
   });
 
   it('queues operation when offline', async () => {
-    Object.defineProperty(navigator, 'onLine', { value: false, writable: true, configurable: true });
+    Object.defineProperty(navigator, 'onLine', {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
 
     const wrapper = createWrapper();
     const { result } = renderHook(() => useOfflineSync(), { wrapper });
@@ -324,7 +343,11 @@ describe('useOfflineSync - queueOperation', () => {
   });
 
   it('falls back to queue when online request gets network error', async () => {
-    Object.defineProperty(navigator, 'onLine', { value: false, writable: true, configurable: true });
+    Object.defineProperty(navigator, 'onLine', {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
     api.mockRejectedValue({ code: 'ERR_NETWORK' });
 
     const wrapper = createWrapper();
@@ -342,7 +365,11 @@ describe('useOfflineSync - queueOperation', () => {
     });
 
     // Now make the request fail with network error and navigator.onLine is false
-    Object.defineProperty(navigator, 'onLine', { value: false, writable: true, configurable: true });
+    Object.defineProperty(navigator, 'onLine', {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
 
     let opResult;
     await act(async () => {
@@ -438,7 +465,12 @@ describe('useOfflineMutation', () => {
 
   it('sets isLoading during mutation and resets after', async () => {
     let resolveApi;
-    api.mockImplementation(() => new Promise(r => { resolveApi = r; }));
+    api.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolveApi = r;
+        })
+    );
 
     const wrapper = createWrapper();
     const { result } = renderHook(

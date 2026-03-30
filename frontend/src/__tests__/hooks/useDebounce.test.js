@@ -4,7 +4,7 @@
  * Critical for preventing excessive API calls during user input
  */
 
-import { describe, it, expect, beforeEach, afterEach, test } from 'vitest';
+import { describe, expect, beforeEach, afterEach, test } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 import { useDebounce } from '../../hooks/useDebounce';
@@ -25,10 +25,9 @@ describe('useDebounce', () => {
   });
 
   test('debounces value changes', () => {
-    const { result, rerender } = renderHook(
-      ({ value, delay }) => useDebounce(value, delay),
-      { initialProps: { value: 'initial', delay: 300 } }
-    );
+    const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
+      initialProps: { value: 'initial', delay: 300 },
+    });
 
     expect(result.current).toBe('initial');
 
@@ -48,10 +47,9 @@ describe('useDebounce', () => {
   });
 
   test('cancels previous timeout on rapid changes', () => {
-    const { result, rerender } = renderHook(
-      ({ value }) => useDebounce(value, 300),
-      { initialProps: { value: 'first' } }
-    );
+    const { result, rerender } = renderHook(({ value }) => useDebounce(value, 300), {
+      initialProps: { value: 'first' },
+    });
 
     // Rapid changes
     rerender({ value: 'second' });
@@ -75,10 +73,9 @@ describe('useDebounce', () => {
   });
 
   test('respects custom delay', () => {
-    const { result, rerender } = renderHook(
-      ({ value, delay }) => useDebounce(value, delay),
-      { initialProps: { value: 'initial', delay: 500 } }
-    );
+    const { result, rerender } = renderHook(({ value, delay }) => useDebounce(value, delay), {
+      initialProps: { value: 'initial', delay: 500 },
+    });
 
     rerender({ value: 'updated', delay: 500 });
 
@@ -96,10 +93,9 @@ describe('useDebounce', () => {
   });
 
   test('uses default delay when not specified', () => {
-    const { result, rerender } = renderHook(
-      ({ value }) => useDebounce(value),
-      { initialProps: { value: 'initial' } }
-    );
+    const { result, rerender } = renderHook(({ value }) => useDebounce(value), {
+      initialProps: { value: 'initial' },
+    });
 
     rerender({ value: 'updated' });
 
@@ -112,10 +108,9 @@ describe('useDebounce', () => {
   });
 
   test('handles empty string values', () => {
-    const { result, rerender } = renderHook(
-      ({ value }) => useDebounce(value, 300),
-      { initialProps: { value: '' } }
-    );
+    const { result, rerender } = renderHook(({ value }) => useDebounce(value, 300), {
+      initialProps: { value: '' },
+    });
 
     expect(result.current).toBe('');
 
@@ -129,10 +124,9 @@ describe('useDebounce', () => {
   });
 
   test('handles number values', () => {
-    const { result, rerender } = renderHook(
-      ({ value }) => useDebounce(value, 300),
-      { initialProps: { value: 0 } }
-    );
+    const { result, rerender } = renderHook(({ value }) => useDebounce(value, 300), {
+      initialProps: { value: 0 },
+    });
 
     expect(result.current).toBe(0);
 

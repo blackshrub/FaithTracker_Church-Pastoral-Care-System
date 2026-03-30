@@ -26,6 +26,7 @@ export class SectionErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    // eslint-disable-next-line no-console
     console.error(`[${this.props.section || 'Section'}] Error:`, error, errorInfo);
   }
 

@@ -80,7 +80,36 @@ export default [
       'no-duplicate-imports': 'error'
     }
   },
+  // Test file overrides - Vitest globals + relaxed rules
   {
-    ignores: ['build/**', 'node_modules/**', '*.config.js', 'craco.config.js']
+    files: ['src/__tests__/**/*.{js,jsx}', 'src/**/*.test.{js,jsx}', 'src/**/*.spec.{js,jsx}', 'src/test/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        // Vitest globals (used with globals: true in vitest config)
+        vi: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+      }
+    },
+    rules: {
+      'no-console': 'off',
+      'react-compiler/react-compiler': 'off',
+      'import/order': 'off',
+      'no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_|^result$|^sync\\d',
+        caughtErrorsIgnorePattern: '^_',
+        caughtErrors: 'none'
+      }],
+    }
+  },
+  {
+    ignores: ['build/**', 'node_modules/**', '*.config.js', 'craco.config.js', 'e2e/**']
   }
 ];

@@ -1083,8 +1083,16 @@ export const MemberDetail = () => {
         <Card className="mb-4">
           <CardContent className="p-4">
             <div
+              role="button"
+              tabIndex={0}
               className="flex justify-between items-center cursor-pointer"
               onClick={() => setNotesExpanded(!notesExpanded)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setNotesExpanded(!notesExpanded);
+                }
+              }}
             >
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-muted-foreground" />
