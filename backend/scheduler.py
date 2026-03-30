@@ -50,9 +50,14 @@ def safe_parse_date(date_str: str) -> date | None:
     except (ValueError, TypeError):
         return None
 
-# MongoDB connection
+# MongoDB connection - limited pool for background jobs only
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=10,
+    minPoolSize=2,
+    maxIdleTimeMS=30000
+)
 db = client[os.environ.get('DB_NAME', 'pastoral_care_db')]
 
 scheduler = AsyncIOScheduler()
@@ -276,40 +281,12 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "completed": False
         }, {"_id": 0}).to_list(100)
 
-        grief_members = []
-        grief_stage_names = {
-            "1_week": "1 minggu",
-            "2_weeks": "2 minggu",
-            "1_month": "1 bulan",
-            "3_months": "3 bulan",
-            "6_months": "6 bulan",
-            "1_year": "1 tahun"
-        }
-        for stage in grief_due:
-            member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0})
-            if member and member.get('phone'):
-                stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                grief_members.append(f"  - {member['name']} ({stage_name} setelah dukacita)\n    wa.me/{phone_clean}")
-
         # 3b. OVERDUE Grief stages (past due, not completed)
         overdue_grief = await db.grief_support.find({
             "campus_id": campus_id,
             "scheduled_date": {"$lt": today.isoformat()},
             "completed": False
         }, {"_id": 0}).to_list(100)
-
-        overdue_grief_members = []
-        for stage in overdue_grief:
-            member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0})
-            if member and member.get('phone'):
-                scheduled_date = safe_parse_date(stage.get("scheduled_date"))
-                if not scheduled_date:
-                    continue  # Skip if date is invalid
-                stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
-                days_overdue = (today - scheduled_date).days
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                overdue_grief_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
 
         # 4. Accident/illness follow-ups due today
         # Query accident_followup collection (similar to grief_support) with scheduled_date
@@ -320,20 +297,6 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "ignored": {"$ne": True}
         }, {"_id": 0}).to_list(100)
 
-        hospital_followups = []
-        hospital_stage_names = {
-            "first_followup": "tindak lanjut ke-1",
-            "second_followup": "tindak lanjut ke-2",
-            "final_followup": "tindak lanjut akhir"
-        }
-
-        for followup in accident_followups_due:
-            member = await db.members.find_one({"id": followup["member_id"]}, {"_id": 0})
-            if member and member.get('phone'):
-                stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                hospital_followups.append(f"  - {member['name']} ({stage_name})\n    wa.me/{phone_clean}")
-
         # 4b. OVERDUE Hospital follow-ups (past due, not completed)
         overdue_hospital = await db.accident_followup.find({
             "campus_id": campus_id,
@@ -342,18 +305,6 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "ignored": {"$ne": True}
         }, {"_id": 0}).to_list(100)
 
-        overdue_hospital_members = []
-        for followup in overdue_hospital:
-            member = await db.members.find_one({"id": followup["member_id"]}, {"_id": 0})
-            if member and member.get('phone'):
-                scheduled_date = safe_parse_date(followup.get("scheduled_date"))
-                if not scheduled_date:
-                    continue  # Skip if date is invalid
-                stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
-                days_overdue = (today - scheduled_date).days
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                overdue_hospital_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
-
         # 5. Financial aid due today
         financial_aid_due = await db.financial_aid_schedules.find({
             "campus_id": campus_id,
@@ -361,38 +312,12 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             "is_active": True
         }, {"_id": 0}).to_list(100)
 
-        financial_aid_members = []
-        aid_type_names = {
-            "education": "Pendidikan",
-            "medical": "Kesehatan",
-            "living": "Kebutuhan Hidup",
-            "other": "Lainnya"
-        }
-        for aid in financial_aid_due:
-            member = await db.members.find_one({"id": aid["member_id"]}, {"_id": 0})
-            if member and member.get('phone'):
-                aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                financial_aid_members.append(f"  - {member['name']} ({aid_type})\n    wa.me/{phone_clean}")
-
         # 5b. OVERDUE Financial aid (past due, still active)
         overdue_financial_aid = await db.financial_aid_schedules.find({
             "campus_id": campus_id,
             "next_occurrence": {"$lt": today.isoformat()},
             "is_active": True
         }, {"_id": 0}).to_list(100)
-
-        overdue_financial_members = []
-        for aid in overdue_financial_aid:
-            member = await db.members.find_one({"id": aid["member_id"]}, {"_id": 0})
-            if member and member.get('phone'):
-                next_occurrence = safe_parse_date(aid.get("next_occurrence"))
-                if not next_occurrence:
-                    continue  # Skip if date is invalid
-                aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
-                days_overdue = (today - next_occurrence).days
-                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
-                overdue_financial_members.append(f"  - {member['name']} ({aid_type}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
 
 
         # 7. Pastoral Notes with overdue follow-ups (due today or past due)
@@ -413,6 +338,112 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
             {"_id": 0}
         ).to_list(100)
 
+        # ---- Batch member lookup (eliminates N+1 queries) ----
+        # Collect ALL member_ids from ALL result sets, do ONE batched fetch
+        all_member_ids = set()
+        for collection in [grief_due, overdue_grief, accident_followups_due, overdue_hospital,
+                           financial_aid_due, overdue_financial_aid, overdue_notes]:
+            for item in collection:
+                mid = item.get("member_id")
+                if mid:
+                    all_member_ids.add(mid)
+
+        if all_member_ids:
+            members_batch = await db.members.find(
+                {"id": {"$in": list(all_member_ids)}},
+                {"_id": 0, "id": 1, "name": 1, "phone": 1}
+            ).to_list(len(all_member_ids) + 10)
+            member_map = {m["id"]: m for m in members_batch}
+        else:
+            member_map = {}
+
+        # ---- Process grief stages due today ----
+        grief_members = []
+        grief_stage_names = {
+            "1_week": "1 minggu",
+            "2_weeks": "2 minggu",
+            "1_month": "1 bulan",
+            "3_months": "3 bulan",
+            "6_months": "6 bulan",
+            "1_year": "1 tahun"
+        }
+        for stage in grief_due:
+            member = member_map.get(stage["member_id"])
+            if member and member.get('phone'):
+                stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                grief_members.append(f"  - {member['name']} ({stage_name} setelah dukacita)\n    wa.me/{phone_clean}")
+
+        # ---- Process overdue grief stages ----
+        overdue_grief_members = []
+        for stage in overdue_grief:
+            member = member_map.get(stage["member_id"])
+            if member and member.get('phone'):
+                scheduled_date = safe_parse_date(stage.get("scheduled_date"))
+                if not scheduled_date:
+                    continue  # Skip if date is invalid
+                stage_name = grief_stage_names.get(stage["stage"], stage["stage"])
+                days_overdue = (today - scheduled_date).days
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                overdue_grief_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
+
+        # ---- Process accident/illness follow-ups due today ----
+        hospital_followups = []
+        hospital_stage_names = {
+            "first_followup": "tindak lanjut ke-1",
+            "second_followup": "tindak lanjut ke-2",
+            "final_followup": "tindak lanjut akhir"
+        }
+
+        for followup in accident_followups_due:
+            member = member_map.get(followup["member_id"])
+            if member and member.get('phone'):
+                stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                hospital_followups.append(f"  - {member['name']} ({stage_name})\n    wa.me/{phone_clean}")
+
+        # ---- Process overdue hospital follow-ups ----
+        overdue_hospital_members = []
+        for followup in overdue_hospital:
+            member = member_map.get(followup["member_id"])
+            if member and member.get('phone'):
+                scheduled_date = safe_parse_date(followup.get("scheduled_date"))
+                if not scheduled_date:
+                    continue  # Skip if date is invalid
+                stage_name = hospital_stage_names.get(followup.get("stage"), followup.get("stage", "tindak lanjut"))
+                days_overdue = (today - scheduled_date).days
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                overdue_hospital_members.append(f"  - {member['name']} ({stage_name}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
+
+        # ---- Process financial aid due today ----
+        financial_aid_members = []
+        aid_type_names = {
+            "education": "Pendidikan",
+            "medical": "Kesehatan",
+            "living": "Kebutuhan Hidup",
+            "other": "Lainnya"
+        }
+        for aid in financial_aid_due:
+            member = member_map.get(aid["member_id"])
+            if member and member.get('phone'):
+                aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                financial_aid_members.append(f"  - {member['name']} ({aid_type})\n    wa.me/{phone_clean}")
+
+        # ---- Process overdue financial aid ----
+        overdue_financial_members = []
+        for aid in overdue_financial_aid:
+            member = member_map.get(aid["member_id"])
+            if member and member.get('phone'):
+                next_occurrence = safe_parse_date(aid.get("next_occurrence"))
+                if not next_occurrence:
+                    continue  # Skip if date is invalid
+                aid_type = aid_type_names.get(aid.get("aid_type"), aid.get("aid_type", "Bantuan"))
+                days_overdue = (today - next_occurrence).days
+                phone_clean = member['phone'].replace('@s.whatsapp.net', '')
+                overdue_financial_members.append(f"  - {member['name']} ({aid_type}, {days_overdue} hari terlambat)\n    wa.me/{phone_clean}")
+
+        # ---- Process pastoral notes ----
         overdue_notes_formatted = []
         notes_due_today = []
 
@@ -427,7 +458,7 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
         }
 
         for note in overdue_notes:
-            member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1, "phone": 1})
+            member = member_map.get(note["member_id"])
             if member and member.get('phone'):
                 phone_clean = member['phone'].replace('@s.whatsapp.net', '')
                 note_date = safe_parse_date(note.get("follow_up_date"))
@@ -876,6 +907,7 @@ async def refresh_all_dashboard_caches():
         from server import db, get_campus_timezone, get_date_in_timezone, get_writeoff_settings, SECRET_KEY
         from routes.dashboard import calculate_dashboard_reminders, init_dashboard_routes
         from dependencies import init_dependencies
+        from services.cache import get_cache, CacheService
 
         # Initialize dependencies for dashboard module
         init_dependencies(db, SECRET_KEY)
@@ -886,6 +918,9 @@ async def refresh_all_dashboard_caches():
 
         logger.info(f"Refreshing dashboard cache for {len(campuses)} campuses...")
 
+        # Get DragonflyDB cache service for primary caching
+        cache_service = get_cache()
+
         for campus in campuses:
             campus_id = campus["id"]
             campus_tz = campus.get("timezone", "Asia/Jakarta")
@@ -894,7 +929,12 @@ async def refresh_all_dashboard_caches():
             # Calculate fresh data
             data = await calculate_dashboard_reminders(campus_id, campus_tz, today_date)
 
-            # Update cache
+            # Primary cache: Write to DragonflyDB (matches the key format used by dashboard endpoint)
+            if cache_service:
+                cache_key_dragonfly = f"reminders:{today_date}"
+                await cache_service.set(cache_key_dragonfly, data, ttl=CacheService.DASHBOARD_TTL, church_id=campus_id)
+
+            # Fallback/archive: Write to MongoDB
             cache_key = f"dashboard_reminders_{campus_id}_{today_date}"
             await db.dashboard_cache.update_one(
                 {"cache_key": cache_key},

@@ -29,6 +29,7 @@ from bson.errors import InvalidId
 import base64
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import UpdateOne
 import os
 import logging
 import secrets
@@ -3113,27 +3114,30 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
         campus_filter = get_campus_filter(current_user)
         members = await db.members.find({**campus_filter}, {"_id": 0, "id": 1, "last_contact_date": 1}).to_list(MAX_LIMIT)
         
-        updated_count = 0
         stats = {"active": 0, "at_risk": 0, "disconnected": 0}
-        
+        operations = []
+        now = datetime.now(timezone.utc)
+
         for member in members:
             status, days = calculate_engagement_status(
                 member.get("last_contact_date"),
                 at_risk_days,
                 disconnected_days
             )
-            
-            await db.members.update_one(
+            operations.append(UpdateOne(
                 {"id": member["id"]},
                 {"$set": {
                     "engagement_status": status,
                     "days_since_last_contact": days,
-                    "updated_at": datetime.now(timezone.utc)
+                    "updated_at": now
                 }}
-            )
-            
+            ))
             stats[status] = stats.get(status, 0) + 1
-            updated_count += 1
+
+        updated_count = 0
+        if operations:
+            result = await db.members.bulk_write(operations)
+            updated_count = result.modified_count
         
         # Clear dashboard cache for all campuses
         await db.dashboard_cache.delete_many({})
@@ -4743,13 +4747,16 @@ async def get_reminder_stats(request: Request) -> dict:
         campus_filter = get_campus_filter(current_user)
         today_start = datetime.now(JAKARTA_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Count notifications sent today
+        # Count notifications sent today using aggregation (avoids fetching all docs)
         # Use datetime object for comparison since created_at is stored as ISODate
         log_query = {**campus_filter, "created_at": {"$gte": today_start}}
-        logs = await db.notification_logs.find(log_query, {"_id": 0}).to_list(1000)
-
-        sent_count = sum(1 for log in logs if log.get('status') == 'sent')
-        failed_count = sum(1 for log in logs if log.get('status') == 'failed')
+        pipeline = [
+            {"$match": log_query},
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+        ]
+        status_counts = await db.notification_logs.aggregate(pipeline).to_list(10)
+        sent_count = next((r["count"] for r in status_counts if r["_id"] == "sent"), 0)
+        failed_count = next((r["count"] for r in status_counts if r["_id"] == "failed"), 0)
 
         # Count pending grief stages due today
         today = date.today()
@@ -5031,13 +5038,15 @@ async def unsubscribe_from_activities(campus_id: str, queue: Queue):
             if not _activity_subscribers[campus_id]:
                 del _activity_subscribers[campus_id]
 
-def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
+def activity_event_generator(campus_id: str, user_id: str):
     """Generate SSE events using DragonflyDB pub/sub with in-memory fallback.
 
     Primary path: subscribe to DragonflyDB channel ft:{campus_id}:activity
     for cross-worker delivery of activity events.
 
     Fallback path: read from in-memory asyncio.Queue (single-worker only).
+    In-memory queue subscription only happens when DragonflyDB is unavailable,
+    preventing leaked Queue objects when DragonflyDB is the active path.
     """
     import json
 
@@ -5080,7 +5089,12 @@ def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
             await pubsub.aclose()
 
     async def _inmemory_stream():
-        """Stream events via in-memory queue (single-worker fallback)"""
+        """Stream events via in-memory queue (single-worker fallback).
+
+        Subscribes to in-memory queue only when actually used (not when
+        DragonflyDB handles streaming), preventing Queue object leaks.
+        """
+        queue = await subscribe_to_activities(campus_id)
         try:
             # Send initial connection event
             yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
@@ -5115,7 +5129,7 @@ def activity_event_generator(campus_id: str, user_id: str, queue: Queue):
         except Exception as e:
             logger.debug(f"DragonflyDB SSE subscription failed, using in-memory fallback: {e}")
 
-        # Fallback to in-memory queue
+        # Fallback to in-memory queue (subscribe only happens here)
         async for event in _inmemory_stream():
             yield event
 
@@ -5174,11 +5188,8 @@ async def stream_activity(request: Request, token: Optional[str] = None) -> Stre
     campus_id = current_user.get("campus_id") or "global"
     user_id = current_user.get("id", "")
 
-    # Subscribe BEFORE creating Stream to avoid async issues in generator
-    queue = await subscribe_to_activities(campus_id)
-
     return Stream(
-        activity_event_generator(campus_id, user_id, queue),
+        activity_event_generator(campus_id, user_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -5510,10 +5521,19 @@ async def list_pastoral_notes(
         skip=skip, limit=limit, projection={"_id": 0}
     )
 
-    # Enrich with member names
+    # Enrich with member names (batch lookup to avoid N+1)
+    member_ids = list({n["member_id"] for n in notes if n.get("member_id")})
+    if member_ids:
+        members = await db.members.find(
+            {"id": {"$in": member_ids}}, {"_id": 0, "id": 1, "name": 1}
+        ).to_list(len(member_ids))
+        member_map = {m["id"]: m for m in members}
+    else:
+        member_map = {}
+
     for note in notes:
-        member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1})
-        note["member_name"] = member["name"] if member else "Unknown"
+        m = member_map.get(note.get("member_id"), {})
+        note["member_name"] = m.get("name", "Unknown")
 
     return {
         "items": notes,
@@ -5747,12 +5767,21 @@ async def get_notes_with_followup_due(request: Request) -> list:
 
     notes = await db.pastoral_notes.find(query, {"_id": 0}).sort("follow_up_date", 1).to_list(200)
 
-    # Enrich with member names
+    # Enrich with member names (batch lookup to avoid N+1)
+    member_ids = list({n["member_id"] for n in notes if n.get("member_id")})
+    if member_ids:
+        members = await db.members.find(
+            {"id": {"$in": member_ids}}, {"_id": 0, "id": 1, "name": 1, "phone": 1}
+        ).to_list(len(member_ids))
+        member_map = {m["id"]: m for m in members}
+    else:
+        member_map = {}
+
     for note in notes:
-        member = await db.members.find_one({"id": note["member_id"]}, {"_id": 0, "name": 1, "phone": 1})
-        if member:
-            note["member_name"] = member["name"]
-            note["member_phone"] = member.get("phone")
+        m = member_map.get(note.get("member_id"), {})
+        if m:
+            note["member_name"] = m.get("name")
+            note["member_phone"] = m.get("phone")
 
     return notes
 

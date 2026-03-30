@@ -296,6 +296,24 @@ async def migration_010_fix_corrupted_uuids(db):
     return f"Fixed {total_fixed} corrupted UUID(s) across all collections"
 
 
+async def migration_011_fix_activity_logs_index(db):
+    """
+    Fix migration_002 which created an index on activity_logs.action_date,
+    but the actual field in the data model is created_at. Drop the wrong
+    index and create the correct one.
+    """
+    # Drop the incorrect action_date index (if it exists)
+    try:
+        await db.activity_logs.drop_index("action_date_1")
+    except Exception:
+        pass  # Index may not exist if migration_002 was never run or already fixed
+
+    # Create the correct index on created_at
+    await db.activity_logs.create_index("created_at")
+
+    return "Dropped action_date index, created created_at index on activity_logs"
+
+
 # ==================== MIGRATION REGISTRY ====================
 
 # List of all migrations in order
@@ -311,6 +329,7 @@ MIGRATIONS: List[tuple[int, str, Callable]] = [
     (8, "Ensure campus id field", migration_008_ensure_campus_id_field),
     (9, "Ensure user required fields", migration_009_ensure_user_required_fields),
     (10, "Fix corrupted UUIDs", migration_010_fix_corrupted_uuids),
+    (11, "Fix activity_logs action_date index to created_at", migration_011_fix_activity_logs_index),
 ]
 
 

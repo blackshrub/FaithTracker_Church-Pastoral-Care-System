@@ -448,19 +448,40 @@ async def get_dashboard_reminders(request: Request) -> dict:
         campus_tz = await _get_campus_timezone(campus_id)
         today_date = _get_date_in_timezone(campus_tz)
         cache_key = f"reminders:{today_date}"
-        
+
         cache = get_cache()
         if cache:
             cached = await cache.get(cache_key, church_id=campus_id)
             if cached:
                 cached["cache_source"] = "dragonfly"
                 return cached
-        
+
+            # Try to acquire a soft computing lock (prevents thundering herd)
+            lock_key = f"computing:{cache_key}"
+            try:
+                lock_acquired = await cache._client.set(
+                    cache._make_key(lock_key, campus_id), "1", nx=True, ex=30
+                )
+                if not lock_acquired:
+                    # Another worker is computing; wait briefly and try cache again
+                    await asyncio.sleep(1)
+                    cached = await cache.get(cache_key, church_id=campus_id)
+                    if cached:
+                        cached["cache_source"] = "dragonfly"
+                        return cached
+                    # Still no cache; compute anyway (lock might have expired)
+            except Exception:
+                pass  # If lock mechanism fails, just compute normally
+
         data = await calculate_dashboard_reminders(campus_id, campus_tz, today_date)
-        
+
         if cache:
             await cache.set(cache_key, data, ttl=CacheService.DASHBOARD_TTL, church_id=campus_id)
-        
+            try:
+                await cache._client.delete(cache._make_key(lock_key, campus_id))
+            except Exception:
+                pass
+
         data["cache_version"] = datetime.now(timezone.utc).isoformat()
         return data
     except Exception as e:
@@ -476,7 +497,7 @@ async def get_dashboard_stats(request: Request) -> dict:
     try:
         campus_id = current_user.get("campus_id", "global")
         cache_key = "dashboard:stats"
-        
+
         # Try cache first
         cache = get_cache()
         if cache:
@@ -484,7 +505,24 @@ async def get_dashboard_stats(request: Request) -> dict:
             if cached:
                 cached["cache_source"] = "dragonfly"
                 return cached
-        
+
+            # Try to acquire a soft computing lock (prevents thundering herd)
+            lock_key = f"computing:{cache_key}"
+            try:
+                lock_acquired = await cache._client.set(
+                    cache._make_key(lock_key, campus_id), "1", nx=True, ex=30
+                )
+                if not lock_acquired:
+                    # Another worker is computing; wait briefly and try cache again
+                    await asyncio.sleep(1)
+                    cached = await cache.get(cache_key, church_id=campus_id)
+                    if cached:
+                        cached["cache_source"] = "dragonfly"
+                        return cached
+                    # Still no cache; compute anyway (lock might have expired)
+            except Exception:
+                pass  # If lock mechanism fails, just compute normally
+
         # Calculate fresh stats
         member_stats_pipeline = [{"$facet": {
             "total_count": [{"$count": "count"}],
@@ -503,14 +541,18 @@ async def get_dashboard_stats(request: Request) -> dict:
         ]
         financial_aid_result = await db.care_events.aggregate(financial_aid_pipeline).to_list(1)
         total_aid = financial_aid_result[0]["total_aid"] if financial_aid_result else 0
-        
+
         data = {"total_members": total_members, "active_grief_support": active_grief,
                 "members_at_risk": at_risk_count, "month_financial_aid": total_aid}
-        
+
         # Cache the result
         if cache:
             await cache.set(cache_key, data, ttl=CacheService.DASHBOARD_TTL, church_id=campus_id)
-        
+            try:
+                await cache._client.delete(cache._make_key(lock_key, campus_id))
+            except Exception:
+                pass
+
         return data
     except Exception as e:
         logger.error(f"Error getting dashboard stats: {str(e)}")
@@ -613,12 +655,12 @@ async def get_care_events_by_type(request: Request) -> dict:
     try:
         campus_filter = get_campus_filter(current_user)
         query = campus_filter if campus_filter else {}
-        events = await db.care_events.find(query, {"_id": 0, "event_type": 1}).to_list(10000)
-        type_counts = {}
-        for event in events:
-            event_type = event.get('event_type')
-            type_counts[event_type] = type_counts.get(event_type, 0) + 1
-        return [{"type": t, "count": c} for t, c in type_counts.items()]
+        pipeline = [
+            {"$match": query},
+            {"$group": {"_id": "$event_type", "count": {"$sum": 1}}}
+        ]
+        result = await db.care_events.aggregate(pipeline).to_list(20)
+        return [{"type": r["_id"], "count": r["count"]} for r in result]
     except Exception as e:
         logger.error(f"Error getting events by type: {str(e)}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))

@@ -212,7 +212,8 @@ const markMemberContacted = async (memberId, memberName, user, queryClient, t) =
       return;
     }
     // Create a regular contact event which updates last_contact_date
-    const response = await api.post(`/care-events`, {
+    // Backend auto-completes regular_contact events, so no separate /complete call needed
+    await api.post(`/care-events`, {
       member_id: memberId,
       campus_id: user.campus_id,
       event_type: 'regular_contact',
@@ -221,11 +222,6 @@ const markMemberContacted = async (memberId, memberName, user, queryClient, t) =
       description: 'Contacted member - marked from dashboard',
       completed: true,
     });
-
-    // If the event was created, mark it as completed to trigger activity logging
-    if (response.data && response.data.id) {
-      await api.post(`/care-events/${response.data.id}/complete`);
-    }
 
     toast.success(t('toasts.member_contacted', { name: memberName }));
     // Invalidate and refetch dashboard data

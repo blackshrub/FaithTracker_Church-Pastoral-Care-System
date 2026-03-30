@@ -80,6 +80,29 @@ async def create_database_indexes():
     await db.job_locks.create_index("expires_at")
     print("✅ Job locks indexes created")
 
+    # Activity logs - compound index for reports/summaries sorted by date
+    await db.activity_logs.create_index([("campus_id", 1), ("created_at", -1)])
+    print("✅ Activity logs compound index created")
+
+    # Pastoral notes indexes (queried by member, campus, and follow-up due dates)
+    await db.pastoral_notes.create_index("member_id")
+    await db.pastoral_notes.create_index("campus_id")
+    await db.pastoral_notes.create_index([("campus_id", 1), ("follow_up_date", 1), ("follow_up_completed", 1)])
+    print("✅ Pastoral notes indexes created")
+
+    # Care events compound - hot path for dashboard birthday queries
+    await db.care_events.create_index([("campus_id", 1), ("event_type", 1)])
+    print("✅ Care events compound index created")
+
+    # Dashboard cache indexes
+    await db.dashboard_cache.create_index("cache_key", unique=True)
+    await db.dashboard_cache.create_index("calculated_at")
+    print("✅ Dashboard cache indexes created")
+
+    # Members compound for dashboard engagement queries
+    await db.members.create_index([("campus_id", 1), ("is_archived", 1), ("engagement_status", 1)])
+    print("✅ Members engagement compound index created")
+
     print("\n🚀 All database indexes created successfully!")
     print("Expected performance improvements:")
     print("  - Member queries: 5-10x faster")

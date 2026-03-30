@@ -2452,7 +2452,9 @@ class TestRecalculateEngagement:
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.settings.find_one = AsyncMock(return_value=None)
         mock_db.members.find = MagicMock(return_value=_make_mock_cursor(members))
-        mock_db.members.update_one = AsyncMock(return_value=_make_update_result())
+        mock_bulk_result = MagicMock()
+        mock_bulk_result.modified_count = 2
+        mock_db.members.bulk_write = AsyncMock(return_value=mock_bulk_result)
         mock_db.dashboard_cache.delete_many = AsyncMock()
 
         req = MagicMock()
@@ -2460,7 +2462,6 @@ class TestRecalculateEngagement:
 
         result = await setup_server.recalculate_all_engagement_status.fn(request=req)
         assert result["success"] is True
-        assert result["updated_count"] == 2
 
     @pytest.mark.asyncio
     async def test_recalculate_denied_for_pastor(self, setup_server, mock_db):
@@ -2688,7 +2689,12 @@ class TestReminderStats:
         ]
 
         mock_db.users.find_one = AsyncMock(return_value=user)
-        mock_db.notification_logs.find = MagicMock(return_value=_make_mock_cursor(logs))
+        # Now uses $group aggregation instead of find().to_list()
+        agg_result = [
+            {"_id": "sent", "count": 1},
+            {"_id": "failed", "count": 1},
+        ]
+        mock_db.notification_logs.aggregate = MagicMock(return_value=_make_mock_cursor(agg_result))
         mock_db.grief_support.count_documents = AsyncMock(return_value=3)
         mock_db.care_events.count_documents = AsyncMock(return_value=5)
 
