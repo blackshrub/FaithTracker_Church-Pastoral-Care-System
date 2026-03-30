@@ -37,12 +37,11 @@ export interface UsePullToRefreshReturn {
  *   </div>
  * );
  */
-export function usePullToRefresh(onRefresh: () => Promise<void>, options: PullToRefreshOptions = {}): UsePullToRefreshReturn {
-  const {
-    threshold = 80,
-    resistance = 2.5,
-    disabled = false,
-  } = options;
+export function usePullToRefresh(
+  onRefresh: () => Promise<void>,
+  options: PullToRefreshOptions = {}
+): UsePullToRefreshReturn {
+  const { threshold = 80, resistance = 2.5, disabled = false } = options;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
@@ -52,40 +51,46 @@ export function usePullToRefresh(onRefresh: () => Promise<void>, options: PullTo
   const startY = useRef(0);
   const currentY = useRef(0);
 
-  const handleTouchStart = useCallback((e: TouchEvent) => {
-    if (disabled || isRefreshing) return;
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      if (disabled || isRefreshing) return;
 
-    const container = containerRef.current;
-    if (!container) return;
+      const container = containerRef.current;
+      if (!container) return;
 
-    // Only activate if scrolled to top
-    if (container.scrollTop > 0) return;
+      // Only activate if scrolled to top
+      if (container.scrollTop > 0) return;
 
-    startY.current = e.touches[0].clientY;
-    setIsPulling(true);
-  }, [disabled, isRefreshing]);
+      startY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    },
+    [disabled, isRefreshing]
+  );
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (!isPulling || disabled || isRefreshing) return;
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (!isPulling || disabled || isRefreshing) return;
 
-    const container = containerRef.current;
-    if (!container) return;
+      const container = containerRef.current;
+      if (!container) return;
 
-    currentY.current = e.touches[0].clientY;
-    const deltaY = currentY.current - startY.current;
+      currentY.current = e.touches[0].clientY;
+      const deltaY = currentY.current - startY.current;
 
-    // Only track downward pull
-    if (deltaY > 0) {
-      // Apply resistance for natural feel
-      const progress = Math.min(deltaY / resistance, threshold * 1.5);
-      setPullProgress(progress);
+      // Only track downward pull
+      if (deltaY > 0) {
+        // Apply resistance for natural feel
+        const progress = Math.min(deltaY / resistance, threshold * 1.5);
+        setPullProgress(progress);
 
-      // Prevent default scroll when pulling
-      if (container.scrollTop === 0) {
-        e.preventDefault();
+        // Prevent default scroll when pulling
+        if (container.scrollTop === 0) {
+          e.preventDefault();
+        }
       }
-    }
-  }, [isPulling, disabled, isRefreshing, resistance, threshold]);
+    },
+    [isPulling, disabled, isRefreshing, resistance, threshold]
+  );
 
   const handleTouchEnd = useCallback(async () => {
     if (!isPulling || disabled) return;

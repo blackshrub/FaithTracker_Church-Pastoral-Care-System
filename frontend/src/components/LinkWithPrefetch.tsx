@@ -23,7 +23,8 @@ import { usePrefetch } from '@/hooks/usePrefetch';
 /**
  * Check if View Transitions API is supported
  */
-const supportsViewTransitions = typeof document !== 'undefined' && 'startViewTransition' in document;
+const supportsViewTransitions =
+  typeof document !== 'undefined' && 'startViewTransition' in document;
 
 type PrefetchType = 'member' | 'dashboard' | 'membersList';
 
@@ -83,29 +84,32 @@ export function LinkWithPrefetch({
    * Handle click with View Transitions API
    * Creates smooth morphing animation between pages
    */
-  const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Only use View Transitions for same-origin navigation
-    if (!useViewTransition || !supportsViewTransitions) {
-      return; // Let Link handle normally
-    }
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      // Only use View Transitions for same-origin navigation
+      if (!useViewTransition || !supportsViewTransitions) {
+        return; // Let Link handle normally
+      }
 
-    // Prevent default link behavior
-    e.preventDefault();
+      // Prevent default link behavior
+      e.preventDefault();
 
-    // Start view transition with proper async handling
-    // The transition captures the current state, then we navigate
-    const transition = (document as any).startViewTransition(async () => {
-      // Navigate and wait for it to complete
-      navigate(to);
-      // Give React time to update the DOM
-      await new Promise(resolve => setTimeout(resolve, 0));
-    });
+      // Start view transition with proper async handling
+      // The transition captures the current state, then we navigate
+      const transition = (document as any).startViewTransition(async () => {
+        // Navigate and wait for it to complete
+        navigate(to);
+        // Give React time to update the DOM
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
 
-    // Handle transition errors gracefully
-    transition.finished.catch(() => {
-      // Transition interrupted - navigation still happens, no action needed
-    });
-  }, [to, useViewTransition, navigate]);
+      // Handle transition errors gracefully
+      transition.finished.catch(() => {
+        // Transition interrupted - navigation still happens, no action needed
+      });
+    },
+    [to, useViewTransition, navigate]
+  );
 
   return (
     <Link
@@ -127,7 +131,10 @@ export function LinkWithPrefetch({
  * MemberLink - Convenience wrapper for member links
  * Automatically extracts member ID from 'to' prop
  */
-interface MemberLinkProps extends Omit<LinkWithPrefetchProps, 'to' | 'prefetchType' | 'prefetchId'> {
+interface MemberLinkProps extends Omit<
+  LinkWithPrefetchProps,
+  'to' | 'prefetchType' | 'prefetchId'
+> {
   memberId: string;
 }
 
@@ -154,12 +161,7 @@ interface DashboardLinkProps extends Omit<LinkWithPrefetchProps, 'to' | 'prefetc
 
 export function DashboardLink({ children, className, ...props }: DashboardLinkProps) {
   return (
-    <LinkWithPrefetch
-      to="/dashboard"
-      prefetchType="dashboard"
-      className={className}
-      {...props}
-    >
+    <LinkWithPrefetch to="/dashboard" prefetchType="dashboard" className={className} {...props}>
       {children}
     </LinkWithPrefetch>
   );

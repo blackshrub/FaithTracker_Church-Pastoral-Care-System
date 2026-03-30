@@ -1,4 +1,3 @@
-
 import { useTranslation } from 'react-i18next';
 import { Calendar, Baby, Heart, Home, Ambulance, Hospital, DollarSign, Phone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -24,7 +23,7 @@ const config: Record<string, EventTypeConfig> = {
   accident_illness: { icon: Ambulance, color: 'hsl(15, 70%, 58%)', bg: 'hsl(15, 70%, 96%)' },
   hospital_visit: { icon: Hospital, color: 'hsl(200, 40%, 50%)', bg: 'hsl(200, 40%, 95%)' },
   financial_aid: { icon: DollarSign, color: 'hsl(140, 55%, 48%)', bg: 'hsl(140, 55%, 95%)' },
-  regular_contact: { icon: Phone, color: 'hsl(180, 42%, 45%)', bg: 'hsl(180, 35%, 97%)' }
+  regular_contact: { icon: Phone, color: 'hsl(180, 42%, 45%)', bg: 'hsl(180, 35%, 97%)' },
 };
 
 export const EventTypeBadge = ({ type }: EventTypeBadgeProps) => {
@@ -38,7 +37,7 @@ export const EventTypeBadge = ({ type }: EventTypeBadgeProps) => {
       className="text-xs font-medium border-0"
       style={{
         backgroundColor: typeConfig.bg,
-        color: typeConfig.color
+        color: typeConfig.color,
       }}
       data-testid={`event-badge-${type}`}
     >

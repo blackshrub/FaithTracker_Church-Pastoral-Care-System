@@ -27,8 +27,7 @@ const supportsViewTransitions =
  * Check if user prefers reduced motion
  */
 const prefersReducedMotion =
-  typeof window !== 'undefined' &&
-  window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
 export interface UseViewTransitionReturn {
   navigate: (to: string, options?: NavigateOptions) => ViewTransition | undefined;

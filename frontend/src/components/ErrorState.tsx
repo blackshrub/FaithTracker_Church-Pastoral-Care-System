@@ -17,18 +17,18 @@ const errorTypes: Record<string, ErrorConfig> = {
   network: {
     icon: WifiOff,
     title: 'Connection problem',
-    description: 'Please check your internet connection and try again.'
+    description: 'Please check your internet connection and try again.',
   },
   server: {
     icon: ServerCrash,
     title: 'Server error',
-    description: 'Something went wrong on our end. Please try again in a moment.'
+    description: 'Something went wrong on our end. Please try again in a moment.',
   },
   default: {
     icon: AlertCircle,
     title: 'Something went wrong',
-    description: 'An unexpected error occurred. Please try again.'
-  }
+    description: 'An unexpected error occurred. Please try again.',
+  },
 };
 
 interface ErrorWithResponse {
@@ -66,20 +66,20 @@ export function ErrorState({
   onRetry,
   title,
   description,
-  className = ''
+  className = '',
 }: ErrorStateProps) {
   const errorType = getErrorType(error);
   const config = errorTypes[errorType];
   const IconComponent = config.icon;
 
   return (
-    <div className={`flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in ${className}`}>
+    <div
+      className={`flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in ${className}`}
+    >
       <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
         <IconComponent className="w-8 h-8 text-destructive" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">
-        {title || config.title}
-      </h3>
+      <h3 className="text-lg font-semibold text-foreground mb-2">{title || config.title}</h3>
       <p className="text-sm text-muted-foreground max-w-sm mb-6">
         {description || config.description}
       </p>
@@ -100,12 +100,7 @@ interface QueryErrorStateProps {
 }
 
 export function QueryErrorState({ error, refetch }: QueryErrorStateProps) {
-  return (
-    <ErrorState
-      error={error}
-      onRetry={refetch}
-    />
-  );
+  return <ErrorState error={error} onRetry={refetch} />;
 }
 
 export default ErrorState;

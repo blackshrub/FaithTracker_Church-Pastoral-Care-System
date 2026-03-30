@@ -104,12 +104,15 @@ api.interceptors.response.use(
 
       // Wait with exponential backoff
       const delay = getRetryDelay(config.__retryCount - 1);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
 
       // Log retry attempt (in development only)
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
-        console.log(`Retrying request (attempt ${config.__retryCount}/${MAX_RETRIES}):`, config.url);
+        console.log(
+          `Retrying request (attempt ${config.__retryCount}/${MAX_RETRIES}):`,
+          config.url
+        );
       }
 
       return api(config);
@@ -126,9 +129,13 @@ api.interceptors.response.use(
     // Handle 403 Forbidden - only redirect if it's an auth/token issue, not a role-based denial
     if (error.response?.status === 403) {
       const detail = (
-        (error.response?.data as Record<string, unknown>)?.detail as string || ''
+        ((error.response?.data as Record<string, unknown>)?.detail as string) || ''
       ).toLowerCase();
-      if (detail.includes('token') || detail.includes('not authenticated') || detail.includes('credentials')) {
+      if (
+        detail.includes('token') ||
+        detail.includes('not authenticated') ||
+        detail.includes('credentials')
+      ) {
         localStorage.removeItem('token');
         delete api.defaults.headers.common['Authorization'];
         if (!window.location.pathname.includes('/login')) {

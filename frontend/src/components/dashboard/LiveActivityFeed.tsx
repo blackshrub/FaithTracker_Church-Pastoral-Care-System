@@ -7,7 +7,18 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Activity, Wifi, WifiOff, Bell, Check, X, UserPlus, Edit, Trash2, Clock } from 'lucide-react';
+import {
+  Activity,
+  Wifi,
+  WifiOff,
+  Bell,
+  Check,
+  X,
+  UserPlus,
+  Edit,
+  Trash2,
+  Clock,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { useActivityStream, formatActivityMessage } from '@/hooks/useActivityStream';
@@ -76,7 +87,9 @@ const ActivityItem = ({ activity, isNew }: ActivityItemProps) => {
   const colorClass = ACTION_COLORS[activity.action_type] || 'bg-gray-100 text-gray-600';
 
   const photoUrl = activity.user_photo_url
-    ? (activity.user_photo_url.startsWith('http') ? activity.user_photo_url : `${BACKEND_URL}${activity.user_photo_url}`)
+    ? activity.user_photo_url.startsWith('http')
+      ? activity.user_photo_url
+      : `${BACKEND_URL}${activity.user_photo_url}`
     : null;
 
   return (
@@ -87,9 +100,7 @@ const ActivityItem = ({ activity, isNew }: ActivityItemProps) => {
       )}
     >
       <Avatar className="h-8 w-8 flex-shrink-0">
-        {photoUrl ? (
-          <AvatarImage src={photoUrl} alt={activity.user_name} />
-        ) : null}
+        {photoUrl ? <AvatarImage src={photoUrl} alt={activity.user_name} /> : null}
         <AvatarFallback className="bg-teal-100 text-teal-700 text-xs">
           {getInitials(activity.user_name)}
         </AvatarFallback>
@@ -97,12 +108,11 @@ const ActivityItem = ({ activity, isNew }: ActivityItemProps) => {
 
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-900">
-          <span className="font-medium">{activity.user_name}</span>
-          {' '}
+          <span className="font-medium">{activity.user_name}</span>{' '}
           <span className="text-gray-600">
             {t(`activity.${activity.action_type}`, {
               member: activity.member_name,
-              defaultValue: formatActivityMessage(activity).replace(activity.user_name + ' ', '')
+              defaultValue: formatActivityMessage(activity).replace(activity.user_name + ' ', ''),
             })}
           </span>
         </p>
@@ -182,8 +192,12 @@ export function LiveActivityFeed({ maxItems = 10, className }: LiveActivityFeedP
         {activities.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">{t('dashboard.no_recent_activity', 'No recent team activity')}</p>
-            <p className="text-xs mt-1">{t('dashboard.activity_will_appear', 'Activity from teammates will appear here')}</p>
+            <p className="text-sm">
+              {t('dashboard.no_recent_activity', 'No recent team activity')}
+            </p>
+            <p className="text-xs mt-1">
+              {t('dashboard.activity_will_appear', 'Activity from teammates will appear here')}
+            </p>
           </div>
         ) : (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">

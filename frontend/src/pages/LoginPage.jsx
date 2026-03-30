@@ -10,7 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const LoginPage = () => {
@@ -24,36 +30,36 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [loadingCampuses, setLoadingCampuses] = useState(true);
   const [error, setError] = useState('');
-  
+
   useEffect(() => {
     loadCampuses();
   }, []);
-  
+
   const loadCampuses = async () => {
     try {
       const response = await api.get('/campuses');
       // Ensure we always set an array
       const data = response.data;
-      setCampuses(Array.isArray(data) ? data : (data?.campuses || []));
+      setCampuses(Array.isArray(data) ? data : data?.campuses || []);
     } catch (_error) {
       setCampuses([]);
     } finally {
       setLoadingCampuses(false);
     }
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     // Validate campus selection
     if (!campusId) {
       setError('Please select a campus');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       await login(email, password, campusId);
       toast.success('Login successful!');
@@ -64,7 +70,7 @@ export const LoginPage = () => {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-md shadow-lg" data-testid="login-card">
@@ -82,7 +88,7 @@ export const LoginPage = () => {
                 <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="campus">Campus / Gereja</Label>
               {loadingCampuses ? (
@@ -101,9 +107,11 @@ export const LoginPage = () => {
                   </SelectContent>
                 </Select>
               )}
-              <p className="text-xs text-muted-foreground">{t('login_page.select_campus_required')}</p>
+              <p className="text-xs text-muted-foreground">
+                {t('login_page.select_campus_required')}
+              </p>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -116,7 +124,7 @@ export const LoginPage = () => {
                 data-testid="login-email-input"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -129,7 +137,7 @@ export const LoginPage = () => {
                 data-testid="login-password-input"
               />
             </div>
-            
+
             <Button
               type="submit"
               className="w-full bg-teal-500 hover:bg-teal-600 text-white"
@@ -138,7 +146,7 @@ export const LoginPage = () => {
             >
               <LogIn className="w-4 h-4 mr-2" /> Sign In
             </Button>
-            
+
             <div className="text-center text-sm text-muted-foreground mt-4">
               <p className="text-xs">{t('login_page.campus_management_hint')}</p>
             </div>

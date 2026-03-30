@@ -16,7 +16,7 @@
   "import_export": "Impor/Ekspor",
   "messaging": "Pesan",
   "whatsapp_logs": "Log WhatsApp",
-  
+
   "_comment_common": "Common Actions",
   "add": "Tambah",
   "add_member": "Tambah Jemaat",
@@ -69,7 +69,7 @@
   "payment_date": "Tanggal Pembayaran",
   "schedule_start_date": "Tanggal Mulai Jadwal",
   "select_members": "Pilih Jemaat",
-  
+
   "_comment_placeholders": "Placeholders",
   "type_name_or_phone": "Ketik nama atau telepon untuk mencari",
   "search_members": "Cari jemaat...",
@@ -81,7 +81,7 @@
   "enter_title": "Masukkan judul",
   "enter_description": "Masukkan deskripsi",
   "enter_hospital_name": "Masukkan nama rumah sakit",
-  
+
   "_comment_auth": "Authentication",
   "login": "Masuk",
   "logout": "Keluar",
@@ -128,7 +128,7 @@
   "view_all_members": "Lihat Semua Jemaat",
   "ai_pastoral_recommendations": "Rekomendasi Pastoral AI",
   "intelligent_followup": "Saran tindak lanjut cerdas berdasarkan pola jemaat",
-  
+
   "_comment_tabs": "Dashboard Tabs",
   "today": "Hari Ini",
   "birthdays": "Ulang Tahun",
@@ -138,7 +138,7 @@
   "at_risk": "Berisiko",
   "upcoming": "Mendatang",
   "all": "Semua",
-  
+
   "_comment_categories": "Categories",
   "birthday_today": "Ulang Tahun Hari Ini",
   "grief_reminders": "Pengingat Dukacita",
@@ -148,7 +148,7 @@
   "upcoming_events": "Acara Mendatang",
   "recent_activity": "Aktivitas Terkini",
   "financial_aid_due": "Bantuan Keuangan Jatuh Tempo",
-  
+
   "_comment_event_types": "Event Types",
   "event_types": {
     "birthday": "Ulang Tahun",
@@ -160,7 +160,7 @@
     "financial_aid": "Bantuan Keuangan",
     "regular_contact": "Kontak Rutin"
   },
-  
+
   "_comment_aid_types": "Aid Types",
   "aid_types": {
     "education": "Dukungan Pendidikan",
@@ -171,7 +171,7 @@
     "funeral_costs": "Biaya Pemakaman",
     "other": "Lainnya"
   },
-  
+
   "_comment_frequency": "Frequency Options",
   "frequency_options": {
     "one_time": "Sekali",
@@ -179,7 +179,7 @@
     "monthly": "Bulanan",
     "annual": "Tahunan"
   },
-  
+
   "_comment_relationship": "Relationship Options",
   "loading": "Memuat...",
   "quick_care_event_multi": "Kejadian Perawatan Cepat (Multi-Jemaat)",
@@ -237,7 +237,7 @@
   "no_overdue_financial_aid": "Tidak ada jadwal bantuan keuangan yang terlambat",
   "no_at_risk_members": "Tidak ada jemaat yang berisiko",
   "no_disconnected_members": "Tidak ada jemaat terputus - semua terlibat!",
-  
+
   "event_titles": {
     "birthday": "Perayaan Ulang Tahun",
     "childbirth": "Perayaan Bayi Baru",
@@ -246,7 +246,7 @@
     "accident_illness": "Dukungan Medis",
     "regular_contact": "Kontak Rutin"
   },
-  
+
   "relationship_options": {
     "parent": "Orang Tua",
     "child": "Anak",
@@ -256,7 +256,7 @@
     "other_family": "Keluarga Lainnya",
     "friend": "Teman"
   },
-  
+
   "_comment_engagement": "Engagement Status",
   "engagement_status": "Status Keterlibatan",
   "active": "Aktif",
@@ -266,7 +266,7 @@
   "never_contacted": "Belum pernah dihubungi",
   "no_contact_for": "Tidak ada kontak selama",
   "days_risk": "hari - risiko terputus",
-  
+
   "_comment_members_page": "Members Page",
   "total_members_count": "{{count}} total jemaat",
   "showing_members": "Menampilkan {{showing}} dari {{total}} jemaat",
@@ -275,7 +275,7 @@
   "care_history": "Riwayat Perawatan",
   "timeline": "Lini Waktu",
   "hospital": "Rumah Sakit",
-  
+
   "_comment_financial_aid_page": "Financial Aid Page",
   "financial_assistance_tracking": "Pelacakan & Analitik Bantuan Keuangan",
   "total_aid": "Total Bantuan",
@@ -289,7 +289,7 @@
   "aid_event": "kejadian bantuan",
   "provided": "diberikan",
   "assistance_provided": "bantuan diberikan",
-  
+
   "_comment_analytics_page": "Analytics Page",
   "pastoral_care_analytics": "Wawasan & tren perawatan pastoral yang komprehensif",
   "care_event_distribution": "Distribusi Kejadian Perawatan",
@@ -327,7 +327,7 @@
   "care_events_distribution": "Distribusi Kejadian Perawatan",
   "member_care_insights": "Wawasan Perawatan Jemaat",
   "financial_aid_effectiveness": "Efektivitas Bantuan Keuangan",
-  
+
   "_comment_calendar_page": "Calendar Page",
   "pastoral_calendar": "Kalender Pastoral",
   "month_view": "Tampilan Bulan",
@@ -336,7 +336,7 @@
   "events_this_month": "Kejadian Bulan Ini",
   "no_events_scheduled": "Tidak ada kejadian terjadwal",
   "events_on": "Kejadian pada",
-  
+
   "_comment_grief": "Grief Support",
   "grief_stages": {
     "mourning": "Upacara Dukacita",
@@ -347,7 +347,7 @@
     "6_months": "Tindak Lanjut Kelima",
     "1_year": "Tindak Lanjut Keenam (Peringatan 1 Tahun)"
   },
-  
+
   "_comment_messages": "Messages",
   "success_messages": {
     "member_created": "Jemaat berhasil ditambahkan",
@@ -359,7 +359,7 @@
     "stage_completed": "Tahap dukacita ditandai selesai",
     "login_successful": "Login berhasil!"
   },
-  
+
   "error_messages": {
     "member_not_found": "Jemaat tidak ditemukan",
     "failed_to_save": "Gagal menyimpan data",
@@ -369,7 +369,7 @@
     "aid_type_required": "Jenis bantuan harus diisi",
     "aid_amount_required": "Jumlah bantuan harus angka yang valid dan tidak negatif"
   },
-  
+
   "empty_states": {
     "no_members": "Belum ada jemaat. Tambahkan jemaat pertama Anda.",
     "no_care_events": "Belum ada kejadian perawatan.",
@@ -378,14 +378,14 @@
     "no_tasks_today": "Tidak ada tugas untuk hari ini!",
     "no_results_found": "Tidak ada hasil ditemukan"
   },
-  
+
   "_comment_hardcoded_ui": "Hardcoded UI Text",
   "main_tabs": {
     "today": "Hari Ini",
     "overdue": "Terlambat",
     "upcoming": "Mendatang"
   },
-  
+
   "nested_tabs": {
     "birthday": "Ulang Tahun",
     "followups": "Tindak Lanjut",
@@ -393,13 +393,13 @@
     "at_risk": "Berisiko",
     "inactive": "Tidak Aktif"
   },
-  
+
   "buttons": {
     "contacted": "Dihubungi",
     "cancel": "Batal",
     "save_care_event": "Simpan Kejadian Perawatan"
   },
-  
+
   "days_of_week": {
     "monday": "Senin",
     "tuesday": "Selasa",
@@ -409,7 +409,7 @@
     "saturday": "Sabtu",
     "sunday": "Minggu"
   },
-  
+
   "months": {
     "january": "Januari",
     "february": "Februari",
@@ -424,7 +424,7 @@
     "november": "November",
     "december": "Desember"
   },
-  
+
   "form_placeholders": {
     "search_name_phone": "Cari berdasarkan nama atau nomor telepon...",
     "select_event_type": "Pilih jenis kejadian...",
@@ -441,7 +441,7 @@
     "select_date": "Pilih tanggal...",
     "select_payment_date": "Pilih tanggal pembayaran..."
   },
-  
+
   "labels": {
     "selected_members": "Jemaat Terpilih",
     "selected_members_count": "Jemaat Terpilih ({{count}})",
@@ -461,7 +461,7 @@
     "photo": "Foto",
     "family": "Keluarga"
   },
-  
+
   "_comment_toasts": "Toast Messages",
   "toasts": {
     "birthday_completed": "Tugas ulang tahun selesai!",
@@ -513,7 +513,7 @@
     "financial_aid_schedule_created": "Jadwal bantuan keuangan dibuat!",
     "failed_mark_birthday": "Gagal menandai ulang tahun selesai"
   },
-  
+
   "_comment_confirmations": "Confirmation Messages",
   "confirmations": {
     "delete_event": "Hapus kejadian perawatan ini?",
@@ -522,7 +522,7 @@
     "stop_schedule": "Hentikan jadwal bantuan keuangan untuk {{name}}?",
     "remove_ignored_occurrence": "Hapus kejadian yang diabaikan ini ({{date}})?"
   },
-  
+
   "_comment_age_groups": "Age Groups",
   "age_groups": {
     "child": "Anak (0-12)",
@@ -531,7 +531,7 @@
     "adult": "Dewasa (31-60)",
     "senior": "Lansia (60+)"
   },
-  
+
   "_comment_misc": "Miscellaneous",
   "misc": {
     "select": "Pilih",
@@ -550,7 +550,7 @@
     "avg": "rata-rata",
     "members": "jemaat"
   },
-  
+
   "_comment_settings_page": "Settings Page",
   "settings_page": {
     "title": "Pengaturan & Konfigurasi",
@@ -588,7 +588,7 @@
     "campus_timezone": "Zona Waktu Kampus",
     "timezone_affects": "Mempengaruhi waktu pengiriman ringkasan harian dan perhitungan tanggal"
   },
-  
+
   "_comment_analytics_page": "Analytics Page Additional",
   "analytics_page": {
     "high_priority": "Prioritas Tinggi",
@@ -668,7 +668,7 @@
     "loading_members": "Memuat jemaat...",
     "searching_members": "Mencari jemaat..."
   },
-  
+
   "_comment_member_detail": "Member Detail Page",
   "member_detail": {
     "age_label": "Usia",
@@ -706,7 +706,7 @@
     "stop_schedule": "Hentikan Jadwal",
     "ignore_payment": "Abaikan Pembayaran Ini"
   },
-  
+
   "_comment_admin_dashboard": "Admin Dashboard Page",
   "admin_dashboard_page": {
     "manage_campuses": "Kelola Kampus",
@@ -740,7 +740,7 @@
     "recalculation_started": "✅ Perhitungan ulang dimulai! Harap tunggu 15 detik lalu refresh halaman untuk melihat hitungan terbaru.",
     "failed_start_recalculation": "Gagal memulai perhitungan ulang"
   },
-  
+
   "_comment_login_page": "Login Page",
   "login_page": {
     "sign_in_subtitle": "Masuk untuk mengakses sistem perawatan pastoral",
@@ -750,7 +750,7 @@
     "select_campus_required": "Pilih kampus Anda (wajib untuk semua pengguna)",
     "campus_management_hint": "Pilih kampus untuk mengelola lokasi tertentu"
   },
-  
+
   "_comment_bulk_messaging": "Bulk Messaging Page",
   "bulk_messaging_page": {
     "title": "Pesan Massal",
@@ -766,7 +766,7 @@
     "bulk_send_failed": "Pengiriman massal gagal",
     "type_message_placeholder": "Ketik pesan Anda ke tim pastoral..."
   },
-  
+
   "_comment_import_export": "Import/Export Page",
   "import_export_page": {
     "title": "Impor/Ekspor Data",
@@ -812,7 +812,7 @@
     "events_exported": "Kejadian diekspor!",
     "export_failed": "Ekspor gagal"
   },
-  
+
   "_comment_whatsapp_logs": "WhatsApp Logs Page",
   "whatsapp_logs_page": {
     "title": "Log Notifikasi WhatsApp",
@@ -822,12 +822,12 @@
     "message_sent": "Pesan terkirim!",
     "failed_send": "Gagal mengirim pesan"
   },
-  
-  "_comment_reminders": "Reminders Page",  
+
+  "_comment_reminders": "Reminders Page",
   "reminders_page": {
     "failed_load_reminders": "Gagal memuat pengingat"
   },
-  
+
   "_comment_activity_log": "Activity Log Page",
   "activity_log": "Log Aktivitas",
   "Activity Log": "Log Aktivitas",
@@ -852,7 +852,7 @@
   "Activity History": "Riwayat Aktivitas",
   "records": "catatan",
   "No activity records found for the selected filters": "Tidak ada catatan aktivitas untuk filter yang dipilih",
-  
+
   "_comment_components": "Reusable Components",
   "components": {
     "app_name": "FaithTracker",

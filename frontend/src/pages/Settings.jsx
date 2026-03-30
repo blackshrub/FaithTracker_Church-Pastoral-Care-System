@@ -7,7 +7,20 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Settings as SettingsIcon, Bell, Heart, Zap, Users, Clock, UserCircle, Upload, RefreshCw, Search, Eye, EyeOff } from 'lucide-react';
+import {
+  Settings as SettingsIcon,
+  Bell,
+  Heart,
+  Zap,
+  Users,
+  Clock,
+  UserCircle,
+  Upload,
+  RefreshCw,
+  Search,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
@@ -15,7 +28,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FilterRuleBuilder from '@/components/FilterRuleBuilder';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -41,7 +60,7 @@ export const Settings = () => {
   const [profileData, setProfileData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
 
@@ -50,7 +69,7 @@ export const Settings = () => {
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [savingPassword, setSavingPassword] = useState(false);
 
@@ -60,14 +79,16 @@ export const Settings = () => {
       await api.put('/auth/profile', {
         name: profileData.name,
         email: profileData.email,
-        phone: profileData.phone
+        phone: profileData.phone,
       });
       toast.success(t('profile_updated_successfully'));
       setEditingProfile(false);
       // Refresh user data without full page reload
       await refreshUser();
     } catch (error) {
-      toast.error(t('failed_update_profile') + ': ' + (error.response?.data?.detail || error.message));
+      toast.error(
+        t('failed_update_profile') + ': ' + (error.response?.data?.detail || error.message)
+      );
     } finally {
       setSavingProfile(false);
     }
@@ -90,7 +111,7 @@ export const Settings = () => {
       setSavingPassword(true);
       await api.post('/auth/change-password', {
         current_password: passwordData.currentPassword,
-        new_password: passwordData.newPassword
+        new_password: passwordData.newPassword,
       });
       toast.success(t('password_changed_successfully'));
       setChangingPassword(false);
@@ -101,13 +122,13 @@ export const Settings = () => {
       setSavingPassword(false);
     }
   };
-  
+
   useEffect(() => {
     if (user) {
       setProfileData({
         name: user.name || '',
         email: user.email || '',
-        phone: user.phone || ''
+        phone: user.phone || '',
       });
     }
   }, [user]);
@@ -128,13 +149,13 @@ export const Settings = () => {
     open: false,
     title: '',
     description: '',
-    onConfirm: () => {}
+    onConfirm: () => {},
   });
-  
+
   const showConfirm = (title, description, onConfirm) => {
     setConfirmDialog({ open: true, title, description, onConfirm });
   };
-  
+
   const closeConfirm = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
@@ -164,7 +185,7 @@ export const Settings = () => {
       await api.put('/settings/automation', {
         digestTime,
         whatsappGateway,
-        enabled: true
+        enabled: true,
       });
       toast.success('Automation settings saved successfully');
     } catch (error) {
@@ -181,7 +202,7 @@ export const Settings = () => {
     { stage: 'final_followup', days: 14, name: 'Final Follow-up' },
   ]);
   const [uploading, setUploading] = useState(false);
-  
+
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -192,7 +213,7 @@ export const Settings = () => {
       formData.append('file', file);
 
       await api.post(`/users/${user.id}/photo`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       toast.success('Profile photo updated successfully');
@@ -221,7 +242,7 @@ export const Settings = () => {
     filter_mode: 'include',
     filter_rules: [],
     webhook_secret: '',
-    is_enabled: false
+    is_enabled: false,
   });
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [syncLogs, setSyncLogs] = useState([]);
@@ -234,7 +255,7 @@ export const Settings = () => {
   const [discovering, setDiscovering] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  
+
   const loadSyncConfig = async () => {
     try {
       const response = await api.get(`/sync/config`);
@@ -246,7 +267,7 @@ export const Settings = () => {
           ...response.data,
           api_path_prefix: response.data.api_path_prefix ?? '/api',
           api_login_endpoint: response.data.api_login_endpoint ?? '/auth/login',
-          api_members_endpoint: response.data.api_members_endpoint ?? '/members/'
+          api_members_endpoint: response.data.api_members_endpoint ?? '/members/',
         });
       } else {
         // Debug: console.log('No sync config data returned');
@@ -278,9 +299,9 @@ export const Settings = () => {
         api_login_endpoint: syncConfig.api_login_endpoint,
         api_members_endpoint: syncConfig.api_members_endpoint,
         api_email: syncConfig.api_email,
-        api_password: syncConfig.api_password
+        api_password: syncConfig.api_password,
       });
-      
+
       if (response.data.success) {
         toast.success(response.data.message);
       } else {
@@ -292,13 +313,13 @@ export const Settings = () => {
       setTesting(false);
     }
   };
-  
+
   const saveSyncConfig = async () => {
     try {
       await api.post(`/sync/config`, syncConfig);
       toast.success('Sync configuration saved successfully');
       await loadSyncConfig();
-      
+
       // If sync is enabled, automatically trigger initial sync
       if (syncConfig.is_enabled) {
         setTimeout(async () => {
@@ -306,7 +327,10 @@ export const Settings = () => {
           setSyncing(true);
           try {
             const response = await api.post(`/sync/members/pull`);
-            toast.success(response.data.message + ` - ${response.data.stats.created} created, ${response.data.stats.updated} updated`);
+            toast.success(
+              response.data.message +
+                ` - ${response.data.stats.created} created, ${response.data.stats.updated} updated`
+            );
             await loadSyncLogs();
             await loadSyncConfig();
           } catch (error) {
@@ -317,15 +341,20 @@ export const Settings = () => {
         }, 500);
       }
     } catch (error) {
-      toast.error('Failed to save configuration: ' + (error.response?.data?.detail || error.message));
+      toast.error(
+        'Failed to save configuration: ' + (error.response?.data?.detail || error.message)
+      );
     }
   };
-  
+
   const syncNow = async () => {
     setSyncing(true);
     try {
       const response = await api.post(`/sync/members/pull`);
-      toast.success(response.data.message + ` - ${response.data.stats.created} created, ${response.data.stats.updated} updated`);
+      toast.success(
+        response.data.message +
+          ` - ${response.data.stats.created} created, ${response.data.stats.updated} updated`
+      );
       loadSyncLogs();
     } catch (error) {
       toast.error('Sync failed: ' + (error.response?.data?.detail || error.message));
@@ -349,9 +378,9 @@ export const Settings = () => {
         api_base_url: syncConfig.api_base_url,
         api_email: syncConfig.api_email,
         api_password: syncConfig.api_password,
-        polling_interval_hours: syncConfig.polling_interval_hours
+        polling_interval_hours: syncConfig.polling_interval_hours,
       });
-      
+
       setAvailableFields(response.data.fields);
       toast.success(response.data.message);
     } catch (error) {
@@ -361,7 +390,6 @@ export const Settings = () => {
     }
   };
 
-  
   // Load engagement, grief, and accident settings from backend on mount
   useEffect(() => {
     const loadSettings = async () => {
@@ -373,12 +401,22 @@ export const Settings = () => {
         ]);
         if (engRes.status === 'fulfilled' && engRes.value.data) {
           setAtRiskDays(engRes.value.data.atRiskDays ?? 60);
-          setInactiveDays(engRes.value.data.disconnectedDays ?? engRes.value.data.inactiveDays ?? 90);
+          setInactiveDays(
+            engRes.value.data.disconnectedDays ?? engRes.value.data.inactiveDays ?? 90
+          );
         }
-        if (griefRes.status === 'fulfilled' && Array.isArray(griefRes.value.data) && griefRes.value.data.length > 0) {
+        if (
+          griefRes.status === 'fulfilled' &&
+          Array.isArray(griefRes.value.data) &&
+          griefRes.value.data.length > 0
+        ) {
           setGriefStages(griefRes.value.data);
         }
-        if (accidentRes.status === 'fulfilled' && Array.isArray(accidentRes.value.data) && accidentRes.value.data.length > 0) {
+        if (
+          accidentRes.status === 'fulfilled' &&
+          Array.isArray(accidentRes.value.data) &&
+          accidentRes.value.data.length > 0
+        ) {
           setAccidentFollowUp(accidentRes.value.data);
         }
       } catch (_error) {
@@ -391,24 +429,25 @@ export const Settings = () => {
   useEffect(() => {
     loadCampusCount();
   }, []);
-  
+
   const loadCampusCount = async () => {
     try {
       const response = await api.get(`/campuses`);
       setCampusCount(response.data.length);
-      
+
       // Load timezone from user's campus
-      const defaultTimezone = import.meta.env.VITE_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const defaultTimezone =
+        import.meta.env.VITE_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (user?.campus_id && user.campus_id !== 'campus_id') {
         try {
           const campusRes = await api.get(`/campuses/${user.campus_id}`);
           setCampusTimezone(campusRes.data.timezone || defaultTimezone);
-          setCampusData(campusRes.data);  // Store full campus data
+          setCampusData(campusRes.data); // Store full campus data
         } catch (error) {
           setCampusTimezone(defaultTimezone);
         }
       }
-      
+
       // Load writeoff settings
       const writeoffRes = await api.get(`/settings/overdue_writeoff`);
       if (writeoffRes.data?.data) {
@@ -429,38 +468,38 @@ export const Settings = () => {
           birthday: parseInt(writeoffBirthday),
           financial_aid: parseInt(writeoffFinancialAid),
           accident_illness: parseInt(writeoffAccident),
-          grief_support: parseInt(writeoffGrief)
-        }
+          grief_support: parseInt(writeoffGrief),
+        },
       });
       toast.success(t('toasts.writeoff_saved'));
     } catch (error) {
       toast.error(t('toasts.failed_save_writeoff'));
     }
   };
-  
+
   const saveTimezoneSettings = async () => {
     try {
       if (!user?.campus_id) {
         toast.error('No campus assigned to user');
         return;
       }
-      
+
       if (!campusData) {
         toast.error('Campus data not loaded');
         return;
       }
-      
+
       await api.put(`/campuses/${user.campus_id}`, {
         campus_name: campusData.campus_name,
         location: campusData.location,
-        timezone: campusTimezone
+        timezone: campusTimezone,
       });
       toast.success(t('toasts.timezone_saved'));
     } catch (error) {
       toast.error(t('toasts.failed_save_timezone'));
     }
   };
-  
+
   const saveEngagementSettings = async () => {
     try {
       await api.put('/settings/engagement', { atRiskDays, disconnectedDays: inactiveDays });
@@ -487,14 +526,14 @@ export const Settings = () => {
       toast.error(error.response?.data?.detail || 'Failed to save accident follow-up settings');
     }
   };
-  
+
   return (
     <div className="space-y-6 max-w-full">
       <div className="min-w-0">
         <h1 className="text-3xl font-playfair font-bold">{t('settings_page.title')}</h1>
         <p className="text-muted-foreground mt-1">{t('settings_page.subtitle')}</p>
       </div>
-      
+
       <Tabs defaultValue="profile" className="max-w-full" onValueChange={(v) => setActiveTab(v)}>
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="inline-flex min-w-full w-max sm:w-full">
@@ -504,27 +543,39 @@ export const Settings = () => {
             </TabsTrigger>
             <TabsTrigger value="automation" className="flex-shrink-0">
               <Bell className="w-4 h-4" />
-              {activeTab === 'automation' && <span className="ml-2">{t('settings_page.automation_tab')}</span>}
+              {activeTab === 'automation' && (
+                <span className="ml-2">{t('settings_page.automation_tab')}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="grief" className="flex-shrink-0">
               <Heart className="w-4 h-4" />
-              {activeTab === 'grief' && <span className="ml-2">{t('settings_page.grief_tab')}</span>}
+              {activeTab === 'grief' && (
+                <span className="ml-2">{t('settings_page.grief_tab')}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="accident" className="flex-shrink-0">
               <Zap className="w-4 h-4" />
-              {activeTab === 'accident' && <span className="ml-2">{t('settings_page.accident_tab')}</span>}
+              {activeTab === 'accident' && (
+                <span className="ml-2">{t('settings_page.accident_tab')}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="engagement" className="flex-shrink-0">
               <Users className="w-4 h-4" />
-              {activeTab === 'engagement' && <span className="ml-2">{t('settings_page.engagement_tab')}</span>}
+              {activeTab === 'engagement' && (
+                <span className="ml-2">{t('settings_page.engagement_tab')}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="writeoff" className="flex-shrink-0">
               <Clock className="w-4 h-4" />
-              {activeTab === 'writeoff' && <span className="ml-2">{t('settings_page.writeoff_tab')}</span>}
+              {activeTab === 'writeoff' && (
+                <span className="ml-2">{t('settings_page.writeoff_tab')}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="system" className="flex-shrink-0">
               <SettingsIcon className="w-4 h-4" />
-              {activeTab === 'system' && <span className="ml-2">{t('settings_page.system_tab')}</span>}
+              {activeTab === 'system' && (
+                <span className="ml-2">{t('settings_page.system_tab')}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="sync" className="flex-shrink-0">
               <RefreshCw className="w-4 h-4" />
@@ -532,7 +583,6 @@ export const Settings = () => {
             </TabsTrigger>
           </TabsList>
         </div>
-        
 
         <TabsContent value="profile">
           <Card>
@@ -546,7 +596,11 @@ export const Settings = () => {
                 <div className="flex-shrink-0">
                   {user?.photo_url ? (
                     <img
-                      src={user.photo_url.startsWith('http') ? user.photo_url : `${BACKEND_URL}${user.photo_url}`}
+                      src={
+                        user.photo_url.startsWith('http')
+                          ? user.photo_url
+                          : `${BACKEND_URL}${user.photo_url}`
+                      }
                       alt={user.name}
                       className="w-24 h-24 rounded-full object-cover border-4 border-teal-100"
                       loading="lazy"
@@ -560,11 +614,16 @@ export const Settings = () => {
                   )}
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">Profile Photo</h3>
-                  <p className="text-sm text-gray-500 mb-3">Upload a photo for your profile. This will appear in activity logs and navigation.</p>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Profile Photo
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Upload a photo for your profile. This will appear in activity logs and
+                    navigation.
+                  </p>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => document.getElementById('photo-upload').click()}
                       disabled={uploading}
                       className="gap-2"
@@ -572,9 +631,9 @@ export const Settings = () => {
                       <Upload className="w-4 h-4" />
                       {uploading ? 'Uploading...' : 'Upload Photo'}
                     </Button>
-                    <input 
+                    <input
                       id="photo-upload"
-                      type="file" 
+                      type="file"
                       accept="image/*"
                       className="hidden"
                       onChange={handlePhotoUpload}
@@ -582,41 +641,51 @@ export const Settings = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Profile Information */}
               <div className="space-y-4 pt-6 border-t">
                 <div>
                   <Label className="text-gray-700">Name</Label>
-                  <Input 
-                    value={editingProfile ? profileData.name : user?.name} 
-                    onChange={(e) => setProfileData({...profileData, name: e.target.value})}
-                    disabled={!editingProfile} 
-                    className={!editingProfile ? "bg-gray-50" : ""} 
+                  <Input
+                    value={editingProfile ? profileData.name : user?.name}
+                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                    disabled={!editingProfile}
+                    className={!editingProfile ? 'bg-gray-50' : ''}
                   />
                 </div>
                 <div>
                   <Label className="text-gray-700">Email</Label>
-                  <Input 
-                    value={editingProfile ? profileData.email : user?.email} 
-                    onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                    disabled={!editingProfile} 
-                    className={!editingProfile ? "bg-gray-50" : ""} 
+                  <Input
+                    value={editingProfile ? profileData.email : user?.email}
+                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                    disabled={!editingProfile}
+                    className={!editingProfile ? 'bg-gray-50' : ''}
                   />
                 </div>
                 <div>
                   <Label className="text-gray-700">Phone</Label>
-                  <Input 
-                    value={editingProfile ? profileData.phone : user?.phone} 
-                    onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                    disabled={!editingProfile} 
-                    className={!editingProfile ? "bg-gray-50" : ""} 
+                  <Input
+                    value={editingProfile ? profileData.phone : user?.phone}
+                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    disabled={!editingProfile}
+                    className={!editingProfile ? 'bg-gray-50' : ''}
                   />
                 </div>
                 <div>
                   <Label className="text-gray-700">Role</Label>
-                  <Input value={user?.role === 'full_admin' ? 'Full Administrator' : user?.role === 'campus_admin' ? 'Campus Administrator' : 'Pastor'} disabled className="bg-gray-50" />
+                  <Input
+                    value={
+                      user?.role === 'full_admin'
+                        ? 'Full Administrator'
+                        : user?.role === 'campus_admin'
+                          ? 'Campus Administrator'
+                          : 'Pastor'
+                    }
+                    disabled
+                    className="bg-gray-50"
+                  />
                 </div>
-                
+
                 {/* Edit/Save buttons */}
                 <div className="flex gap-2">
                   {!editingProfile ? (
@@ -625,13 +694,21 @@ export const Settings = () => {
                     </Button>
                   ) : (
                     <>
-                      <Button onClick={() => {
-                        setEditingProfile(false);
-                        setProfileData({name: user.name, email: user.email, phone: user.phone});
-                      }} variant="outline" disabled={savingProfile}>
+                      <Button
+                        onClick={() => {
+                          setEditingProfile(false);
+                          setProfileData({ name: user.name, email: user.email, phone: user.phone });
+                        }}
+                        variant="outline"
+                        disabled={savingProfile}
+                      >
                         {t('cancel')}
                       </Button>
-                      <Button onClick={saveProfile} className="bg-teal-500 hover:bg-teal-600" disabled={savingProfile}>
+                      <Button
+                        onClick={saveProfile}
+                        className="bg-teal-500 hover:bg-teal-600"
+                        disabled={savingProfile}
+                      >
                         {savingProfile ? t('saving') : t('save_changes')}
                       </Button>
                     </>
@@ -641,7 +718,9 @@ export const Settings = () => {
 
               {/* Password Change Section */}
               <div className="space-y-4 pt-6 border-t">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{t('change_password')}</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                  {t('change_password')}
+                </h3>
                 {!changingPassword ? (
                   <Button onClick={() => setChangingPassword(true)} variant="outline">
                     {t('change_password')}
@@ -653,7 +732,9 @@ export const Settings = () => {
                       <Input
                         type="password"
                         value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                        }
                         placeholder={t('enter_current_password')}
                       />
                     </div>
@@ -662,7 +743,9 @@ export const Settings = () => {
                       <Input
                         type="password"
                         value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, newPassword: e.target.value })
+                        }
                         placeholder={t('enter_new_password')}
                       />
                     </div>
@@ -671,7 +754,9 @@ export const Settings = () => {
                       <Input
                         type="password"
                         value={passwordData.confirmPassword}
-                        onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                        onChange={(e) =>
+                          setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+                        }
                         placeholder={t('confirm_new_password')}
                       />
                     </div>
@@ -679,7 +764,11 @@ export const Settings = () => {
                       <Button
                         onClick={() => {
                           setChangingPassword(false);
-                          setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                          setPasswordData({
+                            currentPassword: '',
+                            newPassword: '',
+                            confirmPassword: '',
+                          });
                         }}
                         variant="outline"
                         disabled={savingPassword}
@@ -689,7 +778,12 @@ export const Settings = () => {
                       <Button
                         onClick={changePassword}
                         className="bg-teal-500 hover:bg-teal-600"
-                        disabled={savingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                        disabled={
+                          savingPassword ||
+                          !passwordData.currentPassword ||
+                          !passwordData.newPassword ||
+                          !passwordData.confirmPassword
+                        }
                       >
                         {savingPassword ? t('saving') : t('update_password')}
                       </Button>
@@ -698,9 +792,7 @@ export const Settings = () => {
                 )}
               </div>
 
-              <p className="text-xs text-gray-500 pt-4 border-t">
-                {t('role_change_note')}
-              </p>
+              <p className="text-xs text-gray-500 pt-4 border-t">{t('role_change_note')}</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -731,7 +823,7 @@ export const Settings = () => {
               <div>
                 <Label>WhatsApp Gateway URL</Label>
                 <Input
-                  value={whatsappGateway || import.meta.env.VITE_WHATSAPP_GATEWAY_URL || ""}
+                  value={whatsappGateway || import.meta.env.VITE_WHATSAPP_GATEWAY_URL || ''}
                   onChange={(e) => setWhatsappGateway(e.target.value)}
                   disabled={user?.role !== 'full_admin'}
                   placeholder="http://your-whatsapp-gateway:3001"
@@ -762,12 +854,15 @@ export const Settings = () => {
                   <li>⚠️ Members at risk (30+ days no contact)</li>
                 </ul>
                 <p className="text-sm mt-2 font-medium">📱 Sent To:</p>
-                <p className="text-sm">All pastoral team members (campus admins + pastors) for their assigned campus. Full admin receives digest for ALL campuses.</p>
+                <p className="text-sm">
+                  All pastoral team members (campus admins + pastors) for their assigned campus.
+                  Full admin receives digest for ALL campuses.
+                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="grief">
           <Card>
             <CardHeader>
@@ -793,7 +888,10 @@ export const Settings = () => {
                   </div>
                 </div>
               ))}
-              <Button onClick={saveGriefStages} className="bg-teal-500 hover:bg-teal-600 text-white">
+              <Button
+                onClick={saveGriefStages}
+                className="bg-teal-500 hover:bg-teal-600 text-white"
+              >
                 Save Grief Stages Configuration
               </Button>
               <div className="p-4 bg-purple-50 rounded-lg mt-4">
@@ -805,12 +903,14 @@ export const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="accident">
           <Card>
             <CardHeader>
               <CardTitle>Accident/Illness Follow-up Configuration</CardTitle>
-              <CardDescription>Customize the follow-up schedule for hospital discharges</CardDescription>
+              <CardDescription>
+                Customize the follow-up schedule for hospital discharges
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {accidentFollowUp.map((stage, index) => (
@@ -831,24 +931,30 @@ export const Settings = () => {
                   </div>
                 </div>
               ))}
-              <Button onClick={saveAccidentFollowUp} className="bg-teal-500 hover:bg-teal-600 text-white">
+              <Button
+                onClick={saveAccidentFollowUp}
+                className="bg-teal-500 hover:bg-teal-600 text-white"
+              >
                 Save Accident/Illness Follow-up Configuration
               </Button>
               <div className="p-4 bg-blue-50 rounded-lg mt-4">
                 <p className="text-sm font-medium">🏥 Note:</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Changes will apply to NEW accident/illness events. Existing timelines remain unchanged.
+                  Changes will apply to NEW accident/illness events. Existing timelines remain
+                  unchanged.
                 </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="engagement">
           <Card>
             <CardHeader>
               <CardTitle>Engagement Status Thresholds</CardTitle>
-              <CardDescription>Configure when members are marked at-risk or inactive</CardDescription>
+              <CardDescription>
+                Configure when members are marked at-risk or inactive
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -859,7 +965,10 @@ export const Settings = () => {
                   onChange={(e) => setAtRiskDays(parseInt(e.target.value))}
                   min="1"
                 />
-                <p className="text-xs text-muted-foreground">Default: 60 days. Members with no contact for this many days will show as "At Risk"</p>
+                <p className="text-xs text-muted-foreground">
+                  Default: 60 days. Members with no contact for this many days will show as "At
+                  Risk"
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Disconnected Threshold (days since last contact)</Label>
@@ -869,9 +978,15 @@ export const Settings = () => {
                   onChange={(e) => setInactiveDays(parseInt(e.target.value))}
                   min="1"
                 />
-                <p className="text-xs text-muted-foreground">Default: 90 days. Members with no contact for this many days will show as "Disconnected"</p>
+                <p className="text-xs text-muted-foreground">
+                  Default: 90 days. Members with no contact for this many days will show as
+                  "Disconnected"
+                </p>
               </div>
-              <Button onClick={saveEngagementSettings} className="bg-teal-500 hover:bg-teal-600 text-white">
+              <Button
+                onClick={saveEngagementSettings}
+                className="bg-teal-500 hover:bg-teal-600 text-white"
+              >
                 Save Engagement Thresholds
               </Button>
             </CardContent>
@@ -883,69 +998,69 @@ export const Settings = () => {
             <CardHeader>
               <CardTitle>Overdue Write-off Policy</CardTitle>
               <CardDescription>
-                Configure how long overdue tasks remain visible before being auto-hidden.
-                Set to 0 for tasks that should never be hidden.
+                Configure how long overdue tasks remain visible before being auto-hidden. Set to 0
+                for tasks that should never be hidden.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="writeoff-birthday">Birthday (days)</Label>
-                  <Input 
+                  <Input
                     id="writeoff-birthday"
-                    type="number" 
+                    type="number"
                     min="0"
                     max="365"
-                    value={writeoffBirthday} 
-                    onChange={(e) => setWriteoffBirthday(e.target.value)} 
+                    value={writeoffBirthday}
+                    onChange={(e) => setWriteoffBirthday(e.target.value)}
                     className="mt-2"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Default: 7 days. Birthday greetings older than this will be hidden.
                   </p>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="writeoff-grief">Grief Support (days)</Label>
-                  <Input 
+                  <Input
                     id="writeoff-grief"
-                    type="number" 
+                    type="number"
                     min="0"
                     max="365"
-                    value={writeoffGrief} 
-                    onChange={(e) => setWriteoffGrief(e.target.value)} 
+                    value={writeoffGrief}
+                    onChange={(e) => setWriteoffGrief(e.target.value)}
                     className="mt-2"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Default: 14 days. Grief stages overdue by more than this will be hidden.
                   </p>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="writeoff-accident">Accident/Illness Recovery (days)</Label>
-                  <Input 
+                  <Input
                     id="writeoff-accident"
-                    type="number" 
+                    type="number"
                     min="0"
                     max="365"
-                    value={writeoffAccident} 
-                    onChange={(e) => setWriteoffAccident(e.target.value)} 
+                    value={writeoffAccident}
+                    onChange={(e) => setWriteoffAccident(e.target.value)}
                     className="mt-2"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Default: 14 days. Accident follow-ups overdue by more than this will be hidden.
                   </p>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="writeoff-aid">Financial Aid (days)</Label>
-                  <Input 
+                  <Input
                     id="writeoff-aid"
-                    type="number" 
+                    type="number"
                     min="0"
                     max="365"
-                    value={writeoffFinancialAid} 
-                    onChange={(e) => setWriteoffFinancialAid(e.target.value)} 
+                    value={writeoffFinancialAid}
+                    onChange={(e) => setWriteoffFinancialAid(e.target.value)}
                     className="mt-2"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
@@ -953,31 +1068,44 @@ export const Settings = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-semibold text-sm mb-2">How Write-off Works:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Tasks overdue beyond the threshold are <strong>automatically hidden</strong> from dashboard tabs</li>
-                  <li>• Active overdue tasks can still be <strong>manually ignored</strong> using the "Ignore" button before auto write-off</li>
-                  <li>• Set to <strong>0</strong> to never auto-hide (tasks stay visible until manually ignored)</li>
+                  <li>
+                    • Tasks overdue beyond the threshold are <strong>automatically hidden</strong>{' '}
+                    from dashboard tabs
+                  </li>
+                  <li>
+                    • Active overdue tasks can still be <strong>manually ignored</strong> using the
+                    "Ignore" button before auto write-off
+                  </li>
+                  <li>
+                    • Set to <strong>0</strong> to never auto-hide (tasks stay visible until
+                    manually ignored)
+                  </li>
                   <li>• Ignored tasks remain visible in member profile history (greyed out)</li>
                   <li>• Write-off helps keep dashboard focused on actionable items</li>
-                  <li>• <strong>Note:</strong> At-Risk and Disconnected status are open-ended (no write-off)</li>
+                  <li>
+                    • <strong>Note:</strong> At-Risk and Disconnected status are open-ended (no
+                    write-off)
+                  </li>
                 </ul>
               </div>
-              
+
               <Button onClick={saveWriteoffSettings}>Save Write-off Settings</Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        
         <TabsContent value="system">
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Campus Timezone Configuration</CardTitle>
-                <CardDescription>Set the timezone for date/time operations across the system</CardDescription>
+                <CardDescription>
+                  Set the timezone for date/time operations across the system
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -988,54 +1116,128 @@ export const Settings = () => {
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px]">
                       {/* Asia Pacific */}
-                      <SelectItem value="Asia/Jakarta">Asia/Jakarta (UTC+7) - Jakarta, Indonesia</SelectItem>
-                      <SelectItem value="Asia/Singapore">Asia/Singapore (UTC+8) - Singapore</SelectItem>
-                      <SelectItem value="Asia/Kuala_Lumpur">Asia/Kuala_Lumpur (UTC+8) - Kuala Lumpur, Malaysia</SelectItem>
-                      <SelectItem value="Asia/Manila">Asia/Manila (UTC+8) - Manila, Philippines</SelectItem>
-                      <SelectItem value="Asia/Bangkok">Asia/Bangkok (UTC+7) - Bangkok, Thailand</SelectItem>
-                      <SelectItem value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (UTC+7) - Ho Chi Minh, Vietnam</SelectItem>
-                      <SelectItem value="Asia/Seoul">Asia/Seoul (UTC+9) - Seoul, South Korea</SelectItem>
+                      <SelectItem value="Asia/Jakarta">
+                        Asia/Jakarta (UTC+7) - Jakarta, Indonesia
+                      </SelectItem>
+                      <SelectItem value="Asia/Singapore">
+                        Asia/Singapore (UTC+8) - Singapore
+                      </SelectItem>
+                      <SelectItem value="Asia/Kuala_Lumpur">
+                        Asia/Kuala_Lumpur (UTC+8) - Kuala Lumpur, Malaysia
+                      </SelectItem>
+                      <SelectItem value="Asia/Manila">
+                        Asia/Manila (UTC+8) - Manila, Philippines
+                      </SelectItem>
+                      <SelectItem value="Asia/Bangkok">
+                        Asia/Bangkok (UTC+7) - Bangkok, Thailand
+                      </SelectItem>
+                      <SelectItem value="Asia/Ho_Chi_Minh">
+                        Asia/Ho_Chi_Minh (UTC+7) - Ho Chi Minh, Vietnam
+                      </SelectItem>
+                      <SelectItem value="Asia/Seoul">
+                        Asia/Seoul (UTC+9) - Seoul, South Korea
+                      </SelectItem>
                       <SelectItem value="Asia/Tokyo">Asia/Tokyo (UTC+9) - Tokyo, Japan</SelectItem>
-                      <SelectItem value="Asia/Hong_Kong">Asia/Hong_Kong (UTC+8) - Hong Kong</SelectItem>
-                      <SelectItem value="Asia/Shanghai">Asia/Shanghai (UTC+8) - Shanghai, China</SelectItem>
-                      <SelectItem value="Asia/Taipei">Asia/Taipei (UTC+8) - Taipei, Taiwan</SelectItem>
-                      <SelectItem value="Asia/Kolkata">Asia/Kolkata (UTC+5:30) - Mumbai, India</SelectItem>
+                      <SelectItem value="Asia/Hong_Kong">
+                        Asia/Hong_Kong (UTC+8) - Hong Kong
+                      </SelectItem>
+                      <SelectItem value="Asia/Shanghai">
+                        Asia/Shanghai (UTC+8) - Shanghai, China
+                      </SelectItem>
+                      <SelectItem value="Asia/Taipei">
+                        Asia/Taipei (UTC+8) - Taipei, Taiwan
+                      </SelectItem>
+                      <SelectItem value="Asia/Kolkata">
+                        Asia/Kolkata (UTC+5:30) - Mumbai, India
+                      </SelectItem>
                       <SelectItem value="Asia/Dubai">Asia/Dubai (UTC+4) - Dubai, UAE</SelectItem>
-                      <SelectItem value="Asia/Riyadh">Asia/Riyadh (UTC+3) - Riyadh, Saudi Arabia</SelectItem>
-                      
+                      <SelectItem value="Asia/Riyadh">
+                        Asia/Riyadh (UTC+3) - Riyadh, Saudi Arabia
+                      </SelectItem>
+
                       {/* Australia & Pacific */}
-                      <SelectItem value="Australia/Sydney">Australia/Sydney (UTC+10/+11) - Sydney</SelectItem>
-                      <SelectItem value="Australia/Melbourne">Australia/Melbourne (UTC+10/+11) - Melbourne</SelectItem>
-                      <SelectItem value="Australia/Perth">Australia/Perth (UTC+8) - Perth</SelectItem>
-                      <SelectItem value="Pacific/Auckland">Pacific/Auckland (UTC+12/+13) - Auckland, NZ</SelectItem>
+                      <SelectItem value="Australia/Sydney">
+                        Australia/Sydney (UTC+10/+11) - Sydney
+                      </SelectItem>
+                      <SelectItem value="Australia/Melbourne">
+                        Australia/Melbourne (UTC+10/+11) - Melbourne
+                      </SelectItem>
+                      <SelectItem value="Australia/Perth">
+                        Australia/Perth (UTC+8) - Perth
+                      </SelectItem>
+                      <SelectItem value="Pacific/Auckland">
+                        Pacific/Auckland (UTC+12/+13) - Auckland, NZ
+                      </SelectItem>
                       <SelectItem value="Pacific/Fiji">Pacific/Fiji (UTC+12) - Fiji</SelectItem>
-                      
+
                       {/* Americas */}
-                      <SelectItem value="America/New_York">America/New_York (UTC-5/-4) - New York, USA</SelectItem>
-                      <SelectItem value="America/Chicago">America/Chicago (UTC-6/-5) - Chicago, USA</SelectItem>
-                      <SelectItem value="America/Denver">America/Denver (UTC-7/-6) - Denver, USA</SelectItem>
-                      <SelectItem value="America/Los_Angeles">America/Los_Angeles (UTC-8/-7) - Los Angeles, USA</SelectItem>
-                      <SelectItem value="America/Toronto">America/Toronto (UTC-5/-4) - Toronto, Canada</SelectItem>
-                      <SelectItem value="America/Vancouver">America/Vancouver (UTC-8/-7) - Vancouver, Canada</SelectItem>
-                      <SelectItem value="America/Mexico_City">America/Mexico_City (UTC-6) - Mexico City</SelectItem>
-                      <SelectItem value="America/Sao_Paulo">America/Sao_Paulo (UTC-3) - São Paulo, Brazil</SelectItem>
-                      <SelectItem value="America/Buenos_Aires">America/Buenos_Aires (UTC-3) - Buenos Aires, Argentina</SelectItem>
-                      
+                      <SelectItem value="America/New_York">
+                        America/New_York (UTC-5/-4) - New York, USA
+                      </SelectItem>
+                      <SelectItem value="America/Chicago">
+                        America/Chicago (UTC-6/-5) - Chicago, USA
+                      </SelectItem>
+                      <SelectItem value="America/Denver">
+                        America/Denver (UTC-7/-6) - Denver, USA
+                      </SelectItem>
+                      <SelectItem value="America/Los_Angeles">
+                        America/Los_Angeles (UTC-8/-7) - Los Angeles, USA
+                      </SelectItem>
+                      <SelectItem value="America/Toronto">
+                        America/Toronto (UTC-5/-4) - Toronto, Canada
+                      </SelectItem>
+                      <SelectItem value="America/Vancouver">
+                        America/Vancouver (UTC-8/-7) - Vancouver, Canada
+                      </SelectItem>
+                      <SelectItem value="America/Mexico_City">
+                        America/Mexico_City (UTC-6) - Mexico City
+                      </SelectItem>
+                      <SelectItem value="America/Sao_Paulo">
+                        America/Sao_Paulo (UTC-3) - São Paulo, Brazil
+                      </SelectItem>
+                      <SelectItem value="America/Buenos_Aires">
+                        America/Buenos_Aires (UTC-3) - Buenos Aires, Argentina
+                      </SelectItem>
+
                       {/* Europe */}
-                      <SelectItem value="Europe/London">Europe/London (UTC+0/+1) - London, UK</SelectItem>
-                      <SelectItem value="Europe/Paris">Europe/Paris (UTC+1/+2) - Paris, France</SelectItem>
-                      <SelectItem value="Europe/Berlin">Europe/Berlin (UTC+1/+2) - Berlin, Germany</SelectItem>
-                      <SelectItem value="Europe/Rome">Europe/Rome (UTC+1/+2) - Rome, Italy</SelectItem>
-                      <SelectItem value="Europe/Madrid">Europe/Madrid (UTC+1/+2) - Madrid, Spain</SelectItem>
-                      <SelectItem value="Europe/Amsterdam">Europe/Amsterdam (UTC+1/+2) - Amsterdam, Netherlands</SelectItem>
-                      <SelectItem value="Europe/Moscow">Europe/Moscow (UTC+3) - Moscow, Russia</SelectItem>
-                      <SelectItem value="Europe/Istanbul">Europe/Istanbul (UTC+3) - Istanbul, Turkey</SelectItem>
-                      
+                      <SelectItem value="Europe/London">
+                        Europe/London (UTC+0/+1) - London, UK
+                      </SelectItem>
+                      <SelectItem value="Europe/Paris">
+                        Europe/Paris (UTC+1/+2) - Paris, France
+                      </SelectItem>
+                      <SelectItem value="Europe/Berlin">
+                        Europe/Berlin (UTC+1/+2) - Berlin, Germany
+                      </SelectItem>
+                      <SelectItem value="Europe/Rome">
+                        Europe/Rome (UTC+1/+2) - Rome, Italy
+                      </SelectItem>
+                      <SelectItem value="Europe/Madrid">
+                        Europe/Madrid (UTC+1/+2) - Madrid, Spain
+                      </SelectItem>
+                      <SelectItem value="Europe/Amsterdam">
+                        Europe/Amsterdam (UTC+1/+2) - Amsterdam, Netherlands
+                      </SelectItem>
+                      <SelectItem value="Europe/Moscow">
+                        Europe/Moscow (UTC+3) - Moscow, Russia
+                      </SelectItem>
+                      <SelectItem value="Europe/Istanbul">
+                        Europe/Istanbul (UTC+3) - Istanbul, Turkey
+                      </SelectItem>
+
                       {/* Africa */}
-                      <SelectItem value="Africa/Cairo">Africa/Cairo (UTC+2) - Cairo, Egypt</SelectItem>
-                      <SelectItem value="Africa/Johannesburg">Africa/Johannesburg (UTC+2) - Johannesburg, South Africa</SelectItem>
-                      <SelectItem value="Africa/Lagos">Africa/Lagos (UTC+1) - Lagos, Nigeria</SelectItem>
-                      <SelectItem value="Africa/Nairobi">Africa/Nairobi (UTC+3) - Nairobi, Kenya</SelectItem>
+                      <SelectItem value="Africa/Cairo">
+                        Africa/Cairo (UTC+2) - Cairo, Egypt
+                      </SelectItem>
+                      <SelectItem value="Africa/Johannesburg">
+                        Africa/Johannesburg (UTC+2) - Johannesburg, South Africa
+                      </SelectItem>
+                      <SelectItem value="Africa/Lagos">
+                        Africa/Lagos (UTC+1) - Lagos, Nigeria
+                      </SelectItem>
+                      <SelectItem value="Africa/Nairobi">
+                        Africa/Nairobi (UTC+3) - Nairobi, Kenya
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-2">
@@ -1051,54 +1253,65 @@ export const Settings = () => {
                 <Button onClick={saveTimezoneSettings}>Save Timezone Settings</Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>System Information</CardTitle>
               </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Church Name</Label>
-                <Input value="GKBJ" disabled />
-              </div>
-              <div>
-                <Label>Database</Label>
-                <Input value="pastoral_care_db" disabled />
-              </div>
-              <div>
-                <Label>Total Campuses</Label>
-                <Input value={campusCount.toString()} disabled />
-              </div>
-              <div>
-                <Label>Your Role</Label>
-                <Input value={user?.role === 'full_admin' ? 'Full Administrator' : user?.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'} disabled />
-              </div>
-              {user?.campus_name && (
+              <CardContent className="space-y-4">
                 <div>
-                  <Label>Your Campus</Label>
-                  <Input value={user.campus_name} disabled />
+                  <Label>Church Name</Label>
+                  <Input value="GKBJ" disabled />
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div>
+                  <Label>Database</Label>
+                  <Input value="pastoral_care_db" disabled />
+                </div>
+                <div>
+                  <Label>Total Campuses</Label>
+                  <Input value={campusCount.toString()} disabled />
+                </div>
+                <div>
+                  <Label>Your Role</Label>
+                  <Input
+                    value={
+                      user?.role === 'full_admin'
+                        ? 'Full Administrator'
+                        : user?.role === 'campus_admin'
+                          ? 'Campus Admin'
+                          : 'Pastor'
+                    }
+                    disabled
+                  />
+                </div>
+                {user?.campus_name && (
+                  <div>
+                    <Label>Your Campus</Label>
+                    <Input value={user.campus_name} disabled />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
-        
         <TabsContent value="sync">
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Core API Sync Configuration</CardTitle>
                 <CardDescription>
-                  Connect to FaithFlow Enterprise (core system) to automatically sync member data. 
+                  Connect to FaithFlow Enterprise (core system) to automatically sync member data.
                   Pastoral care events remain local and private.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>Sync Method</Label>
-                  <Select value={syncConfig.sync_method} onValueChange={(v) => setSyncConfig({...syncConfig, sync_method: v})}>
+                  <Select
+                    value={syncConfig.sync_method}
+                    onValueChange={(v) => setSyncConfig({ ...syncConfig, sync_method: v })}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -1108,20 +1321,22 @@ export const Settings = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500 mt-1">
-                    {syncConfig.sync_method === 'polling' 
+                    {syncConfig.sync_method === 'polling'
                       ? 'FaithTracker pulls data from core API periodically'
                       : 'Core system pushes updates to FaithTracker in real-time'}
                   </p>
                 </div>
-                
+
                 <div>
                   <Label>API Base URL</Label>
                   <Input
                     placeholder="https://faithflow.yourdomain.com"
                     value={syncConfig.api_base_url}
-                    onChange={(e) => setSyncConfig({...syncConfig, api_base_url: e.target.value})}
+                    onChange={(e) => setSyncConfig({ ...syncConfig, api_base_url: e.target.value })}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Base URL of the core API (e.g., https://api.flow.gkbj.org)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Base URL of the core API (e.g., https://api.flow.gkbj.org)
+                  </p>
                 </div>
 
                 <div>
@@ -1129,9 +1344,13 @@ export const Settings = () => {
                   <Input
                     placeholder="/api"
                     value={syncConfig.api_path_prefix}
-                    onChange={(e) => setSyncConfig({...syncConfig, api_path_prefix: e.target.value})}
+                    onChange={(e) =>
+                      setSyncConfig({ ...syncConfig, api_path_prefix: e.target.value })
+                    }
                   />
-                  <p className="text-xs text-gray-500 mt-1">API path prefix (e.g., "/api" or leave empty for no prefix)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    API path prefix (e.g., "/api" or leave empty for no prefix)
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1140,7 +1359,9 @@ export const Settings = () => {
                     <Input
                       placeholder="/auth/login"
                       value={syncConfig.api_login_endpoint}
-                      onChange={(e) => setSyncConfig({...syncConfig, api_login_endpoint: e.target.value})}
+                      onChange={(e) =>
+                        setSyncConfig({ ...syncConfig, api_login_endpoint: e.target.value })
+                      }
                     />
                     <p className="text-xs text-gray-500 mt-1">e.g., /auth/login or /login</p>
                   </div>
@@ -1149,40 +1370,53 @@ export const Settings = () => {
                     <Input
                       placeholder="/members/"
                       value={syncConfig.api_members_endpoint}
-                      onChange={(e) => setSyncConfig({...syncConfig, api_members_endpoint: e.target.value})}
+                      onChange={(e) =>
+                        setSyncConfig({ ...syncConfig, api_members_endpoint: e.target.value })
+                      }
                     />
                     <p className="text-xs text-gray-500 mt-1">e.g., /members/ or /jemaat/</p>
                   </div>
                 </div>
 
                 <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                  Full login URL: {syncConfig.api_base_url || 'https://api.example.com'}{syncConfig.api_path_prefix}{syncConfig.api_login_endpoint}
+                  Full login URL: {syncConfig.api_base_url || 'https://api.example.com'}
+                  {syncConfig.api_path_prefix}
+                  {syncConfig.api_login_endpoint}
                 </p>
 
                 <div>
                   <Label>API Username</Label>
-                  <Input 
+                  <Input
                     type="text"
                     placeholder="admin@yourdomain.com"
                     value={syncConfig.api_email}
-                    onChange={(e) => setSyncConfig({...syncConfig, api_email: e.target.value})}
+                    onChange={(e) => setSyncConfig({ ...syncConfig, api_email: e.target.value })}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Username for API authentication. 
-                    <strong className="text-yellow-600"> Note:</strong> FaithFlow Enterprise requires email format (user@domain.com)
+                    Username for API authentication.
+                    <strong className="text-yellow-600"> Note:</strong> FaithFlow Enterprise
+                    requires email format (user@domain.com)
                   </p>
                 </div>
-                
+
                 <div>
                   <Label>API Secret Key</Label>
                   <Input
                     type="password"
-                    placeholder={syncConfig.api_password === '********' ? '(stored securely)' : 'Enter API password'}
-                    value={syncConfig.api_password === '********' ? '••••••••••••••••' : syncConfig.api_password}
-                    onChange={(e) => setSyncConfig({...syncConfig, api_password: e.target.value})}
+                    placeholder={
+                      syncConfig.api_password === '********'
+                        ? '(stored securely)'
+                        : 'Enter API password'
+                    }
+                    value={
+                      syncConfig.api_password === '********'
+                        ? '••••••••••••••••'
+                        : syncConfig.api_password
+                    }
+                    onChange={(e) => setSyncConfig({ ...syncConfig, api_password: e.target.value })}
                     onFocus={() => {
                       if (syncConfig.api_password === '********') {
-                        setSyncConfig({...syncConfig, api_password: ''});
+                        setSyncConfig({ ...syncConfig, api_password: '' });
                       }
                     }}
                   />
@@ -1192,14 +1426,16 @@ export const Settings = () => {
                       : 'Password for API authentication'}
                   </p>
                 </div>
-                
+
                 {/* Polling-specific settings */}
                 {syncConfig.sync_method === 'polling' && (
                   <div>
                     <Label>Polling Interval (hours)</Label>
-                    <Select 
-                      value={String(syncConfig.polling_interval_hours)} 
-                      onValueChange={(v) => setSyncConfig({...syncConfig, polling_interval_hours: parseInt(v)})}
+                    <Select
+                      value={String(syncConfig.polling_interval_hours)}
+                      onValueChange={(v) =>
+                        setSyncConfig({ ...syncConfig, polling_interval_hours: parseInt(v) })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -1212,46 +1448,54 @@ export const Settings = () => {
                         <SelectItem value="24">Every 24 hours</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-gray-500 mt-1">How often to pull data from core API</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      How often to pull data from core API
+                    </p>
                   </div>
                 )}
 
                 {/* Sync Filters */}
                 <div className="border-t pt-4 mt-4">
                   <div className="flex items-center gap-3 mb-4">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={showFilters}
                       onChange={(e) => {
                         setShowFilters(e.target.checked);
                         if (!e.target.checked) {
                           // Clear filters when unchecking
-                          setSyncConfig({...syncConfig, filter_rules: []});
+                          setSyncConfig({ ...syncConfig, filter_rules: [] });
                         }
                       }}
                       className="w-4 h-4 text-teal-600"
                       id="enable-filters"
                     />
                     <div>
-                      <label htmlFor="enable-filters" className="font-medium text-sm cursor-pointer">
+                      <label
+                        htmlFor="enable-filters"
+                        className="font-medium text-sm cursor-pointer"
+                      >
                         Enable Custom Filters
                       </label>
                       <p className="text-xs text-gray-500">
-                        {showFilters 
-                          ? 'Filters are active - Only matching members will be synced' 
+                        {showFilters
+                          ? 'Filters are active - Only matching members will be synced'
                           : 'No filters - All members from core API will be synced'}
                       </p>
                     </div>
                   </div>
-                  
+
                   {showFilters && (
                     <>
                       <h4 className="font-medium text-sm mb-2">Sync Filters</h4>
-                      
+
                       {/* Filter Mode Selector */}
                       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                         <Label className="mb-2 block">Filter Mode</Label>
-                        <Select value={syncConfig.filter_mode} onValueChange={(v) => setSyncConfig({...syncConfig, filter_mode: v})}>
+                        <Select
+                          value={syncConfig.filter_mode}
+                          onValueChange={(v) => setSyncConfig({ ...syncConfig, filter_mode: v })}
+                        >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -1259,117 +1503,149 @@ export const Settings = () => {
                             <SelectItem value="include">
                               <div className="flex flex-col">
                                 <span className="font-medium">Include Mode</span>
-                                <span className="text-xs text-gray-500">Only sync members matching the filters below</span>
+                                <span className="text-xs text-gray-500">
+                                  Only sync members matching the filters below
+                                </span>
                               </div>
                             </SelectItem>
                             <SelectItem value="exclude">
                               <div className="flex flex-col">
                                 <span className="font-medium">Exclude Mode</span>
-                                <span className="text-xs text-gray-500">Sync all members EXCEPT those matching the filters</span>
+                                <span className="text-xs text-gray-500">
+                                  Sync all members EXCEPT those matching the filters
+                                </span>
                               </div>
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        
-                        <div className={`mt-3 p-2 rounded text-xs ${syncConfig.filter_mode === 'include' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                          <p className={`font-medium mb-1 ${syncConfig.filter_mode === 'include' ? 'text-green-900' : 'text-red-900'}`}>
-                            {syncConfig.filter_mode === 'include' ? '✓ Include Mode' : '✗ Exclude Mode'}
+
+                        <div
+                          className={`mt-3 p-2 rounded text-xs ${syncConfig.filter_mode === 'include' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}
+                        >
+                          <p
+                            className={`font-medium mb-1 ${syncConfig.filter_mode === 'include' ? 'text-green-900' : 'text-red-900'}`}
+                          >
+                            {syncConfig.filter_mode === 'include'
+                              ? '✓ Include Mode'
+                              : '✗ Exclude Mode'}
                           </p>
-                          <p className={syncConfig.filter_mode === 'include' ? 'text-green-700' : 'text-red-700'}>
-                            {syncConfig.filter_mode === 'include' 
-                              ? 'Only members matching ALL the filters below will be synced to FaithTracker. All others are ignored.'
-                              : 'All members will be synced EXCEPT those matching the filters below. Matching members are skipped.'
+                          <p
+                            className={
+                              syncConfig.filter_mode === 'include'
+                                ? 'text-green-700'
+                                : 'text-red-700'
                             }
+                          >
+                            {syncConfig.filter_mode === 'include'
+                              ? 'Only members matching ALL the filters below will be synced to FaithTracker. All others are ignored.'
+                              : 'All members will be synced EXCEPT those matching the filters below. Matching members are skipped.'}
                           </p>
                           <p className="mt-2 text-gray-600">
-                            <strong>Example:</strong> {syncConfig.filter_mode === 'include' 
+                            <strong>Example:</strong>{' '}
+                            {syncConfig.filter_mode === 'include'
                               ? 'Filters: Female + Age 18-35 → Only syncs women aged 18-35'
-                              : 'Filters: Female + Age 18-35 → Syncs everyone EXCEPT women aged 18-35'
-                            }
+                              : 'Filters: Female + Age 18-35 → Syncs everyone EXCEPT women aged 18-35'}
                           </p>
                         </div>
                       </div>
-                  
-                  <p className="text-xs text-gray-600 mb-4">Discover available fields from core API, then create custom filter rules.</p>
-                  
-                  {/* Discover Fields Button */}
-                  <div className="mb-4">
-                    <Button 
-                      onClick={discoverFields}
-                      disabled={discovering || !syncConfig.api_base_url || !syncConfig.api_email || !syncConfig.api_password || syncConfig.api_password === '********'}
-                      variant="outline"
-                      className="gap-2"
-                    >
-                      {discovering ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-500"></div>
-                          Discovering Fields...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-4 h-4" />
-                          Discover Available Fields
-                        </>
+
+                      <p className="text-xs text-gray-600 mb-4">
+                        Discover available fields from core API, then create custom filter rules.
+                      </p>
+
+                      {/* Discover Fields Button */}
+                      <div className="mb-4">
+                        <Button
+                          onClick={discoverFields}
+                          disabled={
+                            discovering ||
+                            !syncConfig.api_base_url ||
+                            !syncConfig.api_email ||
+                            !syncConfig.api_password ||
+                            syncConfig.api_password === '********'
+                          }
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          {discovering ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-500"></div>
+                              Discovering Fields...
+                            </>
+                          ) : (
+                            <>
+                              <Search className="w-4 h-4" />
+                              Discover Available Fields
+                            </>
+                          )}
+                        </Button>
+                        {availableFields.length > 0 && (
+                          <p className="text-xs text-green-600 mt-2">
+                            ✓ Found {availableFields.length} fields. Build filter rules below.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Dynamic Filter Rule Builder */}
+                      <FilterRuleBuilder
+                        availableFields={availableFields}
+                        filterRules={syncConfig.filter_rules || []}
+                        onChange={(rules) => setSyncConfig({ ...syncConfig, filter_rules: rules })}
+                      />
+
+                      {/* Active Filters Summary */}
+                      {syncConfig.filter_rules && syncConfig.filter_rules.length > 0 && (
+                        <div
+                          className={`mt-3 p-3 rounded border ${syncConfig.filter_mode === 'include' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}
+                        >
+                          <p
+                            className={`font-medium text-sm mb-2 ${syncConfig.filter_mode === 'include' ? 'text-green-900' : 'text-red-900'}`}
+                          >
+                            {syncConfig.filter_mode === 'include'
+                              ? '✓ Will ONLY Sync Members Matching ALL Rules:'
+                              : '✗ Will EXCLUDE Members Matching ALL Rules:'}
+                          </p>
+                          <ul
+                            className={`space-y-1 text-xs ${syncConfig.filter_mode === 'include' ? 'text-green-700' : 'text-red-700'}`}
+                          >
+                            {syncConfig.filter_rules.map((rule, idx) => {
+                              const field = availableFields.find((f) => f.name === rule.field);
+                              const fieldLabel = field?.label || rule.field;
+                              return (
+                                <li key={idx}>
+                                  • {fieldLabel} {rule.operator.replace('_', ' ')}{' '}
+                                  {Array.isArray(rule.value) ? rule.value.join(', ') : rule.value}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <p className="mt-2 text-xs text-gray-600 italic">
+                            {syncConfig.filter_mode === 'include'
+                              ? 'Only members matching ALL rules above will be synced to FaithTracker'
+                              : 'Members matching ALL rules above will be SKIPPED (everyone else synced)'}
+                          </p>
+                        </div>
                       )}
-                    </Button>
-                    {availableFields.length > 0 && (
-                      <p className="text-xs text-green-600 mt-2">✓ Found {availableFields.length} fields. Build filter rules below.</p>
-                    )}
-                  </div>
-                  
-                  {/* Dynamic Filter Rule Builder */}
-                  <FilterRuleBuilder 
-                    availableFields={availableFields}
-                    filterRules={syncConfig.filter_rules || []}
-                    onChange={(rules) => setSyncConfig({...syncConfig, filter_rules: rules})}
-                  />
-                  
-                  {/* Active Filters Summary */}
-                  {syncConfig.filter_rules && syncConfig.filter_rules.length > 0 && (
-                    <div className={`mt-3 p-3 rounded border ${syncConfig.filter_mode === 'include' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                      <p className={`font-medium text-sm mb-2 ${syncConfig.filter_mode === 'include' ? 'text-green-900' : 'text-red-900'}`}>
-                        {syncConfig.filter_mode === 'include' ? '✓ Will ONLY Sync Members Matching ALL Rules:' : '✗ Will EXCLUDE Members Matching ALL Rules:'}
-                      </p>
-                      <ul className={`space-y-1 text-xs ${syncConfig.filter_mode === 'include' ? 'text-green-700' : 'text-red-700'}`}>
-                        {syncConfig.filter_rules.map((rule, idx) => {
-                          const field = availableFields.find(f => f.name === rule.field);
-                          const fieldLabel = field?.label || rule.field;
-                          return (
-                            <li key={idx}>
-                              • {fieldLabel} {rule.operator.replace('_', ' ')} {
-                                Array.isArray(rule.value) ? rule.value.join(', ') : rule.value
-                              }
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      <p className="mt-2 text-xs text-gray-600 italic">
-                        {syncConfig.filter_mode === 'include' 
-                          ? 'Only members matching ALL rules above will be synced to FaithTracker'
-                          : 'Members matching ALL rules above will be SKIPPED (everyone else synced)'
-                        }
-                      </p>
-                    </div>
-                  )}
                     </>
                   )}
                 </div>
 
-                
                 {/* Webhook-specific settings */}
                 {syncConfig.sync_method === 'webhook' && syncConfig.webhook_secret && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                    <h4 className="font-medium text-sm text-blue-900">Webhook Configuration for Core System</h4>
+                    <h4 className="font-medium text-sm text-blue-900">
+                      Webhook Configuration for Core System
+                    </h4>
                     <div>
                       <Label className="text-blue-900">Webhook URL</Label>
                       <div className="flex gap-2">
-                        <Input 
+                        <Input
                           value={`${BACKEND_URL}/sync/webhook`}
                           readOnly
                           className="font-mono text-xs bg-white"
                         />
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => {
                             navigator.clipboard.writeText(`${BACKEND_URL}/sync/webhook`);
@@ -1383,13 +1659,13 @@ export const Settings = () => {
                     <div>
                       <Label className="text-blue-900">Webhook Secret</Label>
                       <div className="flex gap-2">
-                        <Input 
+                        <Input
                           value={syncConfig.webhook_secret}
                           readOnly
                           className="font-mono text-xs bg-white"
                         />
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => {
                             navigator.clipboard.writeText(syncConfig.webhook_secret);
@@ -1401,30 +1677,37 @@ export const Settings = () => {
                       </div>
                     </div>
                     <p className="text-xs text-blue-700">
-                      ⓘ Configure these values in your core FaithFlow system's webhook settings. 
-                      The core system should send POST requests with HMAC-SHA256 signature in X-Webhook-Signature header.
+                      ⓘ Configure these values in your core FaithFlow system's webhook settings. The
+                      core system should send POST requests with HMAC-SHA256 signature in
+                      X-Webhook-Signature header.
                     </p>
                   </div>
                 )}
-                
+
                 <div className="border-t pt-4 mt-4">
                   <div className="flex items-start gap-3">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={syncConfig.is_enabled}
-                      onChange={(e) => setSyncConfig({...syncConfig, is_enabled: e.target.checked})}
+                      onChange={(e) =>
+                        setSyncConfig({ ...syncConfig, is_enabled: e.target.checked })
+                      }
                       className="w-5 h-5 text-teal-600 mt-0.5"
                       id="enable-sync"
                     />
                     <div className="flex-1">
-                      <label htmlFor="enable-sync" className="text-sm font-semibold text-gray-900 cursor-pointer">
+                      <label
+                        htmlFor="enable-sync"
+                        className="text-sm font-semibold text-gray-900 cursor-pointer"
+                      >
                         Enable Member Data Sync
                       </label>
                       <p className="text-xs text-gray-600 mt-1">
                         {syncConfig.is_enabled ? (
                           <span className="text-green-700 font-medium">
-                            ✓ Sync is ACTIVE - {syncConfig.sync_method === 'polling' 
-                              ? `Automatically pulls data every ${syncConfig.polling_interval_hours} hours` 
+                            ✓ Sync is ACTIVE -{' '}
+                            {syncConfig.sync_method === 'polling'
+                              ? `Automatically pulls data every ${syncConfig.polling_interval_hours} hours`
                               : 'Receives real-time updates via webhooks'}
                           </span>
                         ) : (
@@ -1434,12 +1717,16 @@ export const Settings = () => {
                         )}
                       </p>
                       <div className="mt-2 text-xs text-gray-600 space-y-1 bg-gray-50 p-2 rounded">
-                        <p><strong>When ENABLED:</strong></p>
+                        <p>
+                          <strong>When ENABLED:</strong>
+                        </p>
                         <p>• Member data syncs from core system automatically</p>
                         <p>• You CANNOT create new members manually (read-only)</p>
                         <p>• Profile updates (name, phone, photo) come from core only</p>
                         <p>• Care events and pastoral data remain fully editable</p>
-                        <p className="pt-1"><strong>When DISABLED:</strong></p>
+                        <p className="pt-1">
+                          <strong>When DISABLED:</strong>
+                        </p>
                         <p>• Works as standalone app</p>
                         <p>• Full control to create/edit members</p>
                         <p>• No automatic sync</p>
@@ -1452,21 +1739,27 @@ export const Settings = () => {
                 {syncConfig.sync_method === 'webhook' && (
                   <div className="border-t pt-4 mt-4">
                     <div className="flex items-start gap-3">
-                      <input 
+                      <input
                         type="checkbox"
                         checked={syncConfig.reconciliation_enabled}
-                        onChange={(e) => setSyncConfig({...syncConfig, reconciliation_enabled: e.target.checked})}
+                        onChange={(e) =>
+                          setSyncConfig({ ...syncConfig, reconciliation_enabled: e.target.checked })
+                        }
                         className="w-5 h-5 text-teal-600 mt-0.5"
                         id="enable-reconciliation"
                       />
                       <div className="flex-1">
-                        <label htmlFor="enable-reconciliation" className="text-sm font-semibold text-gray-900 cursor-pointer">
+                        <label
+                          htmlFor="enable-reconciliation"
+                          className="text-sm font-semibold text-gray-900 cursor-pointer"
+                        >
                           Enable Daily Reconciliation (Recommended)
                         </label>
                         <p className="text-xs text-gray-600 mt-1">
                           {syncConfig.reconciliation_enabled ? (
                             <span className="text-green-700 font-medium">
-                              ✓ Daily reconciliation ACTIVE at {syncConfig.reconciliation_time} (Jakarta time)
+                              ✓ Daily reconciliation ACTIVE at {syncConfig.reconciliation_time}{' '}
+                              (Jakarta time)
                             </span>
                           ) : (
                             <span className="text-gray-500">
@@ -1475,20 +1768,29 @@ export const Settings = () => {
                           )}
                         </p>
                         <div className="mt-2 text-xs text-gray-600 space-y-1 bg-yellow-50 p-2 rounded border border-yellow-200">
-                          <p><strong>Why Reconciliation?</strong></p>
+                          <p>
+                            <strong>Why Reconciliation?</strong>
+                          </p>
                           <p>• Webhooks can occasionally fail or be missed</p>
                           <p>• Network issues might cause lost updates</p>
                           <p>• Daily full sync ensures 100% data integrity</p>
                           <p>• Runs at low-traffic time (3 AM by default)</p>
-                          <p>• <strong>Highly recommended for webhook mode</strong></p>
+                          <p>
+                            • <strong>Highly recommended for webhook mode</strong>
+                          </p>
                         </div>
                         {syncConfig.reconciliation_enabled && (
                           <div className="mt-2">
                             <Label className="text-xs">Reconciliation Time (24-hour format)</Label>
-                            <Input 
+                            <Input
                               type="time"
                               value={syncConfig.reconciliation_time}
-                              onChange={(e) => setSyncConfig({...syncConfig, reconciliation_time: e.target.value})}
+                              onChange={(e) =>
+                                setSyncConfig({
+                                  ...syncConfig,
+                                  reconciliation_time: e.target.value,
+                                })
+                              }
                               className="w-32 h-8 text-xs"
                             />
                             <p className="text-xs text-gray-500 mt-1">Asia/Jakarta timezone</p>
@@ -1499,11 +1801,16 @@ export const Settings = () => {
                   </div>
                 )}
 
-                
                 <div className="flex gap-2 pt-4 border-t">
-                  <Button 
+                  <Button
                     onClick={testConnection}
-                    disabled={testing || !syncConfig.api_base_url || !syncConfig.api_email || !syncConfig.api_password || syncConfig.api_password === '********'}
+                    disabled={
+                      testing ||
+                      !syncConfig.api_base_url ||
+                      !syncConfig.api_email ||
+                      !syncConfig.api_password ||
+                      syncConfig.api_password === '********'
+                    }
                     variant="outline"
                     className="gap-2"
                   >
@@ -1519,7 +1826,7 @@ export const Settings = () => {
                       </>
                     )}
                   </Button>
-                  <Button 
+                  <Button
                     onClick={saveSyncConfig}
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
@@ -1531,101 +1838,136 @@ export const Settings = () => {
 
             {/* Current Sync Status Card - Always show */}
             <Card className="bg-gradient-to-r from-teal-50 to-blue-50 border-teal-200">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    <span>🔄 Active Sync Configuration</span>
-                    {syncConfig.is_enabled ? (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-red-600 border-red-300 hover:bg-red-50"
-                        onClick={() => {
-                          showConfirm(
-                            'Disable Sync',
-                            'Disable sync? This will stop automatic syncing but preserve all synced data. You can re-enable it anytime.',
-                            async () => {
-                              const updated = {...syncConfig, is_enabled: false};
-                              await api.post(`/sync/config`, updated);
-                              toast.success('Sync disabled');
-                              loadSyncConfig();
-                              closeConfirm();
-                            }
-                          );
-                        }}
-                      >
-                        Disable Sync
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-green-600 border-green-300 hover:bg-green-50"
-                        onClick={() => {
-                          showConfirm(
-                            'Enable Sync',
-                            'Enable sync? This will start automatic syncing from core API. Members will be synced based on your configuration.',
-                            async () => {
-                              const updated = {...syncConfig, is_enabled: true};
-                              await api.post(`/sync/config`, updated);
-                              toast.success('Sync enabled');
-                              loadSyncConfig();
-                              closeConfirm();
-                            }
-                          );
-                        }}
-                      >
-                        Enable Sync
-                      </Button>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-600 text-xs uppercase">Method</p>
-                    <p className="font-medium">{syncConfig.sync_method === 'polling' ? '📊 Polling' : '⚡ Webhook'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 text-xs uppercase">Status</p>
-                    <p className={`font-medium ${syncConfig.is_enabled ? 'text-green-600' : 'text-gray-500'}`}>
-                      {syncConfig.is_enabled ? '✓ Enabled' : '✗ Disabled'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 text-xs uppercase">API URL</p>
-                    <p className="font-mono text-xs truncate">{syncConfig.api_base_url}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 text-xs uppercase">Username</p>
-                    <p className="font-mono text-xs truncate">{syncConfig.api_email}</p>
-                  </div>
-                  
-                  {syncConfig.sync_method === 'webhook' && (
-                    <>
-                      <div className="md:col-span-2">
-                        <p className="text-gray-600 text-xs uppercase mb-1">Webhook URL for Core System</p>
-                        <div className="flex gap-2">
-                          <code className="flex-1 text-xs bg-white p-2 rounded border">{BACKEND_URL}/sync/webhook</code>
-                          <Button size="sm" variant="outline" onClick={() => {
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span>🔄 Active Sync Configuration</span>
+                  {syncConfig.is_enabled ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 border-red-300 hover:bg-red-50"
+                      onClick={() => {
+                        showConfirm(
+                          'Disable Sync',
+                          'Disable sync? This will stop automatic syncing but preserve all synced data. You can re-enable it anytime.',
+                          async () => {
+                            const updated = { ...syncConfig, is_enabled: false };
+                            await api.post(`/sync/config`, updated);
+                            toast.success('Sync disabled');
+                            loadSyncConfig();
+                            closeConfirm();
+                          }
+                        );
+                      }}
+                    >
+                      Disable Sync
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-green-600 border-green-300 hover:bg-green-50"
+                      onClick={() => {
+                        showConfirm(
+                          'Enable Sync',
+                          'Enable sync? This will start automatic syncing from core API. Members will be synced based on your configuration.',
+                          async () => {
+                            const updated = { ...syncConfig, is_enabled: true };
+                            await api.post(`/sync/config`, updated);
+                            toast.success('Sync enabled');
+                            loadSyncConfig();
+                            closeConfirm();
+                          }
+                        );
+                      }}
+                    >
+                      Enable Sync
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600 text-xs uppercase">Method</p>
+                  <p className="font-medium">
+                    {syncConfig.sync_method === 'polling' ? '📊 Polling' : '⚡ Webhook'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-xs uppercase">Status</p>
+                  <p
+                    className={`font-medium ${syncConfig.is_enabled ? 'text-green-600' : 'text-gray-500'}`}
+                  >
+                    {syncConfig.is_enabled ? '✓ Enabled' : '✗ Disabled'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-xs uppercase">API URL</p>
+                  <p className="font-mono text-xs truncate">{syncConfig.api_base_url}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-xs uppercase">Username</p>
+                  <p className="font-mono text-xs truncate">{syncConfig.api_email}</p>
+                </div>
+
+                {syncConfig.sync_method === 'webhook' && (
+                  <>
+                    <div className="md:col-span-2">
+                      <p className="text-gray-600 text-xs uppercase mb-1">
+                        Webhook URL for Core System
+                      </p>
+                      <div className="flex gap-2">
+                        <code className="flex-1 text-xs bg-white p-2 rounded border">
+                          {BACKEND_URL}/sync/webhook
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
                             navigator.clipboard.writeText(`${BACKEND_URL}/sync/webhook`);
                             toast.success('Copied!');
-                          }}>Copy</Button>
-                        </div>
+                          }}
+                        >
+                          Copy
+                        </Button>
                       </div>
-                      <div className="md:col-span-2">
-                        <p className="text-gray-600 text-xs uppercase mb-1">Webhook Secret</p>
-                        {syncConfig.webhook_secret ? (
-                          <div className="flex gap-2">
-                            <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">
-                              {showWebhookSecret ? syncConfig.webhook_secret : '••••••••••••••••••••••••••••••••'}
-                            </code>
-                            <Button size="sm" variant="outline" onClick={() => setShowWebhookSecret(!showWebhookSecret)} title={showWebhookSecret ? 'Hide secret' : 'Show secret'}>
-                              {showWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => {
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-gray-600 text-xs uppercase mb-1">Webhook Secret</p>
+                      {syncConfig.webhook_secret ? (
+                        <div className="flex gap-2">
+                          <code className="flex-1 text-xs bg-white p-2 rounded border font-mono">
+                            {showWebhookSecret
+                              ? syncConfig.webhook_secret
+                              : '••••••••••••••••••••••••••••••••'}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                            title={showWebhookSecret ? 'Hide secret' : 'Show secret'}
+                          >
+                            {showWebhookSecret ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
                               navigator.clipboard.writeText(syncConfig.webhook_secret);
                               toast.success('Copied!');
-                            }}>Copy</Button>
-                            <Button size="sm" variant="outline" className="text-orange-600 border-orange-300" onClick={() => {
+                            }}
+                          >
+                            Copy
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-orange-600 border-orange-300"
+                            onClick={() => {
                               showConfirm(
                                 'Regenerate Webhook Secret',
                                 'Regenerate webhook secret? You must update the core system with the new secret after regeneration.',
@@ -1642,20 +1984,22 @@ export const Settings = () => {
                                   }
                                 }
                               );
-                            }}>Regenerate</Button>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
-                            ⚠️ Webhook secret will be generated when you save configuration
-                          </p>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+                            }}
+                          >
+                            Regenerate
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+                          ⚠️ Webhook secret will be generated when you save configuration
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-            
             <Card>
               <CardHeader>
                 <CardTitle>Manual Sync</CardTitle>
@@ -1663,7 +2007,8 @@ export const Settings = () => {
                   Manually trigger a sync to pull the latest member data from core system.
                   {syncConfig.reconciliation_enabled && (
                     <span className="block mt-2 text-blue-600">
-                      ℹ️ Automatic reconciliation runs daily at {syncConfig.reconciliation_time} (Asia/Jakarta timezone) to ensure data integrity.
+                      ℹ️ Automatic reconciliation runs daily at {syncConfig.reconciliation_time}{' '}
+                      (Asia/Jakarta timezone) to ensure data integrity.
                     </span>
                   )}
                 </CardDescription>
@@ -1671,17 +2016,31 @@ export const Settings = () => {
               <CardContent className="space-y-4">
                 {syncConfig.last_sync_at && (
                   <div className="text-sm text-gray-600">
-                    <p><span className="font-medium">Last Sync:</span> {formatToJakarta(syncConfig.last_sync_at)}</p>
-                    <p><span className="font-medium">Status:</span> <span className={syncConfig.last_sync_status === 'success' ? 'text-green-600' : 'text-red-600'}>
-                      {syncConfig.last_sync_status}
-                    </span></p>
+                    <p>
+                      <span className="font-medium">Last Sync:</span>{' '}
+                      {formatToJakarta(syncConfig.last_sync_at)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Status:</span>{' '}
+                      <span
+                        className={
+                          syncConfig.last_sync_status === 'success'
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }
+                      >
+                        {syncConfig.last_sync_status}
+                      </span>
+                    </p>
                     {syncConfig.last_sync_message && (
-                      <p><span className="font-medium">Message:</span> {syncConfig.last_sync_message}</p>
+                      <p>
+                        <span className="font-medium">Message:</span> {syncConfig.last_sync_message}
+                      </p>
                     )}
                   </div>
                 )}
-                
-                <Button 
+
+                <Button
                   onClick={syncNow}
                   disabled={syncing || !syncConfig.is_enabled}
                   className="bg-blue-500 hover:bg-blue-600 text-white gap-2"
@@ -1698,13 +2057,15 @@ export const Settings = () => {
                     </>
                   )}
                 </Button>
-                
+
                 {!syncConfig.is_enabled && (
-                  <p className="text-xs text-yellow-600">⚠️ Sync is disabled. Enable it in configuration above.</p>
+                  <p className="text-xs text-yellow-600">
+                    ⚠️ Sync is disabled. Enable it in configuration above.
+                  </p>
                 )}
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -1724,13 +2085,19 @@ export const Settings = () => {
                   <>
                     <div className="space-y-2">
                       {syncLogs.map((log) => (
-                        <div key={log.id} className={`p-3 rounded border ${
-                          log.status === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                        }`}>
+                        <div
+                          key={log.id}
+                          className={`p-3 rounded border ${
+                            log.status === 'success'
+                              ? 'bg-green-50 border-green-200'
+                              : 'bg-red-50 border-red-200'
+                          }`}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <p className="text-sm font-medium">
-                                {log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1)} Sync
+                                {log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1)}{' '}
+                                Sync
                               </p>
                               <p className="text-xs text-gray-600">
                                 {formatToJakarta(log.started_at)}
@@ -1743,7 +2110,8 @@ export const Settings = () => {
                                   <p className="text-green-700">✓ Success</p>
                                   <p className="text-gray-600">
                                     {log.members_created} created, {log.members_updated} updated
-                                    {log.members_archived > 0 && `, ${log.members_archived} archived`}
+                                    {log.members_archived > 0 &&
+                                      `, ${log.members_archived} archived`}
                                   </p>
                                 </>
                               ) : (
@@ -1761,7 +2129,9 @@ export const Settings = () => {
                     {syncLogsTotal > SYNC_LOGS_PER_PAGE && (
                       <div className="flex items-center justify-between mt-4 pt-3 border-t">
                         <p className="text-xs text-muted-foreground">
-                          Showing {syncLogsPage * SYNC_LOGS_PER_PAGE + 1}-{Math.min((syncLogsPage + 1) * SYNC_LOGS_PER_PAGE, syncLogsTotal)} of {syncLogsTotal}
+                          Showing {syncLogsPage * SYNC_LOGS_PER_PAGE + 1}-
+                          {Math.min((syncLogsPage + 1) * SYNC_LOGS_PER_PAGE, syncLogsTotal)} of{' '}
+                          {syncLogsTotal}
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -1787,22 +2157,36 @@ export const Settings = () => {
                 )}
               </CardContent>
             </Card>
-            
+
             <Card className="bg-yellow-50 border-yellow-200">
               <CardHeader>
-                <CardTitle className="text-sm">Important Notes - {syncConfig.sync_method === 'polling' ? 'Polling Mode' : 'Webhook Mode'}</CardTitle>
+                <CardTitle className="text-sm">
+                  Important Notes -{' '}
+                  {syncConfig.sync_method === 'polling' ? 'Polling Mode' : 'Webhook Mode'}
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-xs space-y-2 text-gray-700">
-                <p>• When sync is enabled, you cannot manually create new members (read-only from core)</p>
+                <p>
+                  • When sync is enabled, you cannot manually create new members (read-only from
+                  core)
+                </p>
                 <p>• Sync only updates basic profile data (name, phone, birth date, photo)</p>
                 <p>• All pastoral care events, engagement data, and notes are preserved locally</p>
-                <p>• Members deactivated in core system will be archived (hidden from lists but history preserved)</p>
-                
+                <p>
+                  • Members deactivated in core system will be archived (hidden from lists but
+                  history preserved)
+                </p>
+
                 {syncConfig.sync_method === 'polling' ? (
                   <>
                     <p className="pt-2 border-t border-yellow-300 font-medium">Polling Mode:</p>
-                    <p>• FaithTracker pulls data from core API every {syncConfig.polling_interval_hours} hours</p>
-                    <p>• Changes may take up to {syncConfig.polling_interval_hours} hours to appear</p>
+                    <p>
+                      • FaithTracker pulls data from core API every{' '}
+                      {syncConfig.polling_interval_hours} hours
+                    </p>
+                    <p>
+                      • Changes may take up to {syncConfig.polling_interval_hours} hours to appear
+                    </p>
                     <p>• No changes needed on core system side</p>
                     <p>• Lower server load, delayed updates</p>
                   </>
@@ -1811,7 +2195,10 @@ export const Settings = () => {
                     <p className="pt-2 border-t border-yellow-300 font-medium">Webhook Mode:</p>
                     <p>• Core system pushes updates to FaithTracker in real-time</p>
                     <p>• Changes appear immediately (within seconds)</p>
-                    <p>• <strong>Requires core system configuration:</strong> Add webhook URL and secret to FaithFlow Enterprise</p>
+                    <p>
+                      • <strong>Requires core system configuration:</strong> Add webhook URL and
+                      secret to FaithFlow Enterprise
+                    </p>
                     <p>• Core must send HMAC-SHA256 signature in X-Webhook-Signature header</p>
                     <p>• See webhook details in blue box above</p>
                   </>
@@ -1821,7 +2208,7 @@ export const Settings = () => {
           </div>
         </TabsContent>
       </Tabs>
-      
+
       {/* Confirmation Dialog */}
       <ConfirmDialog
         open={confirmDialog.open}

@@ -15,11 +15,11 @@ export const BulkMessaging = () => {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  
+
   useEffect(() => {
     loadUsers();
   }, []);
-  
+
   const loadUsers = async () => {
     try {
       const response = await api.get(`/users`);
@@ -28,7 +28,7 @@ export const BulkMessaging = () => {
       toast.error(t('bulk_messaging_page.failed_load_users'));
     }
   };
-  
+
   const handleSendBulk = async () => {
     if (selectedUsers.length === 0) {
       toast.error(t('bulk_messaging_page.select_recipient'));
@@ -38,14 +38,14 @@ export const BulkMessaging = () => {
       toast.error(t('bulk_messaging_page.enter_message'));
       return;
     }
-    
+
     try {
       setSending(true);
       let sent = 0;
       let failed = 0;
-      
+
       for (const userId of selectedUsers) {
-        const user = users.find(u => u.id === userId);
+        const user = users.find((u) => u.id === userId);
         if (user) {
           try {
             // Format phone for WhatsApp (add @s.whatsapp.net if not present)
@@ -59,10 +59,10 @@ export const BulkMessaging = () => {
               }
               phone = phone + '@s.whatsapp.net';
             }
-            
+
             const response = await api.post(`/integrations/ping/whatsapp`, {
               phone: phone,
-              message
+              message,
             });
             if (response.data.success) sent++;
             else failed++;
@@ -71,8 +71,8 @@ export const BulkMessaging = () => {
           }
         }
       }
-      
-      toast.success(t('bulk_messaging_page.sent_results', {sent, failed}));
+
+      toast.success(t('bulk_messaging_page.sent_results', { sent, failed }));
       setMessage('');
       setSelectedUsers([]);
     } catch (_error) {
@@ -81,11 +81,11 @@ export const BulkMessaging = () => {
       setSending(false);
     }
   };
-  
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-playfair font-bold">{t('bulk_messaging_page.title')}</h1>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -93,14 +93,15 @@ export const BulkMessaging = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {users.map(user => (
+              {users.map((user) => (
                 <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-muted rounded">
                   <Checkbox
                     checked={selectedUsers.includes(user.id)}
                     onCheckedChange={(checked) => {
-                      setSelectedUsers(checked 
-                        ? [...selectedUsers, user.id]
-                        : selectedUsers.filter(id => id !== user.id)
+                      setSelectedUsers(
+                        checked
+                          ? [...selectedUsers, user.id]
+                          : selectedUsers.filter((id) => id !== user.id)
                       );
                     }}
                   />
@@ -113,14 +114,16 @@ export const BulkMessaging = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>{t('bulk_messaging_page.compose_message')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-2">{t('bulk_messaging_page.recipients_selected', {count: selectedUsers.length})}</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {t('bulk_messaging_page.recipients_selected', { count: selectedUsers.length })}
+              </p>
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -134,7 +137,9 @@ export const BulkMessaging = () => {
               disabled={sending || selectedUsers.length === 0 || !message.trim()}
             >
               <Send className="w-4 h-4 mr-2" />
-              {sending ? t('bulk_messaging_page.sending') : t('bulk_messaging_page.send_to_recipients', {count: selectedUsers.length})}
+              {sending
+                ? t('bulk_messaging_page.sending')
+                : t('bulk_messaging_page.send_to_recipients', { count: selectedUsers.length })}
             </Button>
           </CardContent>
         </Card>

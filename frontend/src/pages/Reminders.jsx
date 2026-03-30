@@ -30,7 +30,9 @@ const MemberNameWithAvatar = ({ member, memberId }) => {
 
   // Handle both absolute URLs (from external CDN) and relative paths (local uploads)
   const photoUrl = member?.photo_url
-    ? (member.photo_url.startsWith('http') ? member.photo_url : `${BACKEND_URL}${member.photo_url}`)
+    ? member.photo_url.startsWith('http')
+      ? member.photo_url
+      : `${BACKEND_URL}${member.photo_url}`
     : null;
 
   return (
@@ -102,9 +104,9 @@ const markMemberContacted = async (memberId, memberName, user, loadReminders, t)
       event_type: 'regular_contact',
       event_date: new Date().toISOString().split('T')[0],
       title: `Contact with ${memberName}`,
-      description: 'Contacted via Reminders page'
+      description: 'Contacted via Reminders page',
     });
-    toast.success(t('toasts.member_contacted', {name: memberName}));
+    toast.success(t('toasts.member_contacted', { name: memberName }));
     loadReminders(); // Refresh to remove from at-risk/disconnected
   } catch (_error) {
     toast.error(t('toasts.failed_mark_contacted'));
@@ -125,24 +127,24 @@ export const Reminders = () => {
   const [loading, setLoading] = useState(true);
   const [engagementSettings, setEngagementSettings] = useState({
     atRiskDays: 60,
-    inactiveDays: 90
+    inactiveDays: 90,
   });
-  
+
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     title: '',
     description: '',
-    onConfirm: () => {}
+    onConfirm: () => {},
   });
-  
+
   const showConfirm = (title, description, onConfirm) => {
     setConfirmDialog({ open: true, title, description, onConfirm });
   };
-  
+
   const closeConfirm = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
-  
+
   useEffect(() => {
     // Load engagement settings from localStorage (set in Settings page)
     const savedSettings = localStorage.getItem('engagement_settings');
@@ -151,74 +153,100 @@ export const Reminders = () => {
     }
     loadReminders();
   }, []);
-  
+
   const loadReminders = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const weekAhead = new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
-      
-      const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes] = await Promise.all([
-        api.get(`/care-events`),
-        api.get(`/grief-support?completed=false`),
-        api.get(`/care-events/hospital/due-followup`),
-        api.get(`/members/at-risk`),
-        api.get(`/members`),
-        api.get(`/financial-aid-schedules/due-today`)
-      ]);
-      
+      const weekAhead = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const [eventsRes, griefRes, hospitalRes, atRiskRes, membersRes, aidDueRes] =
+        await Promise.all([
+          api.get(`/care-events`),
+          api.get(`/grief-support?completed=false`),
+          api.get(`/care-events/hospital/due-followup`),
+          api.get(`/members/at-risk`),
+          api.get(`/members`),
+          api.get(`/financial-aid-schedules/due-today`),
+        ]);
+
       // Get member names, phones, and photos for events
       const memberMap = {};
-      membersRes.data.forEach(m => memberMap[m.id] = { 
-        name: m.name, 
-        phone: m.phone, 
-        photo_url: m.photo_url 
-      });
-      
+      membersRes.data.forEach(
+        (m) =>
+          (memberMap[m.id] = {
+            name: m.name,
+            phone: m.phone,
+            photo_url: m.photo_url,
+          })
+      );
+
       // Filter birthdays for today with member names and photos
-      const todayBirthdays = eventsRes.data.filter(e => 
-        e.event_type === 'birthday' && e.event_date === today
-      ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-      
+      const todayBirthdays = eventsRes.data
+        .filter((e) => e.event_type === 'birthday' && e.event_date === today)
+        .map((e) => ({
+          ...e,
+          member_name: memberMap[e.member_id]?.name,
+          member_phone: memberMap[e.member_id]?.phone,
+          member_photo_url: memberMap[e.member_id]?.photo_url,
+        }));
+
       // Get upcoming birthdays with member names and photos
-      const upcoming = eventsRes.data.filter(e => 
-        e.event_type === 'birthday' && 
-        e.event_date > today && 
-        e.event_date <= weekAhead
-      ).map(e => ({...e, member_name: memberMap[e.member_id]?.name, member_phone: memberMap[e.member_id]?.phone, member_photo_url: memberMap[e.member_id]?.photo_url}));
-      
+      const upcoming = eventsRes.data
+        .filter(
+          (e) => e.event_type === 'birthday' && e.event_date > today && e.event_date <= weekAhead
+        )
+        .map((e) => ({
+          ...e,
+          member_name: memberMap[e.member_id]?.name,
+          member_phone: memberMap[e.member_id]?.phone,
+          member_photo_url: memberMap[e.member_id]?.photo_url,
+        }));
+
       // Filter grief stages due today AND overdue (for follow-up tab)
-      const griefToday = griefRes.data.filter(g => g.scheduled_date === today).map(g => ({
-        ...g,
-        member_name: memberMap[g.member_id]?.name,
-        member_phone: memberMap[g.member_id]?.phone,
-        member_photo_url: memberMap[g.member_id]?.photo_url
-      }));
-      
+      const griefToday = griefRes.data
+        .filter((g) => g.scheduled_date === today)
+        .map((g) => ({
+          ...g,
+          member_name: memberMap[g.member_id]?.name,
+          member_phone: memberMap[g.member_id]?.phone,
+          member_photo_url: memberMap[g.member_id]?.photo_url,
+        }));
+
       // Filter overdue grief stages for follow-up tab
-      const griefOverdue = griefRes.data.filter(g => {
-        const schedDate = new Date(g.scheduled_date);
-        return schedDate <= new Date() && !g.completed;
-      }).map(g => ({
-        ...g,
-        member_name: memberMap[g.member_id]?.name,
-        member_phone: memberMap[g.member_id]?.phone,
-        member_photo_url: memberMap[g.member_id]?.photo_url
-      }));
-      
+      const griefOverdue = griefRes.data
+        .filter((g) => {
+          const schedDate = new Date(g.scheduled_date);
+          return schedDate <= new Date() && !g.completed;
+        })
+        .map((g) => ({
+          ...g,
+          member_name: memberMap[g.member_id]?.name,
+          member_phone: memberMap[g.member_id]?.phone,
+          member_photo_url: memberMap[g.member_id]?.photo_url,
+        }));
+
       // Separate at-risk and disconnected based on Settings thresholds
-      const atRisk = atRiskRes.data.filter(m => 
-        m.days_since_last_contact >= engagementSettings.atRiskDays && 
-        m.days_since_last_contact < engagementSettings.inactiveDays
+      const atRisk = atRiskRes.data.filter(
+        (m) =>
+          m.days_since_last_contact >= engagementSettings.atRiskDays &&
+          m.days_since_last_contact < engagementSettings.inactiveDays
       );
-      const disconnected = atRiskRes.data.filter(m => 
-        m.days_since_last_contact >= engagementSettings.inactiveDays
+      const disconnected = atRiskRes.data.filter(
+        (m) => m.days_since_last_contact >= engagementSettings.inactiveDays
       );
-      
+
       setBirthdaysToday(todayBirthdays);
       setUpcomingBirthdays(upcoming);
-      setGriefToday(griefToday);  // Set grief stages due today
-      setGriefDue(griefOverdue);  // Use overdue for follow-up tab
-      setHospitalFollowUp(hospitalRes.data.map(h => ({...h, member_name: memberMap[h.member_id]?.name, member_phone: memberMap[h.member_id]?.phone, member_photo_url: memberMap[h.member_id]?.photo_url})));
+      setGriefToday(griefToday); // Set grief stages due today
+      setGriefDue(griefOverdue); // Use overdue for follow-up tab
+      setHospitalFollowUp(
+        hospitalRes.data.map((h) => ({
+          ...h,
+          member_name: memberMap[h.member_id]?.name,
+          member_phone: memberMap[h.member_id]?.phone,
+          member_photo_url: memberMap[h.member_id]?.photo_url,
+        }))
+      );
       setFinancialAidDue(aidDueRes.data);
       setAtRiskMembers(atRisk);
       setDisconnectedMembers(disconnected);
@@ -230,41 +258,53 @@ export const Reminders = () => {
   };
 
   if (loading) return <div>Loading...</div>;
-  
-  const totalTasks = birthdaysToday.length + griefDue.length + hospitalFollowUp.length + Math.min(atRiskMembers.length, 10);
-  
+
+  const totalTasks =
+    birthdaysToday.length +
+    griefDue.length +
+    hospitalFollowUp.length +
+    Math.min(atRiskMembers.length, 10);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-playfair font-bold">Pastoral Care Reminders</h1>
         <p className="text-muted-foreground mt-1">{totalTasks} tasks need your attention today</p>
       </div>
-      
+
       <Tabs defaultValue="today" className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="today">
-            <Calendar className="w-4 h-4 mr-2" />Today ({birthdaysToday.length + griefToday.length})
+            <Calendar className="w-4 h-4 mr-2" />
+            Today ({birthdaysToday.length + griefToday.length})
           </TabsTrigger>
           <TabsTrigger value="followup">
-            <Hospital className="w-4 h-4 mr-2" />Follow-up ({hospitalFollowUp.length + griefDue.length})
+            <Hospital className="w-4 h-4 mr-2" />
+            Follow-up ({hospitalFollowUp.length + griefDue.length})
           </TabsTrigger>
           <TabsTrigger value="financial">
-            <DollarSign className="w-4 h-4 mr-2" />Financial Aid ({financialAidDue.length})
+            <DollarSign className="w-4 h-4 mr-2" />
+            Financial Aid ({financialAidDue.length})
           </TabsTrigger>
           <TabsTrigger value="disconnected">
-            <Users className="w-4 h-4 mr-2" />Disconnected ({disconnectedMembers.length})
+            <Users className="w-4 h-4 mr-2" />
+            Disconnected ({disconnectedMembers.length})
           </TabsTrigger>
           <TabsTrigger value="at-risk">
-            <AlertTriangle className="w-4 h-4 mr-2" />At Risk ({atRiskMembers.length})
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            At Risk ({atRiskMembers.length})
           </TabsTrigger>
           <TabsTrigger value="upcoming">
-            <Heart className="w-4 h-4 mr-2" />Upcoming ({upcomingBirthdays.length})
+            <Heart className="w-4 h-4 mr-2" />
+            Upcoming ({upcomingBirthdays.length})
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="today" className="space-y-4">
           {birthdaysToday.length === 0 && griefToday.length === 0 ? (
-            <Card><CardContent className="p-6 text-center">No urgent tasks for today! 🎉</CardContent></Card>
+            <Card>
+              <CardContent className="p-6 text-center">No urgent tasks for today! 🎉</CardContent>
+            </Card>
           ) : (
             <>
               {birthdaysToday.length > 0 && (
@@ -276,19 +316,42 @@ export const Reminders = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {birthdaysToday.map(event => (
-                        <div key={event.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
+                      {birthdaysToday.map((event) => (
+                        <div
+                          key={event.id}
+                          className="p-3 bg-amber-50 rounded flex justify-between items-center"
+                        >
                           <div className="flex-1">
-                            <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
-                            <p className="text-sm text-muted-foreground ml-13">Call to wish happy birthday</p>
+                            <MemberNameWithAvatar
+                              member={{
+                                name: event.member_name,
+                                photo_url: event.member_photo_url,
+                              }}
+                              memberId={event.member_id}
+                            />
+                            <p className="text-sm text-muted-foreground ml-13">
+                              Call to wish happy birthday
+                            </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" asChild>
-                              <a href={formatPhoneForWhatsApp(event.member_phone)} target="_blank" rel="noopener noreferrer">
+                            <Button
+                              size="sm"
+                              className="bg-amber-500 hover:bg-amber-600 text-white"
+                              asChild
+                            >
+                              <a
+                                href={formatPhoneForWhatsApp(event.member_phone)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 Contact
                               </a>
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => markBirthdayComplete(event.id, loadReminders, t)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => markBirthdayComplete(event.id, loadReminders, t)}
+                            >
                               Mark Complete
                             </Button>
                           </div>
@@ -298,7 +361,7 @@ export const Reminders = () => {
                   </CardContent>
                 </Card>
               )}
-              
+
               {griefToday.length > 0 && (
                 <Card className="card-border-left-pink">
                   <CardHeader>
@@ -308,19 +371,42 @@ export const Reminders = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {griefToday.map(stage => (
-                        <div key={stage.id} className="p-3 bg-pink-50 rounded flex justify-between items-center">
+                      {griefToday.map((stage) => (
+                        <div
+                          key={stage.id}
+                          className="p-3 bg-pink-50 rounded flex justify-between items-center"
+                        >
                           <div className="flex-1">
-                            <MemberNameWithAvatar member={{name: stage.member_name, photo_url: stage.member_photo_url}} memberId={stage.member_id} />
-                            <p className="text-sm text-muted-foreground ml-13">{stage.stage.replace('_', ' ')} stage</p>
+                            <MemberNameWithAvatar
+                              member={{
+                                name: stage.member_name,
+                                photo_url: stage.member_photo_url,
+                              }}
+                              memberId={stage.member_id}
+                            />
+                            <p className="text-sm text-muted-foreground ml-13">
+                              {stage.stage.replace('_', ' ')} stage
+                            </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" className="bg-pink-500 hover:bg-pink-600 text-white" asChild>
-                              <a href={formatPhoneForWhatsApp(stage.member_phone)} target="_blank" rel="noopener noreferrer">
+                            <Button
+                              size="sm"
+                              className="bg-pink-500 hover:bg-pink-600 text-white"
+                              asChild
+                            >
+                              <a
+                                href={formatPhoneForWhatsApp(stage.member_phone)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 Contact
                               </a>
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => markGriefStageComplete(stage.id, loadReminders, t)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => markGriefStageComplete(stage.id, loadReminders, t)}
+                            >
                               Mark Complete
                             </Button>
                           </div>
@@ -333,8 +419,7 @@ export const Reminders = () => {
             </>
           )}
         </TabsContent>
-        
-        
+
         <TabsContent value="financial" className="space-y-4">
           <Card className="card-border-left-green">
             <CardHeader>
@@ -342,42 +427,69 @@ export const Reminders = () => {
             </CardHeader>
             <CardContent>
               {financialAidDue.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">No financial aid scheduled for today</p>
+                <p className="text-center text-muted-foreground py-6">
+                  No financial aid scheduled for today
+                </p>
               ) : (
                 <div className="space-y-2">
-                  {financialAidDue.map(schedule => (
-                    <div key={schedule.id} className="p-3 bg-green-50 rounded flex justify-between items-center">
+                  {financialAidDue.map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="p-3 bg-green-50 rounded flex justify-between items-center"
+                    >
                       <div className="flex-1">
-                        <MemberNameWithAvatar 
-                          member={{name: schedule.member_name, photo_url: schedule.member_photo_url}} 
-                          memberId={schedule.member_id} 
+                        <MemberNameWithAvatar
+                          member={{
+                            name: schedule.member_name,
+                            photo_url: schedule.member_photo_url,
+                          }}
+                          memberId={schedule.member_id}
                         />
                         <p className="text-sm text-muted-foreground ml-13">
-                          {schedule.frequency} - Rp {schedule.aid_amount?.toLocaleString('id-ID')} ({schedule.aid_type})
+                          {schedule.frequency} - Rp {schedule.aid_amount?.toLocaleString('id-ID')} (
+                          {schedule.aid_type})
                         </p>
                         <p className="text-xs ml-13">
-                          <span className={schedule.days_overdue > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
-                            {schedule.days_overdue > 0 ? `Overdue ${schedule.days_overdue} days` : 'Due today'} - 
-                            Scheduled: {formatDate(schedule.next_occurrence)}
+                          <span
+                            className={
+                              schedule.days_overdue > 0
+                                ? 'text-red-600 font-medium'
+                                : 'text-green-600'
+                            }
+                          >
+                            {schedule.days_overdue > 0
+                              ? `Overdue ${schedule.days_overdue} days`
+                              : 'Due today'}{' '}
+                            - Scheduled: {formatDate(schedule.next_occurrence)}
                           </span>
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white" asChild>
-                          <a href={formatPhoneForWhatsApp(schedule.member_phone)} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          size="sm"
+                          className="bg-green-500 hover:bg-green-600 text-white"
+                          asChild
+                        >
+                          <a
+                            href={formatPhoneForWhatsApp(schedule.member_phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             Contact
                           </a>
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={async () => {
                             showConfirm(
                               'Mark Financial Aid Distributed',
                               `Mark financial aid as distributed to ${schedule.member_name}?`,
                               async () => {
                                 try {
-                                  await api.post(`/financial-aid-schedules/${schedule.id}/mark-distributed`);
+                                  await api.post(
+                                    `/financial-aid-schedules/${schedule.id}/mark-distributed`
+                                  );
                                   toast.success(t('toasts.payment_distributed_advanced'));
                                   loadReminders();
                                   closeConfirm();
@@ -390,9 +502,9 @@ export const Reminders = () => {
                         >
                           Mark Distributed
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="text-red-600"
                           onClick={async () => {
                             showConfirm(
@@ -421,30 +533,51 @@ export const Reminders = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="disconnected" className="space-y-4">
           <Card className="card-border-left-red">
             <CardHeader>
-              <CardTitle>Members Disconnected ({engagementSettings.inactiveDays}+ days no contact)</CardTitle>
+              <CardTitle>
+                Members Disconnected ({engagementSettings.inactiveDays}+ days no contact)
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {disconnectedMembers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">No disconnected members</p>
               ) : (
                 <div className="space-y-2">
-                  {disconnectedMembers.slice(0, 15).map(member => (
-                    <div key={member.id} className="p-3 bg-red-50 rounded flex justify-between items-center">
+                  {disconnectedMembers.slice(0, 15).map((member) => (
+                    <div
+                      key={member.id}
+                      className="p-3 bg-red-50 rounded flex justify-between items-center"
+                    >
                       <div className="flex-1">
                         <MemberNameWithAvatar member={member} memberId={member.id} />
-                        <p className="text-sm text-muted-foreground ml-13">{member.days_since_last_contact} days since contact</p>
+                        <p className="text-sm text-muted-foreground ml-13">
+                          {member.days_since_last_contact} days since contact
+                        </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-red-500 hover:bg-red-600 text-white" asChild>
-                          <a href={formatPhoneForWhatsApp(member.phone)} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          size="sm"
+                          className="bg-red-500 hover:bg-red-600 text-white"
+                          asChild
+                        >
+                          <a
+                            href={formatPhoneForWhatsApp(member.phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders, t)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            markMemberContacted(member.id, member.name, user, loadReminders, t)
+                          }
+                        >
                           Mark Contacted
                         </Button>
                       </div>
@@ -455,30 +588,52 @@ export const Reminders = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="at-risk" className="space-y-4">
           <Card className="card-border-left-amber">
             <CardHeader>
-              <CardTitle>Members at Risk ({engagementSettings.atRiskDays}-{engagementSettings.inactiveDays-1} days no contact)</CardTitle>
+              <CardTitle>
+                Members at Risk ({engagementSettings.atRiskDays}-
+                {engagementSettings.inactiveDays - 1} days no contact)
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {atRiskMembers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">No members at risk</p>
               ) : (
                 <div className="space-y-2">
-                  {atRiskMembers.map(member => (
-                    <div key={member.id} className="p-3 bg-amber-50 rounded flex justify-between items-center">
+                  {atRiskMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="p-3 bg-amber-50 rounded flex justify-between items-center"
+                    >
                       <div className="flex-1">
                         <MemberNameWithAvatar member={member} memberId={member.id} />
-                        <p className="text-sm text-muted-foreground ml-13">{member.days_since_last_contact} days since contact</p>
+                        <p className="text-sm text-muted-foreground ml-13">
+                          {member.days_since_last_contact} days since contact
+                        </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" asChild>
-                          <a href={formatPhoneForWhatsApp(member.phone)} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          size="sm"
+                          className="bg-amber-500 hover:bg-amber-600 text-white"
+                          asChild
+                        >
+                          <a
+                            href={formatPhoneForWhatsApp(member.phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markMemberContacted(member.id, member.name, user, loadReminders, t)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            markMemberContacted(member.id, member.name, user, loadReminders, t)
+                          }
+                        >
                           Mark Contacted
                         </Button>
                       </div>
@@ -489,7 +644,7 @@ export const Reminders = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="followup" className="space-y-4">
           {/* Accident/Illness Follow-ups */}
           {hospitalFollowUp.length > 0 && (
@@ -499,19 +654,39 @@ export const Reminders = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {hospitalFollowUp.map(event => (
-                    <div key={event.id} className="p-3 bg-blue-50 rounded flex justify-between items-center">
+                  {hospitalFollowUp.map((event) => (
+                    <div
+                      key={event.id}
+                      className="p-3 bg-blue-50 rounded flex justify-between items-center"
+                    >
                       <div className="flex-1">
-                        <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
-                        <p className="text-sm text-muted-foreground ml-13">{event.followup_reason}</p>
+                        <MemberNameWithAvatar
+                          member={{ name: event.member_name, photo_url: event.member_photo_url }}
+                          memberId={event.member_id}
+                        />
+                        <p className="text-sm text-muted-foreground ml-13">
+                          {event.followup_reason}
+                        </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-blue-500 hover:bg-blue-600 text-white" asChild>
-                          <a href={formatPhoneForWhatsApp(event.member_phone)} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          size="sm"
+                          className="bg-blue-500 hover:bg-blue-600 text-white"
+                          asChild
+                        >
+                          <a
+                            href={formatPhoneForWhatsApp(event.member_phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markAccidentComplete(event.id, loadReminders, t)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => markAccidentComplete(event.id, loadReminders, t)}
+                        >
                           Mark Complete
                         </Button>
                       </div>
@@ -521,7 +696,7 @@ export const Reminders = () => {
               </CardContent>
             </Card>
           )}
-          
+
           {/* Grief Support Follow-ups */}
           {griefDue.length > 0 && (
             <Card className="card-border-left-purple">
@@ -530,19 +705,39 @@ export const Reminders = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {griefDue.map(stage => (
-                    <div key={stage.id} className="p-3 bg-purple-50 rounded flex justify-between items-center">
+                  {griefDue.map((stage) => (
+                    <div
+                      key={stage.id}
+                      className="p-3 bg-purple-50 rounded flex justify-between items-center"
+                    >
                       <div className="flex-1">
-                        <MemberNameWithAvatar member={{name: stage.member_name, photo_url: stage.member_photo_url}} memberId={stage.member_id} />
-                        <p className="text-sm text-muted-foreground ml-13">{stage.stage.replace('_', ' ')} after mourning</p>
+                        <MemberNameWithAvatar
+                          member={{ name: stage.member_name, photo_url: stage.member_photo_url }}
+                          memberId={stage.member_id}
+                        />
+                        <p className="text-sm text-muted-foreground ml-13">
+                          {stage.stage.replace('_', ' ')} after mourning
+                        </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-purple-500 hover:bg-purple-600 text-white" asChild>
-                          <a href={formatPhoneForWhatsApp(stage.member_phone)} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          size="sm"
+                          className="bg-purple-500 hover:bg-purple-600 text-white"
+                          asChild
+                        >
+                          <a
+                            href={formatPhoneForWhatsApp(stage.member_phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             Contact
                           </a>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => markGriefStageComplete(stage.id, loadReminders, t)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => markGriefStageComplete(stage.id, loadReminders, t)}
+                        >
                           Mark Complete
                         </Button>
                       </div>
@@ -552,12 +747,14 @@ export const Reminders = () => {
               </CardContent>
             </Card>
           )}
-          
+
           {hospitalFollowUp.length === 0 && griefDue.length === 0 && (
-            <Card><CardContent className="p-6 text-center">No follow-ups needed today</CardContent></Card>
+            <Card>
+              <CardContent className="p-6 text-center">No follow-ups needed today</CardContent>
+            </Card>
           )}
         </TabsContent>
-        
+
         <TabsContent value="upcoming" className="space-y-4">
           <Card className="card-border-left-purple">
             <CardHeader>
@@ -568,14 +765,25 @@ export const Reminders = () => {
                 <p className="text-center text-muted-foreground py-6">No birthdays coming up</p>
               ) : (
                 <div className="space-y-2">
-                  {upcomingBirthdays.map(event => (
-                    <div key={event.id} className="p-3 bg-purple-50 rounded flex justify-between items-center">
+                  {upcomingBirthdays.map((event) => (
+                    <div
+                      key={event.id}
+                      className="p-3 bg-purple-50 rounded flex justify-between items-center"
+                    >
                       <div className="flex-1">
-                        <MemberNameWithAvatar member={{name: event.member_name, photo_url: event.member_photo_url}} memberId={event.member_id} />
-                        <p className="text-sm text-muted-foreground ml-13">{formatDate(event.event_date)}</p>
+                        <MemberNameWithAvatar
+                          member={{ name: event.member_name, photo_url: event.member_photo_url }}
+                          memberId={event.member_id}
+                        />
+                        <p className="text-sm text-muted-foreground ml-13">
+                          {formatDate(event.event_date)}
+                        </p>
                       </div>
                       <Badge variant="outline" className="text-purple-600">
-                        {Math.ceil((new Date(event.event_date) - new Date()) / (1000 * 60 * 60 * 24))} days
+                        {Math.ceil(
+                          (new Date(event.event_date) - new Date()) / (1000 * 60 * 60 * 24)
+                        )}{' '}
+                        days
                       </Badge>
                     </div>
                   ))}
@@ -585,7 +793,7 @@ export const Reminders = () => {
           </Card>
         </TabsContent>
       </Tabs>
-      
+
       <ConfirmDialog
         open={confirmDialog.open}
         onOpenChange={(open) => !open && closeConfirm()}

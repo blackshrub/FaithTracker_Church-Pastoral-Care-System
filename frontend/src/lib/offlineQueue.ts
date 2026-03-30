@@ -218,7 +218,11 @@ class OfflineQueue {
   /**
    * Update operation status
    */
-  async updateStatus(id: number, status: OperationStatus, error: string | null = null): Promise<QueuedOperation | null> {
+  async updateStatus(
+    id: number,
+    status: OperationStatus,
+    error: string | null = null
+  ): Promise<QueuedOperation | null> {
     const db = await this.init();
 
     return new Promise((resolve, reject) => {
@@ -343,7 +347,7 @@ class OfflineQueue {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({})) as Record<string, unknown>;
+      const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       throw new Error((errorData.detail as string) || `HTTP ${response.status}`);
     }
 

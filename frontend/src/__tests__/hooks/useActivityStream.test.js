@@ -35,7 +35,7 @@ class MockEventSource {
 
   removeEventListener(type, handler) {
     if (this._listeners[type]) {
-      this._listeners[type] = this._listeners[type].filter(h => h !== handler);
+      this._listeners[type] = this._listeners[type].filter((h) => h !== handler);
     }
   }
 
@@ -56,7 +56,7 @@ class MockEventSource {
 
   _triggerEvent(type, data) {
     const handlers = this._listeners[type] || [];
-    handlers.forEach(h => h({ data: JSON.stringify(data) }));
+    handlers.forEach((h) => h({ data: JSON.stringify(data) }));
   }
 }
 MockEventSource.instances = [];
@@ -141,7 +141,7 @@ describe('useActivityStream - connection', () => {
     const initialCount = MockEventSource.instances.length;
     renderHook(() => useActivityStream({ enabled: true }));
 
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     vi.advanceTimersByTime(10);
 
     // No new EventSource should have been created
@@ -152,7 +152,7 @@ describe('useActivityStream - connection', () => {
     const initialCount = MockEventSource.instances.length;
     renderHook(() => useActivityStream({ enabled: false }));
 
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     vi.advanceTimersByTime(10);
 
     expect(MockEventSource.instances.length).toBe(initialCount);
@@ -216,10 +216,14 @@ describe('useActivityStream - disconnect', () => {
     });
 
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerOpen(); });
+    act(() => {
+      es._triggerOpen();
+    });
     expect(result.current.isConnected).toBe(true);
 
-    act(() => { result.current.disconnect(); });
+    act(() => {
+      result.current.disconnect();
+    });
     expect(result.current.isConnected).toBe(false);
   });
 });
@@ -227,16 +231,16 @@ describe('useActivityStream - disconnect', () => {
 describe('useActivityStream - activity filtering', () => {
   it('filters out own user activities from SSE stream', async () => {
     const onActivity = vi.fn();
-    const { result } = renderHook(() =>
-      useActivityStream({ enabled: true, onActivity })
-    );
+    const { result } = renderHook(() => useActivityStream({ enabled: true, onActivity }));
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(0);
     });
 
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerOpen(); });
+    act(() => {
+      es._triggerOpen();
+    });
 
     // Send activity from own user
     act(() => {
@@ -254,23 +258,23 @@ describe('useActivityStream - activity filtering', () => {
 
     // Verify activities list doesn't contain own activity
     const ownActivities = result.current.activities.filter(
-      a => a.user_id === 'user-1' && a.id === 'act-1'
+      (a) => a.user_id === 'user-1' && a.id === 'act-1'
     );
     expect(ownActivities).toHaveLength(0);
   });
 
   it('includes activities from other users', async () => {
     const onActivity = vi.fn();
-    const { result } = renderHook(() =>
-      useActivityStream({ enabled: true, onActivity })
-    );
+    const { result } = renderHook(() => useActivityStream({ enabled: true, onActivity }));
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(0);
     });
 
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerOpen(); });
+    act(() => {
+      es._triggerOpen();
+    });
 
     // Send activity from another user
     act(() => {
@@ -293,7 +297,7 @@ describe('useActivityStream - activity filtering', () => {
     );
 
     // Should be in the activities list
-    const otherActivities = result.current.activities.filter(a => a.id === 'act-2');
+    const otherActivities = result.current.activities.filter((a) => a.id === 'act-2');
     expect(otherActivities).toHaveLength(1);
   });
 
@@ -305,7 +309,9 @@ describe('useActivityStream - activity filtering', () => {
     });
 
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerOpen(); });
+    act(() => {
+      es._triggerOpen();
+    });
 
     const activity = {
       id: 'act-3',
@@ -315,7 +321,9 @@ describe('useActivityStream - activity filtering', () => {
       member_name: 'Member A',
     };
 
-    act(() => { es._triggerEvent('activity', activity); });
+    act(() => {
+      es._triggerEvent('activity', activity);
+    });
 
     expect(result.current.lastActivity).toEqual(activity);
   });
@@ -323,16 +331,16 @@ describe('useActivityStream - activity filtering', () => {
 
 describe('useActivityStream - maxActivities limit', () => {
   it('limits the activities list to maxActivities', async () => {
-    const { result } = renderHook(() =>
-      useActivityStream({ enabled: true, maxActivities: 3 })
-    );
+    const { result } = renderHook(() => useActivityStream({ enabled: true, maxActivities: 3 }));
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(0);
     });
 
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerOpen(); });
+    act(() => {
+      es._triggerOpen();
+    });
 
     // Send 5 activities
     for (let i = 0; i < 5; i++) {
@@ -364,12 +372,16 @@ describe('useActivityStream - reconnect with exponential backoff', () => {
     const instanceCountBefore = MockEventSource.instances.length;
 
     // Trigger error
-    act(() => { es._triggerError(); });
+    act(() => {
+      es._triggerError();
+    });
 
     expect(result.current.isConnected).toBe(false);
 
     // Advance timer by initial delay (1000ms)
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
 
     // A new EventSource should have been created
     await waitFor(() => {
@@ -386,16 +398,22 @@ describe('useActivityStream - reconnect with exponential backoff', () => {
 
     // First error
     const es1 = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es1._triggerError(); });
+    act(() => {
+      es1._triggerError();
+    });
 
     const countAfterFirst = MockEventSource.instances.length;
 
     // After 500ms (less than initial 1000ms delay) - should not reconnect yet
-    act(() => { vi.advanceTimersByTime(500); });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(MockEventSource.instances.length).toBe(countAfterFirst);
 
     // After full 1000ms - should reconnect
-    act(() => { vi.advanceTimersByTime(500); });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(countAfterFirst);
@@ -404,12 +422,18 @@ describe('useActivityStream - reconnect with exponential backoff', () => {
     // Second error - delay should be 2000ms
     const es2 = MockEventSource.instances[MockEventSource.instances.length - 1];
     const countAfterSecond = MockEventSource.instances.length;
-    act(() => { es2._triggerError(); });
+    act(() => {
+      es2._triggerError();
+    });
 
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
     expect(MockEventSource.instances.length).toBe(countAfterSecond);
 
-    act(() => { vi.advanceTimersByTime(500); });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(countAfterSecond);
@@ -426,8 +450,12 @@ describe('useActivityStream - reconnect with exponential backoff', () => {
     const es1 = MockEventSource.instances[MockEventSource.instances.length - 1];
 
     // Trigger error to increase delay
-    act(() => { es1._triggerError(); });
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      es1._triggerError();
+    });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(1);
@@ -435,7 +463,9 @@ describe('useActivityStream - reconnect with exponential backoff', () => {
 
     // Open the new connection successfully
     const es2 = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es2._triggerOpen(); });
+    act(() => {
+      es2._triggerOpen();
+    });
 
     expect(result.current.isConnected).toBe(true);
     // Delay should be reset to initial (tested implicitly by next reconnect timing)
@@ -447,10 +477,9 @@ describe('useActivityStream - connectRef stability', () => {
     // This tests the critical fix: connectRef.current is updated inside connect()
     // so that reconnect timers always call the latest version.
 
-    const { result, rerender } = renderHook(
-      (props) => useActivityStream(props),
-      { initialProps: { enabled: true } }
-    );
+    const { result, rerender } = renderHook((props) => useActivityStream(props), {
+      initialProps: { enabled: true },
+    });
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(0);
@@ -458,13 +487,17 @@ describe('useActivityStream - connectRef stability', () => {
 
     // Trigger error to schedule reconnect
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerError(); });
+    act(() => {
+      es._triggerError();
+    });
 
     // Re-render (simulating prop/state changes that would recreate connect)
     rerender({ enabled: true });
 
     // Advance timer to trigger reconnect
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
 
     // Should still reconnect successfully (connectRef.current is up to date)
     await waitFor(() => {
@@ -491,7 +524,14 @@ describe('useActivityStream - initial load from REST API', () => {
   it('handles array response format', async () => {
     api.get.mockResolvedValue({
       data: [
-        { id: '1', user_id: 'u1', user_name: 'User 1', action_type: 'complete_task', member_name: 'M1', created_at: '2024-01-01' },
+        {
+          id: '1',
+          user_id: 'u1',
+          user_name: 'User 1',
+          action_type: 'complete_task',
+          member_name: 'M1',
+          created_at: '2024-01-01',
+        },
       ],
     });
 
@@ -506,7 +546,14 @@ describe('useActivityStream - initial load from REST API', () => {
     api.get.mockResolvedValue({
       data: {
         logs: [
-          { id: '1', user_id: 'u1', user_name: 'User 1', action_type: 'complete_task', member_name: 'M1', created_at: '2024-01-01' },
+          {
+            id: '1',
+            user_id: 'u1',
+            user_name: 'User 1',
+            action_type: 'complete_task',
+            member_name: 'M1',
+            created_at: '2024-01-01',
+          },
         ],
       },
     });
@@ -531,7 +578,12 @@ describe('useActivityStream - initial load from REST API', () => {
 
   it('respects cancellation when component unmounts during load', async () => {
     let resolveApi;
-    api.get.mockImplementation(() => new Promise(r => { resolveApi = r; }));
+    api.get.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolveApi = r;
+        })
+    );
 
     const { unmount, result } = renderHook(() => useActivityStream({ enabled: true }));
 
@@ -540,7 +592,16 @@ describe('useActivityStream - initial load from REST API', () => {
 
     // Resolve API - should not update state (cancelled = true)
     resolveApi({
-      data: [{ id: '1', user_id: 'u1', user_name: 'X', action_type: 'a', member_name: 'M', created_at: 'c' }],
+      data: [
+        {
+          id: '1',
+          user_id: 'u1',
+          user_name: 'X',
+          action_type: 'a',
+          member_name: 'M',
+          created_at: 'c',
+        },
+      ],
     });
 
     // No error should have been thrown
@@ -556,7 +617,9 @@ describe('useActivityStream - clearActivities', () => {
     });
 
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    act(() => { es._triggerOpen(); });
+    act(() => {
+      es._triggerOpen();
+    });
 
     // Add an activity
     act(() => {
@@ -572,7 +635,9 @@ describe('useActivityStream - clearActivities', () => {
     expect(result.current.lastActivity).toBeTruthy();
 
     // Clear
-    act(() => { result.current.clearActivities(); });
+    act(() => {
+      result.current.clearActivities();
+    });
 
     expect(result.current.activities).toEqual([]);
     expect(result.current.lastActivity).toBeNull();

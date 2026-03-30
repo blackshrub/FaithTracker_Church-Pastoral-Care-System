@@ -3,14 +3,7 @@
  * Provides helpful messaging and optional action button
  */
 
-import {
-  Users,
-  Calendar,
-  Search,
-  FileText,
-  Heart,
-  Inbox
-} from 'lucide-react';
+import { Users, Calendar, Search, FileText, Heart, Inbox } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -20,7 +13,7 @@ const icons = {
   search: Search,
   documents: FileText,
   care: Heart,
-  default: Inbox
+  default: Inbox,
 } as const;
 
 type IconKey = keyof typeof icons;
@@ -40,21 +33,19 @@ export function EmptyState({
   description = 'There is nothing to display here yet.',
   actionLabel,
   onAction,
-  className = ''
+  className = '',
 }: EmptyStateProps) {
   const IconComponent = icons[icon] || icons.default;
 
   return (
-    <div className={`flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in ${className}`}>
+    <div
+      className={`flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in ${className}`}
+    >
       <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
         <IconComponent className="w-8 h-8 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">
-        {title}
-      </h3>
-      <p className="text-sm text-muted-foreground max-w-sm mb-6">
-        {description}
-      </p>
+      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-sm mb-6">{description}</p>
       {actionLabel && onAction && (
         <Button onClick={onAction} variant="outline">
           {actionLabel}

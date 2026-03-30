@@ -16,7 +16,7 @@
   "import_export": "Import/Export",
   "messaging": "Messaging",
   "whatsapp_logs": "WhatsApp Logs",
-  
+
   "_comment_common": "Common Actions",
   "add": "Add",
   "add_member": "Add Member",
@@ -69,7 +69,7 @@
   "payment_date": "Payment Date",
   "schedule_start_date": "Schedule Start Date",
   "select_members": "Select Members",
-  
+
   "_comment_placeholders": "Placeholders",
   "type_name_or_phone": "Type name or phone to search",
   "search_members": "Search members...",
@@ -81,7 +81,7 @@
   "enter_title": "Enter title",
   "enter_description": "Enter description",
   "enter_hospital_name": "Enter hospital name",
-  
+
   "_comment_auth": "Authentication",
   "login": "Login",
   "logout": "Logout",
@@ -110,7 +110,7 @@
   "passwords_do_not_match": "Passwords do not match",
   "password_min_length": "Password must be at least 6 characters",
   "role_change_note": "To change your role or campus, please contact a Full Administrator.",
-  
+
   "_comment_dashboard": "Dashboard",
   "welcome_back": "Welcome Back",
   "pastoral_overview": "Here's your pastoral care overview",
@@ -128,7 +128,7 @@
   "view_all_members": "View All Members",
   "ai_pastoral_recommendations": "AI Pastoral Recommendations",
   "intelligent_followup": "Intelligent follow-up suggestions based on member patterns",
-  
+
   "_comment_tabs": "Dashboard Tabs",
   "today": "Today",
   "birthdays": "Birthdays",
@@ -138,7 +138,7 @@
   "at_risk": "At Risk",
   "upcoming": "Upcoming",
   "all": "All",
-  
+
   "_comment_categories": "Categories",
   "birthday_today": "Birthday Today",
   "grief_reminders": "Grief Reminders",
@@ -148,7 +148,7 @@
   "upcoming_events": "Upcoming Events",
   "recent_activity": "Recent Activity",
   "financial_aid_due": "Financial Aid Due",
-  
+
   "_comment_event_types": "Event Types",
   "event_types": {
     "birthday": "Birthday",
@@ -160,7 +160,7 @@
     "financial_aid": "Financial Aid",
     "regular_contact": "Regular Contact"
   },
-  
+
   "_comment_aid_types": "Aid Types",
   "aid_types": {
     "education": "Education Support",
@@ -171,7 +171,7 @@
     "funeral_costs": "Funeral Costs",
     "other": "Other"
   },
-  
+
   "_comment_frequency": "Frequency Options",
   "frequency_options": {
     "one_time": "One Time",
@@ -179,7 +179,7 @@
     "monthly": "Monthly",
     "annual": "Annual"
   },
-  
+
   "_comment_relationship": "Relationship Options",
   "loading": "Loading...",
   "quick_care_event_multi": "Quick Care Event (Multi-Member)",
@@ -239,7 +239,7 @@
   "no_overdue_financial_aid": "No overdue financial aid schedules",
   "no_at_risk_members": "No members at risk",
   "no_disconnected_members": "No disconnected members - everyone is engaged!",
-  
+
   "event_titles": {
     "birthday": "Birthday Celebration",
     "childbirth": "New Baby Celebration",
@@ -248,7 +248,7 @@
     "accident_illness": "Medical Support",
     "regular_contact": "Regular Contact"
   },
-  
+
   "relationship_options": {
     "parent": "Parent",
     "child": "Child",
@@ -258,7 +258,7 @@
     "other_family": "Other Family",
     "friend": "Friend"
   },
-  
+
   "_comment_engagement": "Engagement Status",
   "engagement_status": "Engagement Status",
   "active": "Active",
@@ -268,7 +268,7 @@
   "never_contacted": "Never contacted",
   "no_contact_for": "No contact for",
   "days_risk": "days - disconnection risk",
-  
+
   "_comment_members_page": "Members Page",
   "total_members_count": "{{count}} total members",
   "showing_members": "Showing {{showing}} of {{total}} members",
@@ -277,7 +277,7 @@
   "care_history": "Care History",
   "timeline": "Timeline",
   "hospital": "Hospital",
-  
+
   "_comment_financial_aid_page": "Financial Aid Page",
   "financial_assistance_tracking": "Financial assistance tracking and analytics",
   "total_aid": "Total Aid",
@@ -291,7 +291,7 @@
   "aid_event": "aid event",
   "provided": "provided",
   "assistance_provided": "assistance provided",
-  
+
   "_comment_analytics_page": "Analytics Page",
   "pastoral_care_analytics": "Comprehensive pastoral care insights and trends",
   "care_event_distribution": "Care Event Distribution",
@@ -329,7 +329,7 @@
   "care_events_distribution": "Care Events Distribution",
   "member_care_insights": "Member Care Insights",
   "financial_aid_effectiveness": "Financial Aid Effectiveness",
-  
+
   "_comment_calendar_page": "Calendar Page",
   "pastoral_calendar": "Pastoral Calendar",
   "month_view": "Month View",
@@ -338,7 +338,7 @@
   "events_this_month": "Events This Month",
   "no_events_scheduled": "No events scheduled",
   "events_on": "Events on",
-  
+
   "_comment_grief": "Grief Support",
   "grief_stages": {
     "mourning": "Mourning Service",
@@ -349,7 +349,7 @@
     "6_months": "Fifth Follow-up",
     "1_year": "Sixth Follow-up (1 Year Anniversary)"
   },
-  
+
   "_comment_messages": "Messages",
   "success_messages": {
     "member_created": "Member successfully added",
@@ -361,7 +361,7 @@
     "stage_completed": "Grief stage marked as completed",
     "login_successful": "Login successful!"
   },
-  
+
   "error_messages": {
     "member_not_found": "Member not found",
     "failed_to_save": "Failed to save data",
@@ -371,7 +371,7 @@
     "aid_type_required": "Aid type is required",
     "aid_amount_required": "Aid amount must be a valid non-negative number"
   },
-  
+
   "empty_states": {
     "no_members": "No members yet. Add your first member.",
     "no_care_events": "No care events yet.",
@@ -380,14 +380,14 @@
     "no_tasks_today": "No tasks for today!",
     "no_results_found": "No results found"
   },
-  
+
   "_comment_hardcoded_ui": "Hardcoded UI Text",
   "main_tabs": {
     "today": "Today",
     "overdue": "Overdue",
     "upcoming": "Upcoming"
   },
-  
+
   "nested_tabs": {
     "birthday": "Birthday",
     "followups": "F-Ups",
@@ -395,13 +395,13 @@
     "at_risk": "At Risk",
     "inactive": "Inactive"
   },
-  
+
   "buttons": {
     "contacted": "Contacted",
     "cancel": "Cancel",
     "save_care_event": "Save Care Event"
   },
-  
+
   "days_of_week": {
     "monday": "Monday",
     "tuesday": "Tuesday",
@@ -411,7 +411,7 @@
     "saturday": "Saturday",
     "sunday": "Sunday"
   },
-  
+
   "months": {
     "january": "January",
     "february": "February",
@@ -426,7 +426,7 @@
     "november": "November",
     "december": "December"
   },
-  
+
   "form_placeholders": {
     "search_name_phone": "Search by name or phone number...",
     "select_event_type": "Select event type...",
@@ -443,7 +443,7 @@
     "select_date": "Select date...",
     "select_payment_date": "Select payment date..."
   },
-  
+
   "labels": {
     "selected_members": "Selected Members",
     "selected_members_count": "Selected Members ({{count}})",
@@ -463,7 +463,7 @@
     "photo": "Photo",
     "family": "Family"
   },
-  
+
   "_comment_toasts": "Toast Messages",
   "toasts": {
     "birthday_completed": "Birthday task completed!",
@@ -515,7 +515,7 @@
     "financial_aid_schedule_created": "Financial aid schedule created!",
     "failed_mark_birthday": "Failed to mark birthday complete"
   },
-  
+
   "_comment_confirmations": "Confirmation Messages",
   "confirmations": {
     "delete_event": "Delete this care event?",
@@ -524,7 +524,7 @@
     "stop_schedule": "Stop financial aid schedule for {{name}}?",
     "remove_ignored_occurrence": "Remove this ignored occurrence ({{date}})?"
   },
-  
+
   "_comment_age_groups": "Age Groups",
   "age_groups": {
     "child": "Child (0-12)",
@@ -533,7 +533,7 @@
     "adult": "Adult (31-60)",
     "senior": "Senior (60+)"
   },
-  
+
   "_comment_misc": "Miscellaneous",
   "misc": {
     "select": "Select",
@@ -552,7 +552,7 @@
     "avg": "avg",
     "members": "members"
   },
-  
+
   "_comment_settings_page": "Settings Page",
   "settings_page": {
     "title": "Settings & Configuration",
@@ -590,7 +590,7 @@
     "campus_timezone": "Campus Timezone",
     "timezone_affects": "Affects daily digest send time and date calculations"
   },
-  
+
   "_comment_analytics_page": "Analytics Page Additional",
   "analytics_page": {
     "high_priority": "High Priority",
@@ -670,7 +670,7 @@
     "loading_members": "Loading members...",
     "searching_members": "Searching members..."
   },
-  
+
   "_comment_member_detail": "Member Detail Page",
   "member_detail": {
     "age_label": "Age",
@@ -708,7 +708,7 @@
     "stop_schedule": "Stop Schedule",
     "ignore_payment": "Ignore This Payment"
   },
-  
+
   "_comment_admin_dashboard": "Admin Dashboard Page",
   "admin_dashboard_page": {
     "manage_campuses": "Manage Campuses",
@@ -742,7 +742,7 @@
     "recalculation_started": "✅ Recalculation started! Please wait 15 seconds then refresh the page to see updated counts.",
     "failed_start_recalculation": "Failed to start recalculation"
   },
-  
+
   "_comment_login_page": "Login Page",
   "login_page": {
     "sign_in_subtitle": "Sign in to access the pastoral care system",
@@ -752,7 +752,7 @@
     "select_campus_required": "Select your campus (required for all users)",
     "campus_management_hint": "Select campus to manage specific location"
   },
-  
+
   "_comment_bulk_messaging": "Bulk Messaging Page",
   "bulk_messaging_page": {
     "title": "Bulk Messaging",
@@ -768,7 +768,7 @@
     "bulk_send_failed": "Bulk send failed",
     "type_message_placeholder": "Type your message to pastoral team..."
   },
-  
+
   "_comment_import_export": "Import/Export Page",
   "import_export_page": {
     "title": "Import/Export Data",
@@ -814,7 +814,7 @@
     "events_exported": "Events exported!",
     "export_failed": "Export failed"
   },
-  
+
   "_comment_whatsapp_logs": "WhatsApp Logs Page",
   "whatsapp_logs_page": {
     "title": "WhatsApp Notification Logs",
@@ -824,12 +824,12 @@
     "message_sent": "Message sent!",
     "failed_send": "Failed to send message"
   },
-  
-  "_comment_reminders": "Reminders Page",  
+
+  "_comment_reminders": "Reminders Page",
   "reminders_page": {
     "failed_load_reminders": "Failed to load reminders"
   },
-  
+
   "_comment_activity_log": "Activity Log Page",
   "activity_log": "Activity Log",
   "Activity Log": "Activity Log",
@@ -854,7 +854,7 @@
   "Activity History": "Activity History",
   "records": "records",
   "No activity records found for the selected filters": "No activity records found for the selected filters",
-  
+
   "_comment_components": "Reusable Components",
   "components": {
     "app_name": "FaithTracker",

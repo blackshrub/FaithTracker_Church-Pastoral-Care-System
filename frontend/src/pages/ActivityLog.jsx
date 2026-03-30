@@ -13,7 +13,13 @@ import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
 const ActivityLog = () => {
@@ -50,13 +56,13 @@ const ActivityLog = () => {
 
   const { data: summary } = useQuery({
     queryKey: ['activity-logs-summary'],
-    queryFn: () => api.get('/activity-logs/summary').then(res => res.data),
+    queryFn: () => api.get('/activity-logs/summary').then((res) => res.data),
     staleTime: 1000 * 60,
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ['users-list'],
-    queryFn: () => api.get('/users').then(res => res.data),
+    queryFn: () => api.get('/users').then((res) => res.data),
     staleTime: 1000 * 60 * 5,
   });
 
@@ -65,43 +71,51 @@ const ActivityLog = () => {
     try {
       // Ensure timestamp is treated as UTC by adding Z if missing
       let utcTimestamp = dateString;
-      if (typeof dateString === 'string' && !dateString.endsWith('Z') && !dateString.includes('+')) {
-        utcTimestamp = dateString.replace(' ', 'T') + 'Z';  // Convert to ISO format with Z
+      if (
+        typeof dateString === 'string' &&
+        !dateString.endsWith('Z') &&
+        !dateString.includes('+')
+      ) {
+        utcTimestamp = dateString.replace(' ', 'T') + 'Z'; // Convert to ISO format with Z
       }
-      
+
       const date = new Date(utcTimestamp);
       if (isNaN(date.getTime())) {
         return { date: 'Invalid date', time: '' };
       }
-      
+
       // Use Intl.DateTimeFormat for proper timezone handling
       const dateFormatter = new Intl.DateTimeFormat('id-ID', {
         timeZone: campusTimezone,
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
       });
-      
+
       const timeFormatter = new Intl.DateTimeFormat('id-ID', {
         timeZone: campusTimezone,
         hour: '2-digit',
         minute: '2-digit',
-        hour12: false
+        hour12: false,
       });
-      
+
       const formattedDate = dateFormatter.format(date);
       const formattedTime = timeFormatter.format(date);
-      
+
       // Debug: console.log(`Input: ${dateString} | UTC: ${utcTimestamp} | Output: ${formattedDate} ${formattedTime} | TZ: ${campusTimezone}`);
-      
+
       return {
         date: formattedDate,
-        time: formattedTime
+        time: formattedTime,
       };
     } catch (_error) {
-      return { 
+      return {
         date: new Date(dateString).toLocaleDateString('id-ID'),
-        time: new Date(dateString).toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit', hour12: false})
+        time: new Date(dateString).toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
       };
     }
   };
@@ -114,7 +128,8 @@ const ActivityLog = () => {
         const campusId = authUser?.campus_id;
         if (campusId && campusId !== 'campus_id') {
           const campusResponse = await api.get(`/campuses/${campusId}`);
-          const timezone = campusResponse.data.timezone ||
+          const timezone =
+            campusResponse.data.timezone ||
             import.meta.env.VITE_TIMEZONE ||
             Intl.DateTimeFormat().resolvedOptions().timeZone;
           setCampusTimezone(timezone);
@@ -140,9 +155,9 @@ const ActivityLog = () => {
   const exportToCSV = () => {
     // CSV headers
     const headers = ['Date', 'Time', 'Staff Member', 'Action', 'Member', 'Event Type', 'Notes'];
-    
+
     // CSV rows with timezone-aware formatting
-    const rows = logs.map(log => {
+    const rows = logs.map((log) => {
       const { date, time } = formatDateTime(log.created_at);
       return [
         date,
@@ -151,14 +166,14 @@ const ActivityLog = () => {
         formatActionType(log.action_type),
         log.member_name || '-',
         log.event_type ? formatEventType(log.event_type) : '-',
-        log.notes || '-'
+        log.notes || '-',
       ];
     });
 
     // Create CSV content
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
     ].join('\n');
 
     // Create download link
@@ -174,15 +189,18 @@ const ActivityLog = () => {
   };
 
   const formatActionType = (actionType) => {
-    return actionType.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    return actionType
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const formatEventType = (eventType) => {
-    return eventType.replace('_', ' ').split(' ').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    return eventType
+      .replace('_', ' ')
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const getActionIcon = (actionType) => {
@@ -198,7 +216,7 @@ const ActivityLog = () => {
       delete_member: '✗',
       create_care_event: '+',
       update_care_event: '✎',
-      delete_care_event: '✗'
+      delete_care_event: '✗',
     };
     return icons[actionType] || '•';
   };
@@ -216,7 +234,7 @@ const ActivityLog = () => {
       delete_member: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30',
       create_care_event: 'text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-900/30',
       update_care_event: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/30',
-      delete_care_event: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30'
+      delete_care_event: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30',
     };
     return colors[actionType] || 'text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-700';
   };
@@ -249,9 +267,7 @@ const ActivityLog = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {summary.total_activities}
-              </div>
+              <div className="text-3xl font-bold text-gray-900">{summary.total_activities}</div>
               <p className="text-xs text-gray-500 mt-1">Last 30 days</p>
             </CardContent>
           </Card>
@@ -263,9 +279,7 @@ const ActivityLog = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {summary.active_users}
-              </div>
+              <div className="text-3xl font-bold text-gray-900">{summary.active_users}</div>
               <p className="text-xs text-gray-500 mt-1">Contributing members</p>
             </CardContent>
           </Card>
@@ -278,7 +292,7 @@ const ActivityLog = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600">
-                {summary.action_breakdown.find(a => a._id === 'complete_task')?.count || 0}
+                {summary.action_breakdown.find((a) => a._id === 'complete_task')?.count || 0}
               </div>
               <p className="text-xs text-gray-500 mt-1">Care tasks</p>
             </CardContent>
@@ -292,7 +306,7 @@ const ActivityLog = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600">
-                {summary.action_breakdown.find(a => a._id === 'send_reminder')?.count || 0}
+                {summary.action_breakdown.find((a) => a._id === 'send_reminder')?.count || 0}
               </div>
               <p className="text-xs text-gray-500 mt-1">WhatsApp messages</p>
             </CardContent>
@@ -321,7 +335,7 @@ const ActivityLog = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('All Staff')}</SelectItem>
-                  {users.map(user => (
+                  {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}
                     </SelectItem>
@@ -436,7 +450,11 @@ const ActivityLog = () => {
                           <div className="flex-shrink-0">
                             {log.user_photo_url ? (
                               <img
-                                src={log.user_photo_url.startsWith('http') ? log.user_photo_url : `${import.meta.env.VITE_BACKEND_URL}${log.user_photo_url}`}
+                                src={
+                                  log.user_photo_url.startsWith('http')
+                                    ? log.user_photo_url
+                                    : `${import.meta.env.VITE_BACKEND_URL}${log.user_photo_url}`
+                                }
                                 alt={log.user_name}
                                 className="h-8 w-8 rounded-full object-cover"
                                 loading="lazy"
@@ -455,7 +473,9 @@ const ActivityLog = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionColor(log.action_type)}`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionColor(log.action_type)}`}
+                        >
                           <span className="mr-1">{getActionIcon(log.action_type)}</span>
                           {formatActionType(log.action_type)}
                         </span>

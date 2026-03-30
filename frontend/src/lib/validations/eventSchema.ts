@@ -133,7 +133,9 @@ type MemberValidationResult = MemberValidationSuccess | MemberValidationFailure;
  * @param memberIds - Array of member IDs
  * @returns Validation result
  */
-export const validateMemberSelection = (memberIds: string[] | null | undefined): MemberValidationResult => {
+export const validateMemberSelection = (
+  memberIds: string[] | null | undefined
+): MemberValidationResult => {
   if (!memberIds || memberIds.length === 0) {
     return { success: false, error: 'Please select at least one member' };
   }

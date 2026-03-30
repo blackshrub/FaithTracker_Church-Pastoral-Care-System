@@ -20,12 +20,17 @@ interface MemberAvatarProps {
  * When enableTransition is true and member.id is provided, the avatar will
  * morph smoothly between list and detail views using the View Transitions API.
  */
-export const MemberAvatar = ({ member, size = 'md', className, enableTransition = false }: MemberAvatarProps) => {
+export const MemberAvatar = ({
+  member,
+  size = 'md',
+  className,
+  enableTransition = false,
+}: MemberAvatarProps) => {
   const sizeClasses: Record<AvatarSize, string> = {
     sm: 'w-8 h-8 text-xs',
     md: 'w-12 h-12 text-sm',
     lg: 'w-20 h-20 text-lg',
-    xl: 'w-32 h-32 text-2xl'
+    xl: 'w-32 h-32 text-2xl',
   };
 
   const getInitials = (name: string | undefined): string => {
@@ -39,14 +44,17 @@ export const MemberAvatar = ({ member, size = 'md', className, enableTransition 
 
   // Handle both absolute URLs (from external CDN) and relative paths (local uploads)
   const photoUrl = member.photo_url
-    ? (member.photo_url.startsWith('http') ? member.photo_url : `${BACKEND_URL}${member.photo_url}`)
+    ? member.photo_url.startsWith('http')
+      ? member.photo_url
+      : `${BACKEND_URL}${member.photo_url}`
     : null;
 
   // Dynamic view-transition-name for shared element transitions
   // Each member gets a unique transition name based on their ID
-  const transitionStyle = enableTransition && member.id
-    ? { viewTransitionName: `member-avatar-${member.id}` }
-    : undefined;
+  const transitionStyle =
+    enableTransition && member.id
+      ? { viewTransitionName: `member-avatar-${member.id}` }
+      : undefined;
 
   return (
     <Avatar

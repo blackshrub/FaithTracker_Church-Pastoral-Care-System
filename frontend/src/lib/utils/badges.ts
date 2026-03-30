@@ -26,7 +26,7 @@ export const getGriefStageBadge = (stage: GriefStageKey | string): string => {
     '1_month': 'Month 1',
     '3_months': 'Month 3',
     '6_months': 'Month 6',
-    '1_year': 'Year 1'
+    '1_year': 'Year 1',
   };
   return badges[stage] || formatStageLabel(stage);
 };
@@ -38,10 +38,10 @@ export const getGriefStageBadge = (stage: GriefStageKey | string): string => {
  */
 export const getAccidentStageBadge = (stage: string): string => {
   const badges: Record<string, string> = {
-    'first_followup': 'First Follow-up',
-    'second_followup': 'Second Follow-up',
-    'third_followup': 'Third Follow-up',
-    'final_check': 'Final Check'
+    first_followup: 'First Follow-up',
+    second_followup: 'Second Follow-up',
+    third_followup: 'Third Follow-up',
+    final_check: 'Final Check',
   };
   return badges[stage] || formatStageLabel(stage);
 };
@@ -56,7 +56,7 @@ const formatStageLabel = (stage: string): string => {
   return stage
     .replace(/_/g, ' ')
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 };
 

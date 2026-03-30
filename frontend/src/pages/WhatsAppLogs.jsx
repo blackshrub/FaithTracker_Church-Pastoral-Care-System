@@ -7,7 +7,14 @@ import api from '@/lib/api';
 import { formatToJakarta } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
 // Use centralized date formatting with Jakarta timezone
@@ -18,11 +25,11 @@ export const WhatsAppLogs = () => {
   const [logs, setLogs] = useState([]);
   const [_loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(null);
-  
+
   useEffect(() => {
     loadLogs();
   }, []);
-  
+
   const loadLogs = async () => {
     try {
       setLoading(true);
@@ -34,16 +41,16 @@ export const WhatsAppLogs = () => {
       setLoading(false);
     }
   };
-  
+
   const retryFailed = async (log) => {
     try {
       setRetrying(log.id);
       // Retry by resending the same message
       const response = await api.post('/integrations/ping/whatsapp', {
         phone: log.recipient.replace('@s.whatsapp.net', ''),
-        message: log.message
+        message: log.message,
       });
-      
+
       if (response.data.success) {
         toast.success(t('whatsapp_logs_page.message_sent'));
         loadLogs();
@@ -56,7 +63,7 @@ export const WhatsAppLogs = () => {
       setRetrying(null);
     }
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -65,10 +72,11 @@ export const WhatsAppLogs = () => {
           <p className="text-muted-foreground mt-1">View and retry failed messages</p>
         </div>
         <Button onClick={loadLogs} variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />Refresh
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
         </Button>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>{t('whatsapp_logs_page.recent_notifications')}</CardTitle>
@@ -88,7 +96,9 @@ export const WhatsAppLogs = () => {
               <TableBody>
                 {logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">No notifications yet</TableCell>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      No notifications yet
+                    </TableCell>
                   </TableRow>
                 ) : (
                   logs.map((log) => (
@@ -103,11 +113,13 @@ export const WhatsAppLogs = () => {
                       <TableCell>
                         {log.status === 'sent' ? (
                           <Badge className="bg-green-100 text-green-700">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />Sent
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Sent
                           </Badge>
                         ) : (
                           <Badge className="bg-red-100 text-red-700">
-                            <AlertCircle className="w-3 h-3 mr-1" />Failed
+                            <AlertCircle className="w-3 h-3 mr-1" />
+                            Failed
                           </Badge>
                         )}
                       </TableCell>

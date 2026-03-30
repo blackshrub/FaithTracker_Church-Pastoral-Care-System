@@ -46,14 +46,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     checkAuth();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (email: string, password: string, campusId: string | null = null): Promise<User> => {
+  const login = async (
+    email: string,
+    password: string,
+    campusId: string | null = null
+  ): Promise<User> => {
     const response = await api.post('/auth/login', {
       email,
       password,
-      campus_id: campusId
+      campus_id: campusId,
     });
     const { access_token, user: userData } = response.data;
 

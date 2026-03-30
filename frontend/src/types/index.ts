@@ -31,18 +31,9 @@ export type AidType =
   | 'transportation'
   | 'emergency';
 
-export type GriefStageKey =
-  | '1_week'
-  | '2_weeks'
-  | '1_month'
-  | '3_months'
-  | '6_months'
-  | '1_year';
+export type GriefStageKey = '1_week' | '2_weeks' | '1_month' | '3_months' | '6_months' | '1_year';
 
-export type AccidentStageKey =
-  | 'first_followup'
-  | 'second_followup'
-  | 'final_followup';
+export type AccidentStageKey = 'first_followup' | 'second_followup' | 'final_followup';
 
 // ==================== CORE MODELS ====================
 

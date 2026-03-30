@@ -35,8 +35,7 @@ export function useCompleteEventOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation<AxiosResponse, Error, CompleteEventVariables, CompleteEventContext>({
-    mutationFn: ({ eventId }) =>
-      api.post(`/care-events/${eventId}/complete`),
+    mutationFn: ({ eventId }) => api.post(`/care-events/${eventId}/complete`),
 
     // Optimistically update before server responds
     onMutate: async ({ eventId, memberId }) => {
@@ -52,15 +51,18 @@ export function useCompleteEventOptimistic() {
       const previousDashboard = dashboardEntries[0]?.[1];
 
       // Optimistically update care events
-      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(['careEvents', memberId], (old) => {
-        if (!old) return old;
-        const events = Array.isArray(old) ? old : old.items || [];
-        return events.map(event =>
-          event.id === eventId
-            ? { ...event, completed: true, completed_at: new Date().toISOString() }
-            : event
-        );
-      });
+      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(
+        ['careEvents', memberId],
+        (old) => {
+          if (!old) return old;
+          const events = Array.isArray(old) ? old : old.items || [];
+          return events.map((event) =>
+            event.id === eventId
+              ? { ...event, completed: true, completed_at: new Date().toISOString() }
+              : event
+          );
+        }
+      );
 
       // Optimistically update dashboard (using actual key with campus_id)
       if (dashboardKey) {
@@ -68,8 +70,10 @@ export function useCompleteEventOptimistic() {
           if (!old) return old;
           return {
             ...old,
-            today_tasks: (old.today_tasks as Array<{ id: string }>)?.filter(t => t.id !== eventId) || [],
-            overdue_tasks: (old.overdue_tasks as Array<{ id: string }>)?.filter(t => t.id !== eventId) || [],
+            today_tasks:
+              (old.today_tasks as Array<{ id: string }>)?.filter((t) => t.id !== eventId) || [],
+            overdue_tasks:
+              (old.overdue_tasks as Array<{ id: string }>)?.filter((t) => t.id !== eventId) || [],
           };
         });
       }
@@ -116,8 +120,7 @@ export function useIgnoreEventOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation<AxiosResponse, Error, IgnoreEventVariables, IgnoreEventContext>({
-    mutationFn: ({ eventId }) =>
-      api.post(`/care-events/${eventId}/ignore`),
+    mutationFn: ({ eventId }) => api.post(`/care-events/${eventId}/ignore`),
 
     onMutate: async ({ eventId, memberId }) => {
       await queryClient.cancelQueries({ queryKey: ['careEvents', memberId] });
@@ -129,15 +132,18 @@ export function useIgnoreEventOptimistic() {
       const previousDashboard = dashboardEntries[0]?.[1];
 
       // Optimistically mark as ignored
-      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(['careEvents', memberId], (old) => {
-        if (!old) return old;
-        const events = Array.isArray(old) ? old : old.items || [];
-        return events.map(event =>
-          event.id === eventId
-            ? { ...event, ignored: true, ignored_at: new Date().toISOString() }
-            : event
-        );
-      });
+      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(
+        ['careEvents', memberId],
+        (old) => {
+          if (!old) return old;
+          const events = Array.isArray(old) ? old : old.items || [];
+          return events.map((event) =>
+            event.id === eventId
+              ? { ...event, ignored: true, ignored_at: new Date().toISOString() }
+              : event
+          );
+        }
+      );
 
       // Remove from dashboard (using actual key with campus_id)
       if (dashboardKey) {
@@ -145,8 +151,10 @@ export function useIgnoreEventOptimistic() {
           if (!old) return old;
           return {
             ...old,
-            today_tasks: (old.today_tasks as Array<{ id: string }>)?.filter(t => t.id !== eventId) || [],
-            overdue_tasks: (old.overdue_tasks as Array<{ id: string }>)?.filter(t => t.id !== eventId) || [],
+            today_tasks:
+              (old.today_tasks as Array<{ id: string }>)?.filter((t) => t.id !== eventId) || [],
+            overdue_tasks:
+              (old.overdue_tasks as Array<{ id: string }>)?.filter((t) => t.id !== eventId) || [],
           };
         });
       }
@@ -189,8 +197,7 @@ export function useUpdateMemberOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation<AxiosResponse, Error, UpdateMemberVariables, UpdateMemberContext>({
-    mutationFn: ({ memberId, data }) =>
-      api.put(`/members/${memberId}`, data),
+    mutationFn: ({ memberId, data }) => api.put(`/members/${memberId}`, data),
 
     onMutate: async ({ memberId, data }) => {
       await queryClient.cancelQueries({ queryKey: ['member', memberId] });
@@ -244,8 +251,7 @@ export function useCreateEventOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation<AxiosResponse, Error, CreateEventData, CreateEventContext>({
-    mutationFn: (data) =>
-      api.post('/care-events', data),
+    mutationFn: (data) => api.post('/care-events', data),
 
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: ['careEvents', data.member_id] });
@@ -261,11 +267,14 @@ export function useCreateEventOptimistic() {
         ignored: false,
       } as unknown as CareEvent;
 
-      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(['careEvents', data.member_id], (old) => {
-        if (!old) return [tempEvent];
-        const events = Array.isArray(old) ? old : old.items || [];
-        return [tempEvent, ...events];
-      });
+      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(
+        ['careEvents', data.member_id],
+        (old) => {
+          if (!old) return [tempEvent];
+          const events = Array.isArray(old) ? old : old.items || [];
+          return [tempEvent, ...events];
+        }
+      );
 
       return { previousEvents, tempEvent };
     },
@@ -279,13 +288,14 @@ export function useCreateEventOptimistic() {
 
     onSuccess: (response, data, context) => {
       // Replace temp event with real event from server
-      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(['careEvents', data.member_id], (old) => {
-        if (!old) return [response.data];
-        const events = Array.isArray(old) ? old : old.items || [];
-        return events.map(e =>
-          e.id === context?.tempEvent.id ? response.data : e
-        );
-      });
+      queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(
+        ['careEvents', data.member_id],
+        (old) => {
+          if (!old) return [response.data];
+          const events = Array.isArray(old) ? old : old.items || [];
+          return events.map((e) => (e.id === context?.tempEvent.id ? response.data : e));
+        }
+      );
     },
 
     onSettled: (_, __, data) => {

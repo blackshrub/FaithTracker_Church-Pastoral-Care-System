@@ -1,4 +1,3 @@
-
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -13,7 +12,7 @@ import {
   Bell,
   Church,
   Activity,
-  FileText
+  FileText,
 } from 'lucide-react';
 
 import { LinkWithPrefetch } from '@/components/LinkWithPrefetch';
@@ -25,38 +24,62 @@ export const DesktopSidebar = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
-  
+
   const mainNavigation = [
     { name: t('dashboard'), href: '/dashboard', icon: Home, testId: 'sidebar-dashboard' },
     { name: t('members'), href: '/members', icon: Users, testId: 'sidebar-members' },
     { name: t('calendar'), href: '/calendar', icon: Calendar, testId: 'sidebar-calendar' },
-    { name: t('financial_aid'), href: '/financial-aid', icon: DollarSign, testId: 'sidebar-financial-aid' },
+    {
+      name: t('financial_aid'),
+      href: '/financial-aid',
+      icon: DollarSign,
+      testId: 'sidebar-financial-aid',
+    },
     { name: t('analytics'), href: '/analytics', icon: BarChart3, testId: 'sidebar-analytics' },
-    { name: t('reports.title') || 'Reports', href: '/reports', icon: FileText, testId: 'sidebar-reports' },
+    {
+      name: t('reports.title') || 'Reports',
+      href: '/reports',
+      icon: FileText,
+      testId: 'sidebar-reports',
+    },
   ];
-  
+
   const adminNavigation = [
-    ...(user?.role === 'full_admin' ? [{ 
-      name: t('admin_dashboard'), 
-      href: '/admin', 
-      icon: Shield, 
-      testId: 'sidebar-admin' 
-    }] : []),
-    { name: t('activity_log'), href: '/activity-log', icon: Activity, testId: 'sidebar-activity-log' },
+    ...(user?.role === 'full_admin'
+      ? [
+          {
+            name: t('admin_dashboard'),
+            href: '/admin',
+            icon: Shield,
+            testId: 'sidebar-admin',
+          },
+        ]
+      : []),
+    {
+      name: t('activity_log'),
+      href: '/activity-log',
+      icon: Activity,
+      testId: 'sidebar-activity-log',
+    },
     // Import/Export hidden - feature deprecated
     // { name: t('import_export'), href: '/import-export', icon: Upload, testId: 'sidebar-import-export' },
     { name: t('messaging'), href: '/messaging', icon: MessageSquare, testId: 'sidebar-messaging' },
-    { name: t('whatsapp_logs'), href: '/whatsapp-logs', icon: Bell, testId: 'sidebar-whatsapp-logs' },
+    {
+      name: t('whatsapp_logs'),
+      href: '/whatsapp-logs',
+      icon: Bell,
+      testId: 'sidebar-whatsapp-logs',
+    },
     { name: t('settings'), href: '/settings', icon: Settings, testId: 'sidebar-settings' },
   ];
-  
+
   const isActive = (href) => {
     if (href === '/dashboard') {
       return location.pathname === '/' || location.pathname === '/dashboard';
     }
     return location.pathname === href;
   };
-  
+
   return (
     <aside
       className="hidden sm:flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0"
@@ -64,17 +87,23 @@ export const DesktopSidebar = () => {
     >
       {/* Logo/Header */}
       <div className="p-6 border-b border-border">
-        <LinkWithPrefetch to="/dashboard" prefetchType="dashboard" className="flex items-center gap-3">
+        <LinkWithPrefetch
+          to="/dashboard"
+          prefetchType="dashboard"
+          className="flex items-center gap-3"
+        >
           <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
             <Church className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-h3 text-teal-700 dark:text-teal-400 leading-tight">{t('components.app_name')}</h2>
+            <h2 className="text-h3 text-teal-700 dark:text-teal-400 leading-tight">
+              {t('components.app_name')}
+            </h2>
             <p className="text-xs text-muted-foreground">{t('pastoral_care')}</p>
           </div>
         </LinkWithPrefetch>
       </div>
-      
+
       {/* Main Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         <div className="space-y-1">
@@ -83,9 +112,12 @@ export const DesktopSidebar = () => {
             const active = isActive(item.href);
             // Use LinkWithPrefetch for dashboard and members for instant navigation
             const usePrefetch = item.href === '/dashboard' || item.href === '/members';
-            const prefetchType = item.href === '/dashboard' ? 'dashboard'
-              : item.href === '/members' ? 'membersList'
-              : undefined;
+            const prefetchType =
+              item.href === '/dashboard'
+                ? 'dashboard'
+                : item.href === '/members'
+                  ? 'membersList'
+                  : undefined;
             const LinkComponent = usePrefetch ? LinkWithPrefetch : Link;
             const linkProps = usePrefetch ? { prefetchType } : {};
 
@@ -93,13 +125,11 @@ export const DesktopSidebar = () => {
               <LinkComponent key={item.name} to={item.href} {...linkProps}>
                 <Button
                   variant="ghost"
-                  className={
-                    `w-full justify-start h-12 transition-all duration-200 ${
-                      active
-                        ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
-                        : 'text-foreground/70 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
-                    }`
-                  }
+                  className={`w-full justify-start h-12 transition-all duration-200 ${
+                    active
+                      ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
+                      : 'text-foreground/70 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
+                  }`}
                   data-testid={item.testId}
                 >
                   <Icon className="mr-3 h-5 w-5" />
@@ -125,13 +155,11 @@ export const DesktopSidebar = () => {
               <Link key={item.name} to={item.href}>
                 <Button
                   variant="ghost"
-                  className={
-                    `w-full justify-start h-12 transition-all duration-200 ${
-                      active
-                        ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
-                        : 'text-foreground/70 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
-                    }`
-                  }
+                  className={`w-full justify-start h-12 transition-all duration-200 ${
+                    active
+                      ? 'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-semibold'
+                      : 'text-foreground/70 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-700 dark:hover:text-teal-400'
+                  }`}
                   data-testid={item.testId}
                 >
                   <Icon className="mr-3 h-5 w-5" />
@@ -142,7 +170,7 @@ export const DesktopSidebar = () => {
           })}
         </div>
       </nav>
-      
+
       {/* User Info at Bottom */}
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
@@ -154,8 +182,11 @@ export const DesktopSidebar = () => {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
             <p className="text-xs text-muted-foreground truncate">
-              {user?.role === 'full_admin' ? t('full_admin') :
-               user?.role === 'campus_admin' ? t('campus_admin') : t('pastor')}
+              {user?.role === 'full_admin'
+                ? t('full_admin')
+                : user?.role === 'campus_admin'
+                  ? t('campus_admin')
+                  : t('pastor')}
             </p>
           </div>
         </div>

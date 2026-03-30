@@ -1,9 +1,9 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 
-import "@/index.css";
-import App from "@/App";
-import reportWebVitals, { sendToAnalytics } from "@/lib/reportWebVitals";
+import '@/index.css';
+import App from '@/App';
+import reportWebVitals, { sendToAnalytics } from '@/lib/reportWebVitals';
 
 // Comprehensive ResizeObserver error suppression
 // Method 1: Window error event
@@ -81,11 +81,11 @@ console.error = (...args) => {
   originalError.apply(console, args);
 };
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
 );
 
 // Track Web Vitals for performance monitoring

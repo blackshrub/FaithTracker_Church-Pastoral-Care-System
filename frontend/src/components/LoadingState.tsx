@@ -10,7 +10,7 @@ interface LoadingStateProps {
 export const LoadingState = ({
   count = 3,
   type = 'card',
-  testId = 'loading-skeleton'
+  testId = 'loading-skeleton',
 }: LoadingStateProps) => {
   if (type === 'list') {
     return (

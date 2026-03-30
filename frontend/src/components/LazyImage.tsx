@@ -36,7 +36,7 @@ export const LazyImage = ({
   placeholderClassName = 'bg-gray-200 animate-pulse',
   sizes = '(max-width: 640px) 100px, (max-width: 1024px) 300px, 600px',
   onLoad,
-  onError
+  onError,
 }: LazyImageProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -51,7 +51,7 @@ export const LazyImage = ({
 
       return {
         imageSrc: photoUrls.medium || photoUrls.large || photoUrls.thumbnail || src,
-        srcSet: srcSetParts.length > 0 ? srcSetParts.join(', ') : undefined
+        srcSet: srcSetParts.length > 0 ? srcSetParts.join(', ') : undefined,
       };
     }
     return { imageSrc: src, srcSet: undefined };
@@ -70,9 +70,7 @@ export const LazyImage = ({
 
   return (
     <div className={`relative ${className}`}>
-      {isLoading && !hasError && (
-        <div className={`w-full h-full ${placeholderClassName}`} />
-      )}
+      {isLoading && !hasError && <div className={`w-full h-full ${placeholderClassName}`} />}
       {hasError ? (
         <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
           ❌

@@ -7,7 +7,13 @@ import { MemberLink } from '@/components/LinkWithPrefetch';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import LazyImage from '@/components/LazyImage';
 import PieChart from '@/components/charts/PieChart';
@@ -21,7 +27,7 @@ const COLORS = [
   '#a78bfa', // Purple
   '#06b6d4', // Cyan
   '#84cc16', // Lime
-  '#f97316'  // Orange
+  '#f97316', // Orange
 ];
 
 const MemberNameWithPhoto = ({ member, memberId }) => {
@@ -36,7 +42,9 @@ const MemberNameWithPhoto = ({ member, memberId }) => {
 
   // Handle both absolute URLs (from external CDN) and relative paths (local uploads)
   const photoUrl = member?.photo_url
-    ? (member.photo_url.startsWith('http') ? member.photo_url : `${BACKEND_URL}${member.photo_url}`)
+    ? member.photo_url.startsWith('http')
+      ? member.photo_url
+      : `${BACKEND_URL}${member.photo_url}`
     : null;
 
   return (
@@ -50,9 +58,7 @@ const MemberNameWithPhoto = ({ member, memberId }) => {
             placeholderClassName="w-full h-full bg-teal-100 flex items-center justify-center text-teal-700 text-xs font-semibold"
           />
         ) : (
-          <span className="text-teal-700 font-semibold text-xs">
-            {getInitials(member.name)}
-          </span>
+          <span className="text-teal-700 font-semibold text-xs">{getInitials(member.name)}</span>
         )}
       </div>
       <span className="font-medium hover:underline">{member.name}</span>
@@ -72,24 +78,27 @@ export const FinancialAid = () => {
       const [summaryRes, eventsRes, membersRes] = await Promise.all([
         api.get('/financial-aid/summary'),
         api.get('/care-events?event_type=financial_aid'),
-        api.get('/members?limit=1000')
+        api.get('/members?limit=1000'),
       ]);
 
       // Add member photos to events
       const memberMap = {};
-      (membersRes.data || []).forEach(m => memberMap[m.id] = {
-        name: m.name,
-        photo_url: m.photo_url
-      });
+      (membersRes.data || []).forEach(
+        (m) =>
+          (memberMap[m.id] = {
+            name: m.name,
+            photo_url: m.photo_url,
+          })
+      );
 
-      const eventsWithPhotos = (eventsRes.data || []).map(event => ({
+      const eventsWithPhotos = (eventsRes.data || []).map((event) => ({
         ...event,
-        member_photo_url: memberMap[event.member_id]?.photo_url
+        member_photo_url: memberMap[event.member_id]?.photo_url,
       }));
 
       return {
         summary: summaryRes.data || {},
-        aidEvents: eventsWithPhotos
+        aidEvents: eventsWithPhotos,
       };
     },
     staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh longer
@@ -113,21 +122,27 @@ export const FinancialAid = () => {
   };
 
   if (loading) {
-    return <div className="space-y-6 max-w-full"><Skeleton className="h-96 w-full" /></div>;
+    return (
+      <div className="space-y-6 max-w-full">
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
   }
-  
-  const chartData = summary?.by_type ? Object.entries(summary.by_type).map(([type, data]) => ({
-    name: t(`aid_types.${type}`),
-    value: data.total_amount
-  })) : [];
-  
+
+  const chartData = summary?.by_type
+    ? Object.entries(summary.by_type).map(([type, data]) => ({
+        name: t(`aid_types.${type}`),
+        value: data.total_amount,
+      }))
+    : [];
+
   return (
     <div className="space-y-6 max-w-full">
       <div className="min-w-0">
         <h1 className="text-3xl font-playfair font-bold text-foreground">{t('financial_aid')}</h1>
         <p className="text-muted-foreground mt-1">{t('financial_assistance_tracking')}</p>
       </div>
-      
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
@@ -140,10 +155,13 @@ export const FinancialAid = () => {
             </p>
           </CardContent>
         </Card>
-        
+
         <Dialog>
           <DialogTrigger asChild>
-            <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={loadRecipients}>
+            <Card
+              className="cursor-pointer hover:bg-accent/50 transition-colors"
+              onClick={loadRecipients}
+            >
               <CardHeader>
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -167,22 +185,25 @@ export const FinancialAid = () => {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : recipients.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">{t('empty_states.no_results_found')}</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {t('empty_states.no_results_found')}
+              </p>
             ) : (
               <div className="space-y-2">
                 {recipients.map((recipient) => (
-                  <div 
-                    key={recipient.member_id} 
+                  <div
+                    key={recipient.member_id}
                     className="block p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex justify-between items-center">
                       <div className="flex-1">
-                        <MemberNameWithPhoto 
-                          member={{ name: recipient.member_name, photo_url: recipient.photo_url }} 
-                          memberId={recipient.member_id} 
+                        <MemberNameWithPhoto
+                          member={{ name: recipient.member_name, photo_url: recipient.photo_url }}
+                          memberId={recipient.member_id}
                         />
                         <p className="text-xs text-muted-foreground mt-1 ml-11">
-                          {recipient.aid_count} {t('aid_event')}{recipient.aid_count !== 1 ? 's' : ''}
+                          {recipient.aid_count} {t('aid_event')}
+                          {recipient.aid_count !== 1 ? 's' : ''}
                         </p>
                       </div>
                       <p className="font-semibold text-green-700">
@@ -195,7 +216,7 @@ export const FinancialAid = () => {
             )}
           </DialogContent>
         </Dialog>
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">{t('aid_types_label')}</CardTitle>
@@ -207,7 +228,7 @@ export const FinancialAid = () => {
           </CardContent>
         </Card>
       </div>
-      
+
       {/* Chart and Recent Aid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -223,18 +244,22 @@ export const FinancialAid = () => {
                 formatValue={(value) => `Rp ${value.toLocaleString('id-ID')}`}
               />
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">{t('empty_states.no_financial_aid')}</p>
+              <p className="text-sm text-muted-foreground text-center py-12">
+                {t('empty_states.no_financial_aid')}
+              </p>
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>{t('recent_aid')}</CardTitle>
           </CardHeader>
           <CardContent>
             {aidEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">{t('empty_states.no_financial_aid')}</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {t('empty_states.no_financial_aid')}
+              </p>
             ) : (
               <div className="space-y-3 max-h-80 overflow-y-auto">
                 {aidEvents.map((event) => (
@@ -242,15 +267,18 @@ export const FinancialAid = () => {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         {event.member_id && event.member_name ? (
-                          <MemberNameWithPhoto 
-                            member={{ name: event.member_name, photo_url: event.member_photo_url }} 
-                            memberId={event.member_id} 
+                          <MemberNameWithPhoto
+                            member={{ name: event.member_name, photo_url: event.member_photo_url }}
+                            memberId={event.member_id}
                           />
                         ) : (
-                          <p className="font-medium text-sm text-muted-foreground">Unknown Member</p>
+                          <p className="font-medium text-sm text-muted-foreground">
+                            Unknown Member
+                          </p>
                         )}
                         <p className="text-xs text-muted-foreground mt-1 ml-11">
-                          {t(`aid_types.${event.aid_type || 'other'}`)} - {formatDate(event.event_date, 'dd MMM yyyy')}
+                          {t(`aid_types.${event.aid_type || 'other'}`)} -{' '}
+                          {formatDate(event.event_date, 'dd MMM yyyy')}
                         </p>
                       </div>
                       <p className="font-semibold text-green-700">

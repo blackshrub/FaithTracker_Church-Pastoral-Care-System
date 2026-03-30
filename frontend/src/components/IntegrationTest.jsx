@@ -10,10 +10,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const IntegrationTest = () => {
   const [whatsappPhone, setWhatsappPhone] = useState('6281290080025');
-  const [whatsappMessage, setWhatsappMessage] = useState('Test message from GKBJ Pastoral Care System');
+  const [whatsappMessage, setWhatsappMessage] = useState(
+    'Test message from GKBJ Pastoral Care System'
+  );
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [whatsappResult, setWhatsappResult] = useState(null);
-  
+
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailResult, setEmailResult] = useState(null);
 
@@ -24,7 +26,7 @@ export const IntegrationTest = () => {
     try {
       const response = await api.post('/integrations/ping/whatsapp', {
         phone: whatsappPhone,
-        message: whatsappMessage
+        message: whatsappMessage,
       });
 
       setWhatsappResult(response.data);
@@ -32,7 +34,7 @@ export const IntegrationTest = () => {
       setWhatsappResult({
         success: false,
         message: error.response?.data?.detail || error.message || 'Unknown error',
-        details: error.response?.data
+        details: error.response?.data,
       });
     } finally {
       setWhatsappLoading(false);
@@ -49,7 +51,7 @@ export const IntegrationTest = () => {
     } catch (error) {
       setEmailResult({
         success: false,
-        message: error.response?.data?.detail || error.message || 'Unknown error'
+        message: error.response?.data?.detail || error.message || 'Unknown error',
       });
     } finally {
       setEmailLoading(false);
@@ -100,8 +102,8 @@ export const IntegrationTest = () => {
               />
             </div>
 
-            <Button 
-              onClick={testWhatsApp} 
+            <Button
+              onClick={testWhatsApp}
               disabled={whatsappLoading || !whatsappPhone || !whatsappMessage}
               className="w-full"
               data-testid="whatsapp-test-button"
@@ -111,8 +113,12 @@ export const IntegrationTest = () => {
             </Button>
 
             {whatsappResult && (
-              <Alert 
-                className={whatsappResult.success ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}
+              <Alert
+                className={
+                  whatsappResult.success
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-red-500 bg-red-50'
+                }
                 data-testid="whatsapp-result"
               >
                 {whatsappResult.success ? (
@@ -147,8 +153,8 @@ export const IntegrationTest = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={testEmail} 
+            <Button
+              onClick={testEmail}
               disabled={emailLoading}
               className="w-full"
               data-testid="email-test-button"
@@ -158,8 +164,12 @@ export const IntegrationTest = () => {
             </Button>
 
             {emailResult && (
-              <Alert 
-                className={emailResult.pending_provider ? 'border-yellow-500 bg-yellow-50' : 'border-red-500 bg-red-50'}
+              <Alert
+                className={
+                  emailResult.pending_provider
+                    ? 'border-yellow-500 bg-yellow-50'
+                    : 'border-red-500 bg-red-50'
+                }
                 data-testid="email-result"
               >
                 {emailResult.pending_provider ? (

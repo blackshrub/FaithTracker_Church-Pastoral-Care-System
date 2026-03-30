@@ -154,7 +154,7 @@ jobs:
       - name: Run unit tests
         run: |
           cd frontend
-          yarn test --coverage --watchAll=false
+          yarn test --coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

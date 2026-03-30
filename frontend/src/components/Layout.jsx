@@ -1,4 +1,3 @@
-
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Church, LogOut, ChevronDown } from 'lucide-react';
@@ -13,17 +12,23 @@ import { DashboardLink } from './LinkWithPrefetch';
 
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 export const Layout = ({ children }) => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
+
   return (
     <div className="flex min-h-screen">
       {/* Desktop Sidebar - Hidden on mobile */}
       <DesktopSidebar />
-      
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Top Header - Responsive */}
@@ -35,7 +40,9 @@ export const Layout = ({ children }) => {
                 <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
                   <Church className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-lg font-playfair font-bold text-teal-700 dark:text-teal-400">{t('components.app_name')}</span>
+                <span className="text-lg font-playfair font-bold text-teal-700 dark:text-teal-400">
+                  {t('components.app_name')}
+                </span>
               </DashboardLink>
 
               {/* Right Side - User Info & Language */}
@@ -44,7 +51,11 @@ export const Layout = ({ children }) => {
                 <div className="flex items-center gap-2">
                   {user?.photo_url ? (
                     <img
-                      src={user.photo_url.startsWith('http') ? user.photo_url : `${import.meta.env.VITE_BACKEND_URL}${user.photo_url}`}
+                      src={
+                        user.photo_url.startsWith('http')
+                          ? user.photo_url
+                          : `${import.meta.env.VITE_BACKEND_URL}${user.photo_url}`
+                      }
                       alt={user.name}
                       className="w-7 h-7 rounded-full object-cover border border-teal-200 dark:border-teal-700"
                     />
@@ -67,7 +78,7 @@ export const Layout = ({ children }) => {
             </div>
           </div>
         </header>
-        
+
         {/* Desktop Header - Hidden on mobile */}
         <header className="hidden sm:block bg-card border-b border-border sticky top-0 z-40">
           <div className="px-6">
@@ -82,12 +93,19 @@ export const Layout = ({ children }) => {
                 <SyncStatusIndicator />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 hover:bg-teal-50 dark:hover:bg-teal-900/30">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 hover:bg-teal-50 dark:hover:bg-teal-900/30"
+                    >
                       <div className="text-right">
                         <p className="text-sm font-semibold text-foreground">{user?.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {user?.role === 'full_admin' ? t('full_admin') :
-                           user?.role === 'campus_admin' ? t('campus_admin') : t('pastor')}
+                          {user?.role === 'full_admin'
+                            ? t('full_admin')
+                            : user?.role === 'campus_admin'
+                              ? t('campus_admin')
+                              : t('pastor')}
                         </p>
                       </div>
                       <ChevronDown className="w-4 h-4" />
@@ -96,7 +114,10 @@ export const Layout = ({ children }) => {
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => { logout(); navigate('/login'); }}
+                      onClick={() => {
+                        logout();
+                        navigate('/login');
+                      }}
                       className="text-red-600 dark:text-red-400"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
@@ -110,13 +131,13 @@ export const Layout = ({ children }) => {
             </div>
           </div>
         </header>
-        
+
         {/* Main Content with page animation */}
         <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 page-enter">
           {children}
         </main>
       </div>
-      
+
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
     </div>

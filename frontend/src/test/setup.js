@@ -57,10 +57,7 @@ beforeAll(() => {
   console.error = (...args) => {
     // Filter out known noisy warnings
     const msg = typeof args[0] === 'string' ? args[0] : '';
-    if (
-      msg.includes('Not implemented: navigation') ||
-      msg.includes('Error: Uncaught')
-    ) {
+    if (msg.includes('Not implemented: navigation') || msg.includes('Error: Uncaught')) {
       return;
     }
     originalConsoleError.call(console, ...args);

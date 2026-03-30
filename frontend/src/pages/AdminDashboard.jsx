@@ -3,7 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, Building2, Users as UsersIcon, Shield, MoreVertical, Edit } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Building2,
+  Users as UsersIcon,
+  Shield,
+  MoreVertical,
+  Edit,
+} from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
@@ -11,12 +19,36 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 export const AdminDashboard = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -27,7 +59,11 @@ export const AdminDashboard = () => {
   const [editingUser, setEditingUser] = useState(null);
 
   // Use TanStack Query for data fetching with prefetched cache from route loader
-  const { data: adminData, isLoading: loading, refetch: loadData } = useQuery({
+  const {
+    data: adminData,
+    isLoading: loading,
+    refetch: loadData,
+  } = useQuery({
     queryKey: ['admin-data'],
     queryFn: async () => {
       const [c, u] = await Promise.all([api.get('/campuses'), api.get('/users')]);
@@ -44,7 +80,7 @@ export const AdminDashboard = () => {
     open: false,
     title: '',
     description: '',
-    onConfirm: () => {}
+    onConfirm: () => {},
   });
 
   const showConfirm = (title, description, onConfirm) => {
@@ -55,14 +91,24 @@ export const AdminDashboard = () => {
     setConfirmDialog({ open: false, title: '', description: '', onConfirm: () => {} });
   };
 
-  const [newUser, setNewUser] = useState({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
-  
+  const [newUser, setNewUser] = useState({
+    email: '',
+    password: '',
+    name: '',
+    phone: '',
+    role: 'pastor',
+    campus_id: '',
+  });
+
   const handleAddCampus = async (e) => {
     e.preventDefault();
     try {
       if (newCampus.id) {
         // Update existing campus
-        await api.put(`/campuses/${newCampus.id}`, { campus_name: newCampus.campus_name, location: newCampus.location });
+        await api.put(`/campuses/${newCampus.id}`, {
+          campus_name: newCampus.campus_name,
+          location: newCampus.location,
+        });
         toast.success(t('toasts.campus_updated'));
       } else {
         // Create new campus
@@ -76,7 +122,7 @@ export const AdminDashboard = () => {
       toast.error(t('toasts.failed'));
     }
   };
-  
+
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
@@ -89,7 +135,7 @@ export const AdminDashboard = () => {
       toast.error(error.response?.data?.detail || t('toasts.failed'));
     }
   };
-  
+
   const handleDeleteUser = async (id, name) => {
     showConfirm(
       'Delete User',
@@ -116,11 +162,11 @@ export const AdminDashboard = () => {
       name: userToEdit.name,
       phone: userToEdit.phone || '',
       role: userToEdit.role,
-      campus_id: userToEdit.campus_id || ''
+      campus_id: userToEdit.campus_id || '',
     });
     setUserModalOpen(true);
   };
-  
+
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
@@ -128,14 +174,14 @@ export const AdminDashboard = () => {
         name: newUser.name,
         phone: newUser.phone,
         role: newUser.role,
-        campus_id: newUser.campus_id || null
+        campus_id: newUser.campus_id || null,
       };
-      
+
       // Only include password if changed
       if (newUser.password && newUser.password.trim()) {
         updateData.password = newUser.password;
       }
-      
+
       await api.put(`/users/${editingUser.id}`, updateData);
       toast.success(t('User updated successfully'));
       setUserModalOpen(false);
@@ -146,29 +192,37 @@ export const AdminDashboard = () => {
       toast.error(error.response?.data?.detail || 'Failed to update user');
     }
   };
-  
+
   const closeUserModal = () => {
     setUserModalOpen(false);
     setEditingUser(null);
     setNewUser({ email: '', password: '', name: '', phone: '', role: 'pastor', campus_id: '' });
   };
 
-  
   if (user?.role !== 'full_admin') return <Navigate to="/dashboard" />;
   if (loading) return <div className="max-w-full">Loading...</div>;
-  
+
   return (
     <div className="space-y-6 max-w-full">
       <h1 className="text-3xl font-playfair font-bold">Admin Dashboard</h1>
       <Tabs defaultValue="campuses" className="max-w-full">
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="inline-flex w-full justify-center">
-            <TabsTrigger value="campuses" className="flex-shrink-0"><Building2 className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Campuses</span> ({campuses.length})</TabsTrigger>
-            <TabsTrigger value="users" className="flex-shrink-0"><UsersIcon className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Users</span> ({users.length})</TabsTrigger>
-            <TabsTrigger value="settings" className="flex-shrink-0"><Shield className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Settings</span></TabsTrigger>
+            <TabsTrigger value="campuses" className="flex-shrink-0">
+              <Building2 className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Campuses</span> ({campuses.length})
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex-shrink-0">
+              <UsersIcon className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Users</span> ({users.length})
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex-shrink-0">
+              <Shield className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Settings</span>
+            </TabsTrigger>
           </TabsList>
         </div>
-        
+
         <TabsContent value="campuses">
           <Card className="max-w-full overflow-hidden">
             <CardHeader>
@@ -176,16 +230,48 @@ export const AdminDashboard = () => {
                 <CardTitle>{t('admin_dashboard_page.manage_campuses')}</CardTitle>
                 <Dialog open={campusModalOpen} onOpenChange={setCampusModalOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />{t('admin_dashboard_page.add_campus')}</Button>
+                    <Button className="bg-teal-500 hover:bg-teal-600 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      {t('admin_dashboard_page.add_campus')}
+                    </Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>{newCampus.id ? t('admin_dashboard_page.edit_campus') : t('admin_dashboard_page.add_campus')}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {newCampus.id
+                          ? t('admin_dashboard_page.edit_campus')
+                          : t('admin_dashboard_page.add_campus')}
+                      </DialogTitle>
+                    </DialogHeader>
                     <form onSubmit={handleAddCampus} className="space-y-4">
-                      <div><Label>{t('admin_dashboard_page.campus_name')}</Label><Input value={newCampus.campus_name} onChange={(e) => setNewCampus({...newCampus, campus_name: e.target.value})} required /></div>
-                      <div><Label>{t('admin_dashboard_page.location')}</Label><Input value={newCampus.location} onChange={(e) => setNewCampus({...newCampus, location: e.target.value})} /></div>
+                      <div>
+                        <Label>{t('admin_dashboard_page.campus_name')}</Label>
+                        <Input
+                          value={newCampus.campus_name}
+                          onChange={(e) =>
+                            setNewCampus({ ...newCampus, campus_name: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label>{t('admin_dashboard_page.location')}</Label>
+                        <Input
+                          value={newCampus.location}
+                          onChange={(e) => setNewCampus({ ...newCampus, location: e.target.value })}
+                        />
+                      </div>
                       <div className="flex gap-2 justify-end">
-                        <Button type="button" variant="outline" onClick={() => setCampusModalOpen(false)}>{t('cancel')}</Button>
-                        <Button type="submit" className="bg-primary-500">{t('admin_dashboard_page.save')}</Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setCampusModalOpen(false)}
+                        >
+                          {t('cancel')}
+                        </Button>
+                        <Button type="submit" className="bg-primary-500">
+                          {t('admin_dashboard_page.save')}
+                        </Button>
                       </div>
                     </form>
                   </DialogContent>
@@ -195,8 +281,11 @@ export const AdminDashboard = () => {
             <CardContent className="p-4">
               {/* Mobile Card Layout */}
               <div className="block sm:hidden space-y-3">
-                {campuses.map(c => (
-                  <div key={c.id} className="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                {campuses.map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-4 border border-gray-200 rounded-lg bg-white shadow-sm"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm">{c.campus_name}</p>
@@ -209,13 +298,19 @@ export const AdminDashboard = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-32">
-                          <DropdownMenuItem onClick={() => {
-                            setNewCampus({id: c.id, campus_name: c.campus_name, location: c.location || ''});
-                            setCampusModalOpen(true);
-                          }}>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setNewCampus({
+                                id: c.id,
+                                campus_name: c.campus_name,
+                                location: c.location || '',
+                              });
+                              setCampusModalOpen(true);
+                            }}
+                          >
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="text-red-600"
                             onClick={async () => {
                               showConfirm(
@@ -243,7 +338,7 @@ export const AdminDashboard = () => {
                   </div>
                 ))}
               </div>
-              
+
               {/* Desktop Table Layout */}
               <div className="hidden sm:block overflow-x-auto">
                 <Table className="w-full">
@@ -255,12 +350,14 @@ export const AdminDashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {campuses.map(c => (
+                    {campuses.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="pl-2 pr-1">
                           <div>
                             <p className="font-medium text-sm">{c.campus_name}</p>
-                            <p className="text-xs text-muted-foreground sm:hidden">{c.location || '-'}</p>
+                            <p className="text-xs text-muted-foreground sm:hidden">
+                              {c.location || '-'}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">{c.location || '-'}</TableCell>
@@ -272,13 +369,19 @@ export const AdminDashboard = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-32">
-                              <DropdownMenuItem onClick={() => {
-                                setNewCampus({id: c.id, campus_name: c.campus_name, location: c.location || ''});
-                                setCampusModalOpen(true);
-                              }}>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setNewCampus({
+                                    id: c.id,
+                                    campus_name: c.campus_name,
+                                    location: c.location || '',
+                                  });
+                                  setCampusModalOpen(true);
+                                }}
+                              >
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={async () => {
                                   showConfirm(
@@ -311,46 +414,127 @@ export const AdminDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="users">
           <Card className="max-w-full overflow-hidden">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>{t('admin_dashboard_page.manage_users')}</CardTitle>
-                <Dialog open={userModalOpen} onOpenChange={(open) => { if (!open) closeUserModal(); else setUserModalOpen(open); }}>
+                <Dialog
+                  open={userModalOpen}
+                  onOpenChange={(open) => {
+                    if (!open) closeUserModal();
+                    else setUserModalOpen(open);
+                  }}
+                >
                   <DialogTrigger asChild>
-                    <Button className="bg-teal-500 hover:bg-teal-600 text-white"><Plus className="w-4 h-4 mr-2" />{t('admin_dashboard_page.add_user')}</Button>
+                    <Button className="bg-teal-500 hover:bg-teal-600 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      {t('admin_dashboard_page.add_user')}
+                    </Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>{editingUser ? 'Edit User' : t('admin_dashboard_page.add_user')}</DialogTitle></DialogHeader>
-                    <form onSubmit={editingUser ? handleUpdateUser : handleAddUser} className="space-y-3">
-                      <div><Label>{t('admin_dashboard_page.name_required')}</Label><Input value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required /></div>
-                      <div><Label>{t('admin_dashboard_page.email_required')}</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required disabled={editingUser} /></div>
-                      <div><Label>{t('admin_dashboard_page.phone_required')}</Label><Input value={newUser.phone} onChange={(e) => setNewUser({...newUser, phone: e.target.value})} placeholder="081234567890" /></div>
-                      <div><Label>{editingUser ? 'Password (leave blank to keep current)' : t('admin_dashboard_page.password_required')}</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} required={!editingUser} /></div>
-                      <div><Label>{t('admin_dashboard_page.role_required')}</Label>
-                        <Select value={newUser.role} onValueChange={(v) => setNewUser({...newUser, role: v})}>
-                          <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingUser ? 'Edit User' : t('admin_dashboard_page.add_user')}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <form
+                      onSubmit={editingUser ? handleUpdateUser : handleAddUser}
+                      className="space-y-3"
+                    >
+                      <div>
+                        <Label>{t('admin_dashboard_page.name_required')}</Label>
+                        <Input
+                          value={newUser.name}
+                          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label>{t('admin_dashboard_page.email_required')}</Label>
+                        <Input
+                          type="email"
+                          value={newUser.email}
+                          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                          required
+                          disabled={editingUser}
+                        />
+                      </div>
+                      <div>
+                        <Label>{t('admin_dashboard_page.phone_required')}</Label>
+                        <Input
+                          value={newUser.phone}
+                          onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                          placeholder="081234567890"
+                        />
+                      </div>
+                      <div>
+                        <Label>
+                          {editingUser
+                            ? 'Password (leave blank to keep current)'
+                            : t('admin_dashboard_page.password_required')}
+                        </Label>
+                        <Input
+                          type="password"
+                          value={newUser.password}
+                          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                          required={!editingUser}
+                        />
+                      </div>
+                      <div>
+                        <Label>{t('admin_dashboard_page.role_required')}</Label>
+                        <Select
+                          value={newUser.role}
+                          onValueChange={(v) => setNewUser({ ...newUser, role: v })}
+                        >
+                          <SelectTrigger className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
                           <SelectContent position="popper" sideOffset={5}>
-                            <SelectItem value="campus_admin">{t('admin_dashboard_page.role_campus_admin')}</SelectItem>
-                            <SelectItem value="pastor">{t('admin_dashboard_page.role_pastor')}</SelectItem>
-                            <SelectItem value="full_admin">{t('admin_dashboard_page.role_full_admin')}</SelectItem>
+                            <SelectItem value="campus_admin">
+                              {t('admin_dashboard_page.role_campus_admin')}
+                            </SelectItem>
+                            <SelectItem value="pastor">
+                              {t('admin_dashboard_page.role_pastor')}
+                            </SelectItem>
+                            <SelectItem value="full_admin">
+                              {t('admin_dashboard_page.role_full_admin')}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {newUser.role !== 'full_admin' && (
-                        <div><Label>{t('admin_dashboard_page.campus_required')}</Label>
-                          <Select value={newUser.campus_id} onValueChange={(v) => setNewUser({...newUser, campus_id: v})}>
-                            <SelectTrigger className="h-12"><SelectValue placeholder={t('misc.select')} /></SelectTrigger>
-                            <SelectContent position="popper" sideOffset={5} className="max-h-[200px] overflow-y-auto">
-                              {campuses.map(c => <SelectItem key={c.id} value={c.id}>{c.campus_name}</SelectItem>)}
+                        <div>
+                          <Label>{t('admin_dashboard_page.campus_required')}</Label>
+                          <Select
+                            value={newUser.campus_id}
+                            onValueChange={(v) => setNewUser({ ...newUser, campus_id: v })}
+                          >
+                            <SelectTrigger className="h-12">
+                              <SelectValue placeholder={t('misc.select')} />
+                            </SelectTrigger>
+                            <SelectContent
+                              position="popper"
+                              sideOffset={5}
+                              className="max-h-[200px] overflow-y-auto"
+                            >
+                              {campuses.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.campus_name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
                       )}
                       <div className="flex gap-2 justify-end">
-                        <Button type="button" variant="outline" onClick={closeUserModal}>{t('cancel')}</Button>
-                        <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">{editingUser ? 'Update' : t('admin_dashboard_page.create')}</Button>
+                        <Button type="button" variant="outline" onClick={closeUserModal}>
+                          {t('cancel')}
+                        </Button>
+                        <Button type="submit" className="bg-teal-500 hover:bg-teal-600 text-white">
+                          {editingUser ? 'Update' : t('admin_dashboard_page.create')}
+                        </Button>
                       </div>
                     </form>
                   </DialogContent>
@@ -360,14 +544,23 @@ export const AdminDashboard = () => {
             <CardContent className="p-4">
               {/* Mobile Card Layout */}
               <div className="block sm:hidden space-y-3">
-                {users.map(u => (
-                  <div key={u.id} className="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                {users.map((u) => (
+                  <div
+                    key={u.id}
+                    className="p-4 border border-gray-200 rounded-lg bg-white shadow-sm"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm">{u.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">{u.email}</p>
-                        <span className={`inline-block text-xs px-2 py-1 rounded mt-2 ${u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                          {u.role === 'full_admin' ? 'Full Admin' : u.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
+                        <span
+                          className={`inline-block text-xs px-2 py-1 rounded mt-2 ${u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}
+                        >
+                          {u.role === 'full_admin'
+                            ? 'Full Admin'
+                            : u.role === 'campus_admin'
+                              ? 'Campus Admin'
+                              : 'Pastor'}
                         </span>
                       </div>
                       {u.id !== user.id && (
@@ -378,7 +571,7 @@ export const AdminDashboard = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-red-600"
                               onClick={() => handleDeleteUser(u.id, u.name)}
                             >
@@ -392,7 +585,7 @@ export const AdminDashboard = () => {
                   </div>
                 ))}
               </div>
-              
+
               {/* Desktop Table Layout */}
               <div className="hidden sm:block overflow-x-auto">
                 <Table className="w-full">
@@ -406,7 +599,7 @@ export const AdminDashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map(u => (
+                    {users.map((u) => (
                       <TableRow key={u.id}>
                         <TableCell className="pl-2 pr-1">
                           <div>
@@ -418,8 +611,14 @@ export const AdminDashboard = () => {
                         <TableCell className="hidden md:table-cell">{u.email}</TableCell>
                         <TableCell className="hidden lg:table-cell">{u.phone || '-'}</TableCell>
                         <TableCell className="px-1">
-                          <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                            {u.role === 'full_admin' ? 'Full Admin' : u.role === 'campus_admin' ? 'Campus Admin' : 'Pastor'}
+                          <span
+                            className={`text-xs px-2 py-1 rounded whitespace-nowrap ${u.role === 'full_admin' ? 'bg-purple-100 text-purple-700' : u.role === 'campus_admin' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}
+                          >
+                            {u.role === 'full_admin'
+                              ? 'Full Admin'
+                              : u.role === 'campus_admin'
+                                ? 'Campus Admin'
+                                : 'Pastor'}
                           </span>
                         </TableCell>
                         <TableCell className="w-10 text-center px-1">
@@ -435,7 +634,7 @@ export const AdminDashboard = () => {
                                   <Edit className="w-4 h-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   className="text-red-600"
                                   onClick={() => handleDeleteUser(u.id, u.name)}
                                 >
@@ -454,17 +653,19 @@ export const AdminDashboard = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="settings">
           <div className="space-y-6">
             <Card>
-              <CardHeader><CardTitle>{t('admin_dashboard_page.recalculate_engagement')}</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>{t('admin_dashboard_page.recalculate_engagement')}</CardTitle>
+              </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
                     {t('admin_dashboard_page.recalculate_description')}
                   </p>
-                  <Button 
+                  <Button
                     onClick={() => {
                       showConfirm(
                         'Recalculate Engagement',
@@ -472,14 +673,20 @@ export const AdminDashboard = () => {
                         async () => {
                           try {
                             // Fire the request (don't wait for response due to long processing time)
-                            api.post(`/admin/recalculate-engagement`, {}, {
-                              timeout: 90000
-                            }).catch(() => {
-                              // Ignore timeout errors - backend still processing
-                            });
-                            
+                            api
+                              .post(
+                                `/admin/recalculate-engagement`,
+                                {},
+                                {
+                                  timeout: 90000,
+                                }
+                              )
+                              .catch(() => {
+                                // Ignore timeout errors - backend still processing
+                              });
+
                             toast.success(t('admin_dashboard_page.recalculation_started'), {
-                              duration: 8000
+                              duration: 8000,
                             });
                             closeConfirm();
                           } catch (error) {
@@ -496,9 +703,11 @@ export const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
-              <CardHeader><CardTitle>{t('admin_dashboard_page.daily_digest_system')}</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>{t('admin_dashboard_page.daily_digest_system')}</CardTitle>
+              </CardHeader>
               <CardContent>
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="font-medium">{t('admin_dashboard_page.digest_how_it_works')}</p>
@@ -509,7 +718,7 @@ export const AdminDashboard = () => {
           </div>
         </TabsContent>
       </Tabs>
-      
+
       <ConfirmDialog
         open={confirmDialog.open}
         onOpenChange={(open) => !open && closeConfirm()}

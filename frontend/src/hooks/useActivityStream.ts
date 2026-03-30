@@ -65,7 +65,11 @@ export interface UseActivityStreamReturn {
 /**
  * Hook for real-time activity stream via SSE
  */
-export function useActivityStream({ onActivity, enabled = true, maxActivities = 50 }: UseActivityStreamOptions = {}): UseActivityStreamReturn {
+export function useActivityStream({
+  onActivity,
+  enabled = true,
+  maxActivities = 50,
+}: UseActivityStreamOptions = {}): UseActivityStreamReturn {
   const { token, user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [lastActivity, setLastActivity] = useState<Activity | null>(null);
@@ -179,10 +183,12 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
         const response = await api.get('/activity-logs', { params: { limit: maxActivities } });
         if (cancelled) return;
         // API returns array directly, not {logs: [...]}
-        const logs: ActivityLog[] = Array.isArray(response.data) ? response.data : (response.data?.logs || []);
+        const logs: ActivityLog[] = Array.isArray(response.data)
+          ? response.data
+          : response.data?.logs || [];
         // Show ALL recent activities (including own) for initial display
         // Only real-time SSE filters out own activities
-        const transformed: Activity[] = logs.map(log => ({
+        const transformed: Activity[] = logs.map((log) => ({
           id: log.id,
           campus_id: log.campus_id,
           user_id: log.user_id,
@@ -194,7 +200,7 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
           care_event_id: log.care_event_id,
           event_type: log.event_type,
           notes: log.notes,
-          timestamp: log.created_at
+          timestamp: log.created_at,
         }));
         setActivities(transformed);
       } catch (err) {
@@ -203,7 +209,9 @@ export function useActivityStream({ onActivity, enabled = true, maxActivities = 
     };
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [enabled, token, maxActivities]);
 
   // Connect on mount, disconnect on unmount

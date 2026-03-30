@@ -22,7 +22,10 @@ interface ApiValidationError {
  * @param defaultMessage - Default message if error details unavailable
  * @returns The error message that was displayed
  */
-export const handleApiError = (error: AxiosError<ApiErrorResponse> | Error, defaultMessage = 'Something went wrong'): string => {
+export const handleApiError = (
+  error: AxiosError<ApiErrorResponse> | Error,
+  defaultMessage = 'Something went wrong'
+): string => {
   // Extract error message from various response formats
   let message = defaultMessage;
 
@@ -35,10 +38,11 @@ export const handleApiError = (error: AxiosError<ApiErrorResponse> | Error, defa
       message = detail;
     } else if (Array.isArray(detail)) {
       // Validation errors array
-      message = detail.map(err => err.msg || err.message || String(err)).join(', ');
+      message = detail.map((err) => err.msg || err.message || String(err)).join(', ');
     } else if (typeof detail === 'object') {
       const detailObj = detail as Record<string, unknown>;
-      message = (detailObj.message as string) || (detailObj.msg as string) || JSON.stringify(detail);
+      message =
+        (detailObj.message as string) || (detailObj.msg as string) || JSON.stringify(detail);
     }
   } else if (axiosError.response?.data?.message) {
     message = axiosError.response.data.message;
@@ -59,7 +63,9 @@ export const handleApiError = (error: AxiosError<ApiErrorResponse> | Error, defa
  * @param error - Error object
  * @returns Safe error message for display
  */
-export const getErrorMessage = (error: AxiosError<ApiErrorResponse> | Error | null | undefined): string => {
+export const getErrorMessage = (
+  error: AxiosError<ApiErrorResponse> | Error | null | undefined
+): string => {
   if (!error) return 'An unknown error occurred';
 
   const axiosError = error as AxiosError<ApiErrorResponse>;
@@ -68,7 +74,7 @@ export const getErrorMessage = (error: AxiosError<ApiErrorResponse> | Error | nu
     const detail = axiosError.response.data.detail;
     if (typeof detail === 'string') return detail;
     if (Array.isArray(detail)) {
-      return detail.map(e => e.msg || e.message || String(e)).join(', ');
+      return detail.map((e) => e.msg || e.message || String(e)).join(', ');
     }
   }
 

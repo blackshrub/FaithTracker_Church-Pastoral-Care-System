@@ -179,7 +179,9 @@ const RouteError = () => {
       <div className="text-center p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Page Error</h1>
         <p className="text-gray-600 mb-4">{error?.message || 'Something went wrong'}</p>
-        <a href="/dashboard" className="text-teal-600 hover:underline">Go to Dashboard</a>
+        <a href="/dashboard" className="text-teal-600 hover:underline">
+          Go to Dashboard
+        </a>
       </div>
     </div>
   );

@@ -7,7 +7,8 @@ import { format } from 'date-fns/format';
 
 // Get timezone from environment variable, or use browser's local timezone
 // This allows deploying to different regions without code changes
-const APP_TIMEZONE: string = import.meta.env.VITE_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
+const APP_TIMEZONE: string =
+  import.meta.env.VITE_TIMEZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 type DateInput = string | Date;
 
@@ -20,7 +21,10 @@ type DateStyle = 'short' | 'medium' | 'long';
  * @param isDateOnly - If true, parse as local date (no timezone conversion)
  * @returns Parsed Date object or null if invalid
  */
-export const parseUTCTimestamp = (timestamp: DateInput | null | undefined, isDateOnly = false): Date | null => {
+export const parseUTCTimestamp = (
+  timestamp: DateInput | null | undefined,
+  isDateOnly = false
+): Date | null => {
   if (!timestamp) return null;
 
   // If already a Date object, return it
@@ -75,7 +79,10 @@ export const formatToLocalTimezone = (timestamp: DateInput | null | undefined): 
  * @param style - 'short' (dd MMM), 'medium' (dd MMM yyyy), 'long' (dd MMMM yyyy)
  * @returns Formatted date string or '-' if invalid
  */
-export const formatDateToLocalTimezone = (timestamp: DateInput | null | undefined, style: DateStyle = 'medium'): string => {
+export const formatDateToLocalTimezone = (
+  timestamp: DateInput | null | undefined,
+  style: DateStyle = 'medium'
+): string => {
   const date = parseUTCTimestamp(timestamp);
   if (!date) return '-';
 
@@ -108,7 +115,10 @@ export const formatDateToLocalTimezone = (timestamp: DateInput | null | undefine
  * @param includeSeconds - Whether to include seconds
  * @returns Formatted time string or '-' if invalid
  */
-export const formatTimeToLocalTimezone = (timestamp: DateInput | null | undefined, includeSeconds = false): string => {
+export const formatTimeToLocalTimezone = (
+  timestamp: DateInput | null | undefined,
+  includeSeconds = false
+): string => {
   const date = parseUTCTimestamp(timestamp);
   if (!date) return '-';
 
@@ -133,7 +143,10 @@ export const formatTimeToLocalTimezone = (timestamp: DateInput | null | undefine
  * @param formatStr - date-fns format string (default: 'dd MMM yyyy')
  * @returns Formatted date string or original input if invalid
  */
-export const formatDate = (dateStr: DateInput | null | undefined, formatStr = 'dd MMM yyyy'): string => {
+export const formatDate = (
+  dateStr: DateInput | null | undefined,
+  formatStr = 'dd MMM yyyy'
+): string => {
   try {
     const date = parseUTCTimestamp(dateStr);
     if (!date) return (dateStr as string) || '-';

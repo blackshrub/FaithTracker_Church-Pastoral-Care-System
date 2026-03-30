@@ -22,7 +22,10 @@ interface SectionErrorBoundaryState {
   error: Error | null;
 }
 
-export class SectionErrorBoundary extends Component<SectionErrorBoundaryProps, SectionErrorBoundaryState> {
+export class SectionErrorBoundary extends Component<
+  SectionErrorBoundaryProps,
+  SectionErrorBoundaryState
+> {
   constructor(props: SectionErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };

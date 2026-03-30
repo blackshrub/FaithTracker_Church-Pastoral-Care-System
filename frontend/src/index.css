@@ -114,12 +114,19 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
   /* Light mode gradient background */
   :root body {
-    background: linear-gradient(135deg, hsl(174, 94%, 97%) 0%, hsl(45, 93%, 97%) 50%, hsl(174, 94%, 97%) 100%);
+    background: linear-gradient(
+      135deg,
+      hsl(174, 94%, 97%) 0%,
+      hsl(45, 93%, 97%) 50%,
+      hsl(174, 94%, 97%) 100%
+    );
   }
 
   /* Dark mode solid background */
@@ -127,7 +134,12 @@
     background: hsl(222, 47%, 11%);
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Playfair Display', serif;
   }
 }
@@ -142,11 +154,15 @@
 }
 
 @media (min-width: 640px) {
-  .text-h1 { font-size: 2.5rem; }
+  .text-h1 {
+    font-size: 2.5rem;
+  }
 }
 
 @media (min-width: 1024px) {
-  .text-h1 { font-size: 3rem; }
+  .text-h1 {
+    font-size: 3rem;
+  }
 }
 
 .text-h2 {
@@ -158,11 +174,15 @@
 }
 
 @media (min-width: 640px) {
-  .text-h2 { font-size: 1.875rem; }
+  .text-h2 {
+    font-size: 1.875rem;
+  }
 }
 
 @media (min-width: 1024px) {
-  .text-h2 { font-size: 2.25rem; }
+  .text-h2 {
+    font-size: 2.25rem;
+  }
 }
 
 .text-h3 {
@@ -173,7 +193,9 @@
 }
 
 @media (min-width: 640px) {
-  .text-h3 { font-size: 1.5rem; }
+  .text-h3 {
+    font-size: 1.5rem;
+  }
 }
 
 .text-h4 {
@@ -184,7 +206,7 @@
 }
 
 /* Dialog styling - uses CSS variables for theme support */
-[role="dialog"],
+[role='dialog'],
 [data-radix-dialog-content] {
   @apply bg-card text-card-foreground;
 }
@@ -193,11 +215,14 @@ label {
   @apply text-foreground font-medium;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   @apply bg-background text-foreground border-input;
 }
 
-input::placeholder, textarea::placeholder {
+input::placeholder,
+textarea::placeholder {
   @apply text-muted-foreground;
 }
 
@@ -206,7 +231,7 @@ input::placeholder, textarea::placeholder {
   @apply bg-accent/20;
 }
 
-[data-radix-select-item][data-state="checked"] {
+[data-radix-select-item][data-state='checked'] {
   @apply bg-accent/30 font-semibold;
 }
 
@@ -237,7 +262,9 @@ input::placeholder, textarea::placeholder {
 
 /* Card hover micro-interactions - Enhanced */
 .card {
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  transition:
+    transform 0.2s ease-out,
+    box-shadow 0.2s ease-out;
 }
 
 .card:hover {
@@ -276,17 +303,21 @@ button:focus-visible {
   border-radius: 4px;
 }
 
-input:focus-visible, textarea:focus-visible, select:focus-visible {
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid hsl(174, 94%, 39%);
   outline-offset: 0;
   border-color: hsl(174, 94%, 39%) !important;
 }
 
 /* Force date inputs to match standard input sizing (44px HIG minimum) */
-input[type="date"], input[type="month"], input[type="time"] {
+input[type='date'],
+input[type='month'],
+input[type='time'] {
   line-height: normal !important;
   padding: 0.5rem 0.75rem !important;
-  height: 2.75rem !important;  /* 44px - HIG compliant */
+  height: 2.75rem !important; /* 44px - HIG compliant */
   max-height: 2.75rem !important;
   min-height: 2.75rem !important;
 }
@@ -297,11 +328,11 @@ input[type="date"], input[type="month"], input[type="time"] {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  
+
   table {
     min-width: 600px;
   }
-  
+
   .timeline-item {
     margin-left: 1rem !important;
     padding-left: 1.5rem !important;
@@ -319,8 +350,12 @@ input[type="date"], input[type="month"], input[type="time"] {
 
 /* Animation keyframes */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeIn {
@@ -366,13 +401,22 @@ input[type="date"], input[type="month"], input[type="time"] {
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .animate-spin {
@@ -400,7 +444,7 @@ input[type="date"], input[type="month"], input[type="time"] {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -420,11 +464,21 @@ input[type="date"], input[type="month"], input[type="time"] {
   animation: fadeIn 0.3s ease-out backwards;
 }
 
-.list-item-enter:nth-child(1) { animation-delay: 0ms; }
-.list-item-enter:nth-child(2) { animation-delay: 50ms; }
-.list-item-enter:nth-child(3) { animation-delay: 100ms; }
-.list-item-enter:nth-child(4) { animation-delay: 150ms; }
-.list-item-enter:nth-child(5) { animation-delay: 200ms; }
+.list-item-enter:nth-child(1) {
+  animation-delay: 0ms;
+}
+.list-item-enter:nth-child(2) {
+  animation-delay: 50ms;
+}
+.list-item-enter:nth-child(3) {
+  animation-delay: 100ms;
+}
+.list-item-enter:nth-child(4) {
+  animation-delay: 150ms;
+}
+.list-item-enter:nth-child(5) {
+  animation-delay: 200ms;
+}
 
 /* Respect user's motion preferences - WCAG 2.1 Level AA */
 @media (prefers-reduced-motion: reduce) {
@@ -436,7 +490,7 @@ input[type="date"], input[type="month"], input[type="time"] {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  
+
   /* Disable hover transforms for reduced motion */
   .card:hover,
   button:hover:not(:disabled),
@@ -474,19 +528,19 @@ input[type="date"], input[type="month"], input[type="time"] {
     transform: translateX(-50%);
     z-index: 100;
   }
-  
+
   /* Compact table cells on mobile for Admin Dashboard */
   table th,
   table td {
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
   }
-  
+
   table th:first-child,
   table td:first-child {
     padding-left: 0.75rem !important;
   }
-  
+
   table th:last-child,
   table td:last-child {
     padding-right: 0.75rem !important;
@@ -514,7 +568,8 @@ input[type="date"], input[type="month"], input[type="time"] {
   max-width: 100% !important;
 }
 
-.rdp-head_cell, .rdp-cell {
+.rdp-head_cell,
+.rdp-cell {
   width: 40px !important;
   height: 40px !important;
   text-align: center !important;

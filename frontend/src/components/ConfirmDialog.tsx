@@ -31,9 +31,9 @@ export const ConfirmDialog = ({
   title,
   description,
   onConfirm,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
-  variant = "default"
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  variant = 'default',
 }: ConfirmDialogProps) => {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -49,7 +49,7 @@ export const ConfirmDialog = ({
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className={variant === "destructive" ? "bg-red-600 hover:bg-red-700" : ""}
+            className={variant === 'destructive' ? 'bg-red-600 hover:bg-red-700' : ''}
           >
             {confirmText}
           </AlertDialogAction>

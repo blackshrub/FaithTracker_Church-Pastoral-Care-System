@@ -20,12 +20,12 @@ const SetupWizard = ({ onComplete }) => {
     password: '',
     confirmPassword: '',
     name: '',
-    phone: ''
+    phone: '',
   });
   const [campusData, setCampusData] = useState({
     campus_name: '',
     location: '',
-    timezone: 'Asia/Jakarta'
+    timezone: 'Asia/Jakarta',
   });
 
   const createAdmin = async () => {
@@ -39,7 +39,7 @@ const SetupWizard = ({ onComplete }) => {
         email: adminData.email,
         password: adminData.password,
         name: adminData.name,
-        phone: adminData.phone
+        phone: adminData.phone,
       });
 
       toast.success('Admin account created');
@@ -68,9 +68,7 @@ const SetupWizard = ({ onComplete }) => {
             <Church className="w-10 h-10 text-white" />
           </div>
           <CardTitle className="text-2xl">Welcome to FaithTracker!</CardTitle>
-          <CardDescription>
-            Let's set up your pastoral care system
-          </CardDescription>
+          <CardDescription>Let's set up your pastoral care system</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Step 1: Create Admin */}
@@ -81,7 +79,7 @@ const SetupWizard = ({ onComplete }) => {
                 <Label>Full Name</Label>
                 <Input
                   value={adminData.name}
-                  onChange={(e) => setAdminData({...adminData, name: e.target.value})}
+                  onChange={(e) => setAdminData({ ...adminData, name: e.target.value })}
                   placeholder="John Doe"
                 />
               </div>
@@ -90,7 +88,7 @@ const SetupWizard = ({ onComplete }) => {
                 <Input
                   type="email"
                   value={adminData.email}
-                  onChange={(e) => setAdminData({...adminData, email: e.target.value})}
+                  onChange={(e) => setAdminData({ ...adminData, email: e.target.value })}
                   placeholder="admin@church.org"
                 />
               </div>
@@ -99,7 +97,7 @@ const SetupWizard = ({ onComplete }) => {
                 <Input
                   type="tel"
                   value={adminData.phone}
-                  onChange={(e) => setAdminData({...adminData, phone: e.target.value})}
+                  onChange={(e) => setAdminData({ ...adminData, phone: e.target.value })}
                   placeholder="+6281234567890 or 081234567890"
                 />
               </div>
@@ -108,7 +106,7 @@ const SetupWizard = ({ onComplete }) => {
                 <Input
                   type="password"
                   value={adminData.password}
-                  onChange={(e) => setAdminData({...adminData, password: e.target.value})}
+                  onChange={(e) => setAdminData({ ...adminData, password: e.target.value })}
                   placeholder="Minimum 8 characters"
                 />
               </div>
@@ -117,14 +115,20 @@ const SetupWizard = ({ onComplete }) => {
                 <Input
                   type="password"
                   value={adminData.confirmPassword}
-                  onChange={(e) => setAdminData({...adminData, confirmPassword: e.target.value})}
+                  onChange={(e) => setAdminData({ ...adminData, confirmPassword: e.target.value })}
                   placeholder="Re-enter password"
                 />
               </div>
-              <Button 
+              <Button
                 onClick={createAdmin}
                 className="w-full bg-teal-500 hover:bg-teal-600"
-                disabled={!adminData.name || !adminData.email || !adminData.phone || !adminData.password || adminData.password.length < 8}
+                disabled={
+                  !adminData.name ||
+                  !adminData.email ||
+                  !adminData.phone ||
+                  !adminData.password ||
+                  adminData.password.length < 8
+                }
               >
                 Create Admin Account
               </Button>
@@ -139,7 +143,7 @@ const SetupWizard = ({ onComplete }) => {
                 <Label>Campus Name</Label>
                 <Input
                   value={campusData.campus_name}
-                  onChange={(e) => setCampusData({...campusData, campus_name: e.target.value})}
+                  onChange={(e) => setCampusData({ ...campusData, campus_name: e.target.value })}
                   placeholder="Downtown Campus"
                 />
               </div>
@@ -147,7 +151,7 @@ const SetupWizard = ({ onComplete }) => {
                 <Label>Location (Address)</Label>
                 <Input
                   value={campusData.location}
-                  onChange={(e) => setCampusData({...campusData, location: e.target.value})}
+                  onChange={(e) => setCampusData({ ...campusData, location: e.target.value })}
                   placeholder="123 Main Street, City"
                 />
               </div>
@@ -156,7 +160,7 @@ const SetupWizard = ({ onComplete }) => {
                 <select
                   className="w-full border rounded p-2"
                   value={campusData.timezone}
-                  onChange={(e) => setCampusData({...campusData, timezone: e.target.value})}
+                  onChange={(e) => setCampusData({ ...campusData, timezone: e.target.value })}
                 >
                   <option value="Asia/Jakarta">Asia/Jakarta (UTC+7)</option>
                   <option value="Asia/Singapore">Asia/Singapore (UTC+8)</option>
@@ -165,7 +169,7 @@ const SetupWizard = ({ onComplete }) => {
                   <option value="Europe/London">Europe/London (UTC+0)</option>
                 </select>
               </div>
-              <Button 
+              <Button
                 onClick={createCampus}
                 className="w-full bg-teal-500 hover:bg-teal-600"
                 disabled={!campusData.campus_name}
@@ -185,9 +189,15 @@ const SetupWizard = ({ onComplete }) => {
 
           {/* Progress */}
           <div className="mt-6 flex justify-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${step >= 1 ? 'bg-teal-500' : 'bg-gray-300'}`}></div>
-            <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-teal-500' : 'bg-gray-300'}`}></div>
-            <div className={`w-3 h-3 rounded-full ${step >= 3 ? 'bg-teal-500' : 'bg-gray-300'}`}></div>
+            <div
+              className={`w-3 h-3 rounded-full ${step >= 1 ? 'bg-teal-500' : 'bg-gray-300'}`}
+            ></div>
+            <div
+              className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-teal-500' : 'bg-gray-300'}`}
+            ></div>
+            <div
+              className={`w-3 h-3 rounded-full ${step >= 3 ? 'bg-teal-500' : 'bg-gray-300'}`}
+            ></div>
           </div>
         </CardContent>
       </Card>

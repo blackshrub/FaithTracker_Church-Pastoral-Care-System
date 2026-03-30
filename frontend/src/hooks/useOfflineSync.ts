@@ -247,21 +247,36 @@ export interface UseOfflineMutationOptions<TPayload = unknown> {
 }
 
 export interface UseOfflineMutationReturn<TPayload = unknown> {
-  mutate: (payload: TPayload, options?: { onSuccess?: (data: unknown) => void; onError?: (error: unknown) => void }) => Promise<QueueOperationResult>;
-  mutateAsync: (payload: TPayload, options?: { onSuccess?: (data: unknown) => void; onError?: (error: unknown) => void }) => Promise<QueueOperationResult>;
+  mutate: (
+    payload: TPayload,
+    options?: { onSuccess?: (data: unknown) => void; onError?: (error: unknown) => void }
+  ) => Promise<QueueOperationResult>;
+  mutateAsync: (
+    payload: TPayload,
+    options?: { onSuccess?: (data: unknown) => void; onError?: (error: unknown) => void }
+  ) => Promise<QueueOperationResult>;
   isLoading: boolean;
   isPending: boolean;
   error: unknown;
   isOnline: boolean;
 }
 
-export function useOfflineMutation<TPayload = unknown>({ type, endpoint, method = 'POST', onSuccess, onError }: UseOfflineMutationOptions<TPayload>): UseOfflineMutationReturn<TPayload> {
+export function useOfflineMutation<TPayload = unknown>({
+  type,
+  endpoint,
+  method = 'POST',
+  onSuccess,
+  onError,
+}: UseOfflineMutationOptions<TPayload>): UseOfflineMutationReturn<TPayload> {
   const { queueOperation, isOnline } = useOfflineSync();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   const mutate = useCallback(
-    async (payload: TPayload, options: { onSuccess?: (data: unknown) => void; onError?: (error: unknown) => void } = {}): Promise<QueueOperationResult> => {
+    async (
+      payload: TPayload,
+      options: { onSuccess?: (data: unknown) => void; onError?: (error: unknown) => void } = {}
+    ): Promise<QueueOperationResult> => {
       setIsLoading(true);
       setError(null);
 
@@ -272,7 +287,7 @@ export function useOfflineMutation<TPayload = unknown>({ type, endpoint, method 
           type,
           endpoint: endpointUrl,
           method,
-          payload: typeof endpoint === 'function' ? undefined : payload as unknown,
+          payload: typeof endpoint === 'function' ? undefined : (payload as unknown),
         });
 
         if (result.success && !result.queued) {

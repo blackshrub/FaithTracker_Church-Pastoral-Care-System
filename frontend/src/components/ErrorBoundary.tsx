@@ -73,19 +73,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               )}
 
               <div className="flex gap-2">
-                <Button
-                  onClick={this.handleReload}
-                  className="flex-1"
-                  variant="default"
-                >
+                <Button onClick={this.handleReload} className="flex-1" variant="default">
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh Page
                 </Button>
-                <Button
-                  onClick={this.handleGoHome}
-                  className="flex-1"
-                  variant="outline"
-                >
+                <Button onClick={this.handleGoHome} className="flex-1" variant="outline">
                   <Home className="w-4 h-4 mr-2" />
                   Go to Dashboard
                 </Button>

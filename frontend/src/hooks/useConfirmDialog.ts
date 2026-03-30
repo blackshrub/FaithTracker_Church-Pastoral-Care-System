@@ -18,7 +18,12 @@ export interface ConfirmDialogState {
 
 export interface UseConfirmDialogReturn {
   confirmDialog: ConfirmDialogState;
-  showConfirm: (title: string, description: string, onConfirm: () => void, variant?: ConfirmDialogVariant) => void;
+  showConfirm: (
+    title: string,
+    description: string,
+    onConfirm: () => void,
+    variant?: ConfirmDialogVariant
+  ) => void;
   closeConfirm: () => void;
 }
 
@@ -28,12 +33,20 @@ export const useConfirmDialog = (): UseConfirmDialogReturn => {
     title: '',
     description: '',
     onConfirm: () => {},
-    variant: 'default'
+    variant: 'default',
   });
 
-  const showConfirm = useCallback((title: string, description: string, onConfirm: () => void, variant: ConfirmDialogVariant = 'default') => {
-    setConfirmDialog({ open: true, title, description, onConfirm, variant });
-  }, []);
+  const showConfirm = useCallback(
+    (
+      title: string,
+      description: string,
+      onConfirm: () => void,
+      variant: ConfirmDialogVariant = 'default'
+    ) => {
+      setConfirmDialog({ open: true, title, description, onConfirm, variant });
+    },
+    []
+  );
 
   const closeConfirm = useCallback(() => {
     setConfirmDialog({
@@ -41,14 +54,14 @@ export const useConfirmDialog = (): UseConfirmDialogReturn => {
       title: '',
       description: '',
       onConfirm: () => {},
-      variant: 'default'
+      variant: 'default',
     });
   }, []);
 
   return {
     confirmDialog,
     showConfirm,
-    closeConfirm
+    closeConfirm,
   };
 };
 
