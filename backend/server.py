@@ -67,11 +67,14 @@ from constants import (
     GRIEF_SIX_MONTHS_DAYS,
     GRIEF_THREE_MONTHS_DAYS,
     GRIEF_TWO_WEEKS_DAYS,
+    AUTH_COOKIE_NAME,
     IMAGE_MAGIC_BYTES,
     JWT_TOKEN_EXPIRE_HOURS,
     MAX_CSV_SIZE,
+    MAX_IMPORT_ROWS,
     MAX_LIMIT,
     MAX_REQUEST_BODY_SIZE,
+    SSE_TOKEN_EXPIRE_SECONDS,
 )
 from dependencies import init_dependencies
 
@@ -603,6 +606,7 @@ def validate_image_magic_bytes(content: bytes) -> tuple[bool, str]:
 
 # JWT Secret Key (REQUIRED - no default for security)
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
+_MIN_JWT_SECRET_LEN = 32
 if not SECRET_KEY:
     if os.environ.get("ENVIRONMENT", "development") == "production":
         raise RuntimeError(
@@ -613,6 +617,17 @@ if not SECRET_KEY:
         # Generate a key for development only - will change on restart
         SECRET_KEY = secrets.token_hex(32)
         logger.warning("JWT_SECRET_KEY not set - using temporary key. Set JWT_SECRET_KEY for production!")
+elif len(SECRET_KEY) < _MIN_JWT_SECRET_LEN:
+    # Reject dangerously short secrets that weaken JWT integrity guarantees.
+    if os.environ.get("ENVIRONMENT", "development") == "production":
+        raise RuntimeError(
+            f"JWT_SECRET_KEY must be at least {_MIN_JWT_SECRET_LEN} characters. "
+            'Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+    else:
+        logger.warning(
+            f"JWT_SECRET_KEY is shorter than {_MIN_JWT_SECRET_LEN} chars — unsafe for production."
+        )
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = JWT_TOKEN_EXPIRE_HOURS * 60
@@ -640,31 +655,39 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(request: Request) -> dict:
-    """Extract and validate JWT token from Authorization header.
+    """Extract and validate JWT token from Authorization header or auth cookie.
 
+    The web client authenticates via an httpOnly cookie (XSS-resistant), while
+    mobile apps and external clients continue to use the Bearer header.
     This is a Litestar dependency that will be provided via Provide().
     """
     auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    token: str | None = None
+
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip() or None
+
+    if not token:
+        # Fall back to httpOnly auth cookie (set by /auth/login for web clients).
+        token = request.cookies.get(AUTH_COOKIE_NAME) or None
+
+    if not token:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             extra={"headers": {"WWW-Authenticate": "Bearer"}},
         )
 
-    token = auth_header[7:]  # Remove "Bearer " prefix
-
-    # Validate token is not empty (security: prevents auth bypass with "Bearer " header)
-    if not token or not token.strip():
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail="Token is empty or invalid",
-            extra={"headers": {"WWW-Authenticate": "Bearer"}},
-        )
-
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
+        # Reject SSE-scoped tokens on normal endpoints — those tokens are
+        # issued specifically for the EventSource URL and must not grant full API access.
+        if payload.get("scope") == "sse":
+            raise HTTPException(
+                status_code=HTTP_401_UNAUTHORIZED,
+                detail="Token scope is not permitted here",
+            )
         if user_id is None:
             raise HTTPException(
                 status_code=HTTP_401_UNAUTHORIZED,
@@ -1430,8 +1453,17 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
             else:
                 engagement_status = "disconnected"
 
+            # Atomic: only update if no newer contact has been recorded concurrently.
+            # Prevents a race where a concurrent insert sets a later last_contact_date
+            # between our read (remaining_events) and this write.
             await db.members.update_one(
-                {"id": member_id},
+                {
+                    "id": member_id,
+                    "$or": [
+                        {"last_contact_date": None},
+                        {"last_contact_date": {"$lte": new_last_contact}},
+                    ],
+                },
                 {
                     "$set": {
                         "last_contact_date": new_last_contact,
@@ -1442,18 +1474,29 @@ async def delete_care_event(event_id: str, request: Request) -> dict:
                 },
             )
         else:
-            # No remaining events - reset to never contacted
-            await db.members.update_one(
-                {"id": member_id},
+            # No remaining events for this member - reset to never contacted.
+            # Guard: only clear if no care events were inserted concurrently.
+            still_no_events = await db.care_events.count_documents(
                 {
-                    "$set": {
-                        "last_contact_date": None,
-                        "days_since_last_contact": 999,
-                        "engagement_status": "disconnected",
-                        "updated_at": datetime.now(UTC),
-                    }
-                },
+                    "member_id": member_id,
+                    "$or": [
+                        {"event_type": {"$ne": "birthday"}},
+                        {"event_type": "birthday", "completed": True},
+                    ],
+                }
             )
+            if still_no_events == 0:
+                await db.members.update_one(
+                    {"id": member_id},
+                    {
+                        "$set": {
+                            "last_contact_date": None,
+                            "days_since_last_contact": 999,
+                            "engagement_status": "disconnected",
+                            "updated_at": datetime.now(UTC),
+                        }
+                    },
+                )
 
         # Also delete related grief support stages and accident followup stages
         await db.grief_support.delete_many({"care_event_id": event_id})
@@ -1490,9 +1533,18 @@ async def sync_members_from_external_api(
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(api_url, headers=headers)
+            response.raise_for_status()
             external_members = response.json()
 
+        if not isinstance(external_members, list):
+            raise HTTPException(
+                status_code=502,
+                detail="External API response invalid: expected JSON array of members",
+            )
+
         sync_campus_id = campus_id or current_admin.get("campus_id")
+        if not sync_campus_id:
+            raise HTTPException(status_code=400, detail="campus_id is required for sync")
         synced_count = 0
         updated_count = 0
         archived_count = 0
@@ -1503,11 +1555,16 @@ async def sync_members_from_external_api(
 
         for ext_member in external_members:
             try:
+                if not isinstance(ext_member, dict):
+                    errors.append(f"Skipped non-object member entry: {ext_member!r}")
+                    continue
                 ext_id = str(ext_member.get("id"))
                 external_ids.add(ext_id)
 
-                # Check if member exists by external_member_id
-                existing = await db.members.find_one({"external_member_id": ext_id}, {"_id": 0})
+                # Check if member exists by external_member_id within this campus (multi-tenancy)
+                existing = await db.members.find_one(
+                    {"external_member_id": ext_id, "campus_id": sync_campus_id}, {"_id": 0}
+                )
 
                 if existing:
                     # Update existing member with latest data
@@ -1593,6 +1650,14 @@ async def sync_members_from_external_api(
             "total_received": len(external_members),
             "errors": errors,
         }
+    except HTTPException:
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error(f"API sync upstream error: {e!s}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"External API returned {e.response.status_code}",
+        )
     except Exception as e:
         logger.error(f"API sync error: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -1629,27 +1694,36 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
                 status_code=400, detail=f"File too large. Maximum size is {MAX_CSV_SIZE // (1024 * 1024)} MB."
             )
 
-        decoded = contents.decode("utf-8")
+        try:
+            decoded = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="CSV file must be UTF-8 encoded")
         reader = csv.DictReader(io.StringIO(decoded))
 
         imported_count = 0
         errors = []
 
-        for row in reader:
+        for row_index, row in enumerate(reader, start=2):  # start=2 since row 1 is the header
+            if row_index - 1 > MAX_IMPORT_ROWS:
+                errors.append(f"Row {row_index}: exceeded max import rows ({MAX_IMPORT_ROWS}); aborting")
+                break
             try:
-                # Create member from CSV row with campus_id for multi-tenancy
+                name = (row.get("name") or "").strip()
+                if not name:
+                    errors.append(f"Row {row_index}: missing required 'name'")
+                    continue
                 member = Member(
-                    name=row.get("name", ""),
-                    phone=row.get("phone", ""),
-                    external_member_id=row.get("external_member_id"),
-                    notes=row.get("notes"),
+                    name=name,
+                    phone=(row.get("phone") or "").strip(),
+                    external_member_id=(row.get("external_member_id") or None) or None,
+                    notes=row.get("notes") or None,
                     campus_id=campus_id,
                 )
 
                 await db.members.insert_one(to_mongo_doc(member))
                 imported_count += 1
             except Exception as e:
-                errors.append(f"Row error: {e!s}")
+                errors.append(f"Row {row_index}: {e!s}")
 
         # Log the import activity
         await log_activity(
@@ -1678,14 +1752,29 @@ async def import_members_json(data: list[dict[str, Any]] = Body(), request: Requ
         if not campus_id:
             raise HTTPException(status_code=400, detail="No campus assigned to your account")
 
+        if not isinstance(data, list):
+            raise HTTPException(status_code=400, detail="Expected JSON array of member objects")
+        if len(data) > MAX_IMPORT_ROWS:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Too many rows. Maximum is {MAX_IMPORT_ROWS}.",
+            )
+
         imported_count = 0
         errors = []
 
-        for member_data in data:
+        for idx, member_data in enumerate(data, start=1):
             try:
+                if not isinstance(member_data, dict):
+                    errors.append(f"Entry {idx}: not an object")
+                    continue
+                name = (member_data.get("name") or "").strip() if isinstance(member_data.get("name"), str) else ""
+                if not name:
+                    errors.append(f"Entry {idx}: missing required 'name'")
+                    continue
                 member = Member(
-                    name=member_data.get("name", ""),
-                    phone=member_data.get("phone", ""),
+                    name=name,
+                    phone=member_data.get("phone") or "",
                     external_member_id=member_data.get("external_member_id"),
                     notes=member_data.get("notes"),
                     campus_id=campus_id,
@@ -1694,7 +1783,7 @@ async def import_members_json(data: list[dict[str, Any]] = Body(), request: Requ
                 await db.members.insert_one(to_mongo_doc(member))
                 imported_count += 1
             except Exception as e:
-                errors.append(f"Member error: {e!s}")
+                errors.append(f"Entry {idx}: {e!s}")
 
         # Log the import activity
         await log_activity(
@@ -1748,7 +1837,7 @@ async def export_members_csv(request: Request) -> Response:
                 "days_since_last_contact",
                 "notes",
             ]
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
             writer.writeheader()
 
             for member in members:
@@ -1814,7 +1903,7 @@ async def export_care_events_csv(request: Request) -> Response:
                 "aid_amount",
                 "hospital_name",
             ]
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
             writer.writeheader()
 
             for event in events:
@@ -2203,13 +2292,23 @@ async def _compute_monthly_report_data(current_user: dict, year: int | None = No
 
         # Activity logs this month (staff actions)
         # Use datetime objects for comparison since created_at is stored as ISODate
+        # Project only fields actually consumed downstream to reduce memory footprint.
+        activity_projection = {
+            "_id": 0,
+            "user_id": 1,
+            "user_name": 1,
+            "action_type": 1,
+            "member_id": 1,
+            "created_at": 1,
+        }
         activities_this_month = await db.activity_logs.find(
-            {**campus_filter, "created_at": {"$gte": start_date, "$lt": end_date}}, {"_id": 0}
+            {**campus_filter, "created_at": {"$gte": start_date, "$lt": end_date}}, activity_projection
         ).to_list(10000)
 
-        activities_prev_month = await db.activity_logs.find(
-            {**campus_filter, "created_at": {"$gte": prev_start, "$lt": prev_end}}, {"_id": 0}
-        ).to_list(10000)
+        # Only a count is needed downstream for the prev-month comparison.
+        activities_prev_month_count = await db.activity_logs.count_documents(
+            {**campus_filter, "created_at": {"$gte": prev_start, "$lt": prev_end}}
+        )
 
         # Financial aid this month
         financial_events = [e for e in events_this_month if e.get("event_type") == "financial_aid"]
@@ -2641,8 +2740,8 @@ async def _compute_monthly_report_data(current_user: dict, year: int | None = No
             },
             "total_activities": {
                 "current": len(activities_this_month),
-                "previous": len(activities_prev_month),
-                "change": len(activities_this_month) - len(activities_prev_month),
+                "previous": activities_prev_month_count,
+                "change": len(activities_this_month) - activities_prev_month_count,
             },
             "financial_aid": {
                 "current": financial_total,
@@ -2805,8 +2904,19 @@ async def get_staff_performance_report(
 
         # Get all activity logs for the month
         # Use datetime objects for comparison (not ISO strings) since created_at is stored as ISODate
+        # Project only the fields used below to keep memory bounded on large campuses.
         activities = await db.activity_logs.find(
-            {**campus_filter, "created_at": {"$gte": start_date, "$lt": end_date}}, {"_id": 0}
+            {**campus_filter, "created_at": {"$gte": start_date, "$lt": end_date}},
+            {
+                "_id": 0,
+                "user_id": 1,
+                "user_name": 1,
+                "user_photo_url": 1,
+                "action_type": 1,
+                "created_at": 1,
+                "member_id": 1,
+                "event_type": 1,
+            },
         ).to_list(20000)
 
         # Note: Staff performance is derived from activity_logs (which use ISODate),
@@ -5548,21 +5658,27 @@ async def stream_activity(request: Request, token: str | None = None) -> Stream:
     });
     ```
     """
-    # Try to get user from header first, then from query param
+    # Auth precedence:
+    # 1. httpOnly auth cookie or Authorization header (validated by get_current_user)
+    # 2. Short-lived (scope="sse") token passed via query string (needed because
+    #    EventSource cannot set headers and cross-origin EventSource may not send
+    #    cookies without withCredentials+CORS).
     current_user = None
 
-    # First try Authorization header
     try:
         current_user = await get_current_user(request)
     except HTTPException:
-        pass  # Header auth not available, will try query param
+        pass  # Fall through to SSE-scoped token validation below
     except Exception:
         pass
 
-    # If no user from header, try query param token
     if not current_user and token:
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            # Query-string tokens must be SSE-scoped. Regular access tokens cannot be
+            # used here, so a leaked SSE token in logs can't be replayed against the API.
+            if payload.get("scope") != "sse":
+                raise HTTPException(status_code=401, detail="Invalid token scope for SSE")
             user_id = payload.get("sub")
             if user_id:
                 user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})

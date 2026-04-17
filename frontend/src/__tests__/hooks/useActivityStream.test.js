@@ -61,18 +61,16 @@ class MockEventSource {
 }
 MockEventSource.instances = [];
 
-// Mock AuthContext
+// Mock AuthContext — cookie migration removed `token`; we gate on `user`.
 const mockUser = { id: 'user-1', name: 'Current User' };
-const mockToken = 'test-jwt-token';
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: vi.fn(() => ({
-    token: mockToken,
     user: mockUser,
   })),
 }));
 
-// Mock api for initial load
+// Mock api for initial load AND for POST /auth/sse-token (short-lived SSE JWT)
 vi.mock('@/lib/api', () => ({
   default: {
     get: vi.fn().mockResolvedValue({
@@ -89,6 +87,9 @@ vi.mock('@/lib/api', () => ({
         },
       ],
     }),
+    post: vi.fn().mockResolvedValue({
+      data: { token: 'short-lived-sse-token', expires_in: 60 },
+    }),
   },
 }));
 
@@ -102,7 +103,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
 
   // Reset mocks
-  vi.mocked(useAuth).mockReturnValue({ token: mockToken, user: mockUser });
+  vi.mocked(useAuth).mockReturnValue({ user: mockUser });
   vi.mocked(api.get).mockResolvedValue({
     data: [
       {
@@ -115,6 +116,9 @@ beforeEach(() => {
       },
     ],
   });
+  vi.mocked(api.post).mockResolvedValue({
+    data: { token: 'short-lived-sse-token', expires_in: 60 },
+  });
 });
 
 afterEach(() => {
@@ -124,19 +128,22 @@ afterEach(() => {
 });
 
 describe('useActivityStream - connection', () => {
-  it('creates EventSource with token on mount when enabled and token exists', async () => {
-    const { result } = renderHook(() => useActivityStream({ enabled: true }));
+  it('fetches a short-lived SSE token and opens EventSource with it', async () => {
+    renderHook(() => useActivityStream({ enabled: true }));
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(0);
     });
 
+    // The hook must first POST /auth/sse-token to obtain the short-lived JWT,
+    // then embed that (and ONLY that) in the EventSource URL.
+    expect(api.post).toHaveBeenCalledWith('/auth/sse-token');
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    expect(es.url).toContain('token=test-jwt-token');
+    expect(es.url).toContain('token=short-lived-sse-token');
   });
 
-  it('does NOT create EventSource when token is null', async () => {
-    vi.mocked(useAuth).mockReturnValue({ token: null, user: null });
+  it('does NOT create EventSource when there is no authenticated user', async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: null });
 
     const initialCount = MockEventSource.instances.length;
     renderHook(() => useActivityStream({ enabled: true }));

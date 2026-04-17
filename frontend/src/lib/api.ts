@@ -32,9 +32,14 @@ interface RetryableAxiosRequestConfig extends InternalAxiosRequestConfig {
 // Create axios instance with defaults
 // Note: BACKEND_URL should be the full API URL (e.g., https://api.domain.com)
 // No /api suffix needed since we're using subdomain routing
+//
+// withCredentials: the backend sets an httpOnly auth cookie on /auth/login.
+// JS cannot read the cookie (XSS-resistant), so axios must opt in to send it
+// automatically on every request.
 const api: AxiosInstance = axios.create({
   baseURL: BACKEND_URL,
   timeout: DEFAULT_TIMEOUT,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -73,11 +78,8 @@ const shouldRetry = (error: AxiosError): boolean => {
 // Request interceptor
 api.interceptors.request.use(
   (config: RetryableAxiosRequestConfig): RetryableAxiosRequestConfig => {
-    // Add auth token if available
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    // Auth is carried by the httpOnly cookie (withCredentials above) — no Bearer
+    // header is attached from JS, so an XSS payload cannot read or forward it.
 
     // Set longer timeout for file uploads
     if (config.data instanceof FormData) {
@@ -118,10 +120,10 @@ api.interceptors.response.use(
       return api(config);
     }
 
-    // Handle 401 Unauthorized - always clear auth and redirect
+    // Handle 401 Unauthorized - cookie is stale or missing; redirect to login.
     if (error.response?.status === 401) {
+      // Clear any legacy localStorage token from previous versions.
       localStorage.removeItem('token');
-      delete api.defaults.headers.common['Authorization'];
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
@@ -137,7 +139,6 @@ api.interceptors.response.use(
         detail.includes('credentials')
       ) {
         localStorage.removeItem('token');
-        delete api.defaults.headers.common['Authorization'];
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
@@ -150,22 +151,17 @@ api.interceptors.response.use(
 );
 
 /**
- * Set authorization header
- * @param token - JWT token
+ * Kept for backwards compatibility with callers that still import these.
+ * Auth is now carried by the httpOnly cookie — no Authorization header is
+ * attached from JS. These functions are no-ops.
  */
-export const setAuthToken = (token: string | null): void => {
-  if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  } else {
-    delete api.defaults.headers.common['Authorization'];
-  }
+export const setAuthToken = (_token: string | null): void => {
+  // Intentionally empty: cookie-based auth.
 };
 
-/**
- * Clear authorization header
- */
 export const clearAuthToken = (): void => {
-  delete api.defaults.headers.common['Authorization'];
+  // Intentionally empty: cookie-based auth. Call POST /auth/logout to clear
+  // the cookie server-side.
 };
 
 export default api;

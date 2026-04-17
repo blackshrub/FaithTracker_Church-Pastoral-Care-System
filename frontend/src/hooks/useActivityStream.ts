@@ -57,7 +57,7 @@ export interface UseActivityStreamReturn {
   lastActivity: Activity | null;
   activities: Activity[];
   error: string | null;
-  connect: () => void;
+  connect: () => Promise<void>;
   disconnect: () => void;
   clearActivities: () => void;
 }
@@ -70,7 +70,7 @@ export function useActivityStream({
   enabled = true,
   maxActivities = 50,
 }: UseActivityStreamOptions = {}): UseActivityStreamReturn {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [lastActivity, setLastActivity] = useState<Activity | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -79,13 +79,13 @@ export function useActivityStream({
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
-  const connectRef = useRef<(() => void) | null>(null);
+  const connectRef = useRef<(() => void | Promise<void>) | null>(null);
 
   /**
    * Connect to SSE endpoint
    */
-  const connect = useCallback(() => {
-    if (!token || !enabled) return;
+  const connect = useCallback(async () => {
+    if (!user || !enabled) return;
 
     // Keep ref in sync so reconnect timer always calls latest version
     connectRef.current = connect;
@@ -101,9 +101,14 @@ export function useActivityStream({
     }
 
     try {
-      // Note: EventSource doesn't support custom headers, so we use query param for auth
-      const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(token)}`;
-      const eventSource = new EventSource(url);
+      // EventSource cannot set Authorization headers. We mint a 60-second
+      // scope="sse" token on demand so that even if the token surfaces in
+      // server/proxy logs its useful lifetime is tiny and it cannot be
+      // replayed against regular API endpoints.
+      const tokenResponse = await api.post<{ token: string }>('/auth/sse-token');
+      const sseToken = tokenResponse.data.token;
+      const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(sseToken)}`;
+      const eventSource = new EventSource(url, { withCredentials: true });
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
@@ -148,7 +153,7 @@ export function useActivityStream({
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [token, enabled, user?.id, onActivity, maxActivities]);
+  }, [enabled, user, onActivity, maxActivities]);
 
   /**
    * Disconnect from SSE endpoint
@@ -173,12 +178,12 @@ export function useActivityStream({
     setLastActivity(null);
   }, []);
 
-  // Load recent activities when component mounts and token is available
+  // Load recent activities when component mounts and user is authenticated
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      if (!enabled || !token) return;
+      if (!enabled || !user) return;
       try {
         const response = await api.get('/activity-logs', { params: { limit: maxActivities } });
         if (cancelled) return;
@@ -212,15 +217,15 @@ export function useActivityStream({
     return () => {
       cancelled = true;
     };
-  }, [enabled, token, maxActivities]);
+  }, [enabled, user, maxActivities]);
 
   // Connect on mount, disconnect on unmount
   useEffect(() => {
-    if (enabled && token) {
-      connect();
+    if (enabled && user) {
+      void connect();
     }
     return () => disconnect();
-  }, [connect, disconnect, enabled, token]);
+  }, [connect, disconnect, enabled, user]);
 
   return {
     isConnected,

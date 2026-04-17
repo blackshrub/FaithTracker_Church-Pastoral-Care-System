@@ -452,6 +452,21 @@ class TokenResponse(Struct):
     access_token: str
     token_type: str
     user: UserResponse
+    # Long-lived refresh token for mobile/external clients. Web clients ignore
+    # this field — they receive the refresh token as an httpOnly cookie.
+    refresh_token: str | None = None
+
+
+class RefreshRequest(Struct):
+    """Body for POST /auth/refresh (mobile path — web uses the cookie)."""
+
+    refresh_token: str | None = None
+
+
+class AccessTokenResponse(Struct):
+    access_token: str
+    token_type: str
+    refresh_token: str | None = None
 
 
 class ProfileUpdate(Struct):

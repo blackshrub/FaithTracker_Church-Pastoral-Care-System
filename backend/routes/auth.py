@@ -2,13 +2,16 @@
 FaithTracker Auth Routes - Authentication and user management endpoints
 """
 
+import hashlib
 import io
 import logging
-from datetime import UTC, datetime
+import os
+import secrets
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from litestar import Request, delete, get, post, put
-from litestar.datastructures import UploadFile
+from litestar import Request, Response, delete, get, post, put
+from litestar.datastructures import Cookie, UploadFile
 from litestar.exceptions import HTTPException
 from litestar.status_codes import (
     HTTP_400_BAD_REQUEST,
@@ -18,7 +21,14 @@ from litestar.status_codes import (
 )
 from PIL import Image
 
-from constants import MAX_IMAGE_SIZE
+from constants import (
+    AUTH_COOKIE_NAME,
+    JWT_TOKEN_EXPIRE_HOURS,
+    MAX_IMAGE_SIZE,
+    REFRESH_COOKIE_NAME,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    SSE_TOKEN_EXPIRE_SECONDS,
+)
 from dependencies import (
     check_login_rate_limit,
     clear_login_attempts,
@@ -34,8 +44,10 @@ from dependencies import (
 )
 from enums import UserRole
 from models import (
+    AccessTokenResponse,
     PasswordChange,
     ProfileUpdate,
+    RefreshRequest,
     TokenResponse,
     User,
     UserCreate,
@@ -47,6 +59,154 @@ from models import (
 from utils import normalize_phone_number, validate_email, validate_image_magic_bytes, validate_password_strength
 
 logger = logging.getLogger(__name__)
+
+
+def _is_production() -> bool:
+    return os.environ.get("ENVIRONMENT", "development") == "production"
+
+
+def _build_auth_cookie(token: str) -> Cookie:
+    """Build the httpOnly auth cookie set on login.
+
+    - httponly: browser JS cannot read the cookie (defense against XSS token theft)
+    - secure: only sent over HTTPS (required in production)
+    - samesite=lax: blocks cross-site POSTs, allows normal same-site navigation
+    - max_age: matches JWT expiry so the cookie dies with the token
+    """
+    return Cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        max_age=JWT_TOKEN_EXPIRE_HOURS * 3600,
+        path="/",
+        httponly=True,
+        secure=_is_production(),
+        samesite="lax",
+    )
+
+
+def _build_expired_auth_cookie() -> Cookie:
+    """Build a cookie that immediately clears the auth cookie in the browser."""
+    return Cookie(
+        key=AUTH_COOKIE_NAME,
+        value="",
+        max_age=0,
+        path="/",
+        httponly=True,
+        secure=_is_production(),
+        samesite="lax",
+    )
+
+
+# ==================== REFRESH TOKEN HELPERS ====================
+
+
+def _hash_refresh_token(raw: str) -> str:
+    """SHA-256 of the raw refresh token. We store hashes, not raw tokens,
+    so a database leak cannot be used to impersonate users."""
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+async def _issue_refresh_token(user_id: str) -> str:
+    """Mint a new opaque refresh token bound to the given user.
+
+    Returns the RAW token to hand back to the client. The server side only
+    remembers the SHA-256 hash plus expiry.
+    """
+    db = get_db()
+    raw = secrets.token_urlsafe(48)  # 384 bits of entropy
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    await db.refresh_tokens.insert_one(
+        {
+            "token_hash": _hash_refresh_token(raw),
+            "user_id": user_id,
+            "created_at": now,
+            "expires_at": expires_at,
+            "revoked_at": None,
+        }
+    )
+    return raw
+
+
+async def _consume_refresh_token(raw: str) -> dict | None:
+    """Atomically validate AND revoke a refresh token (rotation).
+
+    Returns the user document if the token was valid, None otherwise. The
+    token is marked revoked on this same call so that replaying a stolen
+    token (or a network-retry duplicate) cannot reuse it.
+    """
+    db = get_db()
+    token_hash = _hash_refresh_token(raw)
+    now = datetime.now(UTC)
+    # find_one_and_update is atomic under a single-document write — two
+    # concurrent refresh attempts with the same token will race such that
+    # exactly one succeeds.
+    from pymongo import ReturnDocument
+
+    record = await db.refresh_tokens.find_one_and_update(
+        {
+            "token_hash": token_hash,
+            "revoked_at": None,
+            "expires_at": {"$gt": now},
+        },
+        {"$set": {"revoked_at": now}},
+        return_document=ReturnDocument.BEFORE,
+    )
+    if not record:
+        return None
+    user = await db.users.find_one({"id": record["user_id"]}, {"_id": 0})
+    if not user or not user.get("is_active", True):
+        return None
+    return user
+
+
+async def _revoke_refresh_token(raw: str) -> None:
+    """Revoke a specific refresh token (best-effort — used on logout)."""
+    if not raw:
+        return
+    db = get_db()
+    with contextlib_suppress():
+        await db.refresh_tokens.update_one(
+            {"token_hash": _hash_refresh_token(raw)},
+            {"$set": {"revoked_at": datetime.now(UTC)}},
+        )
+
+
+class contextlib_suppress:
+    """Tiny inline async-friendly suppressor; avoids pulling in contextlib here."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return True  # swallow any exception
+
+
+def _build_refresh_cookie(raw: str) -> Cookie:
+    """httpOnly cookie carrying the refresh token. Scoped to /auth so it's
+    only sent along with auth endpoints (not every API call)."""
+    return Cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=raw,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/auth",
+        httponly=True,
+        secure=_is_production(),
+        samesite="lax",
+    )
+
+
+def _build_expired_refresh_cookie() -> Cookie:
+    return Cookie(
+        key=REFRESH_COOKIE_NAME,
+        value="",
+        max_age=0,
+        path="/auth",
+        httponly=True,
+        secure=_is_production(),
+        samesite="lax",
+    )
+
 
 # ROOT_DIR for photo uploads
 ROOT_DIR = Path(__file__).parent.parent
@@ -113,7 +273,7 @@ async def register_user(data: UserCreate, request: Request) -> dict:
 
 
 @post("/auth/login")
-async def login(data: UserLogin, request: Request) -> dict:
+async def login(data: UserLogin, request: Request) -> Response:
     """Login and get access token with brute force protection.
 
     Security features:
@@ -177,9 +337,15 @@ async def login(data: UserLogin, request: Request) -> dict:
 
         logger.info(f"Successful login for {data.email} from {client_ip}")
 
-        return TokenResponse(
+        # Issue a long-lived refresh token alongside the access token so mobile
+        # clients (and the web app) can stay signed in across access-token
+        # expiries without making the user re-type their password.
+        refresh_token = await _issue_refresh_token(user["id"])
+
+        token_response = TokenResponse(
             access_token=access_token,
             token_type="bearer",
+            refresh_token=refresh_token,
             user=UserResponse(
                 id=user["id"],
                 email=user["email"],
@@ -192,11 +358,103 @@ async def login(data: UserLogin, request: Request) -> dict:
                 created_at=user["created_at"],
             ),
         )
+        # Set httpOnly auth + refresh cookies for web clients (XSS-resistant).
+        # The response body still carries both tokens so mobile/external clients
+        # continue to work (they read tokens from the body and ignore cookies).
+        return Response(
+            content=token_response,
+            cookies=[
+                _build_auth_cookie(access_token),
+                _build_refresh_cookie(refresh_token),
+            ],
+        )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error logging in: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
+
+
+@post("/auth/logout")
+async def logout(request: Request, data: RefreshRequest | None = None) -> Response:
+    """Revoke the refresh token (if any) and clear both auth cookies.
+
+    Accepts the refresh token from either the httpOnly cookie (web) or the
+    request body (mobile). Safe to call unauthenticated — missing/invalid
+    tokens are silently ignored.
+    """
+    raw_refresh = None
+    if data and data.refresh_token:
+        raw_refresh = data.refresh_token
+    else:
+        raw_refresh = request.cookies.get(REFRESH_COOKIE_NAME)
+    if raw_refresh:
+        await _revoke_refresh_token(raw_refresh)
+
+    return Response(
+        content={"success": True},
+        cookies=[_build_expired_auth_cookie(), _build_expired_refresh_cookie()],
+    )
+
+
+@post("/auth/refresh")
+async def refresh_access_token(request: Request, data: RefreshRequest | None = None) -> Response:
+    """Exchange a valid refresh token for a new access token.
+
+    Rotation: the incoming refresh token is revoked on use and a fresh one is
+    issued. Stolen refresh tokens therefore stop working after a single use
+    (and the legitimate client will hit an auth error on its next refresh,
+    surfacing the compromise).
+
+    Auth sources (in order): ``refresh_token`` field in JSON body (mobile),
+    then the ``ft_refresh`` httpOnly cookie (web).
+    """
+    raw_refresh = None
+    if data and data.refresh_token:
+        raw_refresh = data.refresh_token
+    if not raw_refresh:
+        raw_refresh = request.cookies.get(REFRESH_COOKIE_NAME)
+
+    if not raw_refresh:
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+
+    user = await _consume_refresh_token(raw_refresh)
+    if not user:
+        # Token was invalid, expired, revoked, or the user is inactive.
+        # Clear any stale refresh cookie the browser is still holding.
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token")
+
+    new_access = create_access_token(data={"sub": user["id"]})
+    new_refresh = await _issue_refresh_token(user["id"])
+
+    body = AccessTokenResponse(
+        access_token=new_access,
+        token_type="bearer",
+        refresh_token=new_refresh,
+    )
+    return Response(
+        content=body,
+        cookies=[_build_auth_cookie(new_access), _build_refresh_cookie(new_refresh)],
+    )
+
+
+@post("/auth/sse-token")
+async def issue_sse_token(request: Request) -> dict:
+    """Issue a short-lived JWT scoped for EventSource/SSE use only.
+
+    EventSource cannot attach Authorization headers, so clients pass tokens via
+    URL query strings — which may surface in proxy/server logs. Using a token
+    with a 60-second expiry and a non-reusable ``scope="sse"`` claim keeps the
+    log-leak blast radius tiny and prevents replay against regular API endpoints
+    (``get_current_user`` rejects ``scope=="sse"``).
+    """
+    current_user = await get_current_user(request)
+    expires_delta = timedelta(seconds=SSE_TOKEN_EXPIRE_SECONDS)
+    token = create_access_token(
+        data={"sub": current_user["id"], "scope": "sse"},
+        expires_delta=expires_delta,
+    )
+    return {"token": token, "expires_in": SSE_TOKEN_EXPIRE_SECONDS}
 
 
 @get("/auth/me")
@@ -455,6 +713,16 @@ async def upload_user_photo(user_id: str, request: Request, data: UploadFile) ->
         # Resize image to 400x400 and optimize
         try:
             img = Image.open(io.BytesIO(contents))
+            # Reject decompression bombs (small file claiming huge dimensions).
+            if img.width * img.height > 40_000_000:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image dimensions too large. Please upload an image under 40 megapixels.",
+                )
+            img.verify()
+            img = Image.open(io.BytesIO(contents))
+        except HTTPException:
+            raise
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
         img = img.convert("RGB")
@@ -504,6 +772,9 @@ async def delete_user(user_id: str, request: Request) -> dict:
 route_handlers = [
     register_user,
     login,
+    logout,
+    refresh_access_token,
+    issue_sse_token,
     get_current_user_info,
     list_users,
     update_user,

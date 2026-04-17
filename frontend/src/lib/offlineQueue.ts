@@ -335,13 +335,14 @@ class OfflineQueue {
   private async executeOperation(operation: QueuedOperation): Promise<unknown> {
     const { endpoint, method, payload } = operation;
     const apiBaseUrl: string = import.meta.env.VITE_API_URL || '/api';
-    const token = localStorage.getItem('token');
 
+    // Auth rides on the httpOnly ft_auth cookie; credentials: 'include' makes
+    // fetch attach it automatically for both same-origin and CORS requests.
     const response = await fetch(`${apiBaseUrl}${endpoint}`, {
       method,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: payload ? JSON.stringify(payload) : undefined,
     });

@@ -13,7 +13,7 @@ from litestar import Request
 from litestar.exceptions import HTTPException
 from litestar.status_codes import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 
-from constants import JWT_TOKEN_EXPIRE_HOURS
+from constants import AUTH_COOKIE_NAME, JWT_TOKEN_EXPIRE_HOURS
 from enums import UserRole
 
 logger = logging.getLogger(__name__)
@@ -48,18 +48,26 @@ def get_db():
 
 
 async def get_current_user(request: Request) -> dict:
-    """Extract and validate JWT token from Authorization header."""
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
+    """Extract and validate JWT token from Authorization header or auth cookie.
 
-    token = auth_header[7:]
-    if not token or not token.strip():
-        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Token is empty or invalid")
+    Web clients authenticate via the httpOnly cookie; mobile/external clients
+    use the Bearer header.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    token: str | None = None
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip() or None
+    if not token:
+        token = request.cookies.get(AUTH_COOKIE_NAME) or None
+    if not token:
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
 
     try:
         payload = jwt.decode(token, _secret_key, algorithms=[_algorithm])
         user_id = payload.get("sub")
+        # SSE-scoped tokens are not valid for regular API calls.
+        if payload.get("scope") == "sse":
+            raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Token scope is not permitted here")
         if user_id is None:
             raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
     except jwt.PyJWTError:

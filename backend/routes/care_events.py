@@ -815,18 +815,21 @@ async def send_care_event_reminder(event_id: str, request: Request) -> dict:
 
 
 @post("/care-events/{event_id:str}/visitation-log")
-async def add_visitation_log(event_id: str, entry: VisitationLogEntry) -> dict:
+async def add_visitation_log(event_id: str, entry: VisitationLogEntry, request: Request) -> dict:
     """Add visitation log entry to hospital visit"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        campus_filter = get_campus_filter(current_user)
+        event = await db.care_events.find_one({"id": event_id, **campus_filter}, {"_id": 0})
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
 
         log_entry = to_mongo_doc(entry)
 
         await db.care_events.update_one(
-            {"id": event_id}, {"$push": {"visitation_log": log_entry}, "$set": {"updated_at": datetime.now(UTC)}}
+            {"id": event_id, **campus_filter},
+            {"$push": {"visitation_log": log_entry}, "$set": {"updated_at": datetime.now(UTC)}},
         )
 
         return {"success": True, "message": "Visitation log added"}
@@ -838,13 +841,16 @@ async def add_visitation_log(event_id: str, entry: VisitationLogEntry) -> dict:
 
 
 @get("/care-events/hospital/due-followup")
-async def get_hospital_followup_due() -> list:
+async def get_hospital_followup_due(request: Request) -> list:
     """Get accident/illness events needing follow-up"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
+        campus_filter = get_campus_filter(current_user)
         # Find accident/illness events (merged from hospital) with discharge date but no completion
         events = await db.care_events.find(
             {
+                **campus_filter,
                 "event_type": "accident_illness",  # Updated from hospital_visit
                 "completed": False,
             },
@@ -873,6 +879,8 @@ async def get_hospital_followup_due() -> list:
                 )
 
         return followup_due
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting hospital followup: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))

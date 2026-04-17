@@ -723,11 +723,15 @@ async def ignore_financial_aid_schedule(schedule_id: str, request: Request) -> d
 
 
 @get("/financial-aid/summary")
-async def get_financial_aid_summary(start_date: str | None = None, end_date: str | None = None) -> dict:
+async def get_financial_aid_summary(
+    request: Request, start_date: str | None = None, end_date: str | None = None
+) -> dict:
     """Get financial aid summary by type and date range"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        query = {"event_type": EventType.FINANCIAL_AID}
+        campus_filter = get_campus_filter(current_user)
+        query = {**campus_filter, "event_type": EventType.FINANCIAL_AID}
 
         if start_date:
             query["event_date"] = {"$gte": start_date}
@@ -755,31 +759,37 @@ async def get_financial_aid_summary(start_date: str | None = None, end_date: str
             total_amount += amount
 
         return {"total_amount": total_amount, "total_count": len(events), "by_type": totals_by_type}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting financial aid summary: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @get("/financial-aid/recipients")
-async def get_financial_aid_recipients() -> dict:
+async def get_financial_aid_recipients(request: Request) -> dict:
     """Get list of all financial aid recipients with totals"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        # Aggregate financial aid by member
+        campus_filter = get_campus_filter(current_user)
+        # Aggregate financial aid by member, scoped to the user's campus
         pipeline = [
-            {"$match": {"event_type": EventType.FINANCIAL_AID}},
+            {"$match": {**campus_filter, "event_type": EventType.FINANCIAL_AID}},
             {"$group": {"_id": "$member_id", "total_amount": {"$sum": "$aid_amount"}, "aid_count": {"$sum": 1}}},
             {"$sort": {"total_amount": -1}},
         ]
 
         recipients_data = await db.care_events.aggregate(pipeline).to_list(1000)
 
-        # Fetch member names and photos
+        # Fetch member names and photos (also campus-scoped)
         recipients = []
         for data in recipients_data:
             member_id = data["_id"]
             if member_id:
-                member = await db.members.find_one({"id": member_id}, {"_id": 0, "name": 1, "photo_url": 1})
+                member = await db.members.find_one(
+                    {"id": member_id, **campus_filter}, {"_id": 0, "name": 1, "photo_url": 1}
+                )
                 member_name = "Unknown"
                 photo_url = None
 
@@ -787,9 +797,10 @@ async def get_financial_aid_recipients() -> dict:
                     member_name = member.get("name", "Unknown")
                     photo_url = member.get("photo_url")
                 else:
-                    # Try to get name from the first event's title
+                    # Try to get name from the first event's title (also campus-scoped)
                     event = await db.care_events.find_one(
-                        {"member_id": member_id, "event_type": EventType.FINANCIAL_AID}, {"_id": 0, "title": 1}
+                        {"member_id": member_id, "event_type": EventType.FINANCIAL_AID, **campus_filter},
+                        {"_id": 0, "title": 1},
                     )
                     if event and event.get("title"):
                         title = event["title"]
@@ -807,18 +818,30 @@ async def get_financial_aid_recipients() -> dict:
                 )
 
         return recipients
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting financial aid recipients: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @get("/financial-aid/member/{member_id:str}")
-async def get_member_financial_aid(member_id: str) -> dict:
+async def get_member_financial_aid(member_id: str, request: Request) -> dict:
     """Get all financial aid given to a member"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
+        campus_filter = get_campus_filter(current_user)
+        # Verify the requested member is visible to this user's campus before returning aid.
+        member = await db.members.find_one({"id": member_id, **campus_filter}, {"_id": 0, "id": 1})
+        if not member:
+            raise HTTPException(status_code=404, detail="Member not found")
+
         aid_events = (
-            await db.care_events.find({"member_id": member_id, "event_type": EventType.FINANCIAL_AID}, {"_id": 0})
+            await db.care_events.find(
+                {"member_id": member_id, "event_type": EventType.FINANCIAL_AID, **campus_filter},
+                {"_id": 0},
+            )
             .sort([("event_date", -1), ("created_at", -1)])
             .to_list(100)
         )
@@ -831,6 +854,8 @@ async def get_member_financial_aid(member_id: str) -> dict:
             "aid_count": len(aid_events),
             "aid_history": aid_events,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting member financial aid: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))

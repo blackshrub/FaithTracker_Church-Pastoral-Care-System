@@ -38,11 +38,17 @@ interface AuthState {
 // ============================================================================
 
 const TOKEN_KEY = 'faithtracker_auth_token';
+const REFRESH_TOKEN_KEY = 'faithtracker_refresh_token';
 const USER_KEY = 'faithtracker_auth_user';
-const BIOMETRIC_EMAIL_KEY = 'faithtracker_biometric_email';
-const BIOMETRIC_PASSWORD_KEY = 'faithtracker_biometric_password';
+// Legacy keys from older app versions — deleted on initialize to scrub stored
+// plaintext passwords that used to gate biometric login.
+const LEGACY_BIOMETRIC_EMAIL_KEY = 'faithtracker_biometric_email';
+const LEGACY_BIOMETRIC_PASSWORD_KEY = 'faithtracker_biometric_password';
+// Presence of this flag means the user opted into biometric unlock. The flag
+// itself is not a secret — biometric only gatekeeps the *already-stored* JWT.
+const BIOMETRIC_ENABLED_KEY = 'faithtracker_biometric_enabled';
 
-// Track if credentials are saved (in-memory flag, set during initialize)
+// Track if biometric unlock is opted in (in-memory flag, set during initialize)
 let hasCredentialsSaved = false;
 
 // ============================================================================
@@ -61,12 +67,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email: string, password: string, campusId?: string) => {
     try {
       let access_token: string;
+      let refresh_token: string | null | undefined;
       let user: User;
 
       if (USE_MOCK_DATA) {
         // Use mock API in development
         const result = await mockLogin(email, password);
         access_token = result.token;
+        refresh_token = null;
         user = result.user;
       } else {
         // Use real API
@@ -79,11 +87,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           payload
         );
         access_token = response.data.access_token;
+        refresh_token = response.data.refresh_token;
         user = response.data.user;
       }
 
-      // Persist to secure storage
+      // Persist access + refresh tokens + user to secure storage.
+      // The refresh token is what keeps the user logged in across access-token
+      // expiries — without it we'd boot them out every 4 hours.
       await SecureStore.setItemAsync(TOKEN_KEY, access_token);
+      if (refresh_token) {
+        await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refresh_token);
+      } else {
+        // Mock mode has no refresh token — ensure we don't carry a stale one.
+        await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY).catch(() => {});
+      }
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
 
       // Update state
@@ -100,48 +117,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   /**
-   * Login using saved biometric credentials
+   * Unlock the already-stored session using biometric auth.
+   *
+   * Unlike the old implementation, this does NOT re-run a password login —
+   * it restores the JWT that was saved at last login (validated via /auth/me).
+   * If the token has expired, the caller should fall back to password entry.
    */
   loginWithBiometrics: async () => {
     try {
-      const email = await SecureStore.getItemAsync(BIOMETRIC_EMAIL_KEY);
-      const password = await SecureStore.getItemAsync(BIOMETRIC_PASSWORD_KEY);
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const userStr = await SecureStore.getItemAsync(USER_KEY);
 
-      if (!email || !password) {
+      if (!token || !userStr) {
+        // Nothing to unlock — user needs to do a full password login.
         return false;
       }
 
-      let access_token: string;
-      let user: User;
+      const user = JSON.parse(userStr) as User;
 
-      if (USE_MOCK_DATA) {
-        const result = await mockLogin(email, password);
-        access_token = result.token;
-        user = result.user;
-      } else {
-        const response = await api.post<LoginResponse>(
-          API_ENDPOINTS.AUTH.LOGIN,
-          { email, password }
-        );
-        access_token = response.data.access_token;
-        user = response.data.user;
-      }
-
-      // Persist to secure storage
-      await SecureStore.setItemAsync(TOKEN_KEY, access_token);
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
-
-      // Update state
+      // Put the token in state so the next /auth/me call carries the Bearer.
       set({
-        token: access_token,
+        token,
         user,
         isAuthenticated: true,
         isLoading: false,
       });
 
-      return true;
+      if (USE_MOCK_DATA) {
+        return true;
+      }
+
+      try {
+        // Confirm the stored token is still valid against the backend.
+        const response = await api.get<User>(API_ENDPOINTS.AUTH.ME);
+        set({ user: response.data });
+        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.data));
+        return true;
+      } catch (error) {
+        // Token expired or revoked — clear state so the UI shows the password form.
+        await get().logout();
+        return false;
+      }
     } catch (error) {
-      console.error('Biometric login failed:', error);
+      console.error('Biometric unlock failed:', error);
       return false;
     }
   },
@@ -150,12 +168,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
    * Logout and clear all auth data
    */
   logout: async () => {
+    // Best-effort revoke the refresh token server-side so a leaked token can't
+    // outlive the logout. We don't block the user if this fails (e.g. offline).
+    try {
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      if (refreshToken && !USE_MOCK_DATA) {
+        await api.post(API_ENDPOINTS.AUTH.LOGOUT, { refresh_token: refreshToken }).catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
+
     try {
       // Clear secure storage
       await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
     } catch (error) {
       console.error('Error clearing auth data:', error);
+    }
+
+    // Clear the TanStack Query cache so data cached for the previous user
+    // cannot bleed into the next user's session on this device.
+    // Lazy require to break circular dependency with queryClient ↔ api.
+    try {
+      const { clearQueryCache } = require('@/lib/queryClient');
+      clearQueryCache();
+    } catch (error) {
+      console.warn('Could not clear query cache on logout:', error);
     }
 
     // Clear state
@@ -176,9 +216,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
       const userStr = await SecureStore.getItemAsync(USER_KEY);
 
-      // Check for saved biometric credentials
-      const savedEmail = await SecureStore.getItemAsync(BIOMETRIC_EMAIL_KEY);
-      hasCredentialsSaved = !!savedEmail;
+      // One-time migration: delete any legacy plaintext-password store from
+      // older app versions. Biometric unlock now gates the JWT only.
+      await SecureStore.deleteItemAsync(LEGACY_BIOMETRIC_EMAIL_KEY).catch(() => {});
+      await SecureStore.deleteItemAsync(LEGACY_BIOMETRIC_PASSWORD_KEY).catch(() => {});
+
+      // User has opted into biometric unlock?
+      const biometricFlag = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
+      hasCredentialsSaved = biometricFlag === '1';
 
       if (token && userStr) {
         const user = JSON.parse(userStr) as User;
@@ -236,26 +281,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   /**
-   * Save credentials for biometric login
+   * Opt into biometric unlock. The email/password args are accepted for
+   * backwards compatibility with existing UI (which prompts the user to
+   * confirm their password), but they are NOT persisted — the password is
+   * intentionally discarded after the caller has used it to verify identity.
+   * Biometric unlock only gates the already-stored JWT.
    */
-  saveCredentialsForBiometric: async (email: string, password: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  saveCredentialsForBiometric: async (_email: string, _password: string) => {
     try {
-      await SecureStore.setItemAsync(BIOMETRIC_EMAIL_KEY, email);
-      await SecureStore.setItemAsync(BIOMETRIC_PASSWORD_KEY, password);
+      await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, '1');
       hasCredentialsSaved = true;
     } catch (error) {
-      console.error('Error saving biometric credentials:', error);
+      console.error('Error enabling biometric unlock:', error);
       throw error;
     }
   },
 
   /**
-   * Clear biometric credentials
+   * Disable biometric unlock.
    */
   clearBiometricCredentials: async () => {
     try {
-      await SecureStore.deleteItemAsync(BIOMETRIC_EMAIL_KEY);
-      await SecureStore.deleteItemAsync(BIOMETRIC_PASSWORD_KEY);
+      await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
+      // Also scrub legacy keys if a pre-migration install still has them.
+      await SecureStore.deleteItemAsync(LEGACY_BIOMETRIC_EMAIL_KEY).catch(() => {});
+      await SecureStore.deleteItemAsync(LEGACY_BIOMETRIC_PASSWORD_KEY).catch(() => {});
       hasCredentialsSaved = false;
     } catch (error) {
       console.error('Error clearing biometric credentials:', error);

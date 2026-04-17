@@ -121,7 +121,10 @@ class ChangeStreamWatcher:
                 logger.info("Loaded change stream resume token from DragonflyDB")
                 return token
         except Exception as e:
-            logger.debug(f"Could not load resume token: {e}")
+            # Surface at warning level: a failed resume token load causes us to
+            # restart the change stream from "now", missing any events written
+            # while we were down. Ops should see this in logs.
+            logger.warning(f"Could not load change stream resume token (resuming from now): {e}")
         return None
 
     async def _save_resume_token(self, token: dict) -> None:

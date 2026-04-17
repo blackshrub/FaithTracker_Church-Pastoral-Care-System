@@ -102,6 +102,13 @@ async def create_database_indexes():
     await db.members.create_index([("campus_id", 1), ("is_archived", 1), ("engagement_status", 1)])
     print("✅ Members engagement compound index created")
 
+    # Refresh tokens - lookup by hash (auth hot path) + TTL cleanup of expired tokens.
+    # MongoDB TTL index with expireAfterSeconds=0 deletes rows whose expires_at is in the past.
+    await db.refresh_tokens.create_index("token_hash", unique=True)
+    await db.refresh_tokens.create_index("user_id")
+    await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)
+    print("✅ Refresh tokens indexes created (with TTL cleanup)")
+
     print("\n🚀 All database indexes created successfully!")
     print("Expected performance improvements:")
     print("  - Member queries: 5-10x faster")

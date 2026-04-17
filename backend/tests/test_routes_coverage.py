@@ -575,6 +575,9 @@ class TestAuthRoutesCoverage:
 
         # Mock PIL Image
         mock_img = MagicMock()
+        mock_img.width = 400
+        mock_img.height = 400
+        mock_img.verify.return_value = None
         mock_img.convert.return_value = mock_img
         mock_img.thumbnail.return_value = None
         mock_img.save.return_value = None
@@ -624,6 +627,9 @@ class TestAuthRoutesCoverage:
         mock_file.read = AsyncMock(return_value=b"\xff\xd8\xff\xe0" + b"\x00" * 100)
 
         mock_img = MagicMock()
+        mock_img.width = 400
+        mock_img.height = 400
+        mock_img.verify.return_value = None
         mock_img.convert.return_value = mock_img
         mock_img.thumbnail.return_value = None
         mock_img.save.side_effect = OSError("No space left on device")
@@ -1000,6 +1006,9 @@ class TestMemberRoutesCoverage:
 
         # Mock PIL Image
         mock_img = MagicMock()
+        mock_img.width = 600
+        mock_img.height = 600
+        mock_img.verify.return_value = None
         mock_img.convert.return_value = mock_img
         mock_img.copy.return_value = mock_img
         mock_img.thumbnail.return_value = None
@@ -1736,82 +1745,95 @@ class TestFinancialAidRoutesCoverage:
 
     # ---- Line 684: get_financial_aid_summary - end_date only ----
 
-    async def test_get_financial_aid_summary_end_date_only(self):
+    @patch("routes.financial_aid.get_current_user", new_callable=AsyncMock)
+    async def test_get_financial_aid_summary_end_date_only(self, mock_user):
         """Covers line 684: summary with end_date but no start_date"""
         from routes.financial_aid import get_financial_aid_summary
 
+        mock_user.return_value = make_admin_user()
         mock_db.care_events.find = MagicMock(return_value=make_cursor([]))
 
-        result = await _fn(get_financial_aid_summary)(end_date="2026-12-31")
+        result = await _fn(get_financial_aid_summary)(request=make_request(), end_date="2026-12-31")
         assert result["total_amount"] == 0
         assert result["total_count"] == 0
 
     # ---- Lines 708-710: get_financial_aid_summary - generic exception -> 500 ----
 
-    async def test_get_financial_aid_summary_db_error(self):
+    @patch("routes.financial_aid.get_current_user", new_callable=AsyncMock)
+    async def test_get_financial_aid_summary_db_error(self, mock_user):
         """Covers lines 708-710: unexpected error in summary"""
         from litestar.exceptions import HTTPException
 
         from routes.financial_aid import get_financial_aid_summary
 
+        mock_user.return_value = make_admin_user()
         mock_db.care_events.find = MagicMock(side_effect=RuntimeError("DB error"))
 
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(get_financial_aid_summary)()
+            await _fn(get_financial_aid_summary)(request=make_request())
         assert exc_info.value.status_code == 500
 
     # ---- Lines 750-752: get_financial_aid_recipients - member name from event title ----
 
-    async def test_get_financial_aid_recipients_name_from_title(self):
+    @patch("routes.financial_aid.get_current_user", new_callable=AsyncMock)
+    async def test_get_financial_aid_recipients_name_from_title(self, mock_user):
         """Covers lines 750-752: fallback to event title for member name"""
         from routes.financial_aid import get_financial_aid_recipients
 
+        mock_user.return_value = make_admin_user()
         agg_data = [{"_id": TEST_MEMBER_ID, "total_amount": 100000, "aid_count": 1}]
         mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
         mock_db.members.find_one = AsyncMock(return_value=None)
         # Return event with title containing " - "
         mock_db.care_events.find_one = AsyncMock(return_value={"title": "Financial Aid - Jane Doe"})
 
-        result = await _fn(get_financial_aid_recipients)()
+        result = await _fn(get_financial_aid_recipients)(request=make_request())
         assert len(result) == 1
         assert result[0]["member_name"] == "Jane Doe"
 
-    async def test_get_financial_aid_recipients_null_member_id(self):
+    @patch("routes.financial_aid.get_current_user", new_callable=AsyncMock)
+    async def test_get_financial_aid_recipients_null_member_id(self, mock_user):
         """Covers line 735: recipient with None member_id skipped"""
         from routes.financial_aid import get_financial_aid_recipients
 
+        mock_user.return_value = make_admin_user()
         agg_data = [{"_id": None, "total_amount": 50000, "aid_count": 1}]
         mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
 
-        result = await _fn(get_financial_aid_recipients)()
+        result = await _fn(get_financial_aid_recipients)(request=make_request())
         assert len(result) == 0
 
     # ---- Lines 763-765: get_financial_aid_recipients - generic exception -> 500 ----
 
-    async def test_get_financial_aid_recipients_db_error(self):
+    @patch("routes.financial_aid.get_current_user", new_callable=AsyncMock)
+    async def test_get_financial_aid_recipients_db_error(self, mock_user):
         """Covers lines 763-765: unexpected error in recipients"""
         from litestar.exceptions import HTTPException
 
         from routes.financial_aid import get_financial_aid_recipients
 
+        mock_user.return_value = make_admin_user()
         mock_db.care_events.aggregate = MagicMock(side_effect=RuntimeError("DB error"))
 
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(get_financial_aid_recipients)()
+            await _fn(get_financial_aid_recipients)(request=make_request())
         assert exc_info.value.status_code == 500
 
     # ---- Lines 786-788: get_member_financial_aid - generic exception -> 500 ----
 
-    async def test_get_member_financial_aid_db_error(self):
+    @patch("routes.financial_aid.get_current_user", new_callable=AsyncMock)
+    async def test_get_member_financial_aid_db_error(self, mock_user):
         """Covers lines 786-788: unexpected error in member financial aid"""
         from litestar.exceptions import HTTPException
 
         from routes.financial_aid import get_member_financial_aid
 
+        mock_user.return_value = make_admin_user()
+        mock_db.members.find_one = AsyncMock(return_value={"id": TEST_MEMBER_ID})
         mock_db.care_events.find = MagicMock(side_effect=RuntimeError("DB error"))
 
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(get_member_financial_aid)(member_id=TEST_MEMBER_ID)
+            await _fn(get_member_financial_aid)(member_id=TEST_MEMBER_ID, request=make_request())
         assert exc_info.value.status_code == 500
 
     # ---- Ignore with duplicate occurrence already in list ----

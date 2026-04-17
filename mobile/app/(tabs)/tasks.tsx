@@ -23,18 +23,14 @@ import { router } from 'expo-router';
 import {
   CheckSquare,
   Cake,
-  Heart,
   Hospital,
   DollarSign,
-  Clock,
   AlertTriangle,
   User,
   Users,
   MessageCircle,
   Phone,
   UserCheck,
-  Baby,
-  Home,
 } from 'lucide-react-native';
 
 import { useDashboardReminders, useCompleteTask, useMarkMemberContacted } from '@/hooks/useDashboard';
@@ -500,6 +496,34 @@ function TasksScreen() {
     router.push(`/member/${task.member_id}`);
   }, []);
 
+  // Stable key for FlashList. Use the first available backend-assigned id;
+  // falling back to member_id+taskType is still stable across reorders,
+  // whereas including the array index would break reconciliation whenever
+  // tasks move (e.g. after completing one).
+  const renderTaskItem = useCallback(
+    ({ item: task }: { item: DashboardTask }) => (
+      <View className="mb-3">
+        <TaskCard
+          task={task}
+          onComplete={() => handleComplete(task)}
+          onMarkContact={() => handleMarkContact(task.member_id)}
+          onPress={() => handleTaskPress(task)}
+          activeTab={activeTab}
+        />
+      </View>
+    ),
+    [handleComplete, handleMarkContact, handleTaskPress, activeTab]
+  );
+
+  const taskKeyExtractor = useCallback(
+    (task: DashboardTask) =>
+      task.event_id ||
+      task.stage_id ||
+      task.schedule_id ||
+      `${getTaskType(task)}-${task.member_id}`,
+    []
+  );
+
   const tabs: { key: TabKey; label: string; count: number }[] = [
     { key: 'today', label: t('tasks.tabs.today'), count: todayTasks.length },
     { key: 'upcoming', label: t('tasks.tabs.upcoming'), count: upcomingTasks.length },
@@ -617,18 +641,8 @@ function TasksScreen() {
       ) : (
         <FlashList
           data={currentTasks}
-          renderItem={({ item: task, index }) => (
-            <View className="mb-3">
-              <TaskCard
-                task={task}
-                onComplete={() => handleComplete(task)}
-                onMarkContact={() => handleMarkContact(task.member_id)}
-                onPress={() => handleTaskPress(task)}
-                activeTab={activeTab}
-              />
-            </View>
-          )}
-          keyExtractor={(task, index) => `${getTaskType(task)}-${task.member_id}-${index}`}
+          renderItem={renderTaskItem}
+          keyExtractor={taskKeyExtractor}
           contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16 }}
           ListEmptyComponent={
             <View className="items-center py-24">

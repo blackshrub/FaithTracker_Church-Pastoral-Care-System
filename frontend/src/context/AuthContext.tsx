@@ -1,14 +1,13 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-import api, { setAuthToken, clearAuthToken } from '@/lib/api';
+import api from '@/lib/api';
 import type { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   loading: boolean;
   login: (email: string, password: string, campusId?: string | null) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<User>;
 }
 
@@ -20,29 +19,24 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
+    // Auth is now carried by an httpOnly cookie; there is no token in JS.
+    // Ask the server who we are — the cookie (if present) flows via withCredentials.
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        try {
-          setAuthToken(storedToken);
-          const response = await api.get('/auth/me');
-          if (!cancelled) {
-            setUser(response.data);
-            setToken(storedToken);
-          }
-        } catch (_error) {
-          localStorage.removeItem('token');
-          clearAuthToken();
-          if (!cancelled) setToken(null);
-        }
+      try {
+        const response = await api.get('/auth/me');
+        if (!cancelled) setUser(response.data);
+      } catch {
+        // Either no cookie or the server rejected it.
+      } finally {
+        // Clear any legacy localStorage token left over from pre-cookie versions.
+        localStorage.removeItem('token');
+        if (!cancelled) setLoading(false);
       }
-      if (!cancelled) setLoading(false);
     };
 
     checkAuth();
@@ -56,26 +50,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     password: string,
     campusId: string | null = null
   ): Promise<User> => {
+    // Backend sets an httpOnly ft_auth cookie; we only read user info from body.
     const response = await api.post('/auth/login', {
       email,
       password,
       campus_id: campusId,
     });
-    const { access_token, user: userData } = response.data;
-
-    localStorage.setItem('token', access_token);
-    setAuthToken(access_token);
+    const { user: userData } = response.data;
     setUser(userData);
-    setToken(access_token);
-
     return userData;
   };
 
-  const logout = () => {
+  const logout = async (): Promise<void> => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // If the server is unreachable we still clear local state.
+    }
+    // Drop any legacy token that may still be sitting around.
     localStorage.removeItem('token');
-    clearAuthToken();
     setUser(null);
-    setToken(null);
   };
 
   const refreshUser = async (): Promise<User> => {
@@ -85,7 +79,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

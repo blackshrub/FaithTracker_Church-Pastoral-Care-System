@@ -8,6 +8,8 @@ export const API_ENDPOINTS = {
   // Auth
   AUTH: {
     LOGIN: '/auth/login',
+    LOGOUT: '/auth/logout',
+    REFRESH: '/auth/refresh',
     ME: '/auth/me',
     REGISTER: '/auth/register',
   },

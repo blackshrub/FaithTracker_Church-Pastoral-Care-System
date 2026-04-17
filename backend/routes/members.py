@@ -457,6 +457,19 @@ async def upload_member_photo(member_id: str, request: Request, data: UploadFile
         # Process image
         try:
             image = Image.open(io.BytesIO(contents))
+            # Reject decompression bombs: a small file can claim huge dimensions.
+            # 40 MP is generous for profile photos (~larger than most DSLR output).
+            MAX_PIXELS = 40_000_000
+            if image.width * image.height > MAX_PIXELS:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image dimensions too large. Please upload an image under 40 megapixels.",
+                )
+            image.verify()
+            # verify() consumes the stream; reopen for further processing.
+            image = Image.open(io.BytesIO(contents))
+        except HTTPException:
+            raise
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
 

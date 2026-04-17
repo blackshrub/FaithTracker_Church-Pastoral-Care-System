@@ -330,16 +330,18 @@ async def undo_grief_stage(stage_id: str, request: Request) -> dict:
 
 
 @post("/grief-support/{stage_id:str}/send-reminder")
-async def send_grief_reminder(stage_id: str) -> dict:
+async def send_grief_reminder(stage_id: str, request: Request) -> dict:
     """Send WhatsApp reminder for grief stage"""
     _assert_initialized()
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.grief_support.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Grief stage not found")
 
-        member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0})
+        member = await db.members.find_one({"id": stage["member_id"], **campus_filter}, {"_id": 0})
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 

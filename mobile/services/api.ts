@@ -98,58 +98,41 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - handle auth errors and retry logic
+// Retry interceptor (runs first — before the refresh interceptor below).
+// Handles transient 5xx / timeout / rate-limit with exponential backoff.
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    try {
-      const config = error.config as RetryConfig | undefined;
+    const config = error.config as RetryConfig | undefined;
 
-      // Check if we should retry
-      if (config && (config.__retryCount || 0) < MAX_RETRIES && shouldRetry(error)) {
-        config.__retryCount = (config.__retryCount || 0) + 1;
+    if (config && (config.__retryCount || 0) < MAX_RETRIES && shouldRetry(error)) {
+      config.__retryCount = (config.__retryCount || 0) + 1;
+      const delay = getRetryDelay(config.__retryCount - 1);
+      await new Promise((resolve) => setTimeout(resolve, delay));
 
-        // Wait with exponential backoff
-        const delay = getRetryDelay(config.__retryCount - 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-
-        // Log retry attempt in development
-        if (__DEV__) {
-          console.log(
-            `[API] Retrying request (attempt ${config.__retryCount}/${MAX_RETRIES}):`,
-            config.url
-          );
-        }
-
-        return api(config);
+      if (__DEV__) {
+        console.log(
+          `[API] Retrying request (attempt ${config.__retryCount}/${MAX_RETRIES}):`,
+          config.url
+        );
       }
+      return api(config);
+    }
 
-      // Handle 401 Unauthorized
-      if (error?.response?.status === 401 && config && !(config as any)._retry) {
-        (config as any)._retry = true;
-
-        // Lazy import to break circular dependency
-        const { useAuthStore } = require('@/stores/auth');
-        const { logout } = useAuthStore.getState();
-        await logout();
-
-        // The router will handle redirect to login
-        return Promise.reject(error);
-      }
-
-      // Handle network errors
-      if (!error?.response && error?.message) {
-        console.warn('[API] Network error:', error.message);
-        // Could queue for offline sync here
-      }
-    } catch (interceptorError) {
-      // Silently handle interceptor errors to prevent crashes
-      console.warn('[API] Interceptor error:', interceptorError);
+    if (!error?.response && error?.message) {
+      console.warn('[API] Network error:', error.message);
     }
 
     return Promise.reject(error);
   }
 );
+
+// Refresh-on-401 interceptor. When the access token expires, transparently
+// swap it for a new one using the long-lived refresh token and re-run the
+// original request — the user sees nothing. Concurrent 401s share one refresh.
+// Installed LAST so it wraps the retry interceptor (runs first on response path).
+import { installRefreshInterceptor } from './authRefresh';
+installRefreshInterceptor(api);
 
 export default api;
 

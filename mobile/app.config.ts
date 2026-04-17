@@ -74,7 +74,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
   ],
   experiments: {
+    // Typed routes: makes `router.push('/member/[id]')` type-checked at build time.
     typedRoutes: true,
+    // React Compiler: auto-memoizes components + callbacks at build time.
+    // Removes the need for most useMemo/useCallback. Supported by React 19
+    // and babel-preset-expo 54+ (which pulls in babel-plugin-react-compiler).
+    reactCompiler: true,
   },
   scheme: 'faithtracker',
   extra: {

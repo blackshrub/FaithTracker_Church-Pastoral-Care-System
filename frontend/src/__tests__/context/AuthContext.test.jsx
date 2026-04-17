@@ -1,22 +1,15 @@
 /**
- * Tests for AuthContext (src/context/AuthContext.jsx)
+ * Tests for AuthContext (src/context/AuthContext.tsx)
  *
- * Covers:
- * - checkAuth with valid stored token restores user session
- * - checkAuth with invalid/expired token clears auth
- * - checkAuth cancelled on unmount (bug fix validation)
- * - login sets token, user, and localStorage
- * - logout clears token, user, and localStorage
- * - refreshUser fetches updated user data
- * - useAuth throws when used outside AuthProvider
- * - loading state transitions correctly
+ * After the httpOnly-cookie migration, the context no longer exposes a `token`
+ * and no longer reads/writes localStorage on login. Auth lives in the server
+ * cookie; the context only tracks user state.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-// Mock the api module
 vi.mock('@/lib/api', () => {
   const mockApi = {
     get: vi.fn(),
@@ -30,20 +23,15 @@ vi.mock('@/lib/api', () => {
   };
 });
 
-// Import after mocks
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import api, { setAuthToken, clearAuthToken } from '@/lib/api';
+import api from '@/lib/api';
 
-// Test component that consumes AuthContext
 function TestConsumer() {
-  const { user, token, loading, login, logout, refreshUser } = useAuth();
-
+  const { user, loading, login, logout, refreshUser } = useAuth();
   if (loading) return <div data-testid="loading">Loading...</div>;
-
   return (
     <div>
       <div data-testid="user">{user ? JSON.stringify(user) : 'null'}</div>
-      <div data-testid="token">{token || 'null'}</div>
       <button data-testid="login-btn" onClick={() => login('test@test.com', 'pass123')}>
         Login
       </button>
@@ -63,7 +51,6 @@ function TestConsumer() {
   );
 }
 
-// Helper: render with AuthProvider
 function renderWithAuth() {
   return render(
     <AuthProvider>
@@ -72,7 +59,6 @@ function renderWithAuth() {
   );
 }
 
-// Mock localStorage
 let storage = {};
 
 beforeEach(() => {
@@ -98,36 +84,25 @@ afterEach(() => {
 });
 
 describe('AuthProvider - initial loading state', () => {
-  it('shows loading state initially', () => {
-    // Store a token so checkAuth makes an API call
-    storage.token = 'some-token';
-    // Make the API call pending (never resolves during this test)
+  it('shows loading while probing /auth/me', () => {
     api.get.mockImplementation(() => new Promise(() => {}));
-
     renderWithAuth();
-
     expect(screen.getByTestId('loading')).toBeInTheDocument();
   });
 
-  it('finishes loading after checkAuth completes (no stored token)', async () => {
-    // No token in localStorage
-    localStorage.getItem.mockReturnValue(null);
-
+  it('renders unauthenticated state when /auth/me rejects', async () => {
+    api.get.mockRejectedValue({ response: { status: 401 } });
     renderWithAuth();
-
     await waitFor(() => {
       expect(screen.getByTestId('user')).toHaveTextContent('null');
     });
-
-    expect(screen.getByTestId('token')).toHaveTextContent('null');
+    expect(api.get).toHaveBeenCalledWith('/auth/me');
   });
 });
 
-describe('AuthProvider - checkAuth with stored token', () => {
-  it('restores session from valid stored token', async () => {
-    storage.token = 'valid-stored-token';
+describe('AuthProvider - checkAuth via cookie', () => {
+  it('restores session from valid auth cookie (server returns user on /auth/me)', async () => {
     const userData = { id: 'user-1', name: 'John Doe', email: 'john@test.com', role: 'pastor' };
-
     api.get.mockResolvedValue({ data: userData });
 
     renderWithAuth();
@@ -135,124 +110,54 @@ describe('AuthProvider - checkAuth with stored token', () => {
     await waitFor(() => {
       expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(userData));
     });
-
-    expect(screen.getByTestId('token')).toHaveTextContent('valid-stored-token');
-    expect(setAuthToken).toHaveBeenCalledWith('valid-stored-token');
     expect(api.get).toHaveBeenCalledWith('/auth/me');
   });
 
-  it('clears auth when stored token is invalid (API returns error)', async () => {
-    storage.token = 'expired-token';
-
-    api.get.mockRejectedValue(new Error('Token expired'));
+  it('clears any legacy localStorage token on mount', async () => {
+    storage.token = 'legacy-token';
+    api.get.mockRejectedValue({ response: { status: 401 } });
 
     renderWithAuth();
 
     await waitFor(() => {
       expect(screen.getByTestId('user')).toHaveTextContent('null');
     });
-
-    expect(screen.getByTestId('token')).toHaveTextContent('null');
     expect(localStorage.removeItem).toHaveBeenCalledWith('token');
-    expect(clearAuthToken).toHaveBeenCalled();
-  });
-
-  it('clears auth when API returns 401', async () => {
-    storage.token = 'old-token';
-
-    api.get.mockRejectedValue({ response: { status: 401 } });
-
-    renderWithAuth();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('token')).toHaveTextContent('null');
-    });
-
-    expect(localStorage.removeItem).toHaveBeenCalledWith('token');
-    expect(clearAuthToken).toHaveBeenCalled();
   });
 });
 
-describe('AuthProvider - checkAuth cancellation on unmount (bug fix)', () => {
-  it('does not update state after unmount when API resolves late', async () => {
-    storage.token = 'some-token';
-
+describe('AuthProvider - checkAuth cancellation on unmount', () => {
+  it('does not throw when API resolves after unmount', async () => {
     let resolveApi;
-    api.get.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveApi = resolve;
-        })
-    );
-
+    api.get.mockImplementation(() => new Promise((resolve) => (resolveApi = resolve)));
     const { unmount } = renderWithAuth();
-
-    // Unmount before API resolves
     unmount();
-
-    // Now resolve the API call
     await act(async () => {
-      resolveApi({ data: { id: 'user-1', name: 'Late User' } });
+      resolveApi({ data: { id: 'user-1', name: 'Late' } });
     });
-
-    // No error should have been thrown (React would warn about state update on unmounted component)
-    // The cancelled flag prevents the state update
   });
 
-  it('does not update state after unmount when API rejects late', async () => {
-    storage.token = 'some-token';
-
+  it('does not throw when API rejects after unmount', async () => {
     let rejectApi;
-    api.get.mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          rejectApi = reject;
-        })
-    );
-
+    api.get.mockImplementation(() => new Promise((_, reject) => (rejectApi = reject)));
     const { unmount } = renderWithAuth();
-
     unmount();
-
-    // Reject after unmount
     await act(async () => {
       rejectApi(new Error('Network error'));
-    });
-
-    // Should not throw
-  });
-
-  it('sets loading to false even when cancelled (no stored token)', async () => {
-    // When there's no stored token, checkAuth should set loading=false immediately
-    localStorage.getItem.mockReturnValue(null);
-
-    renderWithAuth();
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('loading')).not.toBeInTheDocument();
     });
   });
 });
 
 describe('AuthProvider - login', () => {
-  it('calls API with email and password and stores token', async () => {
-    localStorage.getItem.mockReturnValue(null);
-    api.get.mockRejectedValue(new Error('No token')); // Initial checkAuth fails
-
-    const loginResponse = {
-      access_token: 'new-jwt-token',
-      user: { id: 'u1', name: 'Test User', email: 'test@test.com', role: 'pastor' },
-    };
-    api.post.mockResolvedValue({ data: loginResponse });
+  it('calls /auth/login with credentials and sets user from response body', async () => {
+    api.get.mockRejectedValue({ response: { status: 401 } });
+    const userData = { id: 'u1', name: 'Test', email: 'test@test.com', role: 'pastor' };
+    api.post.mockResolvedValue({ data: { access_token: 'ignored', user: userData } });
 
     renderWithAuth();
+    await waitFor(() => expect(screen.getByTestId('login-btn')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByTestId('login-btn')).toBeInTheDocument();
-    });
-
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId('login-btn'));
+    await userEvent.setup().click(screen.getByTestId('login-btn'));
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/auth/login', {
@@ -262,34 +167,21 @@ describe('AuthProvider - login', () => {
       });
     });
 
-    expect(localStorage.setItem).toHaveBeenCalledWith('token', 'new-jwt-token');
-    expect(setAuthToken).toHaveBeenCalledWith('new-jwt-token');
-
     await waitFor(() => {
-      expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(loginResponse.user));
+      expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(userData));
     });
-    expect(screen.getByTestId('token')).toHaveTextContent('new-jwt-token');
+    // Must not persist token to localStorage (cookie is the source of truth now).
+    expect(localStorage.setItem).not.toHaveBeenCalledWith('token', expect.anything());
   });
 
   it('sends campus_id when provided', async () => {
-    localStorage.getItem.mockReturnValue(null);
-    api.get.mockRejectedValue(new Error('No token'));
-
-    api.post.mockResolvedValue({
-      data: {
-        access_token: 'token',
-        user: { id: 'u1', name: 'User' },
-      },
-    });
+    api.get.mockRejectedValue({ response: { status: 401 } });
+    api.post.mockResolvedValue({ data: { access_token: 't', user: { id: 'u1', name: 'U' } } });
 
     renderWithAuth();
+    await waitFor(() => expect(screen.getByTestId('login-campus-btn')).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByTestId('login-campus-btn')).toBeInTheDocument();
-    });
-
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId('login-campus-btn'));
+    await userEvent.setup().click(screen.getByTestId('login-campus-btn'));
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/auth/login', {
@@ -300,16 +192,11 @@ describe('AuthProvider - login', () => {
     });
   });
 
-  it('returns user data from login', async () => {
-    localStorage.getItem.mockReturnValue(null);
-    api.get.mockRejectedValue(new Error('No token'));
+  it('returns the user from login()', async () => {
+    api.get.mockRejectedValue({ response: { status: 401 } });
+    const userData = { id: 'u1', name: 'Test' };
+    api.post.mockResolvedValue({ data: { access_token: 't', user: userData } });
 
-    const userData = { id: 'u1', name: 'Test User' };
-    api.post.mockResolvedValue({
-      data: { access_token: 'token', user: userData },
-    });
-
-    // Use a custom test component to check return value
     let loginResult;
     function LoginTestComponent() {
       const { login, loading } = useAuth();
@@ -325,116 +212,86 @@ describe('AuthProvider - login', () => {
         </button>
       );
     }
-
     render(
       <AuthProvider>
         <LoginTestComponent />
       </AuthProvider>
     );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('login')).toBeInTheDocument();
-    });
-
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId('login'));
-
-    await waitFor(() => {
-      expect(loginResult).toEqual(userData);
-    });
+    await waitFor(() => expect(screen.getByTestId('login')).toBeInTheDocument());
+    await userEvent.setup().click(screen.getByTestId('login'));
+    await waitFor(() => expect(loginResult).toEqual(userData));
   });
 });
 
 describe('AuthProvider - logout', () => {
-  it('clears token, user, and localStorage', async () => {
-    storage.token = 'existing-token';
-    api.get.mockResolvedValue({
-      data: { id: 'u1', name: 'User' },
-    });
+  it('POSTs /auth/logout and clears user state', async () => {
+    api.get.mockResolvedValue({ data: { id: 'u1', name: 'User' } });
+    api.post.mockResolvedValue({ data: { success: true } });
 
     renderWithAuth();
-
     await waitFor(() => {
-      expect(screen.getByTestId('token')).toHaveTextContent('existing-token');
+      expect(screen.getByTestId('user')).toHaveTextContent('User');
     });
 
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId('logout-btn'));
+    await userEvent.setup().click(screen.getByTestId('logout-btn'));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/auth/logout');
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
+    });
+  });
+
+  it('still clears user state even if /auth/logout fails', async () => {
+    api.get.mockResolvedValue({ data: { id: 'u1', name: 'User' } });
+    api.post.mockRejectedValue(new Error('offline'));
+
+    renderWithAuth();
+    await waitFor(() => {
+      expect(screen.getByTestId('user')).toHaveTextContent('User');
+    });
+
+    await userEvent.setup().click(screen.getByTestId('logout-btn'));
 
     await waitFor(() => {
       expect(screen.getByTestId('user')).toHaveTextContent('null');
     });
-    expect(screen.getByTestId('token')).toHaveTextContent('null');
-    expect(localStorage.removeItem).toHaveBeenCalledWith('token');
-    expect(clearAuthToken).toHaveBeenCalled();
   });
 });
 
 describe('AuthProvider - refreshUser', () => {
-  it('fetches updated user data from /auth/me', async () => {
-    storage.token = 'valid-token';
-    const initialUser = { id: 'u1', name: 'Old Name', role: 'pastor' };
-    const updatedUser = { id: 'u1', name: 'New Name', role: 'campus_admin' };
-
-    api.get
-      .mockResolvedValueOnce({ data: initialUser }) // Initial checkAuth
-      .mockResolvedValueOnce({ data: updatedUser }); // refreshUser
+  it('fetches updated user from /auth/me', async () => {
+    const initial = { id: 'u1', name: 'Old', role: 'pastor' };
+    const updated = { id: 'u1', name: 'New', role: 'campus_admin' };
+    api.get.mockResolvedValueOnce({ data: initial }).mockResolvedValueOnce({ data: updated });
 
     renderWithAuth();
-
     await waitFor(() => {
-      expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(initialUser));
+      expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(initial));
     });
 
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId('refresh-btn'));
+    await userEvent.setup().click(screen.getByTestId('refresh-btn'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(updatedUser));
+      expect(screen.getByTestId('user')).toHaveTextContent(JSON.stringify(updated));
     });
   });
 });
 
 describe('useAuth - outside provider', () => {
-  it('throws an error when used outside AuthProvider', () => {
-    // Suppress console.error for this test
+  it('throws when used outside AuthProvider', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
     function BadComponent() {
       useAuth();
       return null;
     }
-
     expect(() => render(<BadComponent />)).toThrow('useAuth must be used within AuthProvider');
-
     consoleSpy.mockRestore();
   });
 });
 
-describe('AuthProvider - context value shape', () => {
-  it('provides all expected properties', async () => {
-    localStorage.getItem.mockReturnValue(null);
-
-    // Render the TestConsumer which exposes context values as DOM elements
-    renderWithAuth();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('user')).toBeInTheDocument();
-    });
-
-    // Verify function-type properties exist by checking buttons render (they use login/logout/refreshUser)
-    expect(screen.getByTestId('login-btn')).toBeInTheDocument();
-    expect(screen.getByTestId('logout-btn')).toBeInTheDocument();
-    expect(screen.getByTestId('refresh-btn')).toBeInTheDocument();
-    expect(screen.getByTestId('user')).toBeInTheDocument();
-    expect(screen.getByTestId('token')).toBeInTheDocument();
-  });
-});
-
 describe('AuthProvider - edge cases', () => {
-  it('handles network error during login gracefully (error propagates)', async () => {
-    localStorage.getItem.mockReturnValue(null);
-    api.get.mockRejectedValue(new Error('No token'));
+  it('propagates network errors from login', async () => {
+    api.get.mockRejectedValue({ response: { status: 401 } });
     api.post.mockRejectedValue(new Error('Network error'));
 
     let loginError;
@@ -462,33 +319,11 @@ describe('AuthProvider - edge cases', () => {
         <ErrorTestComponent />
       </AuthProvider>
     );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('login')).toBeInTheDocument();
-    });
-
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId('login'));
-
+    await waitFor(() => expect(screen.getByTestId('login')).toBeInTheDocument());
+    await userEvent.setup().click(screen.getByTestId('login'));
     await waitFor(() => {
       expect(loginError).toBeDefined();
       expect(loginError.message).toBe('Network error');
     });
-  });
-
-  it('handles empty localStorage token (falsy value)', async () => {
-    storage.token = '';
-    localStorage.getItem.mockReturnValue('');
-
-    renderWithAuth();
-
-    // Empty string is falsy, so checkAuth should skip API call
-    await waitFor(() => {
-      expect(screen.getByTestId('user')).toHaveTextContent('null');
-    });
-
-    // api.get should NOT have been called (empty string is falsy)
-    // Actually '' is falsy in JS, so the if(storedToken) check fails
-    expect(api.get).not.toHaveBeenCalled();
   });
 });

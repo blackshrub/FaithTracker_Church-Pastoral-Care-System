@@ -36,12 +36,30 @@ DEFAULT_REMINDER_DAYS_GRIEF_SUPPORT = 14
 
 # ==================== JWT TOKEN SETTINGS ====================
 JWT_TOKEN_EXPIRE_HOURS = 4  # Reduced from 24h for better security
+# Cookie name used for httpOnly web auth (defense in depth against XSS token theft).
+AUTH_COOKIE_NAME = "ft_auth"
+# Short-lived JWT issued specifically for EventSource/SSE connections where tokens
+# would otherwise have to travel in the URL. Shorter expiry reduces log-leak blast radius.
+SSE_TOKEN_EXPIRE_SECONDS = 60
+
+# ==================== REFRESH TOKENS ====================
+# Opaque random refresh tokens (NOT JWTs) stored server-side as SHA-256 hashes.
+# Using DB-backed opaque tokens (instead of refresh-JWTs) gives us revocation:
+# logout can kill a specific session; a compromised refresh token dies on rotation.
+REFRESH_TOKEN_EXPIRE_DAYS = 30
+# Cookie used by the web client for the refresh token. httpOnly + Secure in prod.
+REFRESH_COOKIE_NAME = "ft_refresh"
 
 # ==================== PAGINATION ====================
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 1000
 MAX_PAGE_NUMBER = 10000
 MAX_LIMIT = 2000
+
+# ==================== IMPORT LIMITS ====================
+# Maximum number of rows accepted in a single CSV/JSON import request.
+# Prevents memory exhaustion and extremely long-running imports.
+MAX_IMPORT_ROWS = 10000
 
 # ==================== DASHBOARD/ANALYTICS ====================
 DEFAULT_ANALYTICS_DAYS = 30

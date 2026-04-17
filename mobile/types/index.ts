@@ -34,6 +34,16 @@ export interface LoginResponse {
   access_token: string;
   token_type: string;
   user: User;
+  /** Long-lived opaque refresh token. Present on fresh login; mobile persists
+   *  it in SecureStore and exchanges it via POST /auth/refresh when the
+   *  access token expires. */
+  refresh_token?: string | null;
+}
+
+export interface RefreshResponse {
+  access_token: string;
+  token_type: string;
+  refresh_token?: string | null;
 }
 
 // ============================================================================

@@ -703,15 +703,18 @@ async def get_dashboard_stats(request: Request) -> dict:
 
 
 @get("/dashboard/upcoming")
-async def get_upcoming_events(days: int = 7) -> dict:
+async def get_upcoming_events(request: Request, days: int = 7) -> dict:
     """Get upcoming events for next N days"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
+        campus_filter = get_campus_filter(current_user)
         today = date.today()
         future_date = today + timedelta(days=days)
         pipeline = [
             {
                 "$match": {
+                    **campus_filter,
                     "event_date": {"$gte": today.isoformat(), "$lte": future_date.isoformat()},
                     "completed": False,
                 }
@@ -729,18 +732,22 @@ async def get_upcoming_events(days: int = 7) -> dict:
         ]
         events = await db.care_events.aggregate(pipeline).to_list(100)
         return events
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting upcoming events: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
 
 
 @get("/dashboard/grief-active")
-async def get_active_grief_support() -> dict:
+async def get_active_grief_support(request: Request) -> dict:
     """Get members currently in grief support timeline"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
+        campus_filter = get_campus_filter(current_user)
         pipeline = [
-            {"$match": {"completed": False}},
+            {"$match": {**campus_filter, "completed": False}},
             {"$sort": {"scheduled_date": 1}},
             {"$lookup": {"from": "members", "localField": "member_id", "foreignField": "id", "as": "member_info"}},
             {"$addFields": {"member_name": {"$arrayElemAt": ["$member_info.name", 0]}}},
@@ -766,6 +773,8 @@ async def get_active_grief_support() -> dict:
         ]
         result = await db.grief_support.aggregate(pipeline).to_list(100)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting active grief support: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))

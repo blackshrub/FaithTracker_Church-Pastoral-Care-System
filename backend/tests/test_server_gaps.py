@@ -143,6 +143,7 @@ def _mock_request(user=None, headers=None, body=None, json_data=None, scope=None
     if headers:
         h.update(headers)
     req.headers = h
+    req.cookies = {}
     req.body = AsyncMock(return_value=body or b"{}")
     req.json = AsyncMock(return_value=json_data or {})
     req.method = "GET"
@@ -2120,13 +2121,18 @@ class TestStreamActivity:
 
     @pytest.mark.asyncio
     async def test_stream_activity_with_query_token(self, setup_server, mock_db):
-        """Stream activity with JWT in query parameter."""
+        """Stream activity with SSE-scoped JWT in query parameter.
+
+        After the SSE-token hardening, query-string tokens must carry
+        ``scope="sse"``. Regular access tokens in the URL are rejected.
+        """
         user = _make_admin_user()
         request = MagicMock()
         request.headers = {}
+        request.cookies = {}
         request.scope = {"client": ("127.0.0.1", 12345)}
 
-        token = _make_token(user["id"])
+        token = _make_token(user["id"], scope="sse")
         mock_db.users.find_one = AsyncMock(return_value=user)
 
         with patch.object(setup_server, "subscribe_to_activities", new_callable=AsyncMock) as mock_sub:
@@ -2141,6 +2147,7 @@ class TestStreamActivity:
 
         request = MagicMock()
         request.headers = {}
+        request.cookies = {}
         request.scope = {"client": ("127.0.0.1", 12345)}
         mock_db.users.find_one = AsyncMock(return_value=None)
 
