@@ -392,7 +392,7 @@ import bcrypt
 import jwt
 from jwt.exceptions import InvalidTokenError as JWTError  # PyJWT (no ecdsa vulnerability)
 
-from scheduler import daily_reminder_job, start_scheduler, stop_scheduler
+from scheduler import daily_reminder_job, scheduler as aps_scheduler, start_scheduler, stop_scheduler
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -5779,6 +5779,63 @@ async def readiness_check() -> dict:
         )
 
 
+@get("/health/scheduler")
+async def scheduler_health() -> dict:
+    """
+    Scheduler liveness probe for external uptime monitors.
+
+    Returns 503 when:
+      - APScheduler is not running, OR
+      - The 'daily_reminders' job is not registered, OR
+      - No pastoral-team digest has been recorded in the last 25 hours
+        (i.e. yesterday's run also missed — earliest reliable signal of failure)
+
+    Multi-worker note: each granian worker has its own scheduler instance, so this
+    only reflects the worker that served the request. Use as a soft signal; the
+    host-level digest_heartbeat.sh provides the authoritative no-digest alert.
+    """
+    jakarta_tz = ZoneInfo("Asia/Jakarta")
+    now = datetime.now(jakarta_tz)
+
+    scheduler_running = bool(aps_scheduler.running)
+    digest_job = aps_scheduler.get_job("daily_reminders") if scheduler_running else None
+    next_run = digest_job.next_run_time.isoformat() if digest_job and digest_job.next_run_time else None
+
+    last_digest_doc = await db.notification_logs.find_one(
+        {"pastoral_team_user_id": {"$exists": True}, "status": "sent"},
+        sort=[("created_at", -1)],
+        projection={"_id": 0, "created_at": 1},
+    )
+    last_sent_at = last_digest_doc.get("created_at") if last_digest_doc else None
+    if last_sent_at and last_sent_at.tzinfo is None:
+        last_sent_at = last_sent_at.replace(tzinfo=UTC)
+
+    hours_since_digest = (now - last_sent_at.astimezone(jakarta_tz)).total_seconds() / 3600 if last_sent_at else None
+
+    payload = {
+        "scheduler_running": scheduler_running,
+        "daily_reminders_registered": digest_job is not None,
+        "next_run_time": next_run,
+        "last_digest_sent_at": last_sent_at.isoformat() if last_sent_at else None,
+        "hours_since_last_digest": round(hours_since_digest, 2) if hours_since_digest is not None else None,
+        "registered_jobs": [j.id for j in aps_scheduler.get_jobs()] if scheduler_running else [],
+        "timestamp": now.isoformat(),
+    }
+
+    unhealthy = (
+        not scheduler_running
+        or digest_job is None
+        or hours_since_digest is None
+        or hours_since_digest > 25
+    )
+    if unhealthy:
+        payload["status"] = "unhealthy"
+        raise HTTPException(status_code=503, detail=payload)
+
+    payload["status"] = "healthy"
+    return payload
+
+
 # ==================== LITESTAR APP CONFIGURATION ====================
 
 # CORS Configuration for subdomain architecture
@@ -6370,6 +6427,7 @@ route_handlers = [
     # Health checks
     health_check,
     readiness_check,
+    scheduler_health,
     # Campus endpoints (from routes/campus.py)
     *campus_route_handlers,
     # Auth endpoints (from routes/auth.py)
