@@ -5919,10 +5919,18 @@ async def on_startup() -> None:
                     )
                     await db.users.insert_one(to_mongo_doc(default_admin))
                     logger.info(f"Default full admin user created: {admin_email}")
+    except Exception as e:
+        logger.error(f"Error checking/creating default admin: {e!s}")
 
+    # Always start the scheduler, even if other startup steps failed.
+    # Why: APScheduler registration is in-memory and must not be skipped because of a
+    # transient DB hiccup during boot — a 2026-04-29 mongo race left scheduler unregistered
+    # for 10 days, silently dropping the daily 06:00 WhatsApp digest. The scheduler itself
+    # tolerates DB unavailability via misfire_grace_time and check_missed_digest catch-up.
+    try:
         start_scheduler()
     except Exception as e:
-        logger.error(f"Error in startup: {e!s}")
+        logger.error(f"Error starting scheduler: {e!s}")
 
     # Start MongoDB Change Stream watcher for real-time SSE broadcasting.
     # This watches the activity_logs collection for new inserts and publishes
