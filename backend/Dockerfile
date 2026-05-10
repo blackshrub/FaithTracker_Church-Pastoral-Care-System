@@ -36,8 +36,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Use Aliyun PyPI mirror for Indonesia (300x faster than default PyPI)
 # Default PyPI routes through US->Europe->Indonesia at ~45 KB/s
 # Aliyun routes directly to Asia at ~13 MB/s
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
-    PIP_TRUSTED_HOST=mirrors.aliyun.com
+# NOTE: PIP_TRUSTED_HOST removed — the index URL is HTTPS so cert
+# verification is on by default. PIP_TRUSTED_HOST disables cert
+# checking and would silently accept downgraded HTTP / unsigned packages.
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 # Copy requirements first for better caching
 COPY requirements.txt .

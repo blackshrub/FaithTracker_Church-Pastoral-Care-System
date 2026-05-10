@@ -78,7 +78,11 @@ class ImageService:
 
             output_path = output_path_base.parent / f"{output_path_base.stem}_{size_name}.jpg"
 
-            resized.save(output_path, "JPEG", quality=quality, optimize=True, progressive=True)
+                        # exif=b"" strips EXIF metadata. Phone-shot member photos
+            # routinely contain GPS coordinates of pastoral visits, camera
+            # serial numbers, and timestamps — all PII that has no business
+            # leaving the photographer's device.
+            resized.save(output_path, "JPEG", quality=quality, optimize=True, progressive=True, exif=b"")
 
             results[size_name] = str(output_path.relative_to(UPLOAD_DIR))
 
@@ -95,7 +99,8 @@ class ImageService:
 
         img.thumbnail(size, Image.Resampling.LANCZOS)
 
-        img.save(output_path, "JPEG", quality=quality, optimize=True, progressive=True)
+        # See _process_image_sync — strip EXIF (GPS, camera info) on save.
+        img.save(output_path, "JPEG", quality=quality, optimize=True, progressive=True, exif=b"")
 
         return str(output_path.relative_to(UPLOAD_DIR))
 

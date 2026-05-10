@@ -27,9 +27,13 @@ server {
         allow all;
     }
 
-    # Redirect all other traffic to HTTPS
+    # Redirect all other traffic to HTTPS.
+    # 308 (Permanent Redirect) preserves the HTTP method + body; 301
+    # silently downgraded POST/PUT/PATCH to GET and dropped the request
+    # body, which is dangerous for an API that handles care event
+    # creation, financial aid submissions, and external sync webhooks.
     location / {
-        return 301 https://$host$request_uri;
+        return 308 https://$host$request_uri;
     }
 }
 

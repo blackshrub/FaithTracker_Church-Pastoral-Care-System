@@ -6646,10 +6646,21 @@ app = Litestar(
         DefineMiddleware(RequestSizeLimitMiddleware),  # Limit request body size
         rate_limit_config.middleware,  # Rate limiting
     ],
-    openapi_config=OpenAPIConfig(
-        title="FaithTracker API",
-        version="1.0.0",
-        description="Pastoral Care Management System API",
+    # OpenAPI docs are off in production — they enumerate every endpoint,
+    # parameter, and response shape, which is significant recon for an
+    # attacker. This is a private pastoral-care API; the docs serve no
+    # public-facing purpose. Set OPENAPI_ENABLED=true to override per-env.
+    openapi_config=(
+        OpenAPIConfig(
+            title="FaithTracker API",
+            version="1.0.0",
+            description="Pastoral Care Management System API",
+        )
+        if (
+            os.environ.get("ENVIRONMENT", "development") != "production"
+            or os.environ.get("OPENAPI_ENABLED", "").lower() == "true"
+        )
+        else None
     ),
     type_encoders={
         datetime: lambda dt: dt.isoformat(),
