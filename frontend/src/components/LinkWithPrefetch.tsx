@@ -26,6 +26,25 @@ import { usePrefetch } from '@/hooks/usePrefetch';
 const supportsViewTransitions =
   typeof document !== 'undefined' && 'startViewTransition' in document;
 
+/**
+ * Live check for hover-capable input. Read on every prefetch attempt so a
+ * user who connects/disconnects an external mouse mid-session gets the
+ * right behavior (a module-level constant would freeze whatever was true
+ * at import time). Also respects Save-Data per-call.
+ */
+function shouldSkipHoverPrefetch(): boolean {
+  if (typeof window === 'undefined') return true;
+  // Touch / coarse-pointer devices fire onMouseEnter as a synthesized
+  // pointer event after tap, so prefetch would race the navigation
+  // itself and waste mobile bandwidth.
+  if (window.matchMedia?.('(hover: none)').matches) return true;
+  if (window.matchMedia?.('(pointer: coarse)').matches) return true;
+  // Honor Save-Data when the browser exposes it (Chromium-based).
+  const conn = (navigator as unknown as { connection?: { saveData?: boolean } }).connection;
+  if (conn?.saveData) return true;
+  return false;
+}
+
 type PrefetchType = 'member' | 'dashboard' | 'membersList';
 
 interface LinkWithPrefetchProps extends Omit<LinkProps, 'to'> {
@@ -53,6 +72,7 @@ export function LinkWithPrefetch({
   const { prefetchMember, prefetchDashboard, prefetchMembersList, cancelPrefetch } = usePrefetch();
 
   const handleMouseEnter = useCallback(() => {
+    if (shouldSkipHoverPrefetch()) return;
     switch (prefetchType) {
       case 'member':
         if (prefetchId) prefetchMember(prefetchId);

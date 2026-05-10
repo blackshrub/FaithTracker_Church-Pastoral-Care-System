@@ -80,6 +80,15 @@ export function useActivityStream({
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const connectRef = useRef<(() => void | Promise<void>) | null>(null);
+  // onActivity often arrives as an inline arrow function from the parent
+  // (e.g. LiveActivityFeed). Including it in connect's dep array would
+  // change `connect` identity on every parent render → tear down and
+  // re-establish the EventSource (plus a /auth/sse-token round-trip)
+  // every render. Capture into a ref so connect stays stable.
+  const onActivityRef = useRef(onActivity);
+  useEffect(() => {
+    onActivityRef.current = onActivity;
+  }, [onActivity]);
   // Tracks whether the hook is still mounted. Guards against:
   //   1. SSE-token fetch resolving after unmount (would open zombie EventSource)
   //   2. onerror reconnect timer firing post-unmount (would call setState on
@@ -172,15 +181,17 @@ export function useActivityStream({
           return updated;
         });
 
-        // Call callback if provided
-        if (onActivity) {
-          onActivity(activity);
+        // Call callback via ref so a parent re-render with a new inline
+        // arrow function doesn't trigger a reconnect storm.
+        const cb = onActivityRef.current;
+        if (cb) {
+          cb(activity);
         }
       });
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [enabled, user, onActivity, maxActivities]);
+  }, [enabled, user, maxActivities]);
 
   /**
    * Disconnect from SSE endpoint

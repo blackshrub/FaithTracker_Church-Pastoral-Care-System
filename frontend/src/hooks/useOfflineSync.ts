@@ -156,9 +156,13 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     }
   }, [isOnline, queryClient]);
 
-  // Auto-sync when coming back online
+  // Auto-sync when coming back online.
+  // Gate by isSyncingRef so the queue's notify()-on-every-status-update
+  // doesn't re-fire this effect for each operation processed mid-sync
+  // (the effect would no-op via the same ref, but the cycle still
+  // burned thousands of renders per sync on large queues).
   useEffect(() => {
-    if (isOnline && pendingCount > 0) {
+    if (isOnline && pendingCount > 0 && !isSyncingRef.current) {
       sync();
     }
   }, [isOnline, pendingCount, sync]);

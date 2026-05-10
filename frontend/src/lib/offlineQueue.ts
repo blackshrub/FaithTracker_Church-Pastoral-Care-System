@@ -334,7 +334,12 @@ class OfflineQueue {
    */
   private async executeOperation(operation: QueuedOperation): Promise<unknown> {
     const { endpoint, method, payload } = operation;
-    const apiBaseUrl: string = import.meta.env.VITE_API_URL || '/api';
+    // VITE_BACKEND_URL is the canonical env var across the codebase
+    // (see CLAUDE.md / api.ts). Previously read VITE_API_URL — a name
+    // that doesn't exist in any .env file — so auto-sync replays from
+    // the online listener fell back to '/api' on the same origin and
+    // 404'd silently in the typical subdomain deploy.
+    const apiBaseUrl: string = import.meta.env.VITE_BACKEND_URL || '/api';
 
     // Auth rides on the httpOnly ft_auth cookie; credentials: 'include' makes
     // fetch attach it automatically for both same-origin and CORS requests.

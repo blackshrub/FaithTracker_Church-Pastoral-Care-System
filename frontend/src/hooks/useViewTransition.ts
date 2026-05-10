@@ -24,10 +24,14 @@ const supportsViewTransitions =
   typeof document !== 'undefined' && 'startViewTransition' in document;
 
 /**
- * Check if user prefers reduced motion
+ * Live check for prefers-reduced-motion. Read on every transition attempt
+ * (not at module load) so users who toggle the OS accessibility setting
+ * mid-session — or whose system theme changes — get the right behavior.
  */
-const prefersReducedMotion =
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+}
 
 export interface UseViewTransitionReturn {
   navigate: (to: string, options?: NavigateOptions) => ViewTransition | undefined;
@@ -49,7 +53,7 @@ export function useViewTransition(): UseViewTransitionReturn {
   const navigate = useCallback(
     (to: string, options: NavigateOptions = {}): ViewTransition | undefined => {
       // Skip transitions if not supported or user prefers reduced motion
-      if (!supportsViewTransitions || prefersReducedMotion) {
+      if (!supportsViewTransitions || prefersReducedMotion()) {
         routerNavigate(to, options);
         return;
       }
@@ -75,7 +79,7 @@ export function useViewTransition(): UseViewTransitionReturn {
    * Navigate back with View Transition
    */
   const goBack = useCallback((): ViewTransition | undefined => {
-    if (!supportsViewTransitions || prefersReducedMotion) {
+    if (!supportsViewTransitions || prefersReducedMotion()) {
       routerNavigate(-1);
       return;
     }
@@ -106,7 +110,7 @@ export function useViewTransition(): UseViewTransitionReturn {
  * Useful for non-navigation state changes that should animate
  */
 export function withViewTransition(updateCallback: () => void): ViewTransition | undefined {
-  if (!supportsViewTransitions || prefersReducedMotion) {
+  if (!supportsViewTransitions || prefersReducedMotion()) {
     updateCallback();
     return undefined;
   }

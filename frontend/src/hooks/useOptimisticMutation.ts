@@ -271,8 +271,12 @@ export function useCreateEventOptimistic() {
         ['careEvents', data.member_id],
         (old) => {
           if (!old) return [tempEvent];
-          const events = Array.isArray(old) ? old : old.items || [];
-          return [tempEvent, ...events];
+          if (Array.isArray(old)) return [tempEvent, ...old];
+          // Preserve the {items: [...]} wrapper shape so downstream consumers
+          // that read `.items` keep working. Previously this branch
+          // collapsed to a flat array and broke list rendering on the
+          // wrapped shape.
+          return { ...old, items: [tempEvent, ...(old.items || [])] };
         }
       );
 
@@ -287,13 +291,20 @@ export function useCreateEventOptimistic() {
     },
 
     onSuccess: (response, data, context) => {
-      // Replace temp event with real event from server
+      // Replace temp event with real event from server, preserving the
+      // wrapper shape if the cache holds {items: [...]} (consumers that
+      // read .items would otherwise crash on the unwrapped array).
       queryClient.setQueryData<CareEvent[] | { items?: CareEvent[] }>(
         ['careEvents', data.member_id],
         (old) => {
           if (!old) return [response.data];
-          const events = Array.isArray(old) ? old : old.items || [];
-          return events.map((e) => (e.id === context?.tempEvent.id ? response.data : e));
+          if (Array.isArray(old)) {
+            return old.map((e) => (e.id === context?.tempEvent.id ? response.data : e));
+          }
+          const items = (old.items || []).map((e) =>
+            e.id === context?.tempEvent.id ? response.data : e
+          );
+          return { ...old, items };
         }
       );
     },
