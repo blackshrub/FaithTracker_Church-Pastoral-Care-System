@@ -7,6 +7,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
+
 from litestar import Request, delete, get, post
 from litestar.exceptions import HTTPException
 from litestar.params import Parameter
@@ -572,7 +574,9 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
                 else:
                     next_date = date(next_year, next_month, min(day_of_month, 31))
         elif schedule["frequency"] == "annually":
-            next_date = current_date.replace(year=current_date.year + 1)
+            # relativedelta clamps Feb 29 → Feb 28 in non-leap years (date.replace
+            # would raise ValueError and trap the schedule in a 500 forever).
+            next_date = current_date + relativedelta(years=+1)
         else:
             next_date = current_date
 
@@ -676,7 +680,9 @@ async def ignore_financial_aid_schedule(schedule_id: str, request: Request) -> d
                 else:
                     next_date = date(next_year, next_month, min(day_of_month, 31))
         elif schedule["frequency"] == "annually":
-            next_date = current_date.replace(year=current_date.year + 1)
+            # relativedelta clamps Feb 29 → Feb 28 in non-leap years (date.replace
+            # would raise ValueError and trap the schedule in a 500 forever).
+            next_date = current_date + relativedelta(years=+1)
         else:
             next_date = current_date
 
