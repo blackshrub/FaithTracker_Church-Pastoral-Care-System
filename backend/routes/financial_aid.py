@@ -17,7 +17,7 @@ from constants import MAX_LIMIT, MAX_PAGE_NUMBER
 from dependencies import get_campus_filter, get_current_user, get_db, safe_error_detail
 from enums import ActivityActionType, EventType
 from models import FinancialAidSchedule, FinancialAidScheduleCreate, generate_uuid, to_mongo_doc
-from utils import calculate_engagement_status
+from utils import calculate_engagement_status, escape_regex
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,16 @@ async def list_aid_schedules(
             query["is_active"] = True
 
         skip = (page - 1) * limit
-        schedules = await db.financial_aid_schedules.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+        # Stable sort required for deterministic pagination — without it,
+        # MongoDB's natural order can shuffle between pages when records
+        # are inserted/deleted concurrently, silently dropping records.
+        schedules = (
+            await db.financial_aid_schedules.find(query, {"_id": 0})
+            .sort([("next_occurrence", 1), ("id", 1)])
+            .skip(skip)
+            .limit(limit)
+            .to_list(limit)
+        )
         return schedules
     except Exception as e:
         logger.error(f"Error listing aid schedules: {e!s}")
@@ -232,13 +241,17 @@ async def remove_ignored_occurrence(schedule_id: str, occurrence_date: str, requ
             {"id": schedule_id}, {"$set": {"ignored_occurrences": ignored_list, "updated_at": datetime.now(UTC)}}
         )
 
-        # Delete activity log for this ignore action
+        # Delete activity log for this ignore action.
+        # occurrence_date is a path parameter — escape before passing into
+        # $regex (a malicious caller could craft a regex like ".*" and
+        # delete unrelated logs).
         await db.activity_logs.delete_many(
             {
                 "member_id": schedule["member_id"],
+                "campus_id": schedule["campus_id"],
                 "event_type": "financial_aid",
                 "action_type": "ignore_task",
-                "notes": {"$regex": occurrence_date, "$options": "i"},
+                "notes": {"$regex": escape_regex(occurrence_date), "$options": "i"},
             }
         )
 
@@ -260,7 +273,13 @@ async def clear_all_ignored_occurrences(schedule_id: str, request: Request) -> d
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        # Scope by campus to prevent cross-campus IDOR — without this, any
+        # authenticated user could mutate another campus's schedule by guessing
+        # a UUID. Same pattern in delete/stop/mark-distributed/ignore below.
+        campus_filter = get_campus_filter(current_user)
+        schedule = await db.financial_aid_schedules.find_one(
+            {"id": schedule_id, **campus_filter}, {"_id": 0}
+        )
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
@@ -300,25 +319,35 @@ async def clear_all_ignored_occurrences(schedule_id: str, request: Request) -> d
 async def delete_aid_schedule(schedule_id: str, request: Request) -> dict:
     """Delete a financial aid schedule and related activity logs"""
     _assert_initialized()
+    current_user = await get_current_user(request)
     db = get_db()
     try:
+        campus_filter = get_campus_filter(current_user)
         # Get schedule details before deleting
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        schedule = await db.financial_aid_schedules.find_one(
+            {"id": schedule_id, **campus_filter}, {"_id": 0}
+        )
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
-        # Delete activity logs related to this schedule
-        # Match by member_id and notes containing aid_type or "financial aid"
+        # Delete activity logs related to this schedule.
+        # aid_type comes from user input at schedule-create time so it MUST
+        # be regex-escaped — otherwise a value like ".*" or "(a+)+" would
+        # delete unrelated activity_logs (or cause ReDoS).
+        aid_type_pattern = escape_regex(schedule.get("aid_type") or "financial aid")
         await db.activity_logs.delete_many(
             {
                 "member_id": schedule["member_id"],
+                "campus_id": schedule["campus_id"],
                 "event_type": "financial_aid",
-                "notes": {"$regex": schedule.get("aid_type", "financial aid"), "$options": "i"},
+                "notes": {"$regex": aid_type_pattern, "$options": "i"},
             }
         )
 
-        # Delete the schedule
-        result = await db.financial_aid_schedules.delete_one({"id": schedule_id})
+        # Delete the schedule (campus-scoped delete prevents TOCTOU)
+        result = await db.financial_aid_schedules.delete_one(
+            {"id": schedule_id, **campus_filter}
+        )
 
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Schedule not found")
@@ -341,8 +370,11 @@ async def stop_aid_schedule(schedule_id: str, request: Request) -> dict:
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        # Get schedule first
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        # Get schedule first (campus-scoped to prevent IDOR)
+        campus_filter = get_campus_filter(current_user)
+        schedule = await db.financial_aid_schedules.find_one(
+            {"id": schedule_id, **campus_filter}, {"_id": 0}
+        )
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
@@ -393,13 +425,25 @@ async def stop_aid_schedule(schedule_id: str, request: Request) -> dict:
 @get("/financial-aid-schedules/member/{member_id:str}")
 async def get_member_aid_schedules(member_id: str, request: Request) -> dict:
     """Get financial aid schedules for specific member (active + stopped with history)"""
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        logger.info(f"[GET AID SCHEDULES] Querying for member_id={member_id}")
+        # Verify the target member is visible to this caller's campus before
+        # returning ANY of their financial aid history. Without this check, a
+        # logged-in user could read any member's aid history by guessing
+        # member_id.
+        campus_filter = get_campus_filter(current_user)
+        member_visible = await db.members.find_one(
+            {"id": member_id, **campus_filter}, {"_id": 0, "id": 1}
+        )
+        if not member_visible:
+            raise HTTPException(status_code=404, detail="Member not found")
 
-        # Get ALL schedules for this member (don't limit to 20)
+        # Get ALL schedules for this member, scoped by campus.
         schedules = (
-            await db.financial_aid_schedules.find({"member_id": member_id}, {"_id": 0})
+            await db.financial_aid_schedules.find(
+                {"member_id": member_id, **campus_filter}, {"_id": 0}
+            )
             .sort("next_occurrence", 1)
             .to_list(MAX_LIMIT)
         )
@@ -424,6 +468,8 @@ async def get_member_aid_schedules(member_id: str, request: Request) -> dict:
                 )
 
         return filtered
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting member aid schedules: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -475,8 +521,11 @@ async def mark_aid_distributed(schedule_id: str, request: Request) -> dict:
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        # Get the schedule
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        # Get the schedule (campus-scoped to prevent IDOR)
+        campus_filter = get_campus_filter(current_user)
+        schedule = await db.financial_aid_schedules.find_one(
+            {"id": schedule_id, **campus_filter}, {"_id": 0}
+        )
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
@@ -623,7 +672,10 @@ async def ignore_financial_aid_schedule(schedule_id: str, request: Request) -> d
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        schedule = await db.financial_aid_schedules.find_one({"id": schedule_id}, {"_id": 0})
+        campus_filter = get_campus_filter(current_user)
+        schedule = await db.financial_aid_schedules.find_one(
+            {"id": schedule_id, **campus_filter}, {"_id": 0}
+        )
         if not schedule:
             raise HTTPException(status_code=404, detail="Financial aid schedule not found")
 
