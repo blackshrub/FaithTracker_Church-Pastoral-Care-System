@@ -769,6 +769,25 @@ async def delete_user(user_id: str, request: Request) -> dict:
         if user_id == current_admin["id"]:
             raise HTTPException(status_code=400, detail="Cannot delete your own account")
 
+        # Look up the target so campus-scoped admins cannot delete users
+        # outside their campus. full_admin is global and skips this check.
+        target = await db.users.find_one({"id": user_id}, {"_id": 0, "campus_id": 1, "role": 1})
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if current_admin.get("role") == UserRole.CAMPUS_ADMIN.value:
+            if target.get("campus_id") != current_admin.get("campus_id"):
+                raise HTTPException(
+                    status_code=HTTP_403_FORBIDDEN,
+                    detail="Cannot delete users outside your campus",
+                )
+            # campus_admin cannot delete a full_admin (privilege protection).
+            if target.get("role") == UserRole.FULL_ADMIN.value:
+                raise HTTPException(
+                    status_code=HTTP_403_FORBIDDEN,
+                    detail="Cannot delete a full_admin",
+                )
+
         result = await db.users.delete_one({"id": user_id})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="User not found")

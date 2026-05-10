@@ -160,20 +160,46 @@ def init_redis(redis_client):
     _redis = redis_client
 
 
+def _parse_trusted_proxies() -> set[str]:
+    """Parse TRUSTED_PROXIES env var into a set of IPs.
+
+    Default in production: containers behind Angie are reached through the
+    Docker bridge network, so the immediate peer is always Angie. Operators
+    can add the explicit Angie container IP / additional ingress addresses
+    via comma-separated TRUSTED_PROXIES.
+    """
+    raw = os.environ.get("TRUSTED_PROXIES", "")
+    proxies = {p.strip() for p in raw.split(",") if p.strip()}
+    # In development, accept localhost so curl --header tests work.
+    if os.environ.get("ENVIRONMENT", "development") != "production":
+        proxies.update({"127.0.0.1", "::1"})
+    return proxies
+
+
+_TRUSTED_PROXIES = _parse_trusted_proxies()
+
+
 def get_client_ip(request: Request) -> str:
-    """Extract client IP from request, handling proxied requests"""
-    # Check X-Forwarded-For header (from Angie/reverse proxy)
-    forwarded_for = request.headers.get("x-forwarded-for", "")
-    if forwarded_for:
-        # Take the first IP (original client)
-        return forwarded_for.split(",")[0].strip()
-    # Check X-Real-IP header
-    real_ip = request.headers.get("x-real-ip", "")
-    if real_ip:
-        return real_ip.strip()
-    # Fallback to direct connection IP
+    """Extract the original client IP, only honoring proxy headers if the
+    immediate peer is a known/trusted proxy.
+
+    Without this trust check, an attacker can spoof X-Forwarded-For per
+    request to bypass rate-limit / lockout keys that are scoped by IP.
+    """
     client = request.scope.get("client")
-    return client[0] if client else "unknown"
+    peer_ip = client[0] if client else None
+
+    # Only trust forwarded headers when the request came directly from a
+    # known reverse proxy. Otherwise the peer IS the client.
+    if peer_ip and peer_ip in _TRUSTED_PROXIES:
+        forwarded_for = request.headers.get("x-forwarded-for", "")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        real_ip = request.headers.get("x-real-ip", "")
+        if real_ip:
+            return real_ip.strip()
+
+    return peer_ip or "unknown"
 
 
 async def check_login_rate_limit(ip: str, email: str) -> tuple[bool, str | None]:
