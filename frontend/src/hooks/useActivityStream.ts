@@ -80,12 +80,18 @@ export function useActivityStream({
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const connectRef = useRef<(() => void | Promise<void>) | null>(null);
+  // Tracks whether the hook is still mounted. Guards against:
+  //   1. SSE-token fetch resolving after unmount (would open zombie EventSource)
+  //   2. onerror reconnect timer firing post-unmount (would call setState on
+  //      unmounted component and re-open a connection with no owner)
+  const unmountedRef = useRef(false);
 
   /**
    * Connect to SSE endpoint
    */
   const connect = useCallback(async () => {
     if (!user || !enabled) return;
+    if (unmountedRef.current) return;
 
     // Keep ref in sync so reconnect timer always calls latest version
     connectRef.current = connect;
@@ -106,25 +112,33 @@ export function useActivityStream({
       // server/proxy logs its useful lifetime is tiny and it cannot be
       // replayed against regular API endpoints.
       const tokenResponse = await api.post<{ token: string }>('/auth/sse-token');
+      // Re-check after the async hop — component may have unmounted while we
+      // were waiting for the token. Without this, EventSource leaks.
+      if (unmountedRef.current) return;
       const sseToken = tokenResponse.data.token;
       const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(sseToken)}`;
       const eventSource = new EventSource(url, { withCredentials: true });
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
+        if (unmountedRef.current) return;
         setIsConnected(true);
         setError(null);
         reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
       };
 
       eventSource.onerror = () => {
-        setIsConnected(false);
         eventSource.close();
+        if (unmountedRef.current) return;
+        setIsConnected(false);
 
         // Schedule reconnect with exponential backoff using stable ref
         const delay = reconnectDelayRef.current;
         reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_DELAY);
-        reconnectTimeoutRef.current = setTimeout(() => connectRef.current?.(), delay);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (unmountedRef.current) return;
+          void connectRef.current?.();
+        }, delay);
       };
 
       // Handle heartbeat (keep-alive)
@@ -180,6 +194,9 @@ export function useActivityStream({
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
+    // Drop the connect ref so any in-flight onerror callback closure that
+    // somehow survives cannot resurrect a connection.
+    connectRef.current = null;
     setIsConnected(false);
   }, []);
 
@@ -232,12 +249,18 @@ export function useActivityStream({
     };
   }, [enabled, user, maxActivities]);
 
-  // Connect on mount, disconnect on unmount
+  // Connect on mount, disconnect on unmount.
+  // Reset unmountedRef on (re)mount so StrictMode's mount-unmount-mount cycle
+  // doesn't leave the hook permanently disabled.
   useEffect(() => {
+    unmountedRef.current = false;
     if (enabled && user) {
       void connect();
     }
-    return () => disconnect();
+    return () => {
+      unmountedRef.current = true;
+      disconnect();
+    };
   }, [connect, disconnect, enabled, user]);
 
   return {
