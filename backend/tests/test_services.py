@@ -541,9 +541,12 @@ class TestCacheServiceRateLimit:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_incr_rate_limit_returns_count(self, cache_service, mock_redis):
-        """incr_rate_limit should return the incremented count."""
-        pipe = mock_redis.pipeline.return_value
-        pipe.execute.return_value = [5]
+        """incr_rate_limit should return the incremented count.
+
+        Round-3 replaced the non-atomic pipeline (incr+expire) with a
+        single Lua eval to close a counter-leak race.
+        """
+        mock_redis.eval = AsyncMock(return_value=5)
         count = await cache_service.incr_rate_limit("login:user@test.com")
         assert count == 5
 
@@ -553,8 +556,7 @@ class TestCacheServiceRateLimit:
         """Redis errors should return 0 (fail open)."""
         import redis.asyncio as redis
 
-        pipe = mock_redis.pipeline.return_value
-        pipe.execute.side_effect = redis.RedisError("Pipeline error")
+        mock_redis.eval = AsyncMock(side_effect=redis.RedisError("eval error"))
         count = await cache_service.incr_rate_limit("login:user@test.com")
         assert count == 0
 

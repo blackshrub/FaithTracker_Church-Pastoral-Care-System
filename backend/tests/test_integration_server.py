@@ -678,10 +678,18 @@ class TestUserManagement:
     def test_update_user(self, client, db):
         """Full admin can update a user."""
         admin = _make_admin_user()
+        # Round-3 hardening adds a target lookup before the privilege
+        # guards (so we can refuse self-demote / cross-admin role edits).
+        # That extra find_one runs between the auth lookup and the
+        # post-update fetch — three calls total. We mock the target as a
+        # pastor (non-full_admin) so the "no peer-admin role edit" guard
+        # doesn't fire on a benign name-only update.
+        target = _make_pastor_user()
         db.users.find_one = AsyncMock(
             side_effect=[
-                admin,  # auth
-                admin,  # updated user
+                admin,   # auth (get_current_user)
+                target,  # update_user target lookup
+                admin,   # updated user fetch (returned to caller)
             ]
         )
         db.users.update_one = AsyncMock(return_value=_make_update_result())
