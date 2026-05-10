@@ -125,6 +125,7 @@ export const Reminders = () => {
   const [upcomingBirthdays, setUpcomingBirthdays] = useState([]);
   const [financialAidDue, setFinancialAidDue] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [engagementSettings, setEngagementSettings] = useState({
     atRiskDays: 60,
     inactiveDays: 90,
@@ -250,8 +251,11 @@ export const Reminders = () => {
       setFinancialAidDue(aidDueRes.data);
       setAtRiskMembers(atRisk);
       setDisconnectedMembers(disconnected);
-    } catch (_error) {
-      // Error handled silently - data will be empty
+      setLoadError(null);
+    } catch (error) {
+      const detail = error.response?.data?.detail || error.message;
+      setLoadError(detail);
+      toast.error('Failed to load reminders: ' + detail);
     } finally {
       setLoading(false);
     }
@@ -271,6 +275,24 @@ export const Reminders = () => {
         <h1 className="text-3xl font-playfair font-bold">Pastoral Care Reminders</h1>
         <p className="text-muted-foreground mt-1">{totalTasks} tasks need your attention today</p>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-medium">Some reminders failed to load</p>
+            <p className="mt-1 text-red-700">{loadError}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 border-red-300 text-red-700 hover:bg-red-100"
+              onClick={() => loadReminders()}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="today" className="w-full">
         <TabsList className="grid w-full grid-cols-6">
