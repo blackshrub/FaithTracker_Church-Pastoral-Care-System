@@ -19,8 +19,9 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 
 // Mock EventSource
 class MockEventSource {
-  constructor(url) {
+  constructor(url, options) {
     this.url = url;
+    this.options = options;
     this.readyState = 0; // CONNECTING
     this.onopen = null;
     this.onerror = null;
@@ -70,7 +71,10 @@ vi.mock('@/context/AuthContext', () => ({
   })),
 }));
 
-// Mock api for initial load AND for POST /auth/sse-token (short-lived SSE JWT)
+// Mock api for initial /activity-logs load. SSE auth no longer needs a
+// URL token mint (POST /auth/sse-token) — EventSource carries the httpOnly
+// auth cookie via withCredentials, so the only remaining api call is the
+// GET /activity-logs initial-load round-trip.
 vi.mock('@/lib/api', () => ({
   default: {
     get: vi.fn().mockResolvedValue({
@@ -87,9 +91,7 @@ vi.mock('@/lib/api', () => ({
         },
       ],
     }),
-    post: vi.fn().mockResolvedValue({
-      data: { token: 'short-lived-sse-token', expires_in: 60 },
-    }),
+    post: vi.fn(),
   },
 }));
 
@@ -116,9 +118,7 @@ beforeEach(() => {
       },
     ],
   });
-  vi.mocked(api.post).mockResolvedValue({
-    data: { token: 'short-lived-sse-token', expires_in: 60 },
-  });
+  vi.mocked(api.post).mockReset();
 });
 
 afterEach(() => {
@@ -128,18 +128,24 @@ afterEach(() => {
 });
 
 describe('useActivityStream - connection', () => {
-  it('fetches a short-lived SSE token and opens EventSource with it', async () => {
+  it('opens EventSource without a URL token (cookie-based auth)', async () => {
     renderHook(() => useActivityStream({ enabled: true }));
 
     await waitFor(() => {
       expect(MockEventSource.instances.length).toBeGreaterThan(0);
     });
 
-    // The hook must first POST /auth/sse-token to obtain the short-lived JWT,
-    // then embed that (and ONLY that) in the EventSource URL.
-    expect(api.post).toHaveBeenCalledWith('/auth/sse-token');
+    // Cookie-based auth — no /auth/sse-token round-trip and no token in URL.
+    // The httpOnly auth cookie is sent automatically because the EventSource
+    // is created with withCredentials: true. This eliminates the 401-churn
+    // pattern from EventSource auto-reconnect using a stale 60-second token.
+    expect(api.post).not.toHaveBeenCalledWith('/auth/sse-token');
     const es = MockEventSource.instances[MockEventSource.instances.length - 1];
-    expect(es.url).toContain('token=short-lived-sse-token');
+    expect(es.url).not.toContain('token=');
+    expect(es.url).toMatch(/\/stream\/activity$/);
+    // withCredentials must be set so the browser sends the httpOnly auth
+    // cookie on this cross-origin (same-site subdomain) request.
+    expect(es.options).toEqual({ withCredentials: true });
   });
 
   it('does NOT create EventSource when there is no authenticated user', async () => {

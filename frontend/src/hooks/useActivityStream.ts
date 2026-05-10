@@ -61,7 +61,7 @@ export interface UseActivityStreamReturn {
   lastActivity: Activity | null;
   activities: Activity[];
   error: string | null;
-  connect: () => Promise<void>;
+  connect: () => void;
   disconnect: () => void;
   clearActivities: () => void;
 }
@@ -87,22 +87,20 @@ export function useActivityStream({
   // onActivity often arrives as an inline arrow function from the parent
   // (e.g. LiveActivityFeed). Including it in connect's dep array would
   // change `connect` identity on every parent render → tear down and
-  // re-establish the EventSource (plus a /auth/sse-token round-trip)
-  // every render. Capture into a ref so connect stays stable.
+  // re-establish the EventSource every render. Capture into a ref so
+  // connect stays stable.
   const onActivityRef = useRef(onActivity);
   useEffect(() => {
     onActivityRef.current = onActivity;
   }, [onActivity]);
-  // Tracks whether the hook is still mounted. Guards against:
-  //   1. SSE-token fetch resolving after unmount (would open zombie EventSource)
-  //   2. onerror reconnect timer firing post-unmount (would call setState on
-  //      unmounted component and re-open a connection with no owner)
+  // Tracks whether the hook is still mounted. Guards onerror reconnect
+  // timers firing post-unmount (would re-open a connection with no owner).
   const unmountedRef = useRef(false);
 
   /**
    * Connect to SSE endpoint
    */
-  const connect = useCallback(async () => {
+  const connect = useCallback(() => {
     if (!user || !enabled) return;
     if (unmountedRef.current) return;
 
@@ -120,16 +118,15 @@ export function useActivityStream({
     }
 
     try {
-      // EventSource cannot set Authorization headers. We mint a 60-second
-      // scope="sse" token on demand so that even if the token surfaces in
-      // server/proxy logs its useful lifetime is tiny and it cannot be
-      // replayed against regular API endpoints.
-      const tokenResponse = await api.post<{ token: string }>('/auth/sse-token');
-      // Re-check after the async hop — component may have unmounted while we
-      // were waiting for the token. Without this, EventSource leaks.
-      if (unmountedRef.current) return;
-      const sseToken = tokenResponse.data.token;
-      const url = `${BACKEND_URL}/stream/activity?token=${encodeURIComponent(sseToken)}`;
+      // Auth via the httpOnly auth cookie (withCredentials below). The cookie
+      // is set on the API host with samesite=lax — same-site to the frontend
+      // host (subdomain), so the browser sends it on this cross-origin SSE
+      // request. This intentionally avoids the previous URL-token approach,
+      // which had a 60-second TTL: EventSource's built-in auto-reconnect re-
+      // uses the original URL, so any tab-sleep/network-drop > 60s caused a
+      // 401 churn (~7 retries every reconnect cycle in production logs).
+      // The cookie has multi-hour TTL, so reconnects authenticate cleanly.
+      const url = `${BACKEND_URL}/stream/activity`;
       const eventSource = new EventSource(url, { withCredentials: true });
       eventSourceRef.current = eventSource;
 
