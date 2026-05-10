@@ -218,8 +218,21 @@ ROOT_DIR = Path(__file__).parent.parent
 @post("/auth/register")
 async def register_user(data: UserCreate, request: Request) -> dict:
     """Register a new user (admin only)"""
+    current_user = await get_current_admin(request)
     db = get_db()
     try:
+        # Only full_admin can create full_admin users (prevent privilege escalation)
+        if data.role == UserRole.FULL_ADMIN and current_user.get("role") != UserRole.FULL_ADMIN.value:
+            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Only full_admin can create full_admin users")
+
+        # campus_admin can only create users for their own campus
+        if (
+            current_user.get("role") == UserRole.CAMPUS_ADMIN.value
+            and data.campus_id
+            and data.campus_id != current_user.get("campus_id")
+        ):
+            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Cannot create users outside your campus")
+
         # Validate email format
         if not validate_email(data.email):
             raise HTTPException(status_code=400, detail="Invalid email format")
