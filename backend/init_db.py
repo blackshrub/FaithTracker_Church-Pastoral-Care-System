@@ -132,10 +132,24 @@ async def create_indexes(db):
     # Activity logs indexes — created_at is the actual timestamp field
     # (action_date was a typo that migrate.py:migration_011 already drops on
     # upgrade; fixing it here ensures fresh installs get the right index).
+    # 90-day TTL prevents the collection from growing without bound.
     await db.activity_logs.create_index("campus_id")
-    await db.activity_logs.create_index("created_at")
+    await db.activity_logs.create_index("created_at", expireAfterSeconds=7776000)
     await db.activity_logs.create_index("user_id")
     indexes_created += 3
+
+    # Notification logs — same TTL story. Every WhatsApp attempt writes a row
+    # and there is no other cleanup path.
+    await db.notification_logs.create_index("created_at", expireAfterSeconds=7776000)
+    await db.notification_logs.create_index("church_id")
+    indexes_created += 2
+
+    # Job locks — unique index prevents two workers' upserts from racing
+    # into two parallel lock documents (would defeat mutual exclusion).
+    # Plus TTL on expires_at to clean up orphan locks.
+    await db.job_locks.create_index("lock_id", unique=True)
+    await db.job_locks.create_index("expires_at", expireAfterSeconds=0)
+    indexes_created += 2
 
     return indexes_created
 

@@ -361,8 +361,14 @@ async def generate_daily_digest_for_campus(campus_id: str, campus_name: str):
                     all_member_ids.add(mid)
 
         if all_member_ids:
+            # Scope by campus_id so a UUID collision across campuses cannot
+            # leak member name/phone from a different tenant into this
+            # digest. Defense-in-depth: every collection above already
+            # filters by campus_id, so member_ids should belong to this
+            # campus, but we explicitly enforce it on the batch lookup too.
             members_batch = await db.members.find(
-                {"id": {"$in": list(all_member_ids)}}, {"_id": 0, "id": 1, "name": 1, "phone": 1}
+                {"id": {"$in": list(all_member_ids)}, "campus_id": campus_id},
+                {"_id": 0, "id": 1, "name": 1, "phone": 1},
             ).to_list(len(all_member_ids) + 10)
             member_map = {m["id"]: m for m in members_batch}
         else:

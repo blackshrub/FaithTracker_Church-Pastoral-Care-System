@@ -246,7 +246,12 @@ class ChangeStreamWatcher:
 
                 watch_kwargs = {
                     "pipeline": pipeline,
-                    "full_document": "updateLookup",
+                    # `default` is correct for an insert-only filter:
+                    # MongoDB always includes fullDocument on inserts.
+                    # `updateLookup` would force an extra round-trip per
+                    # event and only matters for update operations, which
+                    # the pipeline already filters out.
+                    "full_document": "default",
                     "max_await_time_ms": 1000,  # Poll interval for getMore
                 }
                 if resume_token:

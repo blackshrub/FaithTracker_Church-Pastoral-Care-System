@@ -258,6 +258,16 @@ def get_pdf_generator():
     return generate_monthly_report_pdf
 
 
+# Dedicated single-worker executor for PDF generation. WeasyPrint relies on
+# cairo + pango via cffi, neither of which is thread-safe — concurrent calls
+# on the default executor would corrupt rendering state and produce garbled
+# PDFs (or segfault). max_workers=1 serializes generation while still
+# keeping it off the asyncio event loop.
+from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
+
+_PDF_EXECUTOR = _ThreadPoolExecutor(max_workers=1, thread_name_prefix="pdf-gen")
+
+
 # Configure logging - structured JSON in production, human-readable in development
 import sys
 
@@ -2847,11 +2857,13 @@ async def export_monthly_report_pdf(
             if campus:
                 campus_name = campus.get("campus_name", "GKBJ")
 
-        # Generate PDF in a worker thread — WeasyPrint is sync, CPU-bound, and
-        # touches disk for fonts. Running it inline blocks the entire event
-        # loop (SSE, scheduler, all in-flight requests) for the render duration.
+        # Generate PDF in the dedicated single-worker executor — WeasyPrint
+        # is sync, CPU-bound, and touches disk for fonts. cairo/pango are not
+        # thread-safe so we serialize on _PDF_EXECUTOR (max_workers=1) rather
+        # than the default thread pool.
         generate_pdf = get_pdf_generator()
-        pdf_bytes = await asyncio.to_thread(generate_pdf, report_data, campus_name)
+        loop = asyncio.get_running_loop()
+        pdf_bytes = await loop.run_in_executor(_PDF_EXECUTOR, generate_pdf, report_data, campus_name)
 
         # Create filename
         period = report_data.get("report_period", {})
@@ -5742,9 +5754,10 @@ async def simple_sse_generator():
 
 @get("/stream/test")
 async def stream_test() -> Stream:
-    """Simple SSE test endpoint — disabled in production to prevent
-    unauthenticated connection-exhaustion of Granian workers."""
-    if os.environ.get("ENVIRONMENT", "development") == "production":
+    """Simple SSE test endpoint — only enabled in development. Allowlist
+    development explicitly so staging / preview / any non-dev env doesn't
+    accidentally expose an unauthenticated 20-second-long SSE connection."""
+    if os.environ.get("ENVIRONMENT", "development") != "development":
         raise HTTPException(status_code=404, detail="Not found")
     return Stream(
         simple_sse_generator(),

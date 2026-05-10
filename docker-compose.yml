@@ -162,7 +162,11 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       - ALERT_EMAIL=${ALERT_EMAIL:-}
       - MEILI_URL=http://meilisearch:7700
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-faithtracker-search-key}
+      # MUST match the value supplied to the Meilisearch container above.
+      # No default — Compose refuses to start without it (matching the
+      # Meilisearch service block), which is preferable to silently
+      # connecting with a publicly-known key.
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set in .env}
       - SECRETS_DIR=/run/secrets
     secrets:
       - mongo_password

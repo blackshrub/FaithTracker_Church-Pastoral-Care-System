@@ -21,18 +21,20 @@ MEILI_MASTER_KEY = os.environ.get("MEILI_MASTER_KEY", "")
 # network read or overwrite indexed PII if the operator forgot to set the
 # env var. In development we still require an explicit value but accept any
 # non-empty string so local-dev defaults (e.g. compose .env.example) work.
-if not MEILI_MASTER_KEY:
+_KNOWN_INSECURE_KEYS = {"faithtracker-search-key", "masterKey", "MASTER_KEY", ""}
+
+if not MEILI_MASTER_KEY or MEILI_MASTER_KEY in _KNOWN_INSECURE_KEYS:
     if os.environ.get("ENVIRONMENT", "development") == "production":
         raise RuntimeError(
-            "MEILI_MASTER_KEY environment variable is required in production. "
+            "MEILI_MASTER_KEY is unset or set to a known-insecure default. "
             "Set it to a high-entropy secret in your .env / docker secrets."
         )
     # In dev, surface a loud warning and use a clearly-marked dev-only key
     # so this can never accidentally be the same value as in prod.
     MEILI_MASTER_KEY = "dev-only-do-not-use-in-prod"
     logger.warning(
-        "MEILI_MASTER_KEY not set — using insecure dev-only key. Set the env "
-        "var before deploying."
+        "MEILI_MASTER_KEY not set or set to a known default — using "
+        "dev-only key. Set the env var before deploying."
     )
 
 # Index names

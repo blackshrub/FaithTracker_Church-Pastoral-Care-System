@@ -37,8 +37,19 @@ def _open_image_safely(image_bytes: bytes) -> Image.Image:
     PIL only raises DecompressionBombError when MAX_IMAGE_PIXELS is exceeded
     AT decode time, but the size is known from the header — fail fast before
     decoding to avoid the memory spike.
+
+    Multi-frame images (animated GIF, animated WebP) are rejected outright:
+    the per-frame pixel check would let a 100-frame 6000x6000 GIF pass
+    (each frame at 36 MP) but require 3.6 GB to fully decode. Member and
+    user photos have no use for animation.
     """
     img = Image.open(io.BytesIO(image_bytes))
+    n_frames = getattr(img, "n_frames", 1)
+    if n_frames > 1:
+        raise ValueError(
+            f"Animated images are not allowed ({n_frames} frames). "
+            "Use a still image (JPEG, PNG, or single-frame WebP)."
+        )
     width, height = img.size
     if width * height > MAX_IMAGE_PIXELS:
         raise ValueError(

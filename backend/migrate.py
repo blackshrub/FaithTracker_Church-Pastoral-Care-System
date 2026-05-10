@@ -296,6 +296,39 @@ async def migration_011_fix_activity_logs_index(db):
     return "Dropped action_date index, created created_at index on activity_logs"
 
 
+async def migration_012_add_log_ttls_and_lock_index(db):
+    """
+    1. Convert activity_logs and notification_logs created_at indexes to TTL
+       (90 days). Without TTL these collections grow forever — every WhatsApp
+       attempt and every audit-relevant action writes a row.
+    2. Add unique index on job_locks.lock_id so two workers' concurrent
+       upserts cannot create parallel lock documents (would defeat the
+       distributed mutex). Add expires_at TTL to clean up orphan locks.
+    """
+    # Recreate created_at indexes WITH TTL. Drop the existing non-TTL index
+    # first if it exists, since you cannot redefine TTL on an existing index.
+    for coll, ttl_seconds in (("activity_logs", 7776000), ("notification_logs", 7776000)):
+        with contextlib.suppress(Exception):
+            await db[coll].drop_index("created_at_1")
+        await db[coll].create_index("created_at", expireAfterSeconds=ttl_seconds)
+
+    # Job locks unique index. If duplicates already exist (from the pre-fix
+    # race), drop the duplicates first so unique-index creation succeeds.
+    with contextlib.suppress(Exception):
+        # Best-effort dedup: keep the most recent per lock_id.
+        seen: set[str] = set()
+        async for doc in db.job_locks.find({}, {"_id": 1, "lock_id": 1}).sort("acquired_at", -1):
+            lid = doc.get("lock_id")
+            if lid and lid in seen:
+                await db.job_locks.delete_one({"_id": doc["_id"]})
+            elif lid:
+                seen.add(lid)
+    await db.job_locks.create_index("lock_id", unique=True)
+    await db.job_locks.create_index("expires_at", expireAfterSeconds=0)
+
+    return "Added TTL on activity_logs/notification_logs.created_at; unique+TTL on job_locks"
+
+
 # ==================== MIGRATION REGISTRY ====================
 
 # List of all migrations in order
@@ -312,6 +345,7 @@ MIGRATIONS: list[tuple[int, str, Callable]] = [
     (9, "Ensure user required fields", migration_009_ensure_user_required_fields),
     (10, "Fix corrupted UUIDs", migration_010_fix_corrupted_uuids),
     (11, "Fix activity_logs action_date index to created_at", migration_011_fix_activity_logs_index),
+    (12, "TTL on logs + unique index on job_locks", migration_012_add_log_ttls_and_lock_index),
 ]
 
 
@@ -346,34 +380,47 @@ async def log_migration(db, version: int, description: str, success: bool, messa
     )
 
 
-async def _acquire_migration_lock(db) -> bool:
-    """Atomically claim the migration lock so two concurrent runs (e.g.
-    rolling deploy + manual run) cannot both apply the same non-idempotent
-    migration. find_one_and_update with the lock=False filter is the
-    classic single-document atomic primitive."""
-    from datetime import timedelta
+import secrets as _secrets
+from datetime import timedelta as _timedelta
 
+# Per-process token; release only deletes locks WE hold. Without a token,
+# a worker that lost its lock to staleness could still release the new
+# holder's lock during shutdown.
+_MIGRATION_TOKEN = _secrets.token_hex(16)
+
+
+async def _acquire_migration_lock(db) -> bool:
+    """Atomically claim the migration lock so two concurrent runs cannot
+    both apply the same non-idempotent migration. Stores token + native
+    datetime (not ISO string — string comparison only works for UTC-only
+    strings and silently breaks on offset-bearing values)."""
     now = datetime.now(UTC)
-    # Stale locks expire after 30 minutes — long enough for any reasonable
-    # migration, short enough not to block recovery if a previous run crashed.
-    stale_before = now - timedelta(minutes=30)
+    stale_before = now - _timedelta(minutes=30)
+    # find_one_and_update returns the post-update document. We only own
+    # the lock if our token is in the returned doc — if another worker
+    # raced ahead, their token will be there instead.
     result = await db.migrations.find_one_and_update(
         {
             "_id": "lock",
             "$or": [
                 {"locked": {"$ne": True}},
-                {"locked_at": {"$lt": stale_before.isoformat()}},
+                {"locked_at": {"$lt": stale_before}},
             ],
         },
-        {"$set": {"locked": True, "locked_at": now.isoformat()}},
+        {"$set": {"locked": True, "locked_at": now, "token": _MIGRATION_TOKEN}},
         upsert=True,
         return_document=True,  # AFTER
     )
-    return bool(result and result.get("locked"))
+    return bool(result and result.get("token") == _MIGRATION_TOKEN)
 
 
 async def _release_migration_lock(db) -> None:
-    await db.migrations.update_one({"_id": "lock"}, {"$set": {"locked": False}})
+    # Token-scoped release: don't clobber another worker's lock if ours
+    # already expired and someone else picked it up.
+    await db.migrations.update_one(
+        {"_id": "lock", "token": _MIGRATION_TOKEN},
+        {"$set": {"locked": False}},
+    )
 
 
 async def run_migrations(db, current_version: int):
