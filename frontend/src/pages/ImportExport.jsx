@@ -178,7 +178,11 @@ export const ImportExport = () => {
       setShowPreview(false);
       setCsvPreview(null);
     } catch (error) {
-      toast.error(t('import_export_page.import_failed'));
+      toast.error(
+        t('import_export_page.import_failed') +
+          ': ' +
+          (error.response?.data?.detail || error.message)
+      );
     } finally {
       setImporting(false);
     }
@@ -195,7 +199,13 @@ export const ImportExport = () => {
       );
       setJsonData('');
     } catch (error) {
-      toast.error(t('import_export_page.import_failed_json'));
+      // JSON.parse SyntaxError has no .response, so this surfaces both
+      // client-side parse errors and backend row-level validation detail.
+      toast.error(
+        t('import_export_page.import_failed_json') +
+          ': ' +
+          (error.response?.data?.detail || error.message)
+      );
     } finally {
       setImporting(false);
     }

@@ -119,7 +119,7 @@ export const AdminDashboard = () => {
       setNewCampus({ id: null, campus_name: '', location: '' });
       loadData();
     } catch (error) {
-      toast.error(t('toasts.failed'));
+      toast.error(t('toasts.failed') + ': ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -322,8 +322,14 @@ export const AdminDashboard = () => {
                                     toast.success(t('toasts.deleted'));
                                     loadData();
                                     closeConfirm();
-                                  } catch (_e) {
-                                    toast.error(t('toasts.cannot_delete_has_members'));
+                                  } catch (e) {
+                                    // Don't hard-code "has members" — backend may
+                                    // refuse for other reasons (permissions, FK on
+                                    // care_events, etc.).
+                                    toast.error(
+                                      e.response?.data?.detail ||
+                                        t('toasts.cannot_delete_has_members')
+                                    );
                                     closeConfirm();
                                   }
                                 }
@@ -393,8 +399,11 @@ export const AdminDashboard = () => {
                                         toast.success(t('toasts.deleted'));
                                         loadData();
                                         closeConfirm();
-                                      } catch (_e) {
-                                        toast.error(t('toasts.cannot_delete_has_members'));
+                                      } catch (e) {
+                                        toast.error(
+                                          e.response?.data?.detail ||
+                                            t('toasts.cannot_delete_has_members')
+                                        );
                                         closeConfirm();
                                       }
                                     }

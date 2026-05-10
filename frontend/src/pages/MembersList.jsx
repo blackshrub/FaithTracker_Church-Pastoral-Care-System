@@ -212,8 +212,10 @@ export const MembersList = () => {
       setAddModalOpen(false);
       setNewMember({ name: '', phone: '', notes: '' });
       loadMembers();
-    } catch (_error) {
-      toast.error(t('error_messages.failed_to_save'));
+    } catch (error) {
+      toast.error(
+        t('error_messages.failed_to_save') + ': ' + (error.response?.data?.detail || error.message)
+      );
     } finally {
       setSaving(false);
     }
@@ -228,8 +230,8 @@ export const MembersList = () => {
       setEditModalOpen(false);
       setEditingMember(null);
       loadMembers();
-    } catch (_error) {
-      toast.error('Failed to update');
+    } catch (error) {
+      toast.error('Failed to update: ' + (error.response?.data?.detail || error.message));
     } finally {
       setSaving(false);
     }

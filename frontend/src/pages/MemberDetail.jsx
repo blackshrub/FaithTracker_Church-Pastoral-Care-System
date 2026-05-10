@@ -426,7 +426,9 @@ export const MemberDetail = () => {
       });
       queryClient.invalidateQueries({ queryKey: ['member', id] });
     } catch (error) {
-      toast.error(t('error_messages.failed_to_save'));
+      toast.error(
+        t('error_messages.failed_to_save') + ': ' + (error.response?.data?.detail || error.message)
+      );
     } finally {
       setSaving(false);
     }

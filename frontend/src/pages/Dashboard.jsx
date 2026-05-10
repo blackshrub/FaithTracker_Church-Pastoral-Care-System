@@ -474,8 +474,8 @@ export const Dashboard = () => {
       // Refresh dashboard to show new tasks - Invalidate React Query cache
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['members'] });
-    } catch (_error) {
-      toast.error('Failed to add events');
+    } catch (error) {
+      toast.error('Failed to add events: ' + (error.response?.data?.detail || error.message));
     }
   };
 
