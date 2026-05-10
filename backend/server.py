@@ -4195,6 +4195,8 @@ async def get_sync_config(request: Request) -> dict:
 
         return config
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting sync config: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -4821,6 +4823,8 @@ async def get_sync_logs(request: Request, limit: int = 5, skip: int = 0) -> dict
 
         return {"logs": logs, "total": total, "has_more": skip + len(logs) < total}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting sync logs: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -5476,6 +5480,10 @@ async def get_activity_logs(
 
         return logs
 
+    except HTTPException:
+        # Auth failures (401) and other intentional HTTPExceptions must
+        # bubble up unchanged — wrapping them in 500 hides real status codes.
+        raise
     except Exception as e:
         logger.error(f"Error fetching activity logs: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
@@ -5526,6 +5534,8 @@ async def get_activity_summary(request: Request) -> dict:
             "action_breakdown": actions,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching activity summary: {e!s}")
         raise HTTPException(status_code=500, detail=safe_error_detail(e))
