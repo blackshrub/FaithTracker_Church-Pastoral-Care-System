@@ -9,6 +9,7 @@ import contextlib
 import logging
 import os
 import random
+import secrets
 import smtplib
 import uuid
 from datetime import UTC, date, datetime, timedelta
@@ -20,9 +21,19 @@ import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from services.cache import get_redis_client
 from utils import normalize_phone_number
 
 logger = logging.getLogger(__name__)
+
+# Per-process token used to identify lock ownership. Refreshed on import so
+# multiple workers (each running their own Python process) all hold distinct
+# tokens — prevents one worker from accidentally releasing another's lock.
+_WORKER_TOKEN = secrets.token_hex(16)
+# Per-job token issued at acquire time so a slow worker that comes back after
+# its lock has expired and been re-acquired by another cannot delete the new
+# holder's lock during release.
+_HELD_LOCK_TOKENS: dict[str, str] = {}
 
 # Jakarta timezone
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
@@ -982,13 +993,31 @@ async def acquire_job_lock(job_name: str, ttl_seconds: int = 300):
     Returns:
         True if lock acquired, False otherwise
     """
+    lock_id = f"job_lock_{job_name}_{today_jakarta().isoformat()}"
+    token = f"{_WORKER_TOKEN}:{secrets.token_hex(8)}"
+
+    # PRIMARY: Redis SET NX EX is genuinely atomic — exactly one worker wins.
+    redis_client = get_redis_client()
+    if redis_client is not None:
+        try:
+            redis_key = f"ft:joblock:{lock_id}"
+            acquired = await redis_client.set(redis_key, token, nx=True, ex=ttl_seconds)
+            if acquired:
+                _HELD_LOCK_TOKENS[lock_id] = token
+                logger.info(f"Acquired lock for {job_name} (redis)")
+                return True
+            logger.info(f"Lock already held for {job_name} - skipping (redis)")
+            return False
+        except Exception as e:
+            logger.warning(f"Redis lock unavailable for {job_name}, falling back to Mongo: {e!s}")
+
+    # FALLBACK: Mongo lock with token-based ownership. find_one_and_update is
+    # atomic at the document level; the worker whose token ends up in the
+    # document is the holder.
     try:
-        lock_id = f"job_lock_{job_name}_{today_jakarta().isoformat()}"
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
-
-        # Try to insert lock document (will fail if already exists due to unique index)
-        result = await db.job_locks.update_one(
+        result = await db.job_locks.find_one_and_update(
             {
                 "lock_id": lock_id,
                 "$or": [
@@ -996,36 +1025,61 @@ async def acquire_job_lock(job_name: str, ttl_seconds: int = 300):
                     {"expires_at": {"$exists": False}},  # No expiry (shouldn't happen)
                 ],
             },
-            {"$set": {"lock_id": lock_id, "job_name": job_name, "acquired_at": now, "expires_at": expires_at}},
+            {
+                "$set": {
+                    "lock_id": lock_id,
+                    "job_name": job_name,
+                    "acquired_at": now,
+                    "expires_at": expires_at,
+                    "token": token,
+                }
+            },
             upsert=True,
+            return_document=True,  # AFTER
         )
-
-        # If we modified a document, we got the lock
-        if result.matched_count > 0 or result.upserted_id:
-            logger.info(f"Acquired lock for {job_name}")
+        if result and result.get("token") == token:
+            _HELD_LOCK_TOKENS[lock_id] = token
+            logger.info(f"Acquired lock for {job_name} (mongo)")
             return True
-        else:
-            logger.info(f"Lock already held for {job_name} - skipping")
-            return False
-
+        logger.info(f"Lock already held for {job_name} - skipping (mongo)")
+        return False
     except Exception as e:
-        # E11000 duplicate key error is expected when another worker gets the lock first
-        # This is normal behavior in distributed locking, not an error
         error_str = str(e)
         if "E11000" in error_str or "duplicate key" in error_str.lower():
             logger.info(f"Lock for {job_name} already acquired by another worker - skipping")
             return False
-        # Only log as error if it's a different kind of failure
         logger.error(f"Error acquiring lock for {job_name}: {error_str}")
         return False
 
 
 async def release_job_lock(job_name: str):
-    """Release the distributed lock for a job"""
+    """Release the distributed lock for a job (only if we still hold it)."""
+    lock_id = f"job_lock_{job_name}_{today_jakarta().isoformat()}"
+    token = _HELD_LOCK_TOKENS.pop(lock_id, None)
+    if not token:
+        # We never successfully acquired this lock — nothing to release.
+        return
+
+    redis_client = get_redis_client()
+    if redis_client is not None:
+        # Compare-and-delete Lua so we never delete a lock another worker
+        # has since re-acquired (e.g., if our job overran the TTL).
+        cad_script = (
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('del', KEYS[1]) else return 0 end"
+        )
+        try:
+            await redis_client.eval(cad_script, 1, f"ft:joblock:{lock_id}", token)
+            logger.info(f"Released lock for {job_name} (redis)")
+            return
+        except Exception as e:
+            logger.warning(f"Redis lock release failed for {job_name}, trying Mongo: {e!s}")
+
     try:
-        lock_id = f"job_lock_{job_name}_{today_jakarta().isoformat()}"
-        await db.job_locks.delete_one({"lock_id": lock_id})
-        logger.info(f"Released lock for {job_name}")
+        # Only delete if our token still matches — defends against the same
+        # TTL-overrun race in the Mongo fallback path.
+        await db.job_locks.delete_one({"lock_id": lock_id, "token": token})
+        logger.info(f"Released lock for {job_name} (mongo)")
     except Exception as e:
         logger.error(f"Error releasing lock for {job_name}: {e!s}")
 
