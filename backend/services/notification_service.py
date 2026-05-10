@@ -11,6 +11,12 @@ from models import generate_uuid
 
 logger = logging.getLogger(__name__)
 
+# Module-level set keeps a strong reference to background notification tasks
+# so they aren't GC'd mid-flight. Without this, asyncio.create_task returns a
+# weak reference; if the event loop trims the task before completion, the
+# notification_logs row is left stuck in PENDING with no retry.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
 
 class NotificationService:
     def __init__(self, db, whatsapp_gateway_url: str | None = None):
@@ -46,9 +52,11 @@ class NotificationService:
         }
         await self._db.notification_logs.insert_one(log_entry)
 
-        asyncio.create_task(  # noqa: RUF006
+        task = asyncio.create_task(
             self._send_whatsapp_background(notification_id=notification_id, phone=phone, message=message, retry=retry)
         )
+        _BACKGROUND_TASKS.add(task)
+        task.add_done_callback(_BACKGROUND_TASKS.discard)
 
         return {"success": True, "notification_id": notification_id}
 

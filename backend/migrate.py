@@ -346,6 +346,36 @@ async def log_migration(db, version: int, description: str, success: bool, messa
     )
 
 
+async def _acquire_migration_lock(db) -> bool:
+    """Atomically claim the migration lock so two concurrent runs (e.g.
+    rolling deploy + manual run) cannot both apply the same non-idempotent
+    migration. find_one_and_update with the lock=False filter is the
+    classic single-document atomic primitive."""
+    from datetime import timedelta
+
+    now = datetime.now(UTC)
+    # Stale locks expire after 30 minutes — long enough for any reasonable
+    # migration, short enough not to block recovery if a previous run crashed.
+    stale_before = now - timedelta(minutes=30)
+    result = await db.migrations.find_one_and_update(
+        {
+            "_id": "lock",
+            "$or": [
+                {"locked": {"$ne": True}},
+                {"locked_at": {"$lt": stale_before.isoformat()}},
+            ],
+        },
+        {"$set": {"locked": True, "locked_at": now.isoformat()}},
+        upsert=True,
+        return_document=True,  # AFTER
+    )
+    return bool(result and result.get("locked"))
+
+
+async def _release_migration_lock(db) -> None:
+    await db.migrations.update_one({"_id": "lock"}, {"$set": {"locked": False}})
+
+
 async def run_migrations(db, current_version: int):
     """Run all pending migrations"""
     pending_migrations = [m for m in MIGRATIONS if m[0] > current_version]
@@ -354,24 +384,31 @@ async def run_migrations(db, current_version: int):
         print_info("No pending migrations")
         return True
 
-    print(f"\n{CYAN}Found {len(pending_migrations)} pending migration(s):{NC}\n")
+    if not await _acquire_migration_lock(db):
+        print_error("Another migration run is in progress — aborting to prevent double-apply")
+        return False
 
-    for version, description, migration_func in pending_migrations:
-        print_step(f"v{version:03d}: {description}")
+    try:
+        print(f"\n{CYAN}Found {len(pending_migrations)} pending migration(s):{NC}\n")
 
-        try:
-            result = await migration_func(db)
-            await log_migration(db, version, description, True, result)
-            await set_current_version(db, version)
-            print_success(result)
+        for version, description, migration_func in pending_migrations:
+            print_step(f"v{version:03d}: {description}")
 
-        except Exception as e:
-            error_msg = f"Migration failed: {e!s}"
-            print_error(error_msg)
-            await log_migration(db, version, description, False, error_msg)
-            return False
+            try:
+                result = await migration_func(db)
+                await log_migration(db, version, description, True, result)
+                await set_current_version(db, version)
+                print_success(result)
 
-    return True
+            except Exception as e:
+                error_msg = f"Migration failed: {e!s}"
+                print_error(error_msg)
+                await log_migration(db, version, description, False, error_msg)
+                return False
+
+        return True
+    finally:
+        await _release_migration_lock(db)
 
 
 async def show_migration_history(db):

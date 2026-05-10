@@ -4,7 +4,6 @@ Recalculate engagement status for all members
 Run after fixing engagement status thresholds
 """
 
-import asyncio
 from datetime import UTC, datetime
 
 from pymongo import MongoClient
@@ -37,7 +36,10 @@ def calculate_engagement_status(last_contact, at_risk_days=60, disconnected_days
         return "disconnected", days_since
 
 
-async def main():
+def main():
+    # Synchronous PyMongo — running this inside asyncio.run blocked the event
+    # loop on every member update (one blocking call per row), defeating any
+    # parallelism. The script is a one-shot maintenance task; sync is fine.
     client = MongoClient("mongodb://localhost:27017")
     db = client["pastoral_care_db"]
 
@@ -86,4 +88,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

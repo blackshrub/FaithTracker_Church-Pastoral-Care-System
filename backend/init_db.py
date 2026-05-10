@@ -129,9 +129,11 @@ async def create_indexes(db):
     await db.campuses.create_index("id", unique=True)
     indexes_created += 1
 
-    # Activity logs indexes
+    # Activity logs indexes — created_at is the actual timestamp field
+    # (action_date was a typo that migrate.py:migration_011 already drops on
+    # upgrade; fixing it here ensures fresh installs get the right index).
     await db.activity_logs.create_index("campus_id")
-    await db.activity_logs.create_index("action_date")
+    await db.activity_logs.create_index("created_at")
     await db.activity_logs.create_index("user_id")
     indexes_created += 3
 

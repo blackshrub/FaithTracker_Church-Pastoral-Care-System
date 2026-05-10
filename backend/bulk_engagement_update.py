@@ -101,7 +101,19 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                                     {
                                         "$subtract": [
                                             current_date,
-                                            {"$dateFromString": {"dateString": "$last_contact_date", "onError": None}},
+                                            {
+                                                "$dateFromString": {
+                                                    "dateString": "$last_contact_date",
+                                                    # Force Asia/Jakarta interpretation. Without an
+                                                    # explicit timezone, $dateFromString uses the
+                                                    # offset embedded in the string (when present),
+                                                    # producing a 7-hour drift versus current_date
+                                                    # for any record that happens to carry a
+                                                    # +HH:MM suffix. Misclassifies engagement.
+                                                    "timezone": "Asia/Jakarta",
+                                                    "onError": None,
+                                                }
+                                            },
                                         ]
                                     },
                                     86400000,  # milliseconds in a day
@@ -177,6 +189,9 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
                                                 {
                                                     "$dateFromString": {
                                                         "dateString": "$last_contact_date",
+                                                        # See above — explicit Jakarta timezone
+                                                        # avoids 7-hour misclassification.
+                                                        "timezone": "Asia/Jakarta",
                                                         "onError": None,
                                                         "onNull": None,
                                                     }
