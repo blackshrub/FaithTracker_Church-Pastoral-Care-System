@@ -65,7 +65,10 @@ services:
     restart: always
     environment:
       - MEILI_ENV=production
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-faithtracker-search-key}
+      # Required: set MEILI_MASTER_KEY in .env to a high-entropy secret.
+      # No default — Compose will fail with a clear error if missing,
+      # which is preferable to running with a publicly-known key.
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set in .env}
       - MEILI_NO_ANALYTICS=true
     volumes:
       - ./data/meilisearch:/meili_data

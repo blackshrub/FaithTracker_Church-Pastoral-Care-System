@@ -14,7 +14,26 @@ from meilisearch.errors import MeilisearchCommunicationError, MeilisearchError
 logger = logging.getLogger(__name__)
 
 MEILI_URL = os.environ.get("MEILI_URL", "http://localhost:7700")
-MEILI_MASTER_KEY = os.environ.get("MEILI_MASTER_KEY", "faithtracker-search-key")
+MEILI_MASTER_KEY = os.environ.get("MEILI_MASTER_KEY", "")
+
+# Refuse to start with the well-known default in production. The previous
+# fallback ("faithtracker-search-key") would let any container on the docker
+# network read or overwrite indexed PII if the operator forgot to set the
+# env var. In development we still require an explicit value but accept any
+# non-empty string so local-dev defaults (e.g. compose .env.example) work.
+if not MEILI_MASTER_KEY:
+    if os.environ.get("ENVIRONMENT", "development") == "production":
+        raise RuntimeError(
+            "MEILI_MASTER_KEY environment variable is required in production. "
+            "Set it to a high-entropy secret in your .env / docker secrets."
+        )
+    # In dev, surface a loud warning and use a clearly-marked dev-only key
+    # so this can never accidentally be the same value as in prod.
+    MEILI_MASTER_KEY = "dev-only-do-not-use-in-prod"
+    logger.warning(
+        "MEILI_MASTER_KEY not set — using insecure dev-only key. Set the env "
+        "var before deploying."
+    )
 
 # Index names
 MEMBERS_INDEX = "members"
@@ -247,6 +266,17 @@ class SearchService:
         """
         Bulk index all members (optionally filtered by campus_id).
         Returns number of documents indexed.
+
+        TENANT-ISOLATION NOTE: All campuses share the single MEMBERS_INDEX.
+        Per-tenant scoping is enforced at query time via the
+        filterableAttributes filter on campus_id (see search()/multi_search()).
+        Operationally this means:
+          - The Meilisearch master key is highly sensitive (exposes ALL
+            tenants' member PII). The MEILI_MASTER_KEY guard in this module
+            now refuses to start with a publicly-known default.
+          - Any future ad-hoc admin search MUST include a campus_id filter
+            or it will return cross-tenant data. Use search() / multi_search()
+            which thread campus_id through; do not call _client.index(...).
         """
         if not self._available or self._client is None or self._db is None:
             return 0

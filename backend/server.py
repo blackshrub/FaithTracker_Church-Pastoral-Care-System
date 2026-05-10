@@ -5563,7 +5563,15 @@ def activity_event_generator(campus_id: str, user_id: str):
 
         # Create a separate connection for pub/sub (required by redis-py)
         pubsub = redis_client.pubsub()
-        await pubsub.subscribe(f"ft:{campus_id}:activity")
+        # full_admin (campus_id="__all__") fan-outs across every campus
+        # channel via psubscribe pattern; per-campus subscribers use the
+        # exact channel name. Without this, full_admin would receive zero
+        # live events because nothing publishes to ft:global:activity.
+        is_pattern_subscriber = campus_id == "__all__"
+        if is_pattern_subscriber:
+            await pubsub.psubscribe("ft:*:activity")
+        else:
+            await pubsub.subscribe(f"ft:{campus_id}:activity")
         try:
             # Send initial connection event
             yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'campus_id': campus_id})}\n\n"
@@ -5573,7 +5581,8 @@ def activity_event_generator(campus_id: str, user_id: str):
             while True:
                 try:
                     message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=heartbeat_interval)
-                    if message and message["type"] == "message":
+                    # psubscribe yields type="pmessage"; subscribe yields "message".
+                    if message and message["type"] in ("message", "pmessage"):
                         data = json.loads(message["data"])
                         # Don't send user's own activities back to them
                         if data.get("user_id") != user_id:
@@ -5586,7 +5595,10 @@ def activity_event_generator(campus_id: str, user_id: str):
                 except asyncio.CancelledError:
                     break
         finally:
-            await pubsub.unsubscribe()
+            if is_pattern_subscriber:
+                await pubsub.punsubscribe()
+            else:
+                await pubsub.unsubscribe()
             await pubsub.aclose()
 
     async def _inmemory_stream():
@@ -5694,7 +5706,13 @@ async def stream_activity(request: Request, token: str | None = None) -> Stream:
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    campus_id = current_user.get("campus_id") or "global"
+    # full_admin has campus_id=None and historically subscribed to a "global"
+    # channel that nothing publishes to — they got zero live events, breaking
+    # the live-collab feature for the role that needs it most. Detect role
+    # and let the generator fan out across all campus channels for full_admin.
+    role = current_user.get("role")
+    is_full_admin = role == UserRole.FULL_ADMIN.value
+    campus_id = current_user.get("campus_id") or ("__all__" if is_full_admin else "global")
     user_id = current_user.get("id", "")
 
     return Stream(
@@ -5724,7 +5742,10 @@ async def simple_sse_generator():
 
 @get("/stream/test")
 async def stream_test() -> Stream:
-    """Simple SSE test endpoint - no auth required"""
+    """Simple SSE test endpoint — disabled in production to prevent
+    unauthenticated connection-exhaustion of Granian workers."""
+    if os.environ.get("ENVIRONMENT", "development") == "production":
+        raise HTTPException(status_code=404, detail="Not found")
     return Stream(
         simple_sse_generator(),
         media_type="text/event-stream",
@@ -5775,9 +5796,17 @@ async def readiness_check() -> dict:
         await client.admin.command("ping")
         return {"status": "ready", "database": "connected", "timestamp": datetime.now(UTC)}
     except Exception as e:
-        logger.error(f"Readiness check failed: {e!s}")
+        # Log the full exception locally but never return str(e) to the
+        # client — Mongo errors can include credential fragments and
+        # internal hostnames. safe_error_detail enforces the prod/dev split.
+        logger.exception(f"Readiness check failed: {e!s}")
         raise HTTPException(
-            status_code=503, detail={"status": "not_ready", "database": "disconnected", "error": str(e)}
+            status_code=503,
+            detail={
+                "status": "not_ready",
+                "database": "disconnected",
+                "error": safe_error_detail(e, status_code=503),
+            },
         )
 
 
@@ -5865,8 +5894,18 @@ cors_config = CORSConfig(
     allow_credentials=True,
     allow_origins=cors_origins_list,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "Cache-Control", "Pragma"],
-    expose_headers=["X-Total-Count"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Requested-With",
+        "Cache-Control",
+        "Pragma",
+        "If-None-Match",
+        "If-Modified-Since",
+    ],
+    # Headers the browser will allow JS to read off the response. X-Total-Count
+    # is used by paginated list endpoints; the others are used by SSE.
+    expose_headers=["X-Total-Count", "X-Accel-Buffering", "Content-Length"],
 )
 
 
