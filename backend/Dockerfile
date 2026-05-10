@@ -48,11 +48,23 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Copy application code
-COPY . .
+# Create non-root user BEFORE copying code so file ownership is correct.
+# UID 1001 is fixed so the host bind-mount (./data/uploads) can be chowned to
+# match. Deployment note: run `sudo chown -R 1001:1001 ./data/uploads` (and
+# any other writable bind mounts) on the host before `docker compose up`.
+RUN groupadd --system --gid 1001 app \
+    && useradd --system --uid 1001 --gid app --no-create-home --shell /usr/sbin/nologin app
 
-# Create uploads directory
-RUN mkdir -p /app/uploads && chmod 755 /app/uploads
+# Copy application code with correct ownership
+COPY --chown=app:app . .
+
+# Create uploads directory owned by app user
+RUN mkdir -p /app/uploads /app/user_photos \
+    && chown -R app:app /app/uploads /app/user_photos \
+    && chmod 755 /app/uploads /app/user_photos
+
+# Drop privileges — request handling, scheduler, file uploads all run as UID 1001.
+USER app
 
 # Expose port
 EXPOSE 8001
