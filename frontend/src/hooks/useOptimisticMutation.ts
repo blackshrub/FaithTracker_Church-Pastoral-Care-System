@@ -17,8 +17,14 @@ import type { CareEvent, Member } from '@/types';
 // ==================== Complete Event ====================
 
 interface CompleteEventVariables {
-  eventId: string;
+  eventId: string | undefined;
   memberId: string;
+  // Optional — when 'birthday' (or eventId is undefined) we route through the
+  // by-member endpoint, which creates the care_event row on demand. Birthdays
+  // are computed at dashboard-render time from member.birth_date and may not
+  // have a care_event row yet, so /care-events/${eventId}/complete would 404
+  // with eventId=undefined.
+  type?: string;
 }
 
 interface CompleteEventContext {
@@ -35,7 +41,10 @@ export function useCompleteEventOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation<AxiosResponse, Error, CompleteEventVariables, CompleteEventContext>({
-    mutationFn: ({ eventId }) => api.post(`/care-events/${eventId}/complete`),
+    mutationFn: ({ eventId, memberId, type }) =>
+      type === 'birthday' || !eventId
+        ? api.post(`/care-events/birthday/member/${memberId}/complete`)
+        : api.post(`/care-events/${eventId}/complete`),
 
     // Optimistically update before server responds
     onMutate: async ({ eventId, memberId }) => {
@@ -103,8 +112,10 @@ export function useCompleteEventOptimistic() {
 // ==================== Ignore Event ====================
 
 interface IgnoreEventVariables {
-  eventId: string;
+  eventId: string | undefined;
   memberId: string;
+  // See CompleteEventVariables.type for rationale.
+  type?: string;
 }
 
 interface IgnoreEventContext {
@@ -120,7 +131,10 @@ export function useIgnoreEventOptimistic() {
   const queryClient = useQueryClient();
 
   return useMutation<AxiosResponse, Error, IgnoreEventVariables, IgnoreEventContext>({
-    mutationFn: ({ eventId }) => api.post(`/care-events/${eventId}/ignore`),
+    mutationFn: ({ eventId, memberId, type }) =>
+      type === 'birthday' || !eventId
+        ? api.post(`/care-events/birthday/member/${memberId}/ignore`)
+        : api.post(`/care-events/${eventId}/ignore`),
 
     onMutate: async ({ eventId, memberId }) => {
       await queryClient.cancelQueries({ queryKey: ['careEvents', memberId] });

@@ -1770,6 +1770,7 @@ export const Dashboard = () => {
                                   completeEventMutation.mutate({
                                     eventId: event.id,
                                     memberId: event.member_id,
+                                    type: 'birthday',
                                   });
                                   toast.success(t('toasts.birthday_marked_completed'));
                                 }}
@@ -1794,6 +1795,7 @@ export const Dashboard = () => {
                                       ignoreEventMutation.mutate({
                                         eventId: event.id,
                                         memberId: event.member_id,
+                                        type: 'birthday',
                                       });
                                       toast.success(t('toasts.birthday_ignored'));
                                     }}
@@ -2856,10 +2858,14 @@ export const Dashboard = () => {
                                   triggerHaptic();
                                   try {
                                     if (task.type === 'birthday') {
-                                      // Use optimistic mutation for instant UI
+                                      // Use optimistic mutation for instant UI.
+                                      // type: 'birthday' routes through the by-member
+                                      // endpoint so this works for computed birthdays
+                                      // that don't have a care_event row yet.
                                       completeEventMutation.mutate({
-                                        eventId: task.data.id,
+                                        eventId: task.data?.id,
                                         memberId: task.member_id,
+                                        type: 'birthday',
                                       });
                                       toast.success(t('toasts.completed'));
                                     } else {
@@ -2905,10 +2911,14 @@ export const Dashboard = () => {
                                   onClick={async () => {
                                     try {
                                       if (task.type === 'birthday') {
-                                        // Use optimistic mutation for instant UI
+                                        // Use optimistic mutation for instant UI.
+                                        // type: 'birthday' routes through the by-member
+                                        // endpoint so this works for computed birthdays
+                                        // that don't have a care_event row yet.
                                         ignoreEventMutation.mutate({
-                                          eventId: task.data.id,
+                                          eventId: task.data?.id,
                                           memberId: task.member_id,
+                                          type: 'birthday',
                                         });
                                         toast.success(t('toasts.ignored'));
                                       } else {
