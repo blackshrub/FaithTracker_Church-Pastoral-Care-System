@@ -1186,9 +1186,9 @@ export const Dashboard = () => {
                   <Button
                     type="submit"
                     className="flex-1 h-12 bg-teal-500 hover:bg-teal-600 text-white font-semibold"
-                    disabled={selectedMemberIds.length === 0}
+                    disabled={selectedMemberIds.length === 0 || createEventMutation.isPending}
                   >
-                    {t('buttons.save_care_event')}
+                    {createEventMutation.isPending ? t('saving') : t('buttons.save_care_event')}
                   </Button>
                 </div>
               </form>
