@@ -32,6 +32,9 @@ export interface MemberDetailData {
   griefTimeline: GriefStage[];
   accidentTimeline: AccidentFollowup[];
   aidSchedules: FinancialAidSchedule[];
+  // Prefetch parity with MemberDetail.jsx — without this the Notes tab
+  // appeared empty after a prefetched navigation.
+  pastoralNotes: unknown[];
 }
 
 export interface UsePrefetchReturn {
@@ -64,14 +67,25 @@ export function usePrefetch(): UsePrefetchReturn {
         queryClient.prefetchQuery({
           queryKey: ['member', memberId],
           queryFn: async (): Promise<MemberDetailData> => {
-            const [memberRes, eventsRes, griefRes, accidentRes, aidSchedulesRes] =
-              await Promise.all([
-                api.get(`/members/${memberId}`),
-                api.get(`/care-events?member_id=${memberId}`),
-                api.get(`/grief-support/member/${memberId}`).catch(() => ({ data: [] })),
-                api.get(`/accident-followup/member/${memberId}`).catch(() => ({ data: [] })),
-                api.get(`/financial-aid-schedules/member/${memberId}`).catch(() => ({ data: [] })),
-              ]);
+            // Mirror MemberDetail.jsx's queryFn exactly so a prefetch hit
+            // populates every field the page reads — previously
+            // pastoral_notes was missing here, so the Notes tab appeared
+            // empty after a prefetched navigation until staleTime expired.
+            const [
+              memberRes,
+              eventsRes,
+              griefRes,
+              accidentRes,
+              aidSchedulesRes,
+              pastoralNotesRes,
+            ] = await Promise.all([
+              api.get(`/members/${memberId}`),
+              api.get(`/care-events?member_id=${memberId}`),
+              api.get(`/grief-support/member/${memberId}`).catch(() => ({ data: [] })),
+              api.get(`/accident-followup/member/${memberId}`).catch(() => ({ data: [] })),
+              api.get(`/financial-aid-schedules/member/${memberId}`).catch(() => ({ data: [] })),
+              api.get(`/pastoral-notes/member/${memberId}`).catch(() => ({ data: [] })),
+            ]);
 
             const sortedEvents = (eventsRes.data || []).sort((a: CareEvent, b: CareEvent) => {
               const dateCompare =
@@ -86,6 +100,7 @@ export function usePrefetch(): UsePrefetchReturn {
               griefTimeline: griefRes.data,
               accidentTimeline: accidentRes.data,
               aidSchedules: aidSchedulesRes.data || [],
+              pastoralNotes: pastoralNotesRes.data || [],
             };
           },
           staleTime: PREFETCH_STALE_TIME,

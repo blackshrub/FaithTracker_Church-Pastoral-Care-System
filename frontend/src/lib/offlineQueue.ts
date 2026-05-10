@@ -103,9 +103,15 @@ function openDB(): Promise<IDBDatabase> {
  */
 class OfflineQueue {
   private db: IDBDatabase | null;
-  private isOnline: boolean;
+  public isOnline: boolean;
   private syncInProgress: boolean;
   private listeners: Set<QueueChangeListener>;
+  // Stored handler references so destroy() can remove the listeners.
+  // Without these, the listeners leaked permanently (constructor-attached,
+  // never detached) and the constructor's auto-sync raced with the
+  // duplicate auto-sync in useOfflineSync — both fired on every reconnect.
+  private onlineHandler?: () => void;
+  private offlineHandler?: () => void;
 
   constructor() {
     this.db = null;
@@ -113,16 +119,32 @@ class OfflineQueue {
     this.syncInProgress = false;
     this.listeners = new Set();
 
-    // Listen for online/offline events
+    // Track the navigator.onLine status so direct reads of
+    // offlineQueue.isOnline stay correct. Sync orchestration lives in
+    // useOfflineSync (single owner) — we deliberately do NOT call
+    // this.sync() here to avoid the double-fire that races with the
+    // hook's useEffect-driven auto-sync.
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => {
+      this.onlineHandler = () => {
         this.isOnline = true;
-        this.sync();
-      });
-      window.addEventListener('offline', () => {
+      };
+      this.offlineHandler = () => {
         this.isOnline = false;
-      });
+      };
+      window.addEventListener('online', this.onlineHandler);
+      window.addEventListener('offline', this.offlineHandler);
     }
+  }
+
+  /** Detach window listeners. Call from teardown / HMR cleanup. */
+  destroy(): void {
+    if (typeof window !== 'undefined') {
+      if (this.onlineHandler) window.removeEventListener('online', this.onlineHandler);
+      if (this.offlineHandler) window.removeEventListener('offline', this.offlineHandler);
+    }
+    this.onlineHandler = undefined;
+    this.offlineHandler = undefined;
+    this.listeners.clear();
   }
 
   /**

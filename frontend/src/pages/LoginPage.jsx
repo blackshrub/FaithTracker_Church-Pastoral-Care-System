@@ -65,7 +65,22 @@ export const LoginPage = () => {
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+      // Map known status codes to safe user-facing copy. Showing the
+      // backend's raw detail string risks leaking the caller IP, the
+      // attempted email, or internal error context — none of which the
+      // login UI should surface.
+      const status = err.response?.status;
+      if (status === 429) {
+        setError('Too many failed login attempts. Please wait a few minutes before trying again.');
+      } else if (status === 403) {
+        setError('This account is disabled. Please contact your administrator.');
+      } else if (status === 400) {
+        setError('Please select a campus to continue.');
+      } else if (status === 401) {
+        setError('Invalid email or password.');
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

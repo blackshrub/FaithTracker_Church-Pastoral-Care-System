@@ -22,7 +22,11 @@ const UPLOAD_TIMEOUT = 120000; // 2 minutes for file uploads
 // Retry configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY_BASE = 1000; // Base delay of 1 second
-const RETRYABLE_STATUS_CODES: number[] = [408, 429, 500, 502, 503, 504];
+// 429 is intentionally NOT retried. The server is telling us we're over
+// the rate limit; retrying immediately just wastes more of the bucket and
+// hides the response from UIs that need to surface "too many attempts" to
+// the user (e.g. login). Caller-driven backoff is the right pattern.
+const RETRYABLE_STATUS_CODES: number[] = [408, 500, 502, 503, 504];
 
 /** Extended config to track retry count internally */
 interface RetryableAxiosRequestConfig extends InternalAxiosRequestConfig {
