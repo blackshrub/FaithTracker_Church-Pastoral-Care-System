@@ -3709,6 +3709,9 @@ async def update_automation_settings(data: AutomationSettingsUpdate, request: Re
 @get("/settings/overdue_writeoff")
 async def get_overdue_writeoff_settings(request: Request) -> dict:
     """Get overdue write-off threshold settings"""
+    # Auth required to match every other /settings/* endpoint (was the
+    # one outlier that returned operational config to anonymous callers).
+    await get_current_user(request)
     try:
         settings = await db.settings.find_one({"key": "overdue_writeoff"}, {"_id": 0})
         return (
@@ -5420,7 +5423,9 @@ async def get_activity_logs(
     action_type: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
-    limit: int = 100,
+    # Cap so a malicious caller cannot pass limit=1M and force a full
+    # collection scan + huge response.
+    limit: int = Parameter(default=100, ge=1, le=500),
 ) -> dict:
     """
     Get activity logs with optional filters
@@ -6248,13 +6253,14 @@ async def get_pastoral_note(note_id: str, request: Request) -> dict:
     """Get a single pastoral note with full details including edit history"""
     current_user = await get_current_user(request)
 
-    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    # Scope by campus at the DB level. The previous post-fetch Python check
+    # could be bypassed when both sides happened to have None campus_id
+    # (None != None evaluates False), exposing notes across tenants.
+    note = await db.pastoral_notes.find_one(
+        {"id": note_id, **get_campus_filter(current_user)}, {"_id": 0}
+    )
     if not note:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
-
-    # Check campus access
-    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
-        raise PermissionDeniedException("You don't have access to this note")
 
     # Check private note access
     if note.get("is_private") and note.get("created_by") != current_user["id"]:
@@ -6272,13 +6278,14 @@ async def update_pastoral_note(note_id: str, data: PastoralNoteUpdate, request: 
     """Update a pastoral note (saves edit history)"""
     current_user = await get_current_user(request)
 
-    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    # Scope by campus at the DB level. The previous post-fetch Python check
+    # could be bypassed when both sides happened to have None campus_id
+    # (None != None evaluates False), exposing notes across tenants.
+    note = await db.pastoral_notes.find_one(
+        {"id": note_id, **get_campus_filter(current_user)}, {"_id": 0}
+    )
     if not note:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
-
-    # Check campus access
-    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
-        raise PermissionDeniedException("You don't have access to this note")
 
     # Check private note access - only creator can edit private notes
     if note.get("is_private") and note.get("created_by") != current_user["id"]:
@@ -6358,13 +6365,14 @@ async def delete_pastoral_note(note_id: str, request: Request) -> dict:
     """Delete a pastoral note"""
     current_user = await get_current_user(request)
 
-    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    # Scope by campus at the DB level. The previous post-fetch Python check
+    # could be bypassed when both sides happened to have None campus_id
+    # (None != None evaluates False), exposing notes across tenants.
+    note = await db.pastoral_notes.find_one(
+        {"id": note_id, **get_campus_filter(current_user)}, {"_id": 0}
+    )
     if not note:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
-
-    # Check campus access
-    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
-        raise PermissionDeniedException("You don't have access to this note")
 
     # Check private note access - only creator or admin can delete
     if (
@@ -6396,13 +6404,14 @@ async def complete_note_followup(note_id: str, request: Request) -> dict:
     """Mark a pastoral note's follow-up as completed"""
     current_user = await get_current_user(request)
 
-    note = await db.pastoral_notes.find_one({"id": note_id}, {"_id": 0})
+    # Scope by campus at the DB level. The previous post-fetch Python check
+    # could be bypassed when both sides happened to have None campus_id
+    # (None != None evaluates False), exposing notes across tenants.
+    note = await db.pastoral_notes.find_one(
+        {"id": note_id, **get_campus_filter(current_user)}, {"_id": 0}
+    )
     if not note:
         raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Pastoral note not found")
-
-    # Check campus access
-    if current_user["role"] != "full_admin" and current_user.get("campus_id") != note.get("campus_id"):
-        raise PermissionDeniedException("You don't have access to this note")
 
     if not note.get("follow_up_date"):
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="This note has no follow-up scheduled")

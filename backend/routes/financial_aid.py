@@ -183,8 +183,11 @@ async def create_aid_schedule(data: FinancialAidScheduleCreate, request: Request
 
         await db.financial_aid_schedules.insert_one(schedule_dict)
 
-        # Invalidate dashboard cache
-        await _invalidate_dashboard_cache(current_user["campus_id"])
+        # Invalidate dashboard cache for the schedule's campus, NOT the
+        # caller's. full_admin has campus_id=None and the bare key access
+        # `current_user["campus_id"]` raised KeyError. Resolved member campus
+        # (computed above as schedule_campus_id) is the right invalidation key.
+        await _invalidate_dashboard_cache(schedule_campus_id)
 
         return aid_schedule
     except Exception as e:

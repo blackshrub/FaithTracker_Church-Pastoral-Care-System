@@ -588,6 +588,33 @@ async def update_user(user_id: str, data: UserUpdate, request: Request) -> dict:
             update_data["hashed_password"] = get_password_hash(update_data["password"])
             del update_data["password"]
 
+        # Privilege-escalation / lockout guards.
+        # 1. A full_admin must not be able to demote themselves or flip
+        #    their own is_active flag (would lock the only admin out).
+        # 2. A full_admin must not be able to demote/lock-out ANOTHER
+        #    full_admin or move them to a different campus (no role
+        #    rivalry between peers; a super-admin promotion procedure
+        #    should be a separate, manual database operation).
+        target = await db.users.find_one({"id": user_id}, {"_id": 0, "role": 1, "id": 1})
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        is_self = user_id == current_user["id"]
+        target_is_full_admin = target.get("role") == UserRole.FULL_ADMIN.value
+        sensitive_fields = {"role", "campus_id", "is_active"}
+        attempted_sensitive = sensitive_fields & set(update_data.keys())
+
+        if attempted_sensitive and is_self:
+            raise HTTPException(
+                status_code=HTTP_403_FORBIDDEN,
+                detail="Cannot change your own role, campus, or active status",
+            )
+        if attempted_sensitive and target_is_full_admin:
+            raise HTTPException(
+                status_code=HTTP_403_FORBIDDEN,
+                detail="Cannot change role/campus/is_active of another full_admin",
+            )
+
         update_data["updated_at"] = datetime.now(UTC)
 
         result = await db.users.update_one({"id": user_id}, {"$set": update_data})
