@@ -10,6 +10,7 @@ Provides:
 
 import asyncio
 import os
+import re
 import uuid
 from datetime import UTC, datetime
 
@@ -19,6 +20,32 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # Test database configuration
 TEST_DB_NAME = "faithtracker_test"
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+
+# ---------------------------------------------------------------------------
+# Per-worker DB isolation for pytest-xdist
+# ---------------------------------------------------------------------------
+# Each xdist worker gets its own MongoDB database (faithtracker_test_gw0,
+# gw1, ...). We rewrite MONGO_URL HERE — at conftest import time, before
+# any test or server module touches it — so the global `db` in server.py
+# (which is derived from MONGO_URL at import time) lands on the same
+# per-worker DB the test_db fixture cleans.
+#
+# Without this, tests insert into faithtracker_test_gw5 via the fixture
+# but the SUT reads from faithtracker_test (URL's default) — every read
+# returns empty, every write races other workers, ~50 false failures.
+_worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
+if _worker_id != "master" and TEST_DB_NAME in MONGO_URL:
+    _per_worker_db = f"{TEST_DB_NAME}_{_worker_id}"
+    # Replace `/faithtracker_test` (followed by ? or end of string) with
+    # the per-worker variant. Using a regex with lookahead so we don't
+    # accidentally rewrite a substring that happens to appear elsewhere.
+    MONGO_URL = re.sub(
+        rf"/{re.escape(TEST_DB_NAME)}(?=$|\?)",
+        f"/{_per_worker_db}",
+        MONGO_URL,
+        count=1,
+    )
+    os.environ["MONGO_URL"] = MONGO_URL
 
 
 @pytest.fixture(scope="session")
@@ -38,9 +65,16 @@ async def test_db_client():
 
 
 @pytest.fixture
-async def test_db(test_db_client):
-    """Clean test database for each test"""
-    db = test_db_client[TEST_DB_NAME]
+async def test_db(test_db_client, worker_id):
+    """Clean test database for each test.
+
+    Per-worker DB name (faithtracker_test_gw0, gw1, ...) so xdist parallel
+    workers don't share state and race on collection writes. When run
+    serially (no -n), worker_id is 'master' and we use the original name
+    for back-compat with any tooling that connects to faithtracker_test.
+    """
+    db_name = TEST_DB_NAME if worker_id == "master" else f"{TEST_DB_NAME}_{worker_id}"
+    db = test_db_client[db_name]
 
     # Clean all collections before test
     collections = await db.list_collection_names()

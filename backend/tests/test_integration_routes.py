@@ -3130,6 +3130,17 @@ class TestDashboardHelpers:
 class TestDependencies:
     """Tests for dependencies.py functions"""
 
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        # Without this, the global mock_db / init_dependencies state is
+        # whatever the previously-run test class left it as. Under xdist
+        # parallel execution test class order is not deterministic, so
+        # tests that override mock_db.users.find_one would mutate a
+        # different mock than dependencies.get_db() returns.
+        global mock_db
+        mock_db = make_mock_db()
+        init_dependencies(mock_db, TEST_JWT_SECRET)
+
     def test_get_campus_filter_full_admin(self):
         from dependencies import get_campus_filter
 

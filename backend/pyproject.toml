@@ -87,8 +87,11 @@ dependencies = [
 # ============================================================================
 [dependency-groups]
 dev = [
-    "pytest-xdist==3.5.0",        # parallel pytest
+    "pytest-xdist>=3.5.0",        # parallel pytest (-n auto)
     "pytest-timeout>=2.4.0",      # per-test timeout (Round-1+ test infra)
+    "pytest-testmon>=2.1.0",      # incremental: only run tests touched by code changes
+    "mongomock>=4.3.0",           # in-memory MongoDB for unit tests (no Docker)
+    "mongomock-motor>=0.0.34",    # async wrapper for mongomock
     "ruff==0.11.12",              # lint + format
     "pip-audit==2.7.3",           # security scanner
     "ipython==8.18.1",            # better REPL

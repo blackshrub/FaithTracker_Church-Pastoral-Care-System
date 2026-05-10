@@ -214,6 +214,55 @@ uv-export: ## Export locked prod deps to requirements.txt format (for tooling th
 	@echo "$(GREEN)backend/requirements.lock written.$(NC)"
 
 #===============================================================================
+# PYTEST FAST RUNNER (parallel, per-worker DB, bytecode-cached)
+#===============================================================================
+
+# Test runner flags shared by all test targets. PYTHONDONTWRITEBYTECODE=0
+# lets .pyc files persist between runs in the volume mount → saves
+# ~2-3 s of repeated import parsing on warm runs.
+PYTEST_RUN := docker run --rm \
+	--network faithtracker-network \
+	-e MONGO_URL="mongodb://admin:fefb33c5e0eee893f2ee752a480cacc6@mongo:27017/faithtracker_test?authSource=admin" \
+	-e JWT_SECRET_KEY="test-secret-key-for-pytest-only" \
+	-e MEILI_URL="http://meilisearch:7700" \
+	-e MEILI_MASTER_KEY="faithtracker-search-key" \
+	-e DRAGONFLY_URL="redis://dragonfly:6379/0" \
+	-e ENVIRONMENT="development" \
+	-e ENCRYPTION_KEY="dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy0xMjM=" \
+	-e PYTHONDONTWRITEBYTECODE=0 \
+	-v $(PWD)/backend:/app:rw \
+	--user 0:0 \
+	--entrypoint sh \
+	faithtracker_church-pastoral-care-system-backend
+
+test: ## Run full pytest suite (parallel, all CPU cores) — ~40 s
+	@echo "$(GREEN)Running pytest in parallel...$(NC)"
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest"
+
+test-slow: ## Run pytest suite INCLUDING slow tests (network-bound)
+	@echo "$(GREEN)Running pytest including slow markers...$(NC)"
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest -m 'slow or not slow'"
+
+test-incremental: ## Run only tests touched by uncommitted code changes (testmon, serial)
+	@echo "$(GREEN)Running pytest --testmon (serial; best for narrow code edits)...$(NC)"
+	@# testmon needs serial execution (-n 0). On this codebase the
+	@# narrow-test selection rarely beats `make test` (40 s parallel),
+	@# but is useful for tight edit→test loops on a single module.
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest --testmon -n 0"
+
+test-failed: ## Re-run only tests that failed last time (--lf)
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest --lf"
+
+test-fast: ## Failed-first ordering — surface flakes quickly (--ff -x)
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest --ff -x"
+
+test-profile: ## Run tests with --durations=20 to find slowest
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest --durations=20"
+
+test-serial: ## Run tests serially (debug shared-state issues, ~3 min)
+	$(PYTEST_RUN) -c "uv sync --frozen --group dev > /dev/null 2>&1 && uv run pytest -n 0"
+
+#===============================================================================
 # ANGIE WEB SERVER COMMANDS (Host-level)
 #===============================================================================
 

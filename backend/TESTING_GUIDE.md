@@ -75,21 +75,39 @@ See test_api.sh for complete examples!
 
 ## Pytest Suite
 
-Run the full unit + integration suite (1232 tests, ~3 min):
+**Default `pytest` command** (1231 tests, ~40 s on 8-core host):
 
 ```bash
 cd /app/backend
-pytest tests/ -p no:cacheprovider --tb=line -ra --timeout=10 \
-  --deselect 'tests/test_integration_server.py::TestSSEStream' \
-  --deselect 'tests/test_new_features.py::TestChangeStreamWatcherStartStop' \
-  --deselect 'tests/test_new_features.py::TestChangeStreamWatcherIsRunning' \
-  --deselect 'tests/test_new_features.py::TestChangeStreamWatcherIsReplicaSetAvailable' \
-  --deselect 'tests/test_new_features.py::TestModuleLevelFunctions' \
-  --ignore=tests/test_scheduler.py \
-  --ignore=tests/test_scheduler_comprehensive.py \
-  --ignore=tests/test_scheduler_jobs.py \
-  --ignore=tests/test_server_coverage.py
+uv run pytest        # all defaults already in pytest.ini
 ```
+
+`pytest.ini` provides: parallel `-n auto` via xdist (per-worker MongoDB
+isolation), default `-m "not slow"` to skip network-bound tests,
+deselects for the SSE/scheduler/change-stream classes that hang the
+sync TestClient, and Faker/cacheprovider plugin pruning.
+
+### Common workflows
+
+```bash
+make test                # full suite (~40 s)
+make test-slow           # include @pytest.mark.slow tests too
+make test-incremental    # only tests touched by code changes (testmon)
+make test-failed         # re-run only last-failed tests
+make test-fast           # failed-first + stop on first failure (-x)
+make test-profile        # show 20 slowest tests
+make test-serial         # disable parallelism (debug shared state)
+```
+
+### Performance journey
+
+| Configuration                          | Wall time |
+|----------------------------------------|-----------|
+| Baseline (single worker, all tests)    | 168 s     |
+| `+pytest-xdist -n auto` (8 cores)      | 45 s      |
+| `+per-worker MongoDB DB`               | 41 s      |
+| Bytecode cache + plugin pruning        | ~40 s     |
+| `--testmon` after no-op change         | 5 s       |
 
 ### Why are some tests deselected?
 

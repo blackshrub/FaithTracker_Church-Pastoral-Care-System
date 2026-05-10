@@ -450,6 +450,7 @@ class TestPerformMemberSyncForCampus:
             assert result["stats"]["archived"] >= 1
 
     @pytest.mark.asyncio
+    @pytest.mark.slow  # makes a real HTTP call to a nonexistent host (~4s timeout)
     async def test_sync_network_error(self, setup_server, mock_db):
         """Network error during sync is handled gracefully."""
         import httpx as httpx_mod
