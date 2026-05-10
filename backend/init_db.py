@@ -75,14 +75,18 @@ async def create_indexes(db):
     """Create all database indexes"""
     indexes_created = 0
 
-    # Members collection indexes
+    # Members collection indexes. Unique index on `id` is essential — every
+    # cross-collection $lookup uses it as the foreign key (care_events,
+    # grief_support, financial_aid_schedules, pastoral_notes, etc.) and
+    # without it MongoDB does a full collection scan per lookup.
+    await db.members.create_index("id", unique=True)
     await db.members.create_index("campus_id")
     await db.members.create_index("family_group_id")
     await db.members.create_index("last_contact_date")
     await db.members.create_index("engagement_status")
     await db.members.create_index("external_member_id")
     await db.members.create_index([("name", "text"), ("phone", "text")])
-    indexes_created += 6
+    indexes_created += 7
 
     # Care events collection indexes
     await db.care_events.create_index("member_id")

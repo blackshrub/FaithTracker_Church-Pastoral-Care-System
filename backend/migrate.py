@@ -329,6 +329,30 @@ async def migration_012_add_log_ttls_and_lock_index(db):
     return "Added TTL on activity_logs/notification_logs.created_at; unique+TTL on job_locks"
 
 
+async def migration_013_add_members_id_index(db):
+    """
+    Add a unique index on members.id. Round-3 audit found that several
+    aggregation pipelines $lookup from care_events / grief_support /
+    financial_aid_schedules / pastoral_notes onto members.id with no
+    index, forcing a full collection scan per lookup. Hundreds of care
+    events × thousands of members = O(N*M) at every dashboard load.
+
+    If duplicate ids exist (highly unlikely — they're UUIDs — but
+    defensive), keep the most recent and delete the rest before creating
+    the unique index.
+    """
+    with contextlib.suppress(Exception):
+        seen: set[str] = set()
+        async for doc in db.members.find({}, {"_id": 1, "id": 1}).sort("created_at", -1):
+            mid = doc.get("id")
+            if mid and mid in seen:
+                await db.members.delete_one({"_id": doc["_id"]})
+            elif mid:
+                seen.add(mid)
+    await db.members.create_index("id", unique=True)
+    return "Added unique index on members.id"
+
+
 # ==================== MIGRATION REGISTRY ====================
 
 # List of all migrations in order
@@ -346,6 +370,7 @@ MIGRATIONS: list[tuple[int, str, Callable]] = [
     (10, "Fix corrupted UUIDs", migration_010_fix_corrupted_uuids),
     (11, "Fix activity_logs action_date index to created_at", migration_011_fix_activity_logs_index),
     (12, "TTL on logs + unique index on job_locks", migration_012_add_log_ttls_and_lock_index),
+    (13, "Unique index on members.id (eliminates $lookup full scans)", migration_013_add_members_id_index),
 ]
 
 

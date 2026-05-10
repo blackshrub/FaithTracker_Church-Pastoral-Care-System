@@ -107,14 +107,22 @@ class CacheService:
     async def invalidate_settings(self, key: str, church_id: str) -> bool:
         return await self.delete(key, church_id)
 
+    # Lua script: atomic INCR + EXPIRE-on-first. A non-atomic pipeline
+    # could leave the key without a TTL if the client crashes between
+    # INCR and EXPIRE, producing a permanent counter that an attacker
+    # could exploit to lock out a victim forever.
+    _INCR_TTL_SCRIPT = (
+        "local n = redis.call('incr', KEYS[1]) "
+        "if n == 1 then redis.call('expire', KEYS[1], ARGV[1]) end "
+        "return n"
+    )
+
     async def incr_rate_limit(self, key: str, window_seconds: int = 60) -> int:
         full_key = self._make_key(f"ratelimit:{key}")
         try:
-            pipe = self._client.pipeline()
-            pipe.incr(full_key)
-            pipe.expire(full_key, window_seconds)
-            results = await pipe.execute()
-            return results[0]
+            return int(
+                await self._client.eval(self._INCR_TTL_SCRIPT, 1, full_key, window_seconds)
+            )
         except redis.RedisError as e:
             logger.warning(f"Rate limit incr error for {full_key}: {e}")
             return 0

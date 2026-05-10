@@ -65,6 +65,11 @@ class ChangeStreamWatcher:
         self._task: asyncio.Task | None = None
         self._running = False
         self._replica_set_available = False
+        # Throttle resume-token persistence so a high-write workload
+        # doesn't fan out one Redis SET per change event. 5s gap means at
+        # worst 5s of replay on crash, which is acceptable for an
+        # at-least-once activity stream.
+        self._last_token_save_at: float = 0.0
 
     async def _check_replica_set(self) -> bool:
         """Check if MongoDB is running as a replica set (required for change streams).
@@ -267,12 +272,16 @@ class ChangeStreamWatcher:
                         if not self._running:
                             break
 
-                        # Save resume token for crash recovery
+                        # Save resume token for crash recovery (throttled).
+                        # Persist at most once per 5s so high-write
+                        # workloads don't trigger one Redis SET per event.
                         token = change.get("_id")
                         if token:
                             resume_token = token
-                            # Save periodically (not on every event to reduce writes)
-                            await self._save_resume_token(token)
+                            now_ts = asyncio.get_event_loop().time()
+                            if now_ts - self._last_token_save_at >= 5.0:
+                                await self._save_resume_token(token)
+                                self._last_token_save_at = now_ts
 
                         full_doc = change.get("fullDocument")
                         if not full_doc:
