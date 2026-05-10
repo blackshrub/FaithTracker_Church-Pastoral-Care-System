@@ -143,6 +143,15 @@ export const Settings = () => {
     { stage: '6_months', days: 180, name: 'Fifth Follow-up' },
     { stage: '1_year', days: 365, name: 'Sixth Follow-up (1 Year Anniversary)' },
   ]);
+  // Per-section "loaded from server" flags. Save buttons stay disabled until
+  // the corresponding GET succeeds — otherwise a transient load failure would
+  // leave default values in the form and the next Save would overwrite real
+  // backend config with defaults (silent destructive write).
+  const [engagementLoaded, setEngagementLoaded] = useState(false);
+  const [griefLoaded, setGriefLoaded] = useState(false);
+  const [accidentLoaded, setAccidentLoaded] = useState(false);
+  const [automationLoaded, setAutomationLoaded] = useState(false);
+  const [writeoffLoaded, setWriteoffLoaded] = useState(false);
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -163,7 +172,8 @@ export const Settings = () => {
   const [digestTime, setDigestTime] = useState('08:00');
   const [automationLoading, setAutomationLoading] = useState(false);
 
-  // Load automation settings on mount
+  // Load automation settings on mount. automationLoaded gates the Save button
+  // so a failed GET can't overwrite real digestTime/whatsappGateway with defaults.
   useEffect(() => {
     const loadAutomationSettings = async () => {
       try {
@@ -172,8 +182,11 @@ export const Settings = () => {
           setDigestTime(response.data.digestTime || '08:00');
           setWhatsappGateway(response.data.whatsappGateway || '');
         }
-      } catch (_error) {
-        // Settings not available - use defaults
+        setAutomationLoaded(true);
+      } catch (error) {
+        toast.error(
+          'Failed to load automation settings: ' + (error.response?.data?.detail || error.message)
+        );
       }
     };
     loadAutomationSettings();
@@ -221,7 +234,7 @@ export const Settings = () => {
       // Refresh user data without full page reload
       await refreshUser();
     } catch (error) {
-      toast.error('Failed to upload photo');
+      toast.error('Failed to upload photo: ' + (error.response?.data?.detail || error.message));
     } finally {
       setUploading(false);
     }
@@ -390,37 +403,50 @@ export const Settings = () => {
     }
   };
 
-  // Load engagement, grief, and accident settings from backend on mount
+  // Load engagement, grief, and accident settings from backend on mount.
+  // Each section flips its *Loaded flag only on success; on failure we surface
+  // a toast and keep the Save button disabled so a transient GET error can't
+  // turn into a destructive write of default values.
   useEffect(() => {
     const loadSettings = async () => {
-      try {
-        const [engRes, griefRes, accidentRes] = await Promise.allSettled([
-          api.get('/settings/engagement'),
-          api.get('/settings/grief-stages'),
-          api.get('/settings/accident-followup'),
-        ]);
-        if (engRes.status === 'fulfilled' && engRes.value.data) {
-          setAtRiskDays(engRes.value.data.atRiskDays ?? 60);
-          setInactiveDays(
-            engRes.value.data.disconnectedDays ?? engRes.value.data.inactiveDays ?? 90
-          );
-        }
-        if (
-          griefRes.status === 'fulfilled' &&
-          Array.isArray(griefRes.value.data) &&
-          griefRes.value.data.length > 0
-        ) {
+      const [engRes, griefRes, accidentRes] = await Promise.allSettled([
+        api.get('/settings/engagement'),
+        api.get('/settings/grief-stages'),
+        api.get('/settings/accident-followup'),
+      ]);
+      if (engRes.status === 'fulfilled' && engRes.value.data) {
+        setAtRiskDays(engRes.value.data.atRiskDays ?? 60);
+        setInactiveDays(engRes.value.data.disconnectedDays ?? engRes.value.data.inactiveDays ?? 90);
+        setEngagementLoaded(true);
+      } else if (engRes.status === 'rejected') {
+        toast.error(
+          'Failed to load engagement settings: ' +
+            (engRes.reason?.response?.data?.detail || engRes.reason?.message || 'unknown error')
+        );
+      }
+      if (griefRes.status === 'fulfilled' && Array.isArray(griefRes.value.data)) {
+        if (griefRes.value.data.length > 0) {
           setGriefStages(griefRes.value.data);
         }
-        if (
-          accidentRes.status === 'fulfilled' &&
-          Array.isArray(accidentRes.value.data) &&
-          accidentRes.value.data.length > 0
-        ) {
+        setGriefLoaded(true);
+      } else if (griefRes.status === 'rejected') {
+        toast.error(
+          'Failed to load grief stages: ' +
+            (griefRes.reason?.response?.data?.detail || griefRes.reason?.message || 'unknown error')
+        );
+      }
+      if (accidentRes.status === 'fulfilled' && Array.isArray(accidentRes.value.data)) {
+        if (accidentRes.value.data.length > 0) {
           setAccidentFollowUp(accidentRes.value.data);
         }
-      } catch (_error) {
-        // Use defaults on failure
+        setAccidentLoaded(true);
+      } else if (accidentRes.status === 'rejected') {
+        toast.error(
+          'Failed to load accident follow-up settings: ' +
+            (accidentRes.reason?.response?.data?.detail ||
+              accidentRes.reason?.message ||
+              'unknown error')
+        );
       }
     };
     loadSettings();
@@ -445,10 +471,14 @@ export const Settings = () => {
           setCampusData(campusRes.data); // Store full campus data
         } catch (error) {
           setCampusTimezone(defaultTimezone);
+          toast.error(
+            'Failed to load campus timezone: ' + (error.response?.data?.detail || error.message)
+          );
         }
       }
 
-      // Load writeoff settings
+      // Load writeoff settings. writeoffLoaded gates the Save button so a
+      // failed GET can't silently turn into a destructive write of defaults.
       const writeoffRes = await api.get(`/settings/overdue_writeoff`);
       if (writeoffRes.data?.data) {
         setWriteoffBirthday(writeoffRes.data.data.birthday || 7);
@@ -456,8 +486,12 @@ export const Settings = () => {
         setWriteoffAccident(writeoffRes.data.data.accident_illness || 14);
         setWriteoffGrief(writeoffRes.data.data.grief_support || 14);
       }
-    } catch (_error) {
-      // Settings not available - use defaults
+      setWriteoffLoaded(true);
+    } catch (error) {
+      toast.error(
+        'Failed to load campus/writeoff settings: ' +
+          (error.response?.data?.detail || error.message)
+      );
     }
   };
 
@@ -473,7 +507,9 @@ export const Settings = () => {
       });
       toast.success(t('toasts.writeoff_saved'));
     } catch (error) {
-      toast.error(t('toasts.failed_save_writeoff'));
+      toast.error(
+        t('toasts.failed_save_writeoff') + ': ' + (error.response?.data?.detail || error.message)
+      );
     }
   };
 
@@ -496,7 +532,9 @@ export const Settings = () => {
       });
       toast.success(t('toasts.timezone_saved'));
     } catch (error) {
-      toast.error(t('toasts.failed_save_timezone'));
+      toast.error(
+        t('toasts.failed_save_timezone') + ': ' + (error.response?.data?.detail || error.message)
+      );
     }
   };
 
@@ -839,7 +877,7 @@ export const Settings = () => {
               {user?.role === 'full_admin' && (
                 <Button
                   onClick={saveAutomationSettings}
-                  disabled={automationLoading}
+                  disabled={automationLoading || !automationLoaded}
                   className="bg-teal-500 hover:bg-teal-600"
                 >
                   {automationLoading ? 'Saving...' : 'Save Automation Settings'}
@@ -890,6 +928,7 @@ export const Settings = () => {
               ))}
               <Button
                 onClick={saveGriefStages}
+                disabled={!griefLoaded}
                 className="bg-teal-500 hover:bg-teal-600 text-white"
               >
                 Save Grief Stages Configuration
@@ -933,6 +972,7 @@ export const Settings = () => {
               ))}
               <Button
                 onClick={saveAccidentFollowUp}
+                disabled={!accidentLoaded}
                 className="bg-teal-500 hover:bg-teal-600 text-white"
               >
                 Save Accident/Illness Follow-up Configuration
@@ -985,6 +1025,7 @@ export const Settings = () => {
               </div>
               <Button
                 onClick={saveEngagementSettings}
+                disabled={!engagementLoaded}
                 className="bg-teal-500 hover:bg-teal-600 text-white"
               >
                 Save Engagement Thresholds
@@ -1093,7 +1134,9 @@ export const Settings = () => {
                 </ul>
               </div>
 
-              <Button onClick={saveWriteoffSettings}>Save Write-off Settings</Button>
+              <Button onClick={saveWriteoffSettings} disabled={!writeoffLoaded}>
+                Save Write-off Settings
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1250,7 +1293,9 @@ export const Settings = () => {
                     <li>• All date displays in the application</li>
                   </ul>
                 </div>
-                <Button onClick={saveTimezoneSettings}>Save Timezone Settings</Button>
+                <Button onClick={saveTimezoneSettings} disabled={!writeoffLoaded || !campusData}>
+                  Save Timezone Settings
+                </Button>
               </CardContent>
             </Card>
 
