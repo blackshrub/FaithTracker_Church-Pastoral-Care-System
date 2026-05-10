@@ -23,6 +23,31 @@ USER_PHOTO_SIZE = (400, 400)
 
 JPEG_QUALITY = 85
 
+# Cap pixel count to defend against decompression bombs.
+# A few-MB JPEG can expand to hundreds of millions of pixels and exhaust
+# worker memory before the resize call. 40 MP comfortably covers any phone
+# camera shot while rejecting maliciously-crafted payloads.
+MAX_IMAGE_PIXELS = 40_000_000
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+
+
+def _open_image_safely(image_bytes: bytes) -> Image.Image:
+    """Open with explicit pixel-count guard.
+
+    PIL only raises DecompressionBombError when MAX_IMAGE_PIXELS is exceeded
+    AT decode time, but the size is known from the header — fail fast before
+    decoding to avoid the memory spike.
+    """
+    img = Image.open(io.BytesIO(image_bytes))
+    width, height = img.size
+    if width * height > MAX_IMAGE_PIXELS:
+        raise ValueError(
+            f"Image too large: {width}x{height} ({width * height:,} pixels) "
+            f"exceeds limit of {MAX_IMAGE_PIXELS:,} pixels"
+        )
+    img.load()  # decode now (still inside the guarded path)
+    return img
+
 
 class ImageService:
     @staticmethod
@@ -31,7 +56,7 @@ class ImageService:
     ) -> dict[str, str]:
         results = {}
 
-        img = Image.open(io.BytesIO(image_bytes))
+        img = _open_image_safely(image_bytes)
 
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
@@ -52,7 +77,7 @@ class ImageService:
     def _process_single_image_sync(
         image_bytes: bytes, size: tuple[int, int], output_path: Path, quality: int = JPEG_QUALITY
     ) -> str:
-        img = Image.open(io.BytesIO(image_bytes))
+        img = _open_image_safely(image_bytes)
 
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
