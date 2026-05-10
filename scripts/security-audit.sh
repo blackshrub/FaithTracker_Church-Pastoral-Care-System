@@ -85,11 +85,14 @@ if docker ps --format '{{.Names}}' | grep -q 'faithtracker-backend'; then
         echo -e "${GREEN}No vulnerabilities found in backend dependencies.${NC}"
     fi
 else
-    echo -e "${YELLOW}Docker container not running. Checking requirements.txt directly...${NC}"
+    echo -e "${YELLOW}Docker container not running. Auditing locked deps from uv.lock...${NC}"
 
-    if command -v pip-audit &> /dev/null; then
+    if command -v pip-audit &> /dev/null && command -v uv &> /dev/null; then
         cd "$PROJECT_ROOT/backend"
-        BACKEND_AUDIT=$(pip-audit -r requirements.txt --progress-spinner off 2>&1) || true
+        # Export the locked production-only deps to a requirements file
+        # pip-audit understands. --no-dev keeps audit focused on prod image.
+        uv export --frozen --no-dev --format requirements.txt -o /tmp/audit-reqs.txt
+        BACKEND_AUDIT=$(pip-audit -r /tmp/audit-reqs.txt --progress-spinner off 2>&1) || true
 
         if echo "$BACKEND_AUDIT" | grep -q "Found [1-9]"; then
             echo -e "${RED}Backend vulnerabilities found:${NC}"

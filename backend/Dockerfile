@@ -2,17 +2,18 @@
 # FaithTracker Backend — Multi-stage Dockerfile
 #
 # PERFORMANCE NOTES:
-# - Stage 1 ("deps") rarely changes. It rebuilds only when requirements.txt,
-#   the apt package list, or the Python base image moves. ~2 min cold,
-#   instant on cache hit.
-# - Stage 2 ("runtime") rebuilds on every code change. ~5-10 s typical.
-# - `uv` replaces `pip` for installs (10-100× faster wheel resolution +
-#   parallel downloads).
+# - Stage 1 ("deps") rarely changes. It rebuilds only when pyproject.toml,
+#   uv.lock, the apt package list, or the Python base image moves.
+#   ~30 s cold (uv parallel resolver), instant on cache hit.
+# - Stage 2 ("runtime") rebuilds on every code change. ~5 s typical.
+# - `uv sync --frozen` installs exactly what's in uv.lock — fully
+#   deterministic across dev/CI/prod, with hash verification on every
+#   wheel for supply-chain protection.
 # - BuildKit cache mounts persist apt + uv caches across builds.
 #
 # Build:  DOCKER_BUILDKIT=1 docker compose build backend
-# Force-rebuild deps: docker compose build --no-cache backend (or bump
-# requirements.txt — the deps layer key is its hash).
+# Update deps: edit pyproject.toml then `make uv-lock` (regenerates uv.lock).
+# Force-rebuild deps: docker compose build --no-cache backend.
 
 # =============================================================================
 # Stage 1: deps — system libs + Python wheels (cacheable, slow-changing)
@@ -21,10 +22,13 @@ FROM python:3.12-slim AS deps
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    # uv: parallel + Rust-resolved installer
-    UV_SYSTEM_PYTHON=1 \
+    # uv: parallel + Rust-resolved installer.
+    # UV_LINK_MODE=copy avoids hardlink errors on bind-mounted caches.
     UV_LINK_MODE=copy \
-    UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+    UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+    # Put the uv-managed venv on PATH so `granian`, `pytest`, etc. resolve
+    # in both stages without an explicit `.venv/bin/` prefix.
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
@@ -52,13 +56,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # HTTPS index — no PIP_TRUSTED_HOST; cert verification stays on.
 RUN pip install --no-cache-dir uv
 
-# Install Python deps with uv. The cache mount on /root/.cache/uv keeps
-# downloaded wheels warm across builds, so even a deps-stage rebuild is
-# 5-10× faster than the cold path. --system installs into the base
-# interpreter (no venv) which keeps the runtime image simple.
-COPY requirements.txt .
+# Install Python deps from the locked manifest. uv sync --frozen reads
+# uv.lock and refuses to update it (build deterministic across machines).
+# --no-dev excludes the [dependency-groups.dev] group (pytest-xdist, ruff,
+# ipython, mypy, etc.) so the production image stays lean.
+# --no-install-project skips installing the local project as a package
+# (the backend runs as scripts, not as an installed module).
+COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system -r requirements.txt
+    uv sync --frozen --no-dev --no-install-project
 
 # =============================================================================
 # Stage 2: runtime — code + non-root user (fast-changing)
@@ -77,9 +83,10 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
 # Copy application code with correct ownership
 COPY --chown=app:app . .
 
-# Create writable runtime dirs owned by app user
+# Create writable runtime dirs + transfer ownership of the venv (built as
+# root in stage 1) to the app user so import + writes still work post-USER.
 RUN mkdir -p /app/uploads /app/user_photos \
- && chown -R app:app /app/uploads /app/user_photos \
+ && chown -R app:app /app/uploads /app/user_photos /app/.venv \
  && chmod 755 /app/uploads /app/user_photos
 
 # Drop privileges — request handling, scheduler, file uploads all run as UID 1001.

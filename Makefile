@@ -170,6 +170,50 @@ rebuild-frontend: ## Rebuild frontend without cache
 	@echo "$(YELLOW)Run 'make restart-frontend' to apply changes$(NC)"
 
 #===============================================================================
+# UV / PYTHON DEPENDENCY MANAGEMENT (backend/pyproject.toml + uv.lock)
+#===============================================================================
+
+# Run uv inside the existing backend image so the host doesn't need uv installed.
+UV := docker run --rm --user 0:0 \
+	-v $(PWD)/backend:/work -w /work \
+	-e UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+	-e UV_LINK_MODE=copy -e UV_CACHE_DIR=/tmp/uv-cache \
+	faithtracker_church-pastoral-care-system-backend:latest uv
+
+uv-add: ## Add a runtime dep: make uv-add PKG=httpx
+	@test -n "$(PKG)" || (echo "$(YELLOW)Usage: make uv-add PKG=<package>[==version]$(NC)" && exit 1)
+	$(UV) add $(PKG)
+	@echo "$(GREEN)Added $(PKG). Commit pyproject.toml + uv.lock.$(NC)"
+
+uv-add-dev: ## Add a dev dep: make uv-add-dev PKG=ruff
+	@test -n "$(PKG)" || (echo "$(YELLOW)Usage: make uv-add-dev PKG=<package>$(NC)" && exit 1)
+	$(UV) add --group dev $(PKG)
+	@echo "$(GREEN)Added $(PKG) to dev group. Commit pyproject.toml + uv.lock.$(NC)"
+
+uv-remove: ## Remove a dep: make uv-remove PKG=httpx
+	@test -n "$(PKG)" || (echo "$(YELLOW)Usage: make uv-remove PKG=<package>$(NC)" && exit 1)
+	$(UV) remove $(PKG)
+
+uv-lock: ## Regenerate uv.lock from pyproject.toml (does not install)
+	$(UV) lock
+	@echo "$(GREEN)uv.lock regenerated. Commit it.$(NC)"
+
+uv-update: ## Upgrade all deps within pyproject.toml constraints
+	$(UV) lock --upgrade
+	@echo "$(GREEN)Lockfile upgraded. Review uv.lock diff before committing.$(NC)"
+
+uv-update-pkg: ## Upgrade a single dep: make uv-update-pkg PKG=httpx
+	@test -n "$(PKG)" || (echo "$(YELLOW)Usage: make uv-update-pkg PKG=<package>$(NC)" && exit 1)
+	$(UV) lock --upgrade-package $(PKG)
+
+uv-tree: ## Show full dependency tree
+	$(UV) tree
+
+uv-export: ## Export locked prod deps to requirements.txt format (for tooling that needs it)
+	$(UV) export --frozen --no-dev --format requirements.txt -o backend/requirements.lock
+	@echo "$(GREEN)backend/requirements.lock written.$(NC)"
+
+#===============================================================================
 # ANGIE WEB SERVER COMMANDS (Host-level)
 #===============================================================================
 
