@@ -123,8 +123,10 @@ async def complete_grief_stage(stage_id: str, request: Request, notes: str | Non
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        # Get stage first
-        stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
+        # Scope by campus so a user from one campus cannot complete a stage
+        # belonging to another by guessing/enumerating stage IDs.
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.grief_support.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Grief stage not found")
 
@@ -210,7 +212,8 @@ async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.grief_support.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Grief stage not found")
 
@@ -284,20 +287,24 @@ async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
 async def undo_grief_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of grief support stage"""
     _assert_initialized()
-    await get_current_user(request)  # Verify auth
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        stage = await db.grief_support.find_one({"id": stage_id}, {"_id": 0})
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.grief_support.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Grief stage not found")
 
         # Delete timeline entries created for this stage (linked by grief_stage_id)
-        await db.care_events.delete_many({"grief_stage_id": stage_id})
+        await db.care_events.delete_many({"grief_stage_id": stage_id, **campus_filter})
 
-        # Delete activity logs related to this grief stage
+        # Delete activity logs related to this grief stage — explicitly scope by
+        # campus_id so the regex cannot accidentally match unrelated activity in
+        # another campus.
         await db.activity_logs.delete_many(
             {
                 "member_id": stage["member_id"],
+                "campus_id": stage["campus_id"],
                 "notes": {"$regex": f"{stage['stage'].replace('_', ' ')}", "$options": "i"},
             }
         )

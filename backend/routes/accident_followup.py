@@ -112,8 +112,9 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: str | 
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        # Get stage first
-        stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
+        # Scope by campus so users cannot complete stages outside their campus.
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.accident_followup.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Accident follow-up stage not found")
 
@@ -250,7 +251,8 @@ async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.accident_followup.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Accident followup not found")
 
