@@ -244,7 +244,8 @@ class TestGetCurrentUser:
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
-        assert "Token is empty or invalid" in str(exc_info.value.detail)
+        # Empty/whitespace token falls through to the generic credentials message.
+        assert "Could not validate credentials" in str(exc_info.value.detail)
 
     async def test_empty_bearer_no_space(self, initialized_db, mock_request):
         """'Bearer' with no token at all (just 7 chars extraction) should raise 401."""
@@ -254,7 +255,8 @@ class TestGetCurrentUser:
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request)
         assert exc_info.value.status_code == 401
-        assert "Token is empty or invalid" in str(exc_info.value.detail)
+        # Empty/whitespace token falls through to the generic credentials message.
+        assert "Could not validate credentials" in str(exc_info.value.detail)
 
     async def test_expired_token(self, initialized_db, mock_request):
         """An expired JWT token should raise 401."""

@@ -78,6 +78,11 @@ def make_mock_db():
         "activity_logs",
         "notification_logs",
         "settings",
+        "refresh_tokens",
+        "job_locks",
+        "migrations",
+        "pastoral_notes",
+        "dashboard_cache",
     ]:
         collection = MagicMock()
         collection.find_one = AsyncMock(return_value=None)
@@ -103,6 +108,19 @@ def make_mock_db():
         collection.insert_many = AsyncMock()
 
         setattr(db, coll, collection)
+
+    # Smart users.find_one: returns the admin user for an "id"-keyed lookup
+    # (the path get_current_user takes), and None for any other filter
+    # (e.g., "email" duplicate checks). Tests can still override with
+    # mock_db.users.find_one = AsyncMock(...) for specific scenarios.
+    _admin = make_admin_user()
+
+    async def _smart_find_one(filt=None, *_, **__):
+        if isinstance(filt, dict) and "id" in filt:
+            return _admin
+        return None
+
+    db.users.find_one = AsyncMock(side_effect=_smart_find_one)
     return db
 
 
@@ -121,9 +139,22 @@ def make_agg_cursor(data_list):
     return cursor
 
 
-def make_request(headers=None, client_ip="127.0.0.1"):
+def make_request(headers=None, client_ip="127.0.0.1", user_id=None):
+    """Mock Litestar Request with a real JWT signed by TEST_JWT_SECRET so
+    route handlers' get_current_user(request) calls succeed without per-test
+    monkey-patching. Defaults to TEST_ADMIN_ID."""
+    import jwt as _jwt
+
+    token = _jwt.encode(
+        {
+            "sub": user_id or TEST_ADMIN_ID,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+        },
+        TEST_JWT_SECRET,
+        algorithm="HS256",
+    )
     req = MagicMock()
-    default_headers = {"Authorization": "Bearer test-token"}
+    default_headers = {"Authorization": f"Bearer {token}"}
     if headers:
         default_headers.update(headers)
     req.headers = default_headers
@@ -241,14 +272,16 @@ class TestAuthRoutesCoverage:
 
     # ---- Lines 92-94: register_user - generic exception -> 500 ----
 
+    @patch("routes.auth.get_current_admin", new_callable=AsyncMock)
     @patch("routes.auth.get_db")
-    async def test_register_user_db_error(self, mock_get_db):
+    async def test_register_user_db_error(self, mock_get_db, mock_admin):
         """Covers lines 92-94: unexpected exception in register_user"""
         from litestar.exceptions import HTTPException
 
         from models import UserCreate
         from routes.auth import register_user
 
+        mock_admin.return_value = make_admin_user()
         mock_get_db.return_value = mock_db
         mock_db.users.find_one = AsyncMock(return_value=None)
         mock_db.users.insert_one = AsyncMock(side_effect=RuntimeError("DB connection lost"))
@@ -1059,6 +1092,9 @@ class TestFinancialAidRoutesCoverage:
         global mock_db
         mock_db = make_mock_db()
         init_dependencies(mock_db, TEST_JWT_SECRET)
+        # Round-2 added a member-visibility check inside create_aid_schedule
+        # and get_member_aid_schedules. Default to a real member.
+        mock_db.members.find_one = AsyncMock(return_value=make_test_member())
         from routes.financial_aid import init_financial_aid_routes
 
         init_financial_aid_routes(
@@ -1401,6 +1437,8 @@ class TestFinancialAidRoutesCoverage:
             {"id": "s2", "member_id": TEST_MEMBER_ID, "is_active": False, "ignored_occurrences": []},
         ]
         mock_db.financial_aid_schedules.find = MagicMock(return_value=make_cursor(schedules))
+        # Round-2 added member-visibility check before listing aid schedules.
+        mock_db.members.find_one = AsyncMock(return_value=make_test_member())
 
         req = make_request()
         result = await _fn(get_member_aid_schedules)(member_id=TEST_MEMBER_ID, request=req)
@@ -1412,6 +1450,8 @@ class TestFinancialAidRoutesCoverage:
 
         from routes.financial_aid import get_member_aid_schedules
 
+        # Member visibility check passes; the schedules.find() then raises.
+        mock_db.members.find_one = AsyncMock(return_value=make_test_member())
         mock_db.financial_aid_schedules.find = MagicMock(side_effect=RuntimeError("DB error"))
 
         req = make_request()

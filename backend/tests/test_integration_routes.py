@@ -86,6 +86,11 @@ def make_mock_db():
         "activity_logs",
         "notification_logs",
         "settings",
+        "refresh_tokens",
+        "job_locks",
+        "migrations",
+        "pastoral_notes",
+        "dashboard_cache",
     ]:
         collection = MagicMock()
         collection.find_one = AsyncMock(return_value=None)
@@ -114,6 +119,19 @@ def make_mock_db():
         collection.insert_many = AsyncMock()
 
         setattr(db, coll, collection)
+
+    # Smart users.find_one: returns the admin user for an "id"-keyed lookup
+    # (the path get_current_user takes via JWT subject), and None for any
+    # other filter (e.g., "email" duplicate checks). Tests can override
+    # with mock_db.users.find_one = AsyncMock(...) for specific scenarios.
+    _admin = make_admin_user()
+
+    async def _smart_find_one(filt=None, *_, **__):
+        if isinstance(filt, dict) and "id" in filt:
+            return _admin
+        return None
+
+    db.users.find_one = AsyncMock(side_effect=_smart_find_one)
     return db
 
 
@@ -139,10 +157,29 @@ def make_agg_cursor(data_list):
 # ---------------------------------------------------------------------------
 
 
-def make_request(headers=None, client_ip="127.0.0.1"):
-    """Create a mock Litestar Request object."""
+def make_request(headers=None, client_ip="127.0.0.1", user_id=None):
+    """Create a mock Litestar Request object with a VALID test JWT.
+
+    Generates a real token signed with TEST_JWT_SECRET so route handlers'
+    `await get_current_user(request)` calls succeed without per-test
+    monkey-patching. Defaults to TEST_ADMIN_ID; pass user_id to scope
+    requests as a different user.
+
+    The mock DB built by make_mock_db() also defaults users.find_one to
+    return an admin so the lookup inside get_current_user resolves.
+    """
+    import jwt as _jwt
+
+    token = _jwt.encode(
+        {
+            "sub": user_id or TEST_ADMIN_ID,
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+        },
+        TEST_JWT_SECRET,
+        algorithm="HS256",
+    )
     req = MagicMock()
-    default_headers = {"Authorization": "Bearer test-token"}
+    default_headers = {"Authorization": f"Bearer {token}"}
     if headers:
         default_headers.update(headers)
     req.headers = default_headers
@@ -275,9 +312,13 @@ class TestAuthRoutes:
         req = make_request()
 
         result = await _fn(login)(data=data, request=req)
-        assert result.access_token == "test-jwt-token"
-        assert result.user.email == "admin@test.com"
-        assert result.user.campus_name == "Main Campus"
+        # Login was hardened to wrap TokenResponse in a Litestar Response so
+        # it can attach httpOnly auth + refresh cookies. The token model is
+        # carried in result.content for body-based clients.
+        token_response = result.content
+        assert token_response.access_token == "test-jwt-token"
+        assert token_response.user.email == "admin@test.com"
+        assert token_response.user.campus_name == "Main Campus"
 
     @patch("routes.auth.check_login_rate_limit", new_callable=AsyncMock, return_value=(True, None))
     @patch("routes.auth.get_client_ip", return_value="127.0.0.1")
@@ -463,11 +504,18 @@ class TestAuthRoutes:
 
     # ---- REGISTER USER ----
 
+    # Round-1 added an admin guard to register_user. These tests need to
+    # bypass the auth lookup since they mock users.find_one for other
+    # purposes (duplicate email check). Patch get_current_admin to return
+    # a full_admin so we can test the actual email/password validation.
+
+    @patch("routes.auth.get_current_admin", new_callable=AsyncMock)
     @patch("routes.auth.get_db")
-    async def test_register_user_success(self, mock_get_db):
+    async def test_register_user_success(self, mock_get_db, mock_admin):
         from models import UserCreate
         from routes.auth import register_user
 
+        mock_admin.return_value = make_admin_user()
         mock_get_db.return_value = mock_db
         mock_db.users.find_one = AsyncMock(return_value=None)
         mock_db.users.insert_one = AsyncMock()
@@ -486,13 +534,15 @@ class TestAuthRoutes:
         assert result.email == "new@test.com"
         assert result.campus_name == "Main Campus"
 
+    @patch("routes.auth.get_current_admin", new_callable=AsyncMock)
     @patch("routes.auth.get_db")
-    async def test_register_user_duplicate_email(self, mock_get_db):
+    async def test_register_user_duplicate_email(self, mock_get_db, mock_admin):
         from litestar.exceptions import HTTPException
 
         from models import UserCreate
         from routes.auth import register_user
 
+        mock_admin.return_value = make_admin_user()
         mock_get_db.return_value = mock_db
         mock_db.users.find_one = AsyncMock(return_value={"email": "existing@test.com"})
 
@@ -509,13 +559,15 @@ class TestAuthRoutes:
             await _fn(register_user)(data=data, request=req)
         assert exc_info.value.status_code == 400
 
+    @patch("routes.auth.get_current_admin", new_callable=AsyncMock)
     @patch("routes.auth.get_db")
-    async def test_register_user_invalid_email(self, mock_get_db):
+    async def test_register_user_invalid_email(self, mock_get_db, mock_admin):
         from litestar.exceptions import HTTPException
 
         from models import UserCreate
         from routes.auth import register_user
 
+        mock_admin.return_value = make_admin_user()
         mock_get_db.return_value = mock_db
 
         data = UserCreate(
@@ -531,13 +583,18 @@ class TestAuthRoutes:
             await _fn(register_user)(data=data, request=req)
         assert exc_info.value.status_code == 400
 
+    @patch("routes.auth.get_current_admin", new_callable=AsyncMock)
     @patch("routes.auth.get_db")
-    async def test_register_non_admin_without_campus(self, mock_get_db):
+    async def test_register_non_admin_without_campus(self, mock_get_db, mock_admin):
         from litestar.exceptions import HTTPException
 
         from models import UserCreate
         from routes.auth import register_user
 
+        # Use full_admin (not campus_admin) so the campus-scoping guard
+        # added in Round-2 doesn't reject the campus_id=None up-front;
+        # we want to reach the explicit "campus_id required" check.
+        mock_admin.return_value = make_admin_user()
         mock_get_db.return_value = mock_db
         mock_db.users.find_one = AsyncMock(return_value=None)
 
@@ -1538,7 +1595,15 @@ class TestCareEventRoutes:
 
         mock_user.return_value = make_admin_user()
         event = make_test_care_event(event_type="birthday", completed=False)
-        mock_db.care_events.find_one = AsyncMock(return_value=event)
+        # Round-2 added a dedup check that calls find_one with
+        # event_type="regular_contact" + title="Birthday Contact" before
+        # inserting. We need find_one to return the birthday event for the
+        # initial lookup but None for the dedup check, so the insert fires.
+        async def _smart_find_one(filt=None, *_, **__):
+            if isinstance(filt, dict) and filt.get("event_type") == "regular_contact":
+                return None
+            return event
+        mock_db.care_events.find_one = AsyncMock(side_effect=_smart_find_one)
         mock_result = MagicMock()
         mock_result.matched_count = 1
         mock_db.care_events.update_one = AsyncMock(return_value=mock_result)
@@ -1682,7 +1747,7 @@ class TestCareEventRoutes:
         mock_db.care_events.find_one = AsyncMock(return_value=event)
 
         entry = VisitationLogEntry(visitor_name="Pastor John", visit_date=TODAY, notes="Good visit")
-        result = await _fn(add_visitation_log)(event_id=TEST_EVENT_ID, entry=entry)
+        result = await _fn(add_visitation_log)(event_id=TEST_EVENT_ID, entry=entry, request=make_request())
         assert result["success"] is True
 
     async def test_add_visitation_log_event_not_found(self):
@@ -1695,7 +1760,7 @@ class TestCareEventRoutes:
 
         entry = VisitationLogEntry(visitor_name="Pastor", visit_date=TODAY, notes="Ghost")
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(add_visitation_log)(event_id="nonexistent", entry=entry)
+            await _fn(add_visitation_log)(event_id="nonexistent", entry=entry, request=make_request())
         assert exc_info.value.status_code == 404
 
     # ---- HOSPITAL FOLLOWUP DUE ----
@@ -1709,7 +1774,7 @@ class TestCareEventRoutes:
         event["event_date"] = (TODAY - timedelta(days=3)).isoformat()
         mock_db.care_events.find = MagicMock(return_value=make_cursor([event]))
 
-        result = await _fn(get_hospital_followup_due)()
+        result = await _fn(get_hospital_followup_due)(request=make_request())
         assert len(result) == 1
         assert result[0]["days_since_event"] == 3
 
@@ -1718,7 +1783,7 @@ class TestCareEventRoutes:
 
         mock_db.care_events.find = MagicMock(return_value=make_cursor([]))
 
-        result = await _fn(get_hospital_followup_due)()
+        result = await _fn(get_hospital_followup_due)(request=make_request())
         assert result == []
 
     # ---- BULK OPERATIONS ----
@@ -2007,7 +2072,7 @@ class TestGriefSupportRoutes:
         mock_db.grief_support.find_one = AsyncMock(return_value=stage)
         mock_db.members.find_one = AsyncMock(return_value=make_test_member())
 
-        result = await _fn(send_grief_reminder)(stage_id="stage-1")
+        result = await _fn(send_grief_reminder)(stage_id="stage-1", request=make_request())
         assert result["success"] is True
 
     async def test_send_grief_reminder_stage_not_found(self):
@@ -2018,7 +2083,7 @@ class TestGriefSupportRoutes:
         mock_db.grief_support.find_one = AsyncMock(return_value=None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(send_grief_reminder)(stage_id="nonexistent")
+            await _fn(send_grief_reminder)(stage_id="nonexistent", request=make_request())
         assert exc_info.value.status_code == 404
 
     async def test_send_grief_reminder_member_not_found(self):
@@ -2031,7 +2096,7 @@ class TestGriefSupportRoutes:
         mock_db.members.find_one = AsyncMock(return_value=None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(send_grief_reminder)(stage_id="stage-1")
+            await _fn(send_grief_reminder)(stage_id="stage-1", request=make_request())
         assert exc_info.value.status_code == 404
 
 
@@ -2200,6 +2265,10 @@ class TestFinancialAidRoutes:
         global mock_db
         mock_db = make_mock_db()
         init_dependencies(mock_db, TEST_JWT_SECRET)
+        # Round-2 added a member-visibility check inside create_aid_schedule
+        # and get_member_aid_schedules. Default the lookup to a real member
+        # so create/list paths don't 404 before reaching the test logic.
+        mock_db.members.find_one = AsyncMock(return_value=make_test_member())
         from routes.financial_aid import init_financial_aid_routes
 
         init_financial_aid_routes(
@@ -2303,6 +2372,9 @@ class TestFinancialAidRoutes:
             {"id": "s2", "member_id": TEST_MEMBER_ID, "is_active": False, "ignored_occurrences": ["2026-01-01"]},
         ]
         mock_db.financial_aid_schedules.find = MagicMock(return_value=make_cursor(schedules))
+        # Round-2 added a member-visibility check before returning aid history;
+        # provide a member doc so the lookup resolves.
+        mock_db.members.find_one = AsyncMock(return_value=make_test_member())
 
         req = make_request()
         result = await _fn(get_member_aid_schedules)(member_id=TEST_MEMBER_ID, request=req)
@@ -2579,7 +2651,7 @@ class TestFinancialAidRoutes:
         ]
         mock_db.care_events.find = MagicMock(return_value=make_cursor(events))
 
-        result = await _fn(get_financial_aid_summary)()
+        result = await _fn(get_financial_aid_summary)(request=make_request())
         assert result["total_amount"] == 600000
         assert result["total_count"] == 2
 
@@ -2588,7 +2660,7 @@ class TestFinancialAidRoutes:
 
         mock_db.care_events.find = MagicMock(return_value=make_cursor([]))
 
-        result = await _fn(get_financial_aid_summary)(start_date="2026-01-01", end_date="2026-12-31")
+        result = await _fn(get_financial_aid_summary)(request=make_request(), start_date="2026-01-01", end_date="2026-12-31")
         assert result["total_amount"] == 0
 
     async def test_get_financial_aid_recipients(self):
@@ -2598,7 +2670,7 @@ class TestFinancialAidRoutes:
         mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
         mock_db.members.find_one = AsyncMock(return_value=make_test_member())
 
-        result = await _fn(get_financial_aid_recipients)()
+        result = await _fn(get_financial_aid_recipients)(request=make_request())
         assert len(result) == 1
         assert result[0]["total_amount"] == 600000
 
@@ -2611,7 +2683,7 @@ class TestFinancialAidRoutes:
         # Also no event title fallback
         mock_db.care_events.find_one = AsyncMock(return_value=None)
 
-        result = await _fn(get_financial_aid_recipients)()
+        result = await _fn(get_financial_aid_recipients)(request=make_request())
         assert len(result) == 1
         assert result[0]["member_name"] == "Unknown"
 
@@ -2624,7 +2696,7 @@ class TestFinancialAidRoutes:
         ]
         mock_db.care_events.find = MagicMock(return_value=make_cursor(events))
 
-        result = await _fn(get_member_financial_aid)(member_id=TEST_MEMBER_ID)
+        result = await _fn(get_member_financial_aid)(member_id=TEST_MEMBER_ID, request=make_request())
         assert result["total_amount"] == 700000
         assert result["aid_count"] == 2
 
@@ -2725,7 +2797,7 @@ class TestDashboardRoutes:
         events = [{"id": "e1", "event_date": TODAY.isoformat(), "member_name": "John"}]
         mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(events))
 
-        result = await _fn(get_upcoming_events)()
+        result = await _fn(get_upcoming_events)(request=make_request())
         assert len(result) == 1
 
     async def test_get_active_grief_support(self):
@@ -2734,7 +2806,7 @@ class TestDashboardRoutes:
         data = [{"member_id": TEST_MEMBER_ID, "member_name": "John", "stages": []}]
         mock_db.grief_support.aggregate = MagicMock(return_value=make_agg_cursor(data))
 
-        result = await _fn(get_active_grief_support)()
+        result = await _fn(get_active_grief_support)(request=make_request())
         assert len(result) == 1
 
     @patch("routes.dashboard.get_current_user", new_callable=AsyncMock)

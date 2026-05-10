@@ -651,7 +651,12 @@ class TestCalculateEngagementStatus:
         naive = datetime.now() - timedelta(days=10)
         status, days = calculate_engagement_status(naive)
         assert status == EngagementStatus.ACTIVE
-        assert days == 10
+        # Allow ±1 day: comparing a naive datetime built from datetime.now()
+        # against an aware UTC reference can drift by one day depending on
+        # the host's timezone offset and time of day. The test's intent is
+        # to verify the naive-treated-as-UTC path returns a sensible value,
+        # not exact day equality.
+        assert days in (9, 10, 11)
 
     @pytest.mark.unit
     def test_custom_thresholds(self):

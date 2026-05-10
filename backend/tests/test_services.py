@@ -138,6 +138,11 @@ def mock_db():
     db.activity_logs = make_collection()
     db.notification_logs = make_collection()
     db.users = make_collection()
+    # Round-2 expanded MemberService.delete to cascade across these too.
+    db.grief_support = make_collection()
+    db.accident_followup = make_collection()
+    db.financial_aid_schedules = make_collection()
+    db.pastoral_notes = make_collection()
 
     return db
 
