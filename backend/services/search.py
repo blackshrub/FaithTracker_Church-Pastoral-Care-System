@@ -157,23 +157,14 @@ class SearchService:
             return False
 
         try:
-            # Create members index
-            self._client.create_index(MEMBERS_INDEX, {"primaryKey": MEMBERS_CONFIG["primaryKey"]})
-            members_index = self._client.index(MEMBERS_INDEX)
-            members_index.update_searchable_attributes(MEMBERS_CONFIG["searchableAttributes"])
-            members_index.update_filterable_attributes(MEMBERS_CONFIG["filterableAttributes"])
-            members_index.update_sortable_attributes(MEMBERS_CONFIG["sortableAttributes"])
-            members_index.update_displayed_attributes(MEMBERS_CONFIG["displayedAttributes"])
-            logger.info("Meilisearch 'members' index configured")
+            # Snapshot existing indexes once so we don't fire create_index for
+            # ones that already exist. The create_index task fails server-side
+            # with "Index `<name>` already exists" and floods Meilisearch's log
+            # with ERROR lines on every backend boot × N workers.
+            existing = {idx.uid for idx in self._client.get_indexes().get("results", [])}
 
-            # Create care_events index
-            self._client.create_index(CARE_EVENTS_INDEX, {"primaryKey": CARE_EVENTS_CONFIG["primaryKey"]})
-            events_index = self._client.index(CARE_EVENTS_INDEX)
-            events_index.update_searchable_attributes(CARE_EVENTS_CONFIG["searchableAttributes"])
-            events_index.update_filterable_attributes(CARE_EVENTS_CONFIG["filterableAttributes"])
-            events_index.update_sortable_attributes(CARE_EVENTS_CONFIG["sortableAttributes"])
-            events_index.update_displayed_attributes(CARE_EVENTS_CONFIG["displayedAttributes"])
-            logger.info("Meilisearch 'care_events' index configured")
+            self._configure_index(MEMBERS_INDEX, MEMBERS_CONFIG, existing)
+            self._configure_index(CARE_EVENTS_INDEX, CARE_EVENTS_CONFIG, existing)
 
             return True
         except MeilisearchCommunicationError as e:
@@ -186,6 +177,19 @@ class SearchService:
         except Exception as e:
             logger.warning(f"Unexpected error during Meilisearch index setup: {e}")
             return False
+
+    def _configure_index(
+        self, name: str, config: dict, existing: set[str]
+    ) -> None:
+        """Create the index only if missing, then push settings."""
+        if name not in existing:
+            self._client.create_index(name, {"primaryKey": config["primaryKey"]})
+        index = self._client.index(name)
+        index.update_searchable_attributes(config["searchableAttributes"])
+        index.update_filterable_attributes(config["filterableAttributes"])
+        index.update_sortable_attributes(config["sortableAttributes"])
+        index.update_displayed_attributes(config["displayedAttributes"])
+        logger.info(f"Meilisearch '{name}' index configured")
 
     # ==================== SINGLE DOCUMENT INDEXING ====================
 
