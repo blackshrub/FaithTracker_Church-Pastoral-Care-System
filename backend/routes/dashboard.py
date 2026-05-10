@@ -13,7 +13,9 @@ from zoneinfo import ZoneInfo
 
 from litestar import Request, get
 from litestar.exceptions import HTTPException
+from litestar.params import Parameter
 
+from constants import MAX_LIMIT
 from dependencies import get_campus_filter, get_current_user, get_db, safe_error_detail
 from enums import EventType
 from services.cache import CacheService, get_cache
@@ -802,7 +804,12 @@ async def get_active_grief_support(request: Request) -> dict:
 
 
 @get("/dashboard/recent-activity")
-async def get_recent_activity(request: Request, limit: int = 20) -> dict:
+async def get_recent_activity(
+    request: Request,
+    # Cap the limit so a malicious caller cannot pass limit=10000000 and
+    # force a full collection scan + return through the network.
+    limit: int = Parameter(default=20, ge=1, le=100),
+) -> dict:
     """Get recent care events"""
     current_user = await get_current_user(request)
     db = get_db()

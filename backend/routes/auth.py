@@ -225,13 +225,16 @@ async def register_user(data: UserCreate, request: Request) -> dict:
         if data.role == UserRole.FULL_ADMIN and current_user.get("role") != UserRole.FULL_ADMIN.value:
             raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Only full_admin can create full_admin users")
 
-        # campus_admin can only create users for their own campus
-        if (
-            current_user.get("role") == UserRole.CAMPUS_ADMIN.value
-            and data.campus_id
-            and data.campus_id != current_user.get("campus_id")
-        ):
-            raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Cannot create users outside your campus")
+        # campus_admin: every non-full_admin user they create MUST have a
+        # campus_id, and it MUST match the admin's own. Without the
+        # unconditional check, a campus_admin could POST campus_id=null
+        # role=pastor and create an unscoped ghost account.
+        if current_user.get("role") == UserRole.CAMPUS_ADMIN.value and data.role != UserRole.FULL_ADMIN:
+            if not data.campus_id or data.campus_id != current_user.get("campus_id"):
+                raise HTTPException(
+                    status_code=HTTP_403_FORBIDDEN,
+                    detail="campus_admin can only create users in their own campus",
+                )
 
         # Validate email format
         if not validate_email(data.email):

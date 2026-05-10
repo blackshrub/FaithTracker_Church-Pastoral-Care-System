@@ -70,6 +70,20 @@ async def create_aid_schedule(data: FinancialAidScheduleCreate, request: Request
     # Convert Struct to dict for existing code compatibility
     schedule = to_mongo_doc(data)
     try:
+        # Resolve schedule's campus from the member, not from current_user.
+        # full_admin has campus_id=None and the previous bare-key access
+        # crashed with KeyError. Looking up the member's campus also keeps
+        # the schedule consistent with the member it targets.
+        campus_filter = get_campus_filter(current_user)
+        target_member = await db.members.find_one(
+            {"id": schedule["member_id"], **campus_filter},
+            {"_id": 0, "campus_id": 1},
+        )
+        if not target_member:
+            raise HTTPException(status_code=404, detail="Member not found")
+        schedule_campus_id = target_member.get("campus_id")
+        if not schedule_campus_id:
+            raise HTTPException(status_code=400, detail="Member has no campus assigned")
         # Calculate next occurrence based on frequency
         today = date.today()
         start_date = (
@@ -149,7 +163,7 @@ async def create_aid_schedule(data: FinancialAidScheduleCreate, request: Request
 
         aid_schedule = FinancialAidSchedule(
             member_id=schedule["member_id"],
-            campus_id=current_user["campus_id"],
+            campus_id=schedule_campus_id,
             title=schedule["title"],
             aid_type=schedule["aid_type"],
             aid_amount=schedule["aid_amount"],

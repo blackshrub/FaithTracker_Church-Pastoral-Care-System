@@ -632,30 +632,43 @@ async def complete_care_event(event_id: str, request: Request) -> dict:
             },
         )
 
-        # For birthday completions, also create a regular contact event for timeline
+        # For birthday completions, also create a regular contact event for timeline.
+        # Same dedup guard as complete_birthday_by_member: prevents two paths
+        # (event-id and member-id) from each inserting a Birthday Contact row
+        # for the same member on the same day.
         if event["event_type"] == "birthday" and _get_campus_timezone and _get_date_in_timezone:
             # Get campus timezone for correct date
             campus_tz = await _get_campus_timezone(event["campus_id"])
             today_date = _get_date_in_timezone(campus_tz)
 
-            contact_event = {
-                "id": generate_uuid(),
-                "member_id": event["member_id"],
-                "campus_id": event["campus_id"],
-                "event_type": "regular_contact",
-                "event_date": today_date,  # Use campus timezone date
-                "title": "Birthday Contact",
-                "description": f"Contacted {member_name} for their birthday celebration",
-                "completed": True,
-                "completed_at": now,
-                "completed_by_user_id": current_user["id"],
-                "completed_by_user_name": current_user["name"],
-                "reminder_sent": False,
-                "created_at": now,
-                "updated_at": now,
-            }
-
-            await db.care_events.insert_one(contact_event)
+            existing_contact = await db.care_events.find_one(
+                {
+                    "member_id": event["member_id"],
+                    "campus_id": event["campus_id"],
+                    "event_type": "regular_contact",
+                    "event_date": today_date,
+                    "title": "Birthday Contact",
+                },
+                {"_id": 0, "id": 1},
+            )
+            if not existing_contact:
+                contact_event = {
+                    "id": generate_uuid(),
+                    "member_id": event["member_id"],
+                    "campus_id": event["campus_id"],
+                    "event_type": "regular_contact",
+                    "event_date": today_date,
+                    "title": "Birthday Contact",
+                    "description": f"Contacted {member_name} for their birthday celebration",
+                    "completed": True,
+                    "completed_at": now,
+                    "completed_by_user_id": current_user["id"],
+                    "completed_by_user_name": current_user["name"],
+                    "reminder_sent": False,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                await db.care_events.insert_one(contact_event)
 
         # Invalidate dashboard cache after completing event
         if _invalidate_dashboard_cache:
@@ -694,8 +707,11 @@ async def log_additional_visit(
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        # Get parent event
-        parent = await db.care_events.find_one({"id": parent_event_id}, {"_id": 0})
+        # Get parent event — scoped by campus to prevent IDOR.
+        campus_filter = get_campus_filter(current_user)
+        parent = await db.care_events.find_one(
+            {"id": parent_event_id, **campus_filter}, {"_id": 0}
+        )
         if not parent:
             raise HTTPException(status_code=404, detail="Parent event not found")
 
@@ -776,11 +792,18 @@ async def send_care_event_reminder(event_id: str, request: Request) -> dict:
     current_user = await get_current_user(request)
     db = get_db()
     try:
-        event = await db.care_events.find_one({"id": event_id}, {"_id": 0})
+        # Scope by campus so a logged-in user cannot trigger a WhatsApp
+        # message to a member outside their campus.
+        campus_filter = get_campus_filter(current_user)
+        event = await db.care_events.find_one(
+            {"id": event_id, **campus_filter}, {"_id": 0}
+        )
         if not event:
             raise HTTPException(status_code=404, detail="Care event not found")
 
-        member = await db.members.find_one({"id": event["member_id"]}, {"_id": 0})
+        member = await db.members.find_one(
+            {"id": event["member_id"], **campus_filter}, {"_id": 0}
+        )
         if not member:
             raise HTTPException(status_code=404, detail="Member not found")
 

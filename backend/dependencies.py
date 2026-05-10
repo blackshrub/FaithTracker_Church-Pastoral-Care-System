@@ -178,6 +178,19 @@ def _parse_trusted_proxies() -> set[str]:
 
 _TRUSTED_PROXIES = _parse_trusted_proxies()
 
+# Loud warning so ops notice. With no trusted proxies in production, the
+# brute-force lockout's IP key collapses to the proxy's address, which means
+# a single attacker can lock out every legitimate user behind that proxy.
+if os.environ.get("ENVIRONMENT", "development") == "production" and not _TRUSTED_PROXIES:
+    import logging as _log
+
+    _log.getLogger(__name__).warning(
+        "TRUSTED_PROXIES env var is not set in production — get_client_ip will "
+        "fall back to the immediate peer IP for every request, defeating the "
+        "per-client brute-force lockout. Set TRUSTED_PROXIES to your reverse "
+        "proxy's IP (comma-separated for multiple)."
+    )
+
 
 def get_client_ip(request: Request) -> str:
     """Extract the original client IP, only honoring proxy headers if the
