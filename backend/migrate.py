@@ -564,7 +564,7 @@ async def run_migration_process():
         # Show migration history
         await show_migration_history(db)
 
-        client.close()
+        await client.close()
         return success if current_version < latest_version else True
 
     except Exception as e:

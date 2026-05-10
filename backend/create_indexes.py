@@ -117,7 +117,7 @@ async def create_database_indexes():
     print("  - Search: 10x faster")
     print("  - Scheduler: Prevents duplicate job execution across workers")
 
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":

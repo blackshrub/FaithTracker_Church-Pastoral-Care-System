@@ -273,7 +273,7 @@ async def initialize_database(args):
         print(f"   Indexes:   {BOLD}{indexes_count}{NC}")
         print()
 
-        client.close()
+        await client.close()
         return True
 
     except Exception as e:

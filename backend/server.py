@@ -6113,7 +6113,7 @@ async def on_shutdown() -> None:
     except Exception as e:
         logger.warning(f"Error closing cache: {e}")
 
-    client.close()
+    await client.close()
 
 
 # ==================== PASTORAL NOTES ENDPOINTS ====================

@@ -318,7 +318,7 @@ async def main():
         # Run bulk update
         await bulk_update_engagement_statuses(db, campus_id=args.campus_id, dry_run=args.dry_run)
 
-        client.close()
+        await client.close()
 
         sys.exit(0)
 

@@ -52,7 +52,7 @@ async def import_member_photos():
     print(f"  Updated: {updated_count} members")
     print(f"  Not found: {not_found_count} photos")
 
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":

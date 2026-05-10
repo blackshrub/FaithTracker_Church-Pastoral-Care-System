@@ -77,7 +77,7 @@ async def fix_care_event_ids():
     else:
         print(f"\n⚠️ Warning: {remaining} events still have invalid IDs")
 
-    client.close()
+    await client.close()
 
 
 if __name__ == "__main__":
