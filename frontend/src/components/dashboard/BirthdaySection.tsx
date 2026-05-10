@@ -68,21 +68,28 @@ export const BirthdaySection = ({
       setLoadingIds((prev) => new Set(prev).add(memberId));
 
       try {
-        // Optimistic update - mark as completed (don't remove, so other staff can see)
-        queryClient.setQueryData(['dashboard'], (old: any) => {
-          if (!old) return old;
-          const markCompleted = (list: BirthdayEvent[] | undefined) =>
-            list?.map((e) =>
-              e.member_id === memberId
-                ? { ...e, completed: true, completed_by_user_name: 'You' }
-                : e
-            );
-          return {
-            ...old,
-            birthdays_today: markCompleted(old.birthdays_today),
-            overdue_birthdays: markCompleted(old.overdue_birthdays),
-          };
-        });
+        // Optimistic update - mark as completed (don't remove, so other staff can see).
+        // The dashboard useQuery key is ['dashboard', 'reminders', campus_id];
+        // setQueryData(['dashboard'], …) writes to a different cache slot that
+        // nothing reads. setQueriesData with a prefix filter updates every
+        // matching key including the real one.
+        queryClient.setQueriesData(
+          { queryKey: ['dashboard', 'reminders'] },
+          (old: any) => {
+            if (!old) return old;
+            const markCompleted = (list: BirthdayEvent[] | undefined) =>
+              list?.map((e) =>
+                e.member_id === memberId
+                  ? { ...e, completed: true, completed_by_user_name: 'You' }
+                  : e
+              );
+            return {
+              ...old,
+              birthdays_today: markCompleted(old.birthdays_today),
+              overdue_birthdays: markCompleted(old.overdue_birthdays),
+            };
+          }
+        );
 
         // Use the new member-based endpoint that creates event if needed
         await api.post(`/care-events/birthday/member/${memberId}/complete`);

@@ -153,39 +153,39 @@ const _MemberNameWithAvatar = ({ member, memberId }) => {
 
 // formatPhoneForWhatsApp imported from @/lib/utils/formatting
 
+// The actual dashboard query key is ['dashboard', 'reminders', campus_id], so
+// setQueryData(['dashboard'], …) writes to a separate, never-read cache slot.
+// Use setQueriesData with a prefix filter to update every matching key, and
+// match the actual payload shape (today_tasks / birthdays_today / grief_today —
+// NOT today/overdue/upcoming, which were aspirational field names that never
+// existed in the response).
 const _markBirthdayComplete = async (eventId, queryClient, t) => {
   try {
-    // Optimistic update - remove from UI immediately
-    queryClient.setQueryData(['dashboard'], (old) => {
+    queryClient.setQueriesData({ queryKey: ['dashboard', 'reminders'] }, (old) => {
       if (!old) return old;
       return {
         ...old,
-        today: old.today.filter((e) => e.id !== eventId),
-        overdue: old.overdue.filter((e) => e.id !== eventId),
+        birthdays_today: (old.birthdays_today || []).filter((e) => e.id !== eventId),
+        overdue_birthdays: (old.overdue_birthdays || []).filter((e) => e.id !== eventId),
       };
     });
 
     await api.post(`/care-events/${eventId}/complete`);
     toast.success(t('toasts.birthday_completed'));
-    // Refetch to get accurate data
     await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   } catch (_error) {
     toast.error(t('toasts.failed_complete'));
-    // Revert optimistic update on error
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }
 };
 
 const markGriefStageComplete = async (stageId, queryClient, t) => {
   try {
-    // Optimistic update
-    queryClient.setQueryData(['dashboard'], (old) => {
+    queryClient.setQueriesData({ queryKey: ['dashboard', 'reminders'] }, (old) => {
       if (!old) return old;
       return {
         ...old,
-        today: old.today.filter((e) => e.id !== stageId),
-        overdue: old.overdue.filter((e) => e.id !== stageId),
-        upcoming: old.upcoming.filter((e) => e.id !== stageId),
+        grief_today: (old.grief_today || []).filter((e) => e.id !== stageId),
       };
     });
 
