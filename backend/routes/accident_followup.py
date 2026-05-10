@@ -195,19 +195,23 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: str | 
 async def undo_accident_stage(stage_id: str, request: Request) -> dict:
     """Undo completion or ignore of accident followup stage"""
     _assert_initialized()
+    current_user = await get_current_user(request)
     db = get_db()
     try:
-        stage = await db.accident_followup.find_one({"id": stage_id}, {"_id": 0})
+        # Scope lookup to caller's campus to prevent cross-tenant undo
+        campus_filter = get_campus_filter(current_user)
+        stage = await db.accident_followup.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Accident followup not found")
 
         # Delete timeline entries created for this stage (linked by accident_stage_id)
-        await db.care_events.delete_many({"accident_stage_id": stage_id})
+        await db.care_events.delete_many({"accident_stage_id": stage_id, **campus_filter})
 
         # Delete activity logs related to this accident stage
         await db.activity_logs.delete_many(
             {
                 "member_id": stage["member_id"],
+                "campus_id": stage["campus_id"],
                 "notes": {"$regex": f"{stage['stage'].replace('_', ' ')}", "$options": "i"},
             }
         )
