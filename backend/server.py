@@ -878,7 +878,15 @@ async def log_activity(
             notes=notes,
         )
         await db.activity_logs.insert_one(to_mongo_doc(activity))
-        logger.info(f"Activity logged: {user_name} - {action_type} - {member_name}")
+        # Log only opaque IDs at INFO — names + phones are PII that must not
+        # land in upstream log aggregators (Datadog/Loki/CloudWatch). Move
+        # name-bearing detail to DEBUG for local troubleshooting only.
+        logger.info(
+            f"Activity logged: user_id={user_id} action={action_type} member_id={member_id}"
+        )
+        logger.debug(
+            f"Activity detail: {user_name} - {action_type} - {member_name}"
+        )
 
         # Broadcast to SSE subscribers for real-time updates.
         # When MongoDB change streams are active, the ChangeStreamWatcher
@@ -1650,7 +1658,9 @@ async def sync_members_from_external_api(
                     },
                 )
                 archived_count += 1
-                logger.info(f"Archived member {member['name']} - no longer in external source")
+                # PII: keep name out of INFO; log id at INFO and name at DEBUG.
+                logger.info(f"Archived member id={member.get('id')} - no longer in external source")
+                logger.debug(f"Archived member name={member.get('name')!r}")
 
         return {
             "success": True,
@@ -4540,13 +4550,16 @@ async def perform_member_sync_for_campus(campus_id: str, sync_type: str = "manua
                         existing = name_phone_map.get(key)
                         if existing:
                             stats["matched_by_name_phone"] += 1
-                            logger.info(f"Matched '{core_name}' by name+phone (new ID: {core_id})")
+                            # PII: name moves to DEBUG; INFO carries only IDs.
+                            logger.info(f"Matched member by name+phone (new ID: {core_id})")
+                            logger.debug(f"  name was: {core_name!r}")
 
                     if not existing and norm_core_name:
                         existing = name_map.get(norm_core_name)
                         if existing:
                             stats["matched_by_name_only"] += 1
-                            logger.info(f"Matched '{core_name}' by name only (new ID: {core_id})")
+                            logger.info(f"Matched member by name only (new ID: {core_id})")
+                            logger.debug(f"  name was: {core_name!r}")
 
                 # Prepare member data
                 membership_status = (

@@ -74,7 +74,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
 # Run the application with Granian (Rust-based ASGI server - faster than Uvicorn)
-# --workers: Number of worker processes
-# --interface asgi: ASGI protocol for FastAPI
+# --workers: env-driven (GRANIAN_WORKERS, default 2) so ops can tune without
+#   rebuilding the image. Use 'sh -c' so the env-var expansion happens at
+#   container start, not at image build time.
+# --interface asgi: ASGI protocol for ASGI apps (Litestar)
 # --http auto: Auto-negotiate HTTP/1.1 or HTTP/2 (H2C upgrade)
-CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8001", "--workers", "2", "--http", "auto", "server:app"]
+CMD ["sh", "-c", "exec granian --interface asgi --host 0.0.0.0 --port 8001 --workers ${GRANIAN_WORKERS:-2} --http auto server:app"]
