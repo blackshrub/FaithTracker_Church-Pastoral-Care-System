@@ -27,10 +27,10 @@ const supportsViewTransitions =
   typeof document !== 'undefined' && 'startViewTransition' in document;
 
 /**
- * Live check for hover-capable input. Read on every prefetch attempt so a
- * user who connects/disconnects an external mouse mid-session gets the
- * right behavior (a module-level constant would freeze whatever was true
- * at import time). Also respects Save-Data per-call.
+ * Live check for hover-capable input. Used for onMouseEnter, NOT onFocus —
+ * keyboard focus represents intentional user navigation regardless of
+ * input device, so we keep prefetch on for focus on touch + keyboard
+ * combos (e.g. tablet with bluetooth keyboard).
  */
 function shouldSkipHoverPrefetch(): boolean {
   if (typeof window === 'undefined') return true;
@@ -43,6 +43,13 @@ function shouldSkipHoverPrefetch(): boolean {
   const conn = (navigator as unknown as { connection?: { saveData?: boolean } }).connection;
   if (conn?.saveData) return true;
   return false;
+}
+
+/** Save-Data check only — applied to focus prefetch (skip touch detection). */
+function shouldSkipFocusPrefetch(): boolean {
+  if (typeof window === 'undefined') return true;
+  const conn = (navigator as unknown as { connection?: { saveData?: boolean } }).connection;
+  return Boolean(conn?.saveData);
 }
 
 type PrefetchType = 'member' | 'dashboard' | 'membersList';
@@ -71,8 +78,7 @@ export function LinkWithPrefetch({
   const navigate = useNavigate();
   const { prefetchMember, prefetchDashboard, prefetchMembersList, cancelPrefetch } = usePrefetch();
 
-  const handleMouseEnter = useCallback(() => {
-    if (shouldSkipHoverPrefetch()) return;
+  const doPrefetch = useCallback(() => {
     switch (prefetchType) {
       case 'member':
         if (prefetchId) prefetchMember(prefetchId);
@@ -95,6 +101,16 @@ export function LinkWithPrefetch({
         }
     }
   }, [prefetchType, prefetchId, to, prefetchMember, prefetchDashboard, prefetchMembersList]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (shouldSkipHoverPrefetch()) return;
+    doPrefetch();
+  }, [doPrefetch]);
+
+  const handleFocus = useCallback(() => {
+    if (shouldSkipFocusPrefetch()) return;
+    doPrefetch();
+  }, [doPrefetch]);
 
   const handleMouseLeave = useCallback(() => {
     cancelPrefetch();
@@ -137,7 +153,7 @@ export function LinkWithPrefetch({
       className={className}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onFocus={handleMouseEnter}
+      onFocus={handleFocus}
       onBlur={handleMouseLeave}
       onClick={handleClick}
       {...props}

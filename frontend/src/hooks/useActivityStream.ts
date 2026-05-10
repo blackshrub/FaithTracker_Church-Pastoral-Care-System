@@ -43,7 +43,11 @@ export interface Activity {
   care_event_id?: string | null;
   event_type?: string | null;
   notes?: string | null;
-  timestamp: string;
+  // Backend SSE frames carry created_at; the REST loader maps it to
+  // timestamp. Both fields are accepted so consumers can read whichever
+  // is populated without crashing on type mismatch.
+  timestamp?: string;
+  created_at?: string;
 }
 
 export interface UseActivityStreamOptions {

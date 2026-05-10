@@ -33,7 +33,9 @@ import api from '@/lib/api';
 export interface QueueOperation {
   type: string;
   endpoint: string;
-  method: string;
+  // Match the literal union from offlineQueue.QueuedOperationInput so the
+  // hook can pass operations through without a downstream type error.
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   payload?: unknown;
   optimisticUpdate?: Record<string, unknown>;
 }
@@ -245,7 +247,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 export interface UseOfflineMutationOptions<TPayload = unknown> {
   type: string;
   endpoint: string | ((payload: TPayload) => string);
-  method?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   onSuccess?: (data: unknown) => void;
   onError?: (error: unknown) => void;
 }
@@ -287,11 +289,15 @@ export function useOfflineMutation<TPayload = unknown>({
       try {
         const endpointUrl = typeof endpoint === 'function' ? endpoint(payload) : endpoint;
 
+        // Always pass the payload as the request body. Previously this was
+        // dropped when `endpoint` was a function — but a function endpoint
+        // is only a URL builder; callers commonly use it for /resource/:id
+        // mutations that ALSO have a JSON body (e.g. PATCH /members/:id).
         const result = await queueOperation({
           type,
           endpoint: endpointUrl,
           method,
-          payload: typeof endpoint === 'function' ? undefined : (payload as unknown),
+          payload: payload as unknown,
         });
 
         if (result.success && !result.queued) {

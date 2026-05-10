@@ -22,10 +22,15 @@
  * await offlineQueue.sync();
  */
 
-/** Input for enqueuing a new operation */
+/** Input for enqueuing a new operation.
+ *
+ * payload is `unknown` (not Record) because callers reasonably pass arrays,
+ * primitives, or FormData. The only operation we perform on it is
+ * JSON.stringify which works on any value.
+ */
 export interface QueuedOperationInput {
   type: string;
-  payload?: Record<string, unknown>;
+  payload?: unknown;
   endpoint: string;
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   optimisticUpdate?: Record<string, unknown>;

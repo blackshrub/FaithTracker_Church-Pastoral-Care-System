@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
 export interface PullToRefreshOptions {
@@ -15,7 +15,7 @@ export interface UsePullToRefreshReturn {
   isRefreshing: boolean;
   pullProgress: number;
   isPulling: boolean;
-  PullIndicator: () => JSX.Element | null;
+  PullIndicator: () => React.JSX.Element | null;
 }
 
 /**
@@ -131,7 +131,7 @@ export function usePullToRefresh(
   }, [handleTouchStart, handleTouchMove, handleTouchEnd, disabled]);
 
   // Pull indicator component
-  const PullIndicator = useCallback((): JSX.Element | null => {
+  const PullIndicator = useCallback((): React.JSX.Element | null => {
     if (pullProgress === 0 && !isRefreshing) return null;
 
     const rotation = Math.min((pullProgress / threshold) * 360, 360);

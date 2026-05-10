@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import api from '@/lib/api';
 import type { User } from '@/types';
@@ -45,44 +53,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
   }, []);
 
-  const login = async (
-    email: string,
-    password: string,
-    campusId: string | null = null
-  ): Promise<User> => {
-    // Backend sets an httpOnly ft_auth cookie; we only read user info from body.
-    const response = await api.post('/auth/login', {
-      email,
-      password,
-      campus_id: campusId,
-    });
-    const { user: userData } = response.data;
-    setUser(userData);
-    return userData;
-  };
+  // useCallback so login/logout/refreshUser have stable identities across
+  // renders — prevents downstream consumers from re-rendering whenever
+  // AuthProvider's local state changes for unrelated reasons.
+  const login = useCallback(
+    async (email: string, password: string, campusId: string | null = null): Promise<User> => {
+      const response = await api.post('/auth/login', {
+        email,
+        password,
+        campus_id: campusId,
+      });
+      const { user: userData } = response.data;
+      setUser(userData);
+      return userData;
+    },
+    []
+  );
 
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     try {
       await api.post('/auth/logout');
     } catch {
       // If the server is unreachable we still clear local state.
     }
-    // Drop any legacy token that may still be sitting around.
     localStorage.removeItem('token');
     setUser(null);
-  };
+  }, []);
 
-  const refreshUser = async (): Promise<User> => {
+  const refreshUser = useCallback(async (): Promise<User> => {
     const response = await api.get('/auth/me');
     setUser(response.data);
     return response.data;
-  };
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, loading, refreshUser }}>
-      {children}
-    </AuthContext.Provider>
+  // Memoize the context value so consumers only re-render when one of the
+  // captured fields actually changes, not on every AuthProvider render.
+  const value = useMemo(
+    () => ({ user, login, logout, loading, refreshUser }),
+    [user, login, logout, loading, refreshUser]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
