@@ -1042,8 +1042,18 @@ async def daily_reminder_job():
         logger.info("DAILY PASTORAL CARE DIGEST - Sending to Team")
         logger.info("==" * 30)
 
-        # Refresh dashboard cache for all campuses first
-        await refresh_all_dashboard_caches()
+        # Refresh dashboard cache for all campuses first.
+        # Wrap in try/except so a cache-refresh failure does NOT silently
+        # skip the WhatsApp digest — the digest is the user-visible
+        # output the team relies on every morning, and a stale cache is
+        # vastly preferable to no message at all.
+        try:
+            await refresh_all_dashboard_caches()
+        except Exception as e:
+            logger.exception(
+                f"Dashboard cache refresh failed during daily digest job: {e!s}. "
+                "Continuing to send WhatsApp digest with stale cache."
+            )
 
         # Send WhatsApp digests
         await send_daily_digest_to_pastoral_team()
