@@ -657,8 +657,13 @@ async def get_dashboard_stats(request: Request) -> dict:
             except Exception:
                 pass  # If lock mechanism fails, just compute normally
 
-        # Calculate fresh stats
+        # Calculate fresh stats — every aggregation MUST be scoped by campus
+        # to prevent cross-tenant data leak (full_admin gets {} = all campuses).
+        campus_filter = get_campus_filter(current_user)
+
+        member_match_stage = [{"$match": campus_filter}] if campus_filter else []
         member_stats_pipeline = [
+            *member_match_stage,
             {
                 "$facet": {
                     "total_count": [{"$count": "count"}],
@@ -667,17 +672,23 @@ async def get_dashboard_stats(request: Request) -> dict:
                         {"$count": "count"},
                     ],
                 }
-            }
+            },
         ]
         member_stats_result = await db.members.aggregate(member_stats_pipeline).to_list(1)
         member_stats = member_stats_result[0] if member_stats_result else {}
         total_members = member_stats.get("total_count", [{}])[0].get("count", 0)
         at_risk_count = member_stats.get("at_risk_count", [{}])[0].get("count", 0)
-        active_grief = await db.grief_support.count_documents({"completed": False})
+        active_grief = await db.grief_support.count_documents({"completed": False, **campus_filter})
         today = date.today()
         month_start = today.replace(day=1).isoformat()
         financial_aid_pipeline = [
-            {"$match": {"event_type": EventType.FINANCIAL_AID, "event_date": {"$gte": month_start}}},
+            {
+                "$match": {
+                    "event_type": EventType.FINANCIAL_AID,
+                    "event_date": {"$gte": month_start},
+                    **campus_filter,
+                }
+            },
             {"$group": {"_id": None, "total_aid": {"$sum": {"$ifNull": ["$aid_amount", 0]}}}},
         ]
         financial_aid_result = await db.care_events.aggregate(financial_aid_pipeline).to_list(1)
