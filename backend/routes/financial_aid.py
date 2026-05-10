@@ -855,7 +855,7 @@ async def get_financial_aid_recipients(request: Request) -> dict:
             {"$sort": {"total_amount": -1}},
         ]
 
-        recipients_data = await db.care_events.aggregate(pipeline).to_list(1000)
+        recipients_data = await (await db.care_events.aggregate(pipeline)).to_list(1000)
 
         # Fetch member names and photos (also campus-scoped)
         recipients = []

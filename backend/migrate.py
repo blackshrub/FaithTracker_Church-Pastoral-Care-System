@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
@@ -524,7 +524,7 @@ async def run_migration_process():
     try:
         # Connect to database
         print_step("Connecting to database")
-        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+        client = AsyncMongoClient(mongo_url, serverSelectionTimeoutMS=5000)
         await client.admin.command("ping")
         db = client[db_name]
         print_success(f"Connected to {db_name}")

@@ -112,7 +112,7 @@ def make_mock_db():
         # aggregate() returns a cursor with to_list
         agg_cursor = MagicMock()
         agg_cursor.to_list = AsyncMock(return_value=[])
-        collection.aggregate = MagicMock(return_value=agg_cursor)
+        collection.aggregate = AsyncMock(return_value=agg_cursor)
 
         # update_many / insert_many
         collection.update_many = AsyncMock()
@@ -482,7 +482,7 @@ class TestAuthRoutes:
                 "campus_name": "Main Campus",
             }
         ]
-        mock_db.users.aggregate = MagicMock(return_value=make_agg_cursor(users_data))
+        mock_db.users.aggregate = AsyncMock(return_value=make_agg_cursor(users_data))
 
         req = make_request()
         result = await _fn(list_users)(request=req)
@@ -496,7 +496,7 @@ class TestAuthRoutes:
         admin = make_campus_admin_user()
         mock_admin.return_value = admin
 
-        mock_db.users.aggregate = MagicMock(return_value=make_agg_cursor([]))
+        mock_db.users.aggregate = AsyncMock(return_value=make_agg_cursor([]))
 
         req = make_request()
         result = await _fn(list_users)(request=req)
@@ -1462,7 +1462,7 @@ class TestCareEventRoutes:
 
         mock_user.return_value = make_admin_user()
         events = [make_test_care_event()]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(events))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(events))
 
         req = make_request()
         result = await _fn(list_care_events)(request=req, page=1, limit=50)
@@ -1473,7 +1473,7 @@ class TestCareEventRoutes:
         from routes.care_events import list_care_events
 
         mock_user.return_value = make_admin_user()
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor([]))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor([]))
 
         req = make_request()
         result = await _fn(list_care_events)(
@@ -2667,7 +2667,7 @@ class TestFinancialAidRoutes:
         from routes.financial_aid import get_financial_aid_recipients
 
         agg_data = [{"_id": TEST_MEMBER_ID, "total_amount": 600000, "aid_count": 3}]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(agg_data))
         mock_db.members.find_one = AsyncMock(return_value=make_test_member())
 
         result = await _fn(get_financial_aid_recipients)(request=make_request())
@@ -2678,7 +2678,7 @@ class TestFinancialAidRoutes:
         from routes.financial_aid import get_financial_aid_recipients
 
         agg_data = [{"_id": TEST_MEMBER_ID, "total_amount": 100000, "aid_count": 1}]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(agg_data))
         mock_db.members.find_one = AsyncMock(return_value=None)
         # Also no event title fallback
         mock_db.care_events.find_one = AsyncMock(return_value=None)
@@ -2780,11 +2780,11 @@ class TestDashboardRoutes:
         from routes.dashboard import get_dashboard_stats
 
         mock_user.return_value = make_admin_user()
-        mock_db.members.aggregate = MagicMock(
+        mock_db.members.aggregate = AsyncMock(
             return_value=make_agg_cursor([{"total_count": [{"count": 100}], "at_risk_count": [{"count": 10}]}])
         )
         mock_db.grief_support.count_documents = AsyncMock(return_value=5)
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor([{"total_aid": 1000000}]))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor([{"total_aid": 1000000}]))
 
         req = make_request()
         result = await _fn(get_dashboard_stats)(request=req)
@@ -2795,7 +2795,7 @@ class TestDashboardRoutes:
         from routes.dashboard import get_upcoming_events
 
         events = [{"id": "e1", "event_date": TODAY.isoformat(), "member_name": "John"}]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(events))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(events))
 
         result = await _fn(get_upcoming_events)(request=make_request())
         assert len(result) == 1
@@ -2804,7 +2804,7 @@ class TestDashboardRoutes:
         from routes.dashboard import get_active_grief_support
 
         data = [{"member_id": TEST_MEMBER_ID, "member_name": "John", "stages": []}]
-        mock_db.grief_support.aggregate = MagicMock(return_value=make_agg_cursor(data))
+        mock_db.grief_support.aggregate = AsyncMock(return_value=make_agg_cursor(data))
 
         result = await _fn(get_active_grief_support)(request=make_request())
         assert len(result) == 1
@@ -2815,7 +2815,7 @@ class TestDashboardRoutes:
 
         mock_user.return_value = make_admin_user()
         events = [{"id": "e1", "event_type": "birthday", "member_name": "John"}]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(events))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(events))
 
         req = make_request()
         result = await _fn(get_recent_activity)(request=req)
@@ -2885,7 +2885,7 @@ class TestDashboardRoutes:
         mock_user.return_value = make_admin_user()
         mock_db.members.count_documents = AsyncMock(side_effect=[100, 20])
         mock_db.grief_support.count_documents = AsyncMock(side_effect=[10, 7])
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor([]))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor([]))
 
         req = make_request()
         result = await _fn(get_analytics_dashboard)(request=req)
@@ -2899,7 +2899,7 @@ class TestDashboardRoutes:
         mock_user.return_value = make_admin_user()
         mock_db.members.count_documents = AsyncMock(return_value=50)
         mock_db.grief_support.count_documents = AsyncMock(return_value=0)
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor([]))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor([]))
 
         req = make_request()
 

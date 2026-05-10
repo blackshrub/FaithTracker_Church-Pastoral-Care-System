@@ -692,7 +692,7 @@ async def get_dashboard_stats(request: Request) -> dict:
                 }
             },
         ]
-        member_stats_result = await db.members.aggregate(member_stats_pipeline).to_list(1)
+        member_stats_result = await (await db.members.aggregate(member_stats_pipeline)).to_list(1)
         member_stats = member_stats_result[0] if member_stats_result else {}
         total_members = member_stats.get("total_count", [{}])[0].get("count", 0)
         at_risk_count = member_stats.get("at_risk_count", [{}])[0].get("count", 0)
@@ -709,7 +709,7 @@ async def get_dashboard_stats(request: Request) -> dict:
             },
             {"$group": {"_id": None, "total_aid": {"$sum": {"$ifNull": ["$aid_amount", 0]}}}},
         ]
-        financial_aid_result = await db.care_events.aggregate(financial_aid_pipeline).to_list(1)
+        financial_aid_result = await (await db.care_events.aggregate(financial_aid_pipeline)).to_list(1)
         total_aid = financial_aid_result[0]["total_aid"] if financial_aid_result else 0
 
         data = {
@@ -760,7 +760,7 @@ async def get_upcoming_events(request: Request, days: int = 7) -> dict:
             {"$sort": {"event_date": 1}},
             {"$limit": 100},
         ]
-        events = await db.care_events.aggregate(pipeline).to_list(100)
+        events = await (await db.care_events.aggregate(pipeline)).to_list(100)
         return events
     except HTTPException:
         raise
@@ -801,7 +801,7 @@ async def get_active_grief_support(request: Request) -> dict:
             {"$project": {"_id": 0}},
             {"$limit": 100},
         ]
-        result = await db.grief_support.aggregate(pipeline).to_list(100)
+        result = await (await db.grief_support.aggregate(pipeline)).to_list(100)
         return result
     except HTTPException:
         raise
@@ -831,7 +831,7 @@ async def get_recent_activity(
             {"$sort": {"created_at": -1}},
             {"$limit": limit},
         ]
-        events = await db.care_events.aggregate(pipeline).to_list(limit)
+        events = await (await db.care_events.aggregate(pipeline)).to_list(limit)
         return events
     except Exception as e:
         logger.error(f"Error getting recent activity: {e!s}")
@@ -874,7 +874,7 @@ async def get_care_events_by_type(request: Request) -> dict:
         campus_filter = get_campus_filter(current_user)
         query = campus_filter if campus_filter else {}
         pipeline = [{"$match": query}, {"$group": {"_id": "$event_type", "count": {"$sum": 1}}}]
-        result = await db.care_events.aggregate(pipeline).to_list(20)
+        result = await (await db.care_events.aggregate(pipeline)).to_list(20)
         return [{"type": r["_id"], "count": r["count"]} for r in result]
     except Exception as e:
         logger.error(f"Error getting events by type: {e!s}")
@@ -933,14 +933,14 @@ async def get_analytics_dashboard(
             db.grief_support.count_documents({**campus_filter, "completed": True}),
         )
 
-        events_by_type_agg = await db.care_events.aggregate(
+        events_by_type_agg = await (await db.care_events.aggregate(
             [
                 {"$match": {**campus_filter, **event_date_filter, "event_type": {"$ne": "birthday"}}},
                 {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
             ]
-        ).to_list(20)
+        )).to_list(20)
 
-        financial_agg = await db.care_events.aggregate(
+        financial_agg = await (await db.care_events.aggregate(
             [
                 {"$match": {**campus_filter, "event_type": "financial_aid"}},
                 {
@@ -951,7 +951,7 @@ async def get_analytics_dashboard(
                     }
                 },
             ]
-        ).to_list(20)
+        )).to_list(20)
 
         member_stats = {"total": total_members, "with_photos": members_with_photos}
         grief_rate = round((grief_completed / grief_total * 100) if grief_total > 0 else 0, 2)

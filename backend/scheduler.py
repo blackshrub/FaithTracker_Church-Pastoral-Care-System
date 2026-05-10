@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 from services.cache import get_redis_client
 from utils import normalize_phone_number
@@ -68,7 +68,7 @@ def safe_parse_date(date_str: str) -> date | None:
 
 # MongoDB connection - limited pool for background jobs only
 mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-client = AsyncIOMotorClient(mongo_url, maxPoolSize=10, minPoolSize=2, maxIdleTimeMS=30000)
+client = AsyncMongoClient(mongo_url, maxPoolSize=10, minPoolSize=2, maxIdleTimeMS=30000)
 db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
 
 scheduler = AsyncIOScheduler()

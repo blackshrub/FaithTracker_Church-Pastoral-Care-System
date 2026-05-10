@@ -1,19 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Use Babel-based React plugin with React Compiler
   plugins: [
-    react({
-      babel: {
+    // @vitejs/plugin-react v6: Oxc (Rust) handles JSX + Fast Refresh by
+    // default — no Babel for the hot path. Faster HMR, smaller install.
+    react(),
+    // React Compiler still needs Babel. We run it as a separate Rolldown
+    // Babel plugin so it ONLY transforms our source files (filter below)
+    // — keeps node_modules off the Babel pipeline entirely.
+    babel({
+      filter: /\.[jt]sx?$/,
+      babelConfig: {
+        babelrc: false,
+        configFile: false,
         plugins: [
-          ['babel-plugin-react-compiler', {
-            // React Compiler configuration
-            target: '19', // Target React 19
-          }],
+          ['babel-plugin-react-compiler', { target: '19' }],
         ],
       },
     }),

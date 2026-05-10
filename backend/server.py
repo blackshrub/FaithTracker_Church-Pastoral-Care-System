@@ -43,7 +43,7 @@ from litestar.status_codes import (
     HTTP_413_REQUEST_ENTITY_TOO_LARGE,
     HTTP_500_INTERNAL_SERVER_ERROR,
 )
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from msgspec import UNSET, Struct
 from pymongo import UpdateOne
 
@@ -416,7 +416,7 @@ validate_config(exit_on_error=False)  # Show warnings but don't exit
 
 # MongoDB connection with optimized pooling for production
 mongo_url = os.environ["MONGO_URL"]
-client = AsyncIOMotorClient(
+client = AsyncMongoClient(
     mongo_url,
     maxPoolSize=50,  # Maximum number of connections in the pool
     minPoolSize=10,  # Minimum number of connections to keep open
@@ -5161,7 +5161,7 @@ async def get_reminder_stats(request: Request) -> dict:
         # Use datetime object for comparison since created_at is stored as ISODate
         log_query = {**campus_filter, "created_at": {"$gte": today_start}}
         pipeline = [{"$match": log_query}, {"$group": {"_id": "$status", "count": {"$sum": 1}}}]
-        status_counts = await db.notification_logs.aggregate(pipeline).to_list(10)
+        status_counts = await (await db.notification_logs.aggregate(pipeline)).to_list(10)
         sent_count = next((r["count"] for r in status_counts if r["_id"] == "sent"), 0)
         failed_count = next((r["count"] for r in status_counts if r["_id"] == "failed"), 0)
 
@@ -5508,7 +5508,7 @@ async def get_activity_summary(request: Request) -> dict:
             {"$sort": {"count": -1}},
         ]
 
-        users = await db.activity_logs.aggregate(users_pipeline).to_list(MAX_LIMIT)
+        users = await (await db.activity_logs.aggregate(users_pipeline)).to_list(MAX_LIMIT)
 
         # Count by action type
         actions_pipeline = [
@@ -5517,7 +5517,7 @@ async def get_activity_summary(request: Request) -> dict:
             {"$sort": {"count": -1}},
         ]
 
-        actions = await db.activity_logs.aggregate(actions_pipeline).to_list(MAX_LIMIT)
+        actions = await (await db.activity_logs.aggregate(actions_pipeline)).to_list(MAX_LIMIT)
 
         return {
             "total_activities": total,

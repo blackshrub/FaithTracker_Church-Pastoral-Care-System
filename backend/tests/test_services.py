@@ -129,7 +129,7 @@ def mock_db():
         # Mock aggregate
         agg_cursor = MagicMock()
         agg_cursor.to_list = AsyncMock(return_value=[])
-        coll.aggregate = MagicMock(return_value=agg_cursor)
+        coll.aggregate = AsyncMock(return_value=agg_cursor)
 
         return coll
 
@@ -654,7 +654,7 @@ class TestMemberServiceGetMany:
             {"id": "m1", "name": "Alice"},
             {"id": "m2", "name": "Bob"},
         ]
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result(members_list))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result(members_list))
 
         members, total = await member_service.get_many(CHURCH_ID)
         assert len(members) == 2
@@ -664,7 +664,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_filters_by_campus_id(self, member_service, mock_db):
         """Should add campus_id to query when provided."""
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, campus_id=CAMPUS_ID)
         pipeline = mock_db.members.aggregate.call_args[0][0]
@@ -675,7 +675,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_filters_by_search(self, member_service, mock_db):
         """Should add search regex to query when provided."""
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, search="John")
         pipeline = mock_db.members.aggregate.call_args[0][0]
@@ -687,7 +687,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_filters_by_engagement_status(self, member_service, mock_db):
         """Should add engagement_status filter when provided."""
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, engagement_status=EngagementStatus.AT_RISK.value)
         pipeline = mock_db.members.aggregate.call_args[0][0]
@@ -698,7 +698,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_respects_max_page_size(self, member_service, mock_db):
         """Limit should be capped at MAX_PAGE_SIZE."""
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, limit=MAX_PAGE_SIZE + 500)
         pipeline = mock_db.members.aggregate.call_args[0][0]
@@ -710,7 +710,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_search_escapes_regex_special_chars(self, member_service, mock_db):
         """Search text with regex special chars should be escaped."""
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await member_service.get_many(CHURCH_ID, search="John.Doe+")
         pipeline = mock_db.members.aggregate.call_args[0][0]
@@ -723,7 +723,7 @@ class TestMemberServiceGetMany:
     @pytest.mark.asyncio
     async def test_get_many_empty_result(self, member_service, mock_db):
         """Should return empty list and zero count when no members."""
-        mock_db.members.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.members.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         members, total = await member_service.get_many(CHURCH_ID)
         assert members == []
@@ -1117,7 +1117,7 @@ class TestCareEventServiceGetForMember:
     async def test_get_for_member_basic(self, care_event_service, mock_db):
         """Should return events for a member."""
         events = [{"id": "e1"}, {"id": "e2"}]
-        mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result(events))
+        mock_db.care_events.aggregate = AsyncMock(return_value=mock_facet_result(events))
 
         result, total = await care_event_service.get_for_member(MEMBER_ID, CHURCH_ID)
         assert len(result) == 2
@@ -1127,7 +1127,7 @@ class TestCareEventServiceGetForMember:
     @pytest.mark.asyncio
     async def test_get_for_member_filters_by_event_type(self, care_event_service, mock_db):
         """Should filter by event_type when provided."""
-        mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.care_events.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await care_event_service.get_for_member(MEMBER_ID, CHURCH_ID, event_type="birthday")
         pipeline = mock_db.care_events.aggregate.call_args[0][0]
@@ -1138,7 +1138,7 @@ class TestCareEventServiceGetForMember:
     @pytest.mark.asyncio
     async def test_get_for_member_filters_by_completion(self, care_event_service, mock_db):
         """Should filter by is_completed when provided."""
-        mock_db.care_events.aggregate = MagicMock(return_value=mock_facet_result([]))
+        mock_db.care_events.aggregate = AsyncMock(return_value=mock_facet_result([]))
 
         await care_event_service.get_for_member(MEMBER_ID, CHURCH_ID, is_completed=False)
         pipeline = mock_db.care_events.aggregate.call_args[0][0]

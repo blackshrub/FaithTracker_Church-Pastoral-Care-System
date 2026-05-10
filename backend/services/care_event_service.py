@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from constants import (
     ACCIDENT_FINAL_FOLLOWUP_DAYS,
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class CareEventService:
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self._db = db
 
     async def get_by_id(
@@ -102,7 +102,7 @@ class CareEventService:
             {"$limit": limit},
         ]
 
-        return await self._db.care_events.aggregate(pipeline).to_list(length=limit)
+        return await (await self._db.care_events.aggregate(pipeline)).to_list(length=limit)
 
     async def create(
         self,

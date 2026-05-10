@@ -541,7 +541,7 @@ async def list_users(request: Request) -> list:
             {"$limit": 100},
         ]
 
-        users = await db.users.aggregate(pipeline).to_list(100)
+        users = await (await db.users.aggregate(pipeline)).to_list(100)
 
         # Convert to UserResponse (is_active defaults to True if not present)
         result = [

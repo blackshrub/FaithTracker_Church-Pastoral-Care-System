@@ -5,11 +5,11 @@ import random
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # MongoDB connection
 mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncMongoClient(mongo_url)
 db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
 
 

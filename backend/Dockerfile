@@ -98,6 +98,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
 # Granian (Rust-based ASGI server). --workers env-driven via GRANIAN_WORKERS
-# (default 2) so ops can tune without rebuilding. exec ensures granian is
-# PID 1 for proper signal handling.
-CMD ["sh", "-c", "exec granian --interface asgi --host 0.0.0.0 --port 8001 --workers ${GRANIAN_WORKERS:-2} --http auto server:app"]
+# (default 2) so ops can tune without rebuilding. --loop uvloop is explicit
+# (uvloop is in deps; auto would pick it but stating it makes the choice
+# documented). uvloop gives ~15% throughput vs default asyncio per the
+# Granian April 2026 benchmarks. exec ensures granian is PID 1 for
+# proper signal handling.
+CMD ["sh", "-c", "exec granian --interface asgi --host 0.0.0.0 --port 8001 --workers ${GRANIAN_WORKERS:-2} --http auto --loop uvloop server:app"]

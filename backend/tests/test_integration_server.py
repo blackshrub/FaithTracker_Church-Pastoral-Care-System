@@ -257,7 +257,7 @@ def mock_db():
         coll.delete_many = AsyncMock(return_value=_make_delete_result())
         coll.count_documents = AsyncMock(return_value=0)
         coll.find = MagicMock(return_value=_make_mock_cursor())
-        coll.aggregate = MagicMock(return_value=_make_mock_agg_cursor())
+        coll.aggregate = AsyncMock(return_value=_make_mock_agg_cursor())
         setattr(db, collection_name, coll)
 
     return db
@@ -651,7 +651,7 @@ class TestUserManagement:
         """Admin can list users."""
         admin = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=admin)
-        db.users.aggregate = MagicMock(
+        db.users.aggregate = AsyncMock(
             return_value=_make_mock_agg_cursor(
                 [
                     {
@@ -1708,7 +1708,7 @@ class TestActivityLogs:
         """Get activity summary."""
         _setup_auth(db)
         db.activity_logs.count_documents = AsyncMock(return_value=42)
-        db.activity_logs.aggregate = MagicMock(
+        db.activity_logs.aggregate = AsyncMock(
             return_value=_make_mock_agg_cursor([{"_id": TEST_USER_ID, "name": "Admin", "count": 10}])
         )
 
@@ -2539,7 +2539,7 @@ class TestDashboard:
         """Get dashboard statistics."""
         _setup_auth(db)
         # Aggregation pipeline returns stats
-        db.members.aggregate = MagicMock(
+        db.members.aggregate = AsyncMock(
             return_value=_make_mock_agg_cursor(
                 [
                     {
@@ -2551,7 +2551,7 @@ class TestDashboard:
                 ]
             )
         )
-        db.care_events.aggregate = MagicMock(return_value=_make_mock_agg_cursor([]))
+        db.care_events.aggregate = AsyncMock(return_value=_make_mock_agg_cursor([]))
         db.members.count_documents = AsyncMock(return_value=100)
         db.care_events.count_documents = AsyncMock(return_value=50)
 
@@ -2672,7 +2672,7 @@ class TestMultiTenancy:
         # /members route now uses paginated_query (services/db_utils.py)
         # which goes through collection.aggregate, NOT collection.find. The
         # $match stage of the aggregation pipeline is what we assert against.
-        db.members.aggregate = MagicMock(return_value=_make_mock_agg_cursor([{"data": [], "total": []}]))
+        db.members.aggregate = AsyncMock(return_value=_make_mock_agg_cursor([{"data": [], "total": []}]))
 
         response = client.get("/members", headers=_auth_headers(TEST_PASTOR_ID))
         assert response.status_code == 200
@@ -2685,7 +2685,7 @@ class TestMultiTenancy:
         """Full admin should see all campus data."""
         admin = _make_admin_user()
         db.users.find_one = AsyncMock(return_value=admin)
-        db.members.aggregate = MagicMock(return_value=_make_mock_agg_cursor([{"data": [], "total": []}]))
+        db.members.aggregate = AsyncMock(return_value=_make_mock_agg_cursor([{"data": [], "total": []}]))
 
         response = client.get("/members", headers=_auth_headers())
         assert response.status_code == 200

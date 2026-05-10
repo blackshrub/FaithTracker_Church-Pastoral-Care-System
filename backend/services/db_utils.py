@@ -65,7 +65,7 @@ async def paginated_query(
         }
     )
 
-    result = await collection.aggregate(pipeline).to_list(1)
+    result = await (await collection.aggregate(pipeline)).to_list(1)
     if result:
         data = result[0].get("data", [])
         total_list = result[0].get("total", [])

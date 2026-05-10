@@ -199,7 +199,7 @@ def mock_db():
         coll.delete_many = AsyncMock(return_value=_make_delete_result())
         coll.count_documents = AsyncMock(return_value=0)
         coll.find = MagicMock(return_value=_make_mock_cursor())
-        coll.aggregate = MagicMock(return_value=_make_mock_agg_cursor())
+        coll.aggregate = AsyncMock(return_value=_make_mock_agg_cursor())
         setattr(db, collection_name, coll)
     return db
 
@@ -1972,7 +1972,7 @@ class TestSyncLogs:
             {"id": "sl2", "status": "error", "error_message": "Timeout"},
         ]
         facet_result = [{"data": logs, "total": [{"count": len(logs)}]}]
-        mock_db.sync_logs.aggregate = MagicMock(return_value=_make_mock_agg_cursor(facet_result))
+        mock_db.sync_logs.aggregate = AsyncMock(return_value=_make_mock_agg_cursor(facet_result))
 
         result = await setup_server.get_sync_logs.fn(request=request)
         assert result["total"] == 2

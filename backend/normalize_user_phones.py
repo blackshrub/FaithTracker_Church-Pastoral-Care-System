@@ -7,7 +7,7 @@ Converts local format (081xxx) to international format (+6281xxx)
 import asyncio
 import os
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 
 def normalize_phone_number(phone: str, default_country_code: str = "+62") -> str:
@@ -44,7 +44,7 @@ async def normalize_all_user_phones():
     mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
     db_name = os.environ.get("DB_NAME", "pastoral_care_db")
 
-    client = AsyncIOMotorClient(mongo_url)
+    client = AsyncMongoClient(mongo_url)
     db = client[db_name]
 
     print("🔍 Checking user phone numbers...")

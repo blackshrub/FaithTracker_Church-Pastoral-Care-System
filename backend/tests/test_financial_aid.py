@@ -265,7 +265,7 @@ async def test_aid_total_by_member(test_db, test_campus, test_member, financial_
         {"$group": {"_id": "$member_id", "total_aid": {"$sum": "$total_paid"}, "total_schedules": {"$sum": 1}}},
     ]
 
-    result = await test_db.financial_aid_schedules.aggregate(pipeline).to_list(None)
+    result = await (await test_db.financial_aid_schedules.aggregate(pipeline)).to_list(None)
     assert len(result) == 1
     assert result[0]["total_aid"] >= 2500000
 
@@ -278,7 +278,7 @@ async def test_aid_by_type_summary(test_db, test_campus, financial_aid_schedule)
         {"$group": {"_id": "$aid_type", "count": {"$sum": 1}, "total_monthly": {"$sum": "$amount"}}},
     ]
 
-    result = await test_db.financial_aid_schedules.aggregate(pipeline).to_list(None)
+    result = await (await test_db.financial_aid_schedules.aggregate(pipeline)).to_list(None)
     assert len(result) >= 1
 
 

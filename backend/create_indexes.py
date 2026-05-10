@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ async def create_database_indexes():
     """Create performance indexes for faster queries"""
 
     mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-    client = AsyncIOMotorClient(mongo_url)
+    client = AsyncMongoClient(mongo_url)
     db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
 
     print("Creating database indexes for performance optimization...")

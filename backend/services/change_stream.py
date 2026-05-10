@@ -80,7 +80,9 @@ class ChangeStreamWatcher:
             # Try to open a change stream briefly to verify support.
             # This is the most reliable detection method since it tests
             # the actual capability rather than inferring from topology.
-            async with self._db.activity_logs.watch(
+            # PyMongo async API: collection.watch() is now a coroutine that
+            # returns the async context manager — needs an extra `await`.
+            async with await self._db.activity_logs.watch(
                 pipeline=[{"$match": {"operationType": "insert"}}],
                 max_await_time_ms=100,
             ):
@@ -264,7 +266,8 @@ class ChangeStreamWatcher:
 
                 logger.info("Opening change stream on activity_logs collection")
 
-                async with self._db.activity_logs.watch(**watch_kwargs) as stream:
+                # See _check_replica_set comment — watch() is async-call now.
+                async with await self._db.activity_logs.watch(**watch_kwargs) as stream:
                     # Reset backoff on successful connection
                     backoff = _INITIAL_BACKOFF_SECONDS
 

@@ -334,7 +334,7 @@ async def list_care_events(
             {"$project": {"member_info": 0, "_id": 0}},
         ]
 
-        events = await db.care_events.aggregate(pipeline).to_list(limit)
+        events = await (await db.care_events.aggregate(pipeline)).to_list(limit)
         return events
     except Exception as e:
         logger.error(f"Error listing care events: {e!s}")

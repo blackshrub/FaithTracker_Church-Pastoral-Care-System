@@ -962,7 +962,9 @@ class TestChangeStreamWatcherCheckReplicaSet:
         mock_watch_cm = AsyncMock()
         mock_watch_cm.__aenter__ = AsyncMock(side_effect=Exception("not supported: replica set"))
         mock_watch_cm.__aexit__ = AsyncMock(return_value=False)
-        mock_db.activity_logs.watch.return_value = mock_watch_cm
+        # PyMongo async: collection.watch() is now a coroutine that
+        # resolves to the async context manager.
+        mock_db.activity_logs.watch = AsyncMock(return_value=mock_watch_cm)
 
         watcher = ChangeStreamWatcher(mock_db)
         result = await watcher._check_replica_set()
@@ -977,7 +979,9 @@ class TestChangeStreamWatcherCheckReplicaSet:
         mock_watch_cm = AsyncMock()
         mock_watch_cm.__aenter__ = AsyncMock()
         mock_watch_cm.__aexit__ = AsyncMock(return_value=False)
-        mock_db.activity_logs.watch.return_value = mock_watch_cm
+        # PyMongo async: collection.watch() is now a coroutine that
+        # resolves to the async context manager.
+        mock_db.activity_logs.watch = AsyncMock(return_value=mock_watch_cm)
 
         watcher = ChangeStreamWatcher(mock_db)
         result = await watcher._check_replica_set()
@@ -991,7 +995,9 @@ class TestChangeStreamWatcherCheckReplicaSet:
         mock_watch_cm = AsyncMock()
         mock_watch_cm.__aenter__ = AsyncMock(side_effect=Exception("Operation not allowed on standalone"))
         mock_watch_cm.__aexit__ = AsyncMock(return_value=False)
-        mock_db.activity_logs.watch.return_value = mock_watch_cm
+        # PyMongo async: collection.watch() is now a coroutine that
+        # resolves to the async context manager.
+        mock_db.activity_logs.watch = AsyncMock(return_value=mock_watch_cm)
 
         watcher = ChangeStreamWatcher(mock_db)
         result = await watcher._check_replica_set()

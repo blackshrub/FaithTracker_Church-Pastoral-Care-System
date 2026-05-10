@@ -24,7 +24,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
@@ -141,7 +141,7 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
             {"$sort": {"_id": 1}},
         ]
 
-        result = await db.members.aggregate(pipeline).to_list(None)
+        result = await (await db.members.aggregate(pipeline)).to_list(None)
 
         for status_group in result:
             status = status_group["_id"]
@@ -240,7 +240,7 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
         start_time = datetime.now()
 
         try:
-            await db.members.aggregate(pipeline).to_list(None)
+            await (await db.members.aggregate(pipeline)).to_list(None)
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
@@ -254,13 +254,13 @@ async def bulk_update_engagement_statuses(db, campus_id=None, dry_run=False):
             # Show updated distribution
             print(f"\n{CYAN}📈 Updated Distribution:{NC}")
 
-            status_counts = await db.members.aggregate(
+            status_counts = await (await db.members.aggregate(
                 [
                     {"$match": match_stage},
                     {"$group": {"_id": "$engagement_status", "count": {"$sum": 1}}},
                     {"$sort": {"_id": 1}},
                 ]
-            ).to_list(None)
+            )).to_list(None)
 
             for status_group in status_counts:
                 status = status_group["_id"]
@@ -311,7 +311,7 @@ async def main():
 
     try:
         # Connect to database
-        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+        client = AsyncMongoClient(mongo_url, serverSelectionTimeoutMS=5000)
         await client.admin.command("ping")
         db = client[db_name]
 

@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 
 from constants import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from enums import ActivityActionType, EngagementStatus
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class MemberService:
-    def __init__(self, db: AsyncIOMotorDatabase):
+    def __init__(self, db: AsyncDatabase):
         self._db = db
 
     async def get_by_id(

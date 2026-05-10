@@ -9,7 +9,7 @@ import os
 import re
 import uuid
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # Valid UUID pattern
 UUID_PATTERN = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
@@ -28,7 +28,7 @@ async def fix_care_event_ids():
     mongo_uri = os.environ.get(
         "MONGODB_URI", "mongodb://admin:fefb33c5e0eee893f2ee752a480cacc6@mongo:27017/faithtracker?authSource=admin"
     )
-    client = AsyncIOMotorClient(mongo_uri)
+    client = AsyncMongoClient(mongo_uri)
     db = client.faithtracker
 
     print("Checking care events for corrupted IDs...")

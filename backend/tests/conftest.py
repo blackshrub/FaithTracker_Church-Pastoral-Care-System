@@ -15,7 +15,7 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # Test database configuration
 TEST_DB_NAME = "faithtracker_test"
@@ -59,7 +59,7 @@ def event_loop():
 @pytest.fixture
 async def test_db_client():
     """MongoDB client for tests (function-scoped for pytest-asyncio compatibility)"""
-    client = AsyncIOMotorClient(MONGO_URL)
+    client = AsyncMongoClient(MONGO_URL)
     yield client
     client.close()
 

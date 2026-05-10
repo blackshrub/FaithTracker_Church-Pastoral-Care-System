@@ -2,14 +2,14 @@ import asyncio
 import csv
 import os
 
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 
 async def import_member_photos():
     """Import member photos based on CSV photo column"""
 
     mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-    client = AsyncIOMotorClient(mongo_url)
+    client = AsyncMongoClient(mongo_url)
     db = client[os.environ.get("DB_NAME", "pastoral_care_db")]
 
     print("Importing member photos...")

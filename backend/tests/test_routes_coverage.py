@@ -102,7 +102,7 @@ def make_mock_db():
 
         agg_cursor = MagicMock()
         agg_cursor.to_list = AsyncMock(return_value=[])
-        collection.aggregate = MagicMock(return_value=agg_cursor)
+        collection.aggregate = AsyncMock(return_value=agg_cursor)
 
         collection.update_many = AsyncMock()
         collection.insert_many = AsyncMock()
@@ -328,7 +328,7 @@ class TestAuthRoutesCoverage:
         from routes.auth import list_users
 
         mock_admin.return_value = make_admin_user()
-        mock_db.users.aggregate = MagicMock(side_effect=RuntimeError("Aggregation error"))
+        mock_db.users.aggregate = AsyncMock(side_effect=RuntimeError("Aggregation error"))
 
         req = make_request()
         with pytest.raises(HTTPException) as exc_info:
@@ -765,7 +765,7 @@ class TestMemberRoutesCoverage:
         # paginated_query uses aggregate which should throw
         mock_cursor = MagicMock()
         mock_cursor.to_list = AsyncMock(side_effect=RuntimeError("DB error"))
-        mock_db.members.aggregate = MagicMock(return_value=mock_cursor)
+        mock_db.members.aggregate = AsyncMock(return_value=mock_cursor)
 
         req = make_request()
         with pytest.raises(HTTPException) as exc_info:
@@ -1822,7 +1822,7 @@ class TestFinancialAidRoutesCoverage:
 
         mock_user.return_value = make_admin_user()
         agg_data = [{"_id": TEST_MEMBER_ID, "total_amount": 100000, "aid_count": 1}]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(agg_data))
         mock_db.members.find_one = AsyncMock(return_value=None)
         # Return event with title containing " - "
         mock_db.care_events.find_one = AsyncMock(return_value={"title": "Financial Aid - Jane Doe"})
@@ -1838,7 +1838,7 @@ class TestFinancialAidRoutesCoverage:
 
         mock_user.return_value = make_admin_user()
         agg_data = [{"_id": None, "total_amount": 50000, "aid_count": 1}]
-        mock_db.care_events.aggregate = MagicMock(return_value=make_agg_cursor(agg_data))
+        mock_db.care_events.aggregate = AsyncMock(return_value=make_agg_cursor(agg_data))
 
         result = await _fn(get_financial_aid_recipients)(request=make_request())
         assert len(result) == 0
@@ -1853,7 +1853,7 @@ class TestFinancialAidRoutesCoverage:
         from routes.financial_aid import get_financial_aid_recipients
 
         mock_user.return_value = make_admin_user()
-        mock_db.care_events.aggregate = MagicMock(side_effect=RuntimeError("DB error"))
+        mock_db.care_events.aggregate = AsyncMock(side_effect=RuntimeError("DB error"))
 
         with pytest.raises(HTTPException) as exc_info:
             await _fn(get_financial_aid_recipients)(request=make_request())

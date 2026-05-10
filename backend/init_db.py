@@ -13,7 +13,7 @@ from pathlib import Path
 
 import bcrypt
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
@@ -64,7 +64,7 @@ def print_error(message):
 async def test_connection(mongo_url, db_name):
     """Test MongoDB connection"""
     try:
-        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+        client = AsyncMongoClient(mongo_url, serverSelectionTimeoutMS=5000)
         await client.admin.command("ping")
         return client
     except Exception as e:

@@ -234,7 +234,7 @@ def mock_db():
         coll.delete_many = AsyncMock(return_value=_make_delete_result())
         coll.count_documents = AsyncMock(return_value=0)
         coll.find = MagicMock(return_value=_make_mock_cursor())
-        coll.aggregate = MagicMock(return_value=_make_mock_agg_cursor())
+        coll.aggregate = AsyncMock(return_value=_make_mock_agg_cursor())
         setattr(db, collection_name, coll)
     return db
 
@@ -2130,7 +2130,7 @@ class TestSyncConfig:
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         facet_result = [{"data": logs, "total": [{"count": len(logs)}]}]
-        mock_db.sync_logs.aggregate = MagicMock(return_value=_make_mock_agg_cursor(facet_result))
+        mock_db.sync_logs.aggregate = AsyncMock(return_value=_make_mock_agg_cursor(facet_result))
 
         req = MagicMock()
         req.headers = {"Authorization": f"Bearer {token}"}
@@ -2722,7 +2722,7 @@ class TestActivityLogs:
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         mock_db.activity_logs.count_documents = AsyncMock(return_value=42)
-        mock_db.activity_logs.aggregate = MagicMock(
+        mock_db.activity_logs.aggregate = AsyncMock(
             return_value=_make_mock_agg_cursor([{"_id": "user-1", "name": "Test", "count": 10}])
         )
 
@@ -2750,7 +2750,7 @@ class TestReminderStats:
             {"_id": "sent", "count": 1},
             {"_id": "failed", "count": 1},
         ]
-        mock_db.notification_logs.aggregate = MagicMock(return_value=_make_mock_cursor(agg_result))
+        mock_db.notification_logs.aggregate = AsyncMock(return_value=_make_mock_cursor(agg_result))
         mock_db.grief_support.count_documents = AsyncMock(return_value=3)
         mock_db.care_events.count_documents = AsyncMock(return_value=5)
 
@@ -3088,7 +3088,7 @@ class TestPastoralNotes:
 
         mock_db.users.find_one = AsyncMock(return_value=user)
         facet_result = [{"data": notes, "total": [{"count": len(notes)}]}]
-        mock_db.pastoral_notes.aggregate = MagicMock(return_value=_make_mock_agg_cursor(facet_result))
+        mock_db.pastoral_notes.aggregate = AsyncMock(return_value=_make_mock_agg_cursor(facet_result))
         mock_db.members.find_one = AsyncMock(return_value=_make_member())
 
         req = MagicMock()
