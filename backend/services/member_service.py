@@ -180,6 +180,7 @@ class MemberService:
         await self._db.accident_followup.delete_many(cascade)
         await self._db.financial_aid_schedules.delete_many(cascade)
         await self._db.pastoral_notes.delete_many(cascade)
+        await self._db.notification_logs.delete_many(cascade)
         await self._db.activity_logs.delete_many(cascade)
 
         await self._log_activity(

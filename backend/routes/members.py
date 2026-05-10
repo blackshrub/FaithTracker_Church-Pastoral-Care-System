@@ -213,7 +213,14 @@ async def list_members(
         from services.db_utils import paginated_query
 
         members, total = await paginated_query(
-            db.members, query, sort=[("name", 1)], skip=skip, limit=limit, projection=projection
+            db.members,
+            query,
+            # Stable secondary sort on id so two members with the same name
+            # don't shuffle between pages.
+            sort=[("name", 1), ("id", 1)],
+            skip=skip,
+            limit=limit,
+            projection=projection,
         )
 
         # Update engagement status for each member
@@ -398,6 +405,10 @@ async def delete_member(member_id: str, request: Request) -> dict:
         # forever (aid_due_today / pastoral notes for a deleted member).
         await db.financial_aid_schedules.delete_many(cascade_filter)
         await db.pastoral_notes.delete_many(cascade_filter)
+        # notification_logs orphans accumulate without this — every WhatsApp
+        # reminder ever sent to this member would otherwise leave a stale
+        # member_id reference in the logs collection.
+        await db.notification_logs.delete_many(cascade_filter)
         await db.activity_logs.delete_many(
             {"member_id": member_id, "campus_id": member_campus_id} if member_campus_id else {"member_id": member_id}
         )

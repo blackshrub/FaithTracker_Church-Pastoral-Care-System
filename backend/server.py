@@ -1059,18 +1059,24 @@ def generate_accident_followup_timeline(
 
 def generate_grief_timeline(mourning_date: date, care_event_id: str, member_id: str) -> list[dict[str, Any]]:
     """Generate 6-stage grief support timeline"""
-    stages = [
-        (GriefStage.ONE_WEEK, GRIEF_ONE_WEEK_DAYS),
-        (GriefStage.TWO_WEEKS, GRIEF_TWO_WEEKS_DAYS),
-        (GriefStage.ONE_MONTH, GRIEF_ONE_MONTH_DAYS),
-        (GriefStage.THREE_MONTHS, GRIEF_THREE_MONTHS_DAYS),
-        (GriefStage.SIX_MONTHS, GRIEF_SIX_MONTHS_DAYS),
-        (GriefStage.ONE_YEAR, GRIEF_ONE_YEAR_DAYS),
+    from dateutil.relativedelta import relativedelta as _relativedelta
+
+    # Day-based stages stay as timedelta. ONE_YEAR uses relativedelta so a
+    # leap-day mourning date (Feb 29) lands on Feb 28 in non-leap years
+    # (matches the financial-aid annual fix from Round 1) — using
+    # timedelta(days=365) would silently miss the actual anniversary.
+    stages: list[tuple[GriefStage, timedelta | _relativedelta]] = [
+        (GriefStage.ONE_WEEK, timedelta(days=GRIEF_ONE_WEEK_DAYS)),
+        (GriefStage.TWO_WEEKS, timedelta(days=GRIEF_TWO_WEEKS_DAYS)),
+        (GriefStage.ONE_MONTH, timedelta(days=GRIEF_ONE_MONTH_DAYS)),
+        (GriefStage.THREE_MONTHS, timedelta(days=GRIEF_THREE_MONTHS_DAYS)),
+        (GriefStage.SIX_MONTHS, timedelta(days=GRIEF_SIX_MONTHS_DAYS)),
+        (GriefStage.ONE_YEAR, _relativedelta(years=1)),
     ]
 
     timeline = []
-    for stage, days_offset in stages:
-        scheduled_date = mourning_date + timedelta(days=days_offset)
+    for stage, offset in stages:
+        scheduled_date = mourning_date + offset
         grief_support = {
             "id": generate_uuid(),
             "care_event_id": care_event_id,
@@ -3574,8 +3580,11 @@ async def recalculate_all_engagement_status(request: Request) -> dict:
             result = await db.members.bulk_write(operations)
             updated_count = result.modified_count
 
-        # Clear dashboard cache for all campuses
-        await db.dashboard_cache.delete_many({})
+        # Clear dashboard cache scoped to the same campus_filter the
+        # recalculation used. campus_admin who triggers this should NOT
+        # invalidate every other campus's cache (cross-tenant operational
+        # impact). full_admin's empty filter still wipes everything.
+        await db.dashboard_cache.delete_many(dict(campus_filter))
 
         logger.info(f"Recalculated engagement for {updated_count} members")
 
@@ -6189,15 +6198,26 @@ async def list_pastoral_notes(
     """List pastoral notes with filtering options"""
     current_user = await get_current_user(request)
 
-    # Build query
-    query: dict[str, Any] = {}
+    # Build query — use the canonical campus filter helper so the rules
+    # match every other endpoint (including the IMPOSSIBLE_VALUE fallback
+    # for non-admin users with no campus_id, which guarantees zero results
+    # rather than an unscoped query).
+    query: dict[str, Any] = {**get_campus_filter(current_user)}
 
-    # Campus filtering
-    if current_user["role"] != "full_admin":
-        query["campus_id"] = current_user.get("campus_id")
-
-    # Member filtering
+    # Member filtering. For non-full_admin callers we additionally verify
+    # the member belongs to their campus, otherwise a pastor in Campus A
+    # could probe member_ids in Campus B and at minimum confirm existence
+    # via the empty-result vs filtered-result difference.
     if member_id:
+        if current_user.get("role") != UserRole.FULL_ADMIN.value:
+            visible = await db.members.find_one(
+                {"id": member_id, **get_campus_filter(current_user)},
+                {"_id": 0, "id": 1},
+            )
+            if not visible:
+                # Same response shape as a normal empty list — don't leak
+                # whether the member exists in another campus.
+                return []
         query["member_id"] = member_id
 
     # Category filtering

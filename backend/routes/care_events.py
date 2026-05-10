@@ -281,7 +281,10 @@ async def list_care_events(
         # Use aggregation with $lookup to avoid N+1 queries (50x faster)
         pipeline = [
             {"$match": query},
-            {"$sort": {"event_date": -1, "created_at": -1}},  # Secondary sort by created_at for same-day events
+            # Tie-break by id so two events with identical event_date+created_at
+            # (bulk imports / same-second auto-generated events) don't shuffle
+            # between pages and silently drop or duplicate records.
+            {"$sort": {"event_date": -1, "created_at": -1, "id": 1}},
             {"$skip": skip},
             {"$limit": limit},
             # Join with members collection to get member names, phone, and photo in single query

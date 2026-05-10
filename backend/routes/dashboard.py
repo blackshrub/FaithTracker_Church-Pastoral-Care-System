@@ -421,7 +421,14 @@ async def calculate_dashboard_reminders(campus_id: str, campus_tz, today_date: s
 
             try:
                 birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-                this_year_birthday = birth_date.replace(year=today.year)
+                # Feb 29 birthdays must be observed on Feb 28 in non-leap
+                # years — replace(year=non_leap) raises ValueError and the
+                # except below would silently drop the member from the
+                # dashboard for the entire year.
+                try:
+                    this_year_birthday = birth_date.replace(year=today.year)
+                except ValueError:
+                    this_year_birthday = birth_date.replace(year=today.year, day=28)
 
                 # Build base birthday data
                 base_data = {
