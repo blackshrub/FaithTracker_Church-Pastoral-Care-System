@@ -2847,9 +2847,11 @@ async def export_monthly_report_pdf(
             if campus:
                 campus_name = campus.get("campus_name", "GKBJ")
 
-        # Generate PDF
+        # Generate PDF in a worker thread — WeasyPrint is sync, CPU-bound, and
+        # touches disk for fonts. Running it inline blocks the entire event
+        # loop (SSE, scheduler, all in-flight requests) for the render duration.
         generate_pdf = get_pdf_generator()
-        pdf_bytes = generate_pdf(report_data, campus_name)
+        pdf_bytes = await asyncio.to_thread(generate_pdf, report_data, campus_name)
 
         # Create filename
         period = report_data.get("report_period", {})
