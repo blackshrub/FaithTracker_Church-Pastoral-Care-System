@@ -134,7 +134,20 @@ export function useActivityStream({
 
       // Handle activity events
       eventSource.addEventListener('activity', (e: MessageEvent) => {
-        const activity: Activity = JSON.parse(e.data);
+        // A single malformed frame would otherwise throw out of the listener
+        // and silently kill the stream — EventSource stays "open" but no
+        // further events get dispatched. Catch + continue keeps the stream
+        // healthy on transient backend errors / partial flushes.
+        let activity: Activity;
+        try {
+          activity = JSON.parse(e.data);
+        } catch (err) {
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn('[SSE] Failed to parse activity payload, skipping frame', err);
+          }
+          return;
+        }
 
         // Skip own activities
         if (activity.user_id === user?.id) return;
