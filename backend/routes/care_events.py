@@ -122,9 +122,19 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
                     status_code=400, detail="Aid amount is required and must be non-negative for financial aid events"
                 )
 
-        # Get member name for logging
-        member = await db.members.find_one({"id": event.member_id}, {"_id": 0, "name": 1})
-        member_name = member["name"] if member else "Unknown"
+        # Verify the target member is in the caller's campus. Without this, a
+        # campus_admin in Campus A could POST a care event with member_id from
+        # Campus B; the event itself would be tagged with A's campus_id, but
+        # the member-engagement update at the bottom of this handler and the
+        # log_activity call would silently mutate Campus B's data. Enforce
+        # tenant scoping at the DB level (campus_filter is {} for full_admin).
+        campus_filter = get_campus_filter(current_user)
+        member = await db.members.find_one(
+            {**campus_filter, "id": event.member_id}, {"_id": 0, "name": 1, "campus_id": 1}
+        )
+        if not member:
+            raise HTTPException(status_code=404, detail="Member not found")
+        member_name = member["name"]
 
         # Determine if this is a one-time event that should be auto-completed
         one_time_events = [EventType.REGULAR_CONTACT, EventType.CHILDBIRTH, EventType.NEW_HOUSE]
@@ -218,11 +228,13 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
                 await db.accident_followup.insert_many(timeline)
                 logger.info(f"Generated {len(timeline)} accident follow-up stages for member {event.member_id}")
 
-        # Update member's last contact date for completed one-time events or non-birthday events
+        # Update member's last contact date for completed one-time events or non-birthday events.
+        # campus_filter is the same one used to verify the member above — defense-in-depth so a
+        # later refactor that drops the find_one check doesn't reintroduce the cross-tenant write.
         if is_one_time or (event.event_type != EventType.BIRTHDAY):
             now = datetime.now(UTC)
             await db.members.update_one(
-                {"id": event.member_id},
+                {**campus_filter, "id": event.member_id},
                 {
                     "$set": {
                         "last_contact_date": now,

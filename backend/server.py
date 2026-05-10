@@ -963,43 +963,63 @@ async def _broadcast_activity_safe(campus_id: str, activity_data: dict):
 # ==================== HELPER FUNCTIONS ====================
 
 
-async def get_member_or_404(member_id: str, projection: dict | None = None) -> dict:
+async def get_member_or_404(
+    member_id: str, current_user: dict, projection: dict | None = None
+) -> dict:
     """
-    Get member by ID or raise 404 HTTPException
+    Get member by ID, scoped to the caller's campus, or raise 404.
+
+    The campus filter is enforced at the DB level — full_admin sees all
+    campuses, every other role is restricted to its own campus_id (with an
+    IMPOSSIBLE_VALUE failsafe for users with a missing campus_id). A 404
+    is returned for cross-tenant lookups (instead of 403) so the existence
+    of the cross-tenant id is not disclosed.
+
+    `current_user` is required: the previous "trust the helper name"
+    pattern leaked because Python-level `if user.campus != member.campus`
+    checks tolerate `None == None` and don't run if the caller forgets.
 
     Args:
         member_id: The member's ID
+        current_user: The authenticated user dict (from get_current_user)
         projection: Optional MongoDB projection dict to limit fields returned
 
     Returns:
         Member document
 
     Raises:
-        HTTPException: 404 if member not found
+        HTTPException: 404 if member not found OR not in caller's campus
     """
     projection_dict = projection if projection else {"_id": 0}
-    member = await db.members.find_one({"id": member_id}, projection_dict)
+    query = {**get_campus_filter(current_user), "id": member_id}
+    member = await db.members.find_one(query, projection_dict)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     return member
 
 
-async def get_care_event_or_404(event_id: str, projection: dict | None = None) -> dict:
+async def get_care_event_or_404(
+    event_id: str, current_user: dict, projection: dict | None = None
+) -> dict:
     """
-    Get care event by ID or raise 404 HTTPException
+    Get care event by ID, scoped to the caller's campus, or raise 404.
+    See get_member_or_404 for the rationale and behaviour around
+    `current_user` and the IMPOSSIBLE_VALUE failsafe.
 
     Args:
         event_id: The event's ID
+        current_user: The authenticated user dict (from get_current_user)
         projection: Optional MongoDB projection dict to limit fields returned
 
     Returns:
         Care event document
 
     Raises:
-        HTTPException: 404 if care event not found
+        HTTPException: 404 if event not found OR not in caller's campus
     """
     projection_dict = projection if projection else {"_id": 0}
-    event = await db.care_events.find_one({"id": event_id}, projection_dict)
+    query = {**get_campus_filter(current_user), "id": event_id}
+    event = await db.care_events.find_one(query, projection_dict)
     if not event:
         raise HTTPException(status_code=404, detail="Care event not found")
     return event
@@ -1566,7 +1586,21 @@ async def sync_members_from_external_api(
                 detail="External API response invalid: expected JSON array of members",
             )
 
-        sync_campus_id = campus_id or current_admin.get("campus_id")
+        # Tenant scoping: campus_admin / pastor must operate only on their own
+        # campus. Without this, a campus_admin in Campus A could pass
+        # ?campus_id=<campusB> and the sync would update / archive Campus B's
+        # entire member roster (mass-delete vector by pointing at an empty
+        # external source). Only full_admin may target any campus_id.
+        if current_admin.get("role") != UserRole.FULL_ADMIN.value:
+            own_campus_id = current_admin.get("campus_id")
+            if campus_id and campus_id != own_campus_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You may only sync members for your own campus",
+                )
+            sync_campus_id = own_campus_id
+        else:
+            sync_campus_id = campus_id or current_admin.get("campus_id")
         if not sync_campus_id:
             raise HTTPException(status_code=400, detail="campus_id is required for sync")
         synced_count = 0
@@ -1704,8 +1738,10 @@ async def member_sync_webhook(request: Request) -> dict:
 
 @post("/import/members/csv")
 async def import_members_csv(request: Request, data: UploadFile) -> Response:
-    """Import members from CSV file"""
-    current_user = await get_current_user(request)
+    """Import members from CSV file. Admin role required — bulk member
+    creation is a privileged operation that should not be available to
+    plain `pastor` accounts even within their own campus."""
+    current_user = await get_current_admin(request)
     file = data  # Alias for compatibility
     try:
         # Get campus_id from current user for multi-tenancy
@@ -1770,8 +1806,9 @@ async def import_members_csv(request: Request, data: UploadFile) -> Response:
 
 @post("/import/members/json")
 async def import_members_json(data: list[dict[str, Any]] = Body(), request: Request = None) -> dict:
-    """Import members from JSON array"""
-    current_user = await get_current_user(request)
+    """Import members from JSON array. Admin role required — see
+    import_members_csv for rationale."""
+    current_user = await get_current_admin(request)
     try:
         # Get campus_id from current user for multi-tenancy
         campus_id = current_user.get("campus_id")
@@ -5111,12 +5148,25 @@ async def receive_sync_webhook(request: Request) -> dict:
                             member_data["photo_url"] = photo_url
                             logger.info(f"Using SeaweedFS photo URL for {core_member.get('full_name')}: {photo_url}")
 
-                        # Check if member exists
-                        existing = await db.members.find_one({"external_member_id": member_id}, {"_id": 0})
+                        # Check if member exists IN THIS CAMPUS. Without the
+                        # campus_id filter, two campuses that share an
+                        # external_member_id space (likely if both pull from
+                        # the same upstream system) would have webhook A
+                        # update the row in campus B. The HMAC was already
+                        # validated against this campus's secret, so the
+                        # member must also be in this campus.
+                        existing = await db.members.find_one(
+                            {"external_member_id": member_id, "campus_id": config["campus_id"]},
+                            {"_id": 0},
+                        )
 
                         if existing:
-                            # Update existing
-                            await db.members.update_one({"id": existing["id"]}, {"$set": member_data})
+                            # Update existing — re-scope by campus on the
+                            # update too (defense-in-depth).
+                            await db.members.update_one(
+                                {"id": existing["id"], "campus_id": config["campus_id"]},
+                                {"$set": member_data},
+                            )
                             logger.info(f"Updated member {core_member.get('full_name')} via webhook")
                             action = "updated"
                         else:
@@ -5199,8 +5249,14 @@ async def get_reminder_stats(request: Request) -> dict:
 
 
 @get("/uploads/{filename:str}")
-async def get_uploaded_file(filename: str) -> dict:
-    """Serve uploaded files with path traversal protection"""
+async def get_uploaded_file(filename: str, request: Request) -> dict:
+    """Serve uploaded files with path traversal protection. Requires
+    authentication — member photos are PII; without auth a leaked
+    member_id (in URLs, exports, error messages) lets anyone fetch the
+    photo. Cookie auth flows on `<img>` tags via SameSite=Lax (frontend
+    and API are same-site subdomains in production)."""
+    await get_current_user(request)
+
     # Validate filename - reject any path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
@@ -5218,8 +5274,11 @@ async def get_uploaded_file(filename: str) -> dict:
 
 
 @get("/user-photos/{filename:str}")
-async def get_user_photo(filename: str) -> dict:
-    """Serve user profile photos with path traversal protection"""
+async def get_user_photo(filename: str, request: Request) -> dict:
+    """Serve user profile photos with path traversal protection. See
+    get_uploaded_file for the auth rationale."""
+    await get_current_user(request)
+
     # Validate filename - reject any path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
@@ -5253,13 +5312,12 @@ async def global_search(q: str, request: Request) -> dict:
         # Security: Escape regex special characters to prevent NoSQL injection
         safe_query = escape_regex(q)
 
-        # Get user's campus
-        campus_id = current_user.get("campus_id")
-
-        # For full admin, search across all campuses they have access to
-        search_filter = {}
-        if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
-            search_filter["campus_id"] = campus_id
+        # Tenant scoping via get_campus_filter — full_admin sees all, every
+        # other role is scoped to its own campus_id (with an IMPOSSIBLE_VALUE
+        # failsafe for users missing campus_id). The previous role-allowlist
+        # pattern leaked cross-tenant member + care_event search results for
+        # any role not explicitly listed.
+        search_filter = dict(get_campus_filter(current_user))
 
         # Search members
         member_query = {
@@ -5374,13 +5432,15 @@ async def advanced_search(
                 "source": "meilisearch",
             }
 
-        # Fallback to MongoDB regex search (same as /search endpoint)
+        # Fallback to MongoDB regex search (same as /search endpoint).
+        # Use get_campus_filter so a non-full_admin with a null/missing
+        # campus_id can't accidentally match orphan documents (where
+        # campus_id is also null) — the IMPOSSIBLE_VALUE failsafe in the
+        # helper guarantees zero results in that case.
         logger.info("Meilisearch unavailable, falling back to MongoDB search")
         safe_query = escape_regex(q)
 
-        search_filter = {}
-        if not is_full_admin:
-            search_filter["campus_id"] = campus_id
+        search_filter = dict(get_campus_filter(current_user))
 
         members = []
         care_events = []
@@ -5446,13 +5506,13 @@ async def get_activity_logs(
     """
     try:
         current_user = await get_current_user(request)
-        # Get user's campus
-        campus_id = current_user.get("campus_id")
 
-        # Build query
-        query = {}
-        if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
-            query["campus_id"] = campus_id
+        # Build query — use get_campus_filter so any role other than full_admin
+        # is scoped to its own campus_id. The previous role-allowlist
+        # (`if role in [CAMPUS_ADMIN, PASTOR]`) leaked cross-tenant activity
+        # logs (which contain member names + visit/call narratives) for any
+        # mis-provisioned user whose role didn't match the allowlist.
+        query = dict(get_campus_filter(current_user))
 
         # Filter by user
         if user_id:
@@ -5496,11 +5556,11 @@ async def get_activity_summary(request: Request) -> dict:
     """
     try:
         current_user = await get_current_user(request)
-        campus_id = current_user.get("campus_id")
 
-        query = {}
-        if current_user["role"] in [UserRole.CAMPUS_ADMIN.value, UserRole.PASTOR.value]:
-            query["campus_id"] = campus_id
+        # Same get_campus_filter fix as get_activity_logs above — see comment
+        # there. The role-allowlist pattern leaked cross-tenant data for any
+        # role not explicitly listed.
+        query = dict(get_campus_filter(current_user))
 
         # Last 30 days
         start_datetime = datetime.now(UTC) - timedelta(days=30)
@@ -6134,12 +6194,11 @@ async def create_pastoral_note(data: PastoralNoteCreate, request: Request) -> di
     """Create a new pastoral note for a member"""
     current_user = await get_current_user(request)
 
-    # Verify member exists
-    member = await get_member_or_404(data.member_id)
-
-    # Check campus access
-    if current_user["role"] != "full_admin" and current_user.get("campus_id") != member.get("campus_id"):
-        raise PermissionDeniedException("You don't have access to this member's records")
+    # Verify member exists in the caller's campus. The helper enforces the
+    # campus filter at the DB level — the previous Python `!=` check
+    # tolerated `None == None` (a pastor with campus_id=None could match any
+    # member with campus_id=None).
+    member = await get_member_or_404(data.member_id, current_user)
 
     # Validate category if provided
     if data.category and data.category not in [c.value for c in NoteCategory]:
@@ -6458,12 +6517,9 @@ async def get_member_pastoral_notes(member_id: str, request: Request) -> list:
     """Get all pastoral notes for a specific member"""
     current_user = await get_current_user(request)
 
-    # Verify member exists
-    member = await get_member_or_404(member_id)
-
-    # Check campus access
-    if current_user["role"] != "full_admin" and current_user.get("campus_id") != member.get("campus_id"):
-        raise PermissionDeniedException("You don't have access to this member's records")
+    # Verify member exists in the caller's campus. The helper now enforces
+    # this at the DB level (see comment in create_pastoral_note above).
+    await get_member_or_404(member_id, current_user)
 
     # Query notes - filter private notes
     query = {

@@ -788,18 +788,25 @@ class TestCampus:
         assert response.status_code == 403
 
     def test_get_campus_by_id(self, client, db):
-        """Get campus by ID."""
+        """Get campus by ID (auth required after multi-tenancy hardening)."""
+        _setup_auth(db)
         db.campuses.find_one = AsyncMock(return_value=_make_campus())
 
-        response = client.get(f"/campuses/{TEST_CAMPUS_ID}")
+        response = client.get(f"/campuses/{TEST_CAMPUS_ID}", headers=_auth_headers())
         assert response.status_code == 200
 
     def test_get_campus_not_found(self, client, db):
-        """Get nonexistent campus returns 404."""
+        """Get nonexistent campus returns 404 (auth required)."""
+        _setup_auth(db)
         db.campuses.find_one = AsyncMock(return_value=None)
 
-        response = client.get(f"/campuses/{uuid.uuid4()!s}")
+        response = client.get(f"/campuses/{uuid.uuid4()!s}", headers=_auth_headers())
         assert response.status_code == 404
+
+    def test_get_campus_requires_auth(self, client, db):
+        """Unauthenticated GET on /campuses/{id} returns 401 (security)."""
+        response = client.get(f"/campuses/{TEST_CAMPUS_ID}")
+        assert response.status_code == 401
 
     def test_update_campus(self, client, db):
         """Full admin can update a campus."""
@@ -2373,19 +2380,34 @@ class TestIntegrations:
 class TestStaticFiles:
     """Tests for /uploads/* and /user-photos/* endpoints."""
 
+    def test_upload_requires_auth(self, client, db):
+        """Unauthenticated GET on /uploads/* returns 401 (PII protection)."""
+        response = client.get("/uploads/anything.jpg")
+        assert response.status_code == 401
+
+    def test_user_photo_requires_auth(self, client, db):
+        """Unauthenticated GET on /user-photos/* returns 401."""
+        response = client.get("/user-photos/anything.jpg")
+        assert response.status_code == 401
+
     def test_upload_path_traversal_rejected(self, client, db):
         """Path traversal in uploads is rejected (router may handle this as 404)."""
+        # Path traversal is checked BEFORE auth in Litestar's router (the
+        # router rejects malformed paths before our handler runs), so this
+        # works without auth.
         response = client.get("/uploads/../etc/passwd")
         assert response.status_code in [400, 404]
 
     def test_upload_backslash_rejected(self, client, db):
         """Backslash in uploads is rejected."""
-        response = client.get("/uploads/..\\etc\\passwd")
+        _setup_auth(db)
+        response = client.get("/uploads/..\\etc\\passwd", headers=_auth_headers())
         assert response.status_code in [400, 404]
 
     def test_upload_not_found(self, client, db):
-        """Nonexistent upload returns 404."""
-        response = client.get("/uploads/nonexistent.jpg")
+        """Nonexistent upload returns 404 (auth required)."""
+        _setup_auth(db)
+        response = client.get("/uploads/nonexistent.jpg", headers=_auth_headers())
         assert response.status_code == 404
 
     def test_user_photo_path_traversal_rejected(self, client, db):
@@ -2394,8 +2416,9 @@ class TestStaticFiles:
         assert response.status_code in [400, 404]
 
     def test_user_photo_not_found(self, client, db):
-        """Nonexistent user photo returns 404."""
-        response = client.get("/user-photos/nonexistent.jpg")
+        """Nonexistent user photo returns 404 (auth required)."""
+        _setup_auth(db)
+        response = client.get("/user-photos/nonexistent.jpg", headers=_auth_headers())
         assert response.status_code == 404
 
 
