@@ -109,9 +109,16 @@ async def migration_004_normalize_phone_numbers(db):
     """Normalize phone numbers to international format (62xxx)"""
     members_updated = 0
 
-    cursor = db.members.find({"phone": {"$exists": True, "$ne": ""}})
+    # The {"$ne": ""} filter does NOT exclude null/None — Mongo treats
+    # those as distinct from "". Without the explicit None check below,
+    # member.get("phone", "").strip() crashed with NoneType.strip() on
+    # any member whose phone field was explicitly null.
+    cursor = db.members.find({"phone": {"$exists": True, "$nin": ["", None]}})
     async for member in cursor:
-        phone = member.get("phone", "").strip()
+        raw_phone = member.get("phone")
+        if not isinstance(raw_phone, str):
+            continue
+        phone = raw_phone.strip()
         if phone:
             # Normalize phone format
             if phone.startswith("0"):
