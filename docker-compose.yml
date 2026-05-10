@@ -144,6 +144,12 @@ services:
       - "127.0.0.1:8001:8001"
     environment:
       - ENVIRONMENT=production
+      # Gateway IP of the faithtracker-network bridge — peer IP the backend
+      # sees when host-side Angie proxies through the published port. Without
+      # this the brute-force lockout collapses every client to Angie's IP and
+      # one attacker can lock out every legitimate user. Override via
+      # TRUSTED_PROXIES in .env for non-default network setups.
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-172.31.0.1}
       - MONGO_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/faithtracker?authSource=admin
       - DB_NAME=faithtracker
       - JWT_SECRET_KEY=${JWT_SECRET}
