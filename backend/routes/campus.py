@@ -73,9 +73,13 @@ async def _get_campus_by_id(campus_id: str) -> dict:
 
 
 @get("/campuses/{campus_id:str}")
-async def get_campus(campus_id: str) -> dict:
-    """Get campus by ID"""
+async def get_campus(campus_id: str, request: Request) -> dict:
+    """Get campus by ID. Requires authentication — list_campuses (no auth)
+    is intentional for the login-screen picker, but the detail endpoint
+    returns timezone, location, is_active, created_at, etc. and shouldn't
+    leak to anonymous callers."""
     try:
+        await get_current_user(request)
         return await _get_campus_by_id(campus_id)
     except HTTPException:
         raise

@@ -894,23 +894,27 @@ class TestCampusRoutes:
         result = await _fn(list_campuses)()
         assert result is not None
 
-    async def test_get_campus_by_id_success(self):
+    @patch("routes.campus.get_current_user", new_callable=AsyncMock)
+    async def test_get_campus_by_id_success(self, mock_user):
         from routes.campus import get_campus
 
+        mock_user.return_value = {"id": "u", "role": "full_admin"}
         mock_db.campuses.find_one = AsyncMock(return_value={"id": TEST_CAMPUS_ID, "campus_name": "Main Campus"})
 
-        result = await _fn(get_campus)(campus_id=TEST_CAMPUS_ID)
+        result = await _fn(get_campus)(campus_id=TEST_CAMPUS_ID, request=MagicMock())
         assert result["campus_name"] == "Main Campus"
 
-    async def test_get_campus_by_id_not_found(self):
+    @patch("routes.campus.get_current_user", new_callable=AsyncMock)
+    async def test_get_campus_by_id_not_found(self, mock_user):
         from litestar.exceptions import HTTPException
 
         from routes.campus import get_campus
 
+        mock_user.return_value = {"id": "u", "role": "full_admin"}
         mock_db.campuses.find_one = AsyncMock(return_value=None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await _fn(get_campus)(campus_id="nonexistent")
+            await _fn(get_campus)(campus_id="nonexistent", request=MagicMock())
         assert exc_info.value.status_code == 404
 
     @patch("routes.campus.get_current_user", new_callable=AsyncMock)
