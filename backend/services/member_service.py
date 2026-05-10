@@ -174,7 +174,13 @@ class MemberService:
             return False
 
         await self._db.members.delete_one({"id": member_id, "church_id": church_id})
-        await self._db.care_events.delete_many({"member_id": member_id, "church_id": church_id})
+        cascade = {"member_id": member_id, "church_id": church_id}
+        await self._db.care_events.delete_many(cascade)
+        await self._db.grief_support.delete_many(cascade)
+        await self._db.accident_followup.delete_many(cascade)
+        await self._db.financial_aid_schedules.delete_many(cascade)
+        await self._db.pastoral_notes.delete_many(cascade)
+        await self._db.activity_logs.delete_many(cascade)
 
         await self._log_activity(
             church_id=church_id,

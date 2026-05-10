@@ -589,6 +589,12 @@ async def get_dashboard_reminders(request: Request) -> dict:
         today_date = _get_date_in_timezone(campus_tz)
         cache_key = f"reminders:{today_date}"
 
+        # Initialize lock_key unconditionally so the cleanup branch below
+        # cannot raise NameError when the cache try-block bailed early —
+        # contextlib.suppress(Exception) used to swallow that NameError
+        # silently, which left the soft computing lock dangling for 30 s
+        # and stalled every other worker.
+        lock_key = None
         cache = get_cache()
         if cache:
             cached = await cache.get(cache_key, church_id=campus_id)
@@ -615,8 +621,9 @@ async def get_dashboard_reminders(request: Request) -> dict:
 
         if cache:
             await cache.set(cache_key, data, ttl=CacheService.DASHBOARD_TTL, church_id=campus_id)
-            with contextlib.suppress(Exception):
-                await cache._client.delete(cache._make_key(lock_key, campus_id))
+            if lock_key is not None:
+                with contextlib.suppress(Exception):
+                    await cache._client.delete(cache._make_key(lock_key, campus_id))
 
         data["cache_version"] = datetime.now(UTC).isoformat()
         return data
@@ -634,6 +641,8 @@ async def get_dashboard_stats(request: Request) -> dict:
         campus_id = current_user.get("campus_id", "global")
         cache_key = "dashboard:stats"
 
+        # See get_dashboard_reminders for why lock_key is initialized here.
+        lock_key = None
         # Try cache first
         cache = get_cache()
         if cache:
@@ -704,8 +713,9 @@ async def get_dashboard_stats(request: Request) -> dict:
         # Cache the result
         if cache:
             await cache.set(cache_key, data, ttl=CacheService.DASHBOARD_TTL, church_id=campus_id)
-            with contextlib.suppress(Exception):
-                await cache._client.delete(cache._make_key(lock_key, campus_id))
+            if lock_key is not None:
+                with contextlib.suppress(Exception):
+                    await cache._client.delete(cache._make_key(lock_key, campus_id))
 
         return data
     except Exception as e:

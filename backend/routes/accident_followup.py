@@ -118,6 +118,11 @@ async def complete_accident_stage(stage_id: str, request: Request, notes: str | 
         if not stage:
             raise HTTPException(status_code=404, detail="Accident follow-up stage not found")
 
+        # Idempotency guard: prevent double-tap from inserting duplicate
+        # care_events + activity_logs rows.
+        if stage.get("completed"):
+            return {"success": True, "message": "Accident follow-up stage already completed"}
+
         # Get member name for logging
         member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0, "name": 1})
         member_name = member["name"] if member else "Unknown"
@@ -255,6 +260,10 @@ async def ignore_accident_stage(stage_id: str, request: Request) -> dict:
         stage = await db.accident_followup.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Accident followup not found")
+
+        # Idempotency: don't insert a second "ignored" timeline entry on retry.
+        if stage.get("ignored") or stage.get("completed"):
+            return {"success": True, "message": "Accident followup already resolved"}
 
         # Get member name for logging
         member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0, "name": 1})

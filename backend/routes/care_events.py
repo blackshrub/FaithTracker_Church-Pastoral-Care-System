@@ -129,11 +129,15 @@ async def create_care_event(data: CareEventCreate, request: Request) -> dict:
         # Determine if this is a one-time event that should be auto-completed
         one_time_events = [EventType.REGULAR_CONTACT, EventType.CHILDBIRTH, EventType.NEW_HOUSE]
 
-        # Check if financial aid is one-time
+        # Financial aid is one-time unless the caller explicitly flags it
+        # as recurring. Previously this was inferred from "not event.aid_notes"
+        # — but aid_notes is a free-text field, so an admin who typed any
+        # note on a one-time payment would silently flip it to non-one-time
+        # (and vice versa for recurring schedules with no notes).
         is_one_time_financial_aid = (
             event.event_type == EventType.FINANCIAL_AID
             and event.aid_type
-            and not event.aid_notes  # No recurring schedule means one-time
+            and not event.is_recurring
         )
 
         is_one_time = event.event_type in one_time_events or is_one_time_financial_aid
@@ -511,25 +515,39 @@ async def complete_birthday_by_member(member_id: str, request: Request) -> dict:
             },
         )
 
-        # Create "Birthday Contact" regular_contact event for timeline
+        # Create "Birthday Contact" regular_contact event for timeline.
+        # Guard against unbounded duplicates: a repeat call same-day after the
+        # birthday event was already completed used to fall through the else
+        # branch and re-insert a Birthday Contact every time.
         if _get_campus_timezone and _get_date_in_timezone:
-            contact_event = {
-                "id": generate_uuid(),
-                "member_id": member_id,
-                "campus_id": campus_id,
-                "event_type": "regular_contact",
-                "event_date": today_date,
-                "title": "Birthday Contact",
-                "description": f"Contacted {member['name']} for their birthday celebration",
-                "completed": True,
-                "completed_at": now,
-                "completed_by_user_id": current_user["id"],
-                "completed_by_user_name": current_user["name"],
-                "reminder_sent": False,
-                "created_at": now,
-                "updated_at": now,
-            }
-            await db.care_events.insert_one(contact_event)
+            existing_contact = await db.care_events.find_one(
+                {
+                    "member_id": member_id,
+                    "campus_id": campus_id,
+                    "event_type": "regular_contact",
+                    "event_date": today_date,
+                    "title": "Birthday Contact",
+                },
+                {"_id": 0, "id": 1},
+            )
+            if not existing_contact:
+                contact_event = {
+                    "id": generate_uuid(),
+                    "member_id": member_id,
+                    "campus_id": campus_id,
+                    "event_type": "regular_contact",
+                    "event_date": today_date,
+                    "title": "Birthday Contact",
+                    "description": f"Contacted {member['name']} for their birthday celebration",
+                    "completed": True,
+                    "completed_at": now,
+                    "completed_by_user_id": current_user["id"],
+                    "completed_by_user_name": current_user["name"],
+                    "reminder_sent": False,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                await db.care_events.insert_one(contact_event)
 
         # Invalidate dashboard cache
         if _invalidate_dashboard_cache:

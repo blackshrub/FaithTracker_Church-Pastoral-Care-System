@@ -158,6 +158,11 @@ class CareEventCreate(Struct):
     aid_type: AidType | None = None
     aid_amount: float | None = None
     aid_notes: str | None = None
+    # Explicit recurrence flag for financial aid (default False = one-time).
+    # Used by the create handler to decide whether to auto-complete the event.
+    # Previously inferred from "not aid_notes" which was semantically wrong:
+    # aid_notes is a free-text user field, not a recurrence marker.
+    is_recurring: bool = False
 
 
 class CareEventUpdate(Struct):

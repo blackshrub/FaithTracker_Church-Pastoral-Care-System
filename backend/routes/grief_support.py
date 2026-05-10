@@ -130,6 +130,11 @@ async def complete_grief_stage(stage_id: str, request: Request, notes: str | Non
         if not stage:
             raise HTTPException(status_code=404, detail="Grief stage not found")
 
+        # Idempotency guard: a double-tap or retry must not insert another
+        # care_events row + activity_log row for the same completion.
+        if stage.get("completed"):
+            return {"success": True, "message": "Grief stage already completed"}
+
         # Get member name for logging
         member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0, "name": 1})
         member_name = member["name"] if member else "Unknown"
@@ -216,6 +221,10 @@ async def ignore_grief_stage(stage_id: str, request: Request) -> dict:
         stage = await db.grief_support.find_one({"id": stage_id, **campus_filter}, {"_id": 0})
         if not stage:
             raise HTTPException(status_code=404, detail="Grief stage not found")
+
+        # Idempotency: don't insert a second "ignored" timeline entry on retry.
+        if stage.get("ignored") or stage.get("completed"):
+            return {"success": True, "message": "Grief stage already resolved"}
 
         # Get member name for logging
         member = await db.members.find_one({"id": stage["member_id"]}, {"_id": 0, "name": 1})

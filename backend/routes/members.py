@@ -136,11 +136,13 @@ async def list_members(
     try:
         query = get_campus_filter(current_user)
 
-        # Exclude archived members by default (unless show_archived=true)
+        # Exclude archived by default. show_archived=true means "include
+        # archived alongside active members" (the natural meaning of the
+        # parameter name) — previously it returned ONLY archived members,
+        # silently hiding the entire active roster from any caller that
+        # passed the flag.
         if not show_archived:
             query["is_archived"] = {"$ne": True}
-        else:
-            query["is_archived"] = True
 
         if engagement_status:
             query["engagement_status"] = engagement_status
@@ -391,6 +393,11 @@ async def delete_member(member_id: str, request: Request) -> dict:
         await db.care_events.delete_many(cascade_filter)
         await db.grief_support.delete_many(cascade_filter)
         await db.accident_followup.delete_many(cascade_filter)
+        # financial_aid_schedules and pastoral_notes were previously not
+        # cascaded, leaving orphan rows that kept surfacing on the dashboard
+        # forever (aid_due_today / pastoral notes for a deleted member).
+        await db.financial_aid_schedules.delete_many(cascade_filter)
+        await db.pastoral_notes.delete_many(cascade_filter)
         await db.activity_logs.delete_many(
             {"member_id": member_id, "campus_id": member_campus_id} if member_campus_id else {"member_id": member_id}
         )
