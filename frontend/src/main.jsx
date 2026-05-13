@@ -4,6 +4,11 @@ import ReactDOM from 'react-dom/client';
 import '@/index.css';
 import App from '@/App';
 import reportWebVitals, { sendToAnalytics } from '@/lib/reportWebVitals';
+import { initSentry } from '@/lib/sentry';
+
+// Initialize error tracking before any React render so the SDK captures
+// errors from the initial mount.
+initSentry();
 
 // Comprehensive ResizeObserver error suppression
 // Method 1: Window error event
