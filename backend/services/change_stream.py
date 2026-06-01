@@ -31,6 +31,8 @@ import json
 import logging
 from datetime import UTC, datetime
 
+from services.db_compat import open_change_stream
+
 logger = logging.getLogger(__name__)
 
 # Resume token key in DragonflyDB for crash recovery
@@ -80,9 +82,8 @@ class ChangeStreamWatcher:
             # Try to open a change stream briefly to verify support.
             # This is the most reliable detection method since it tests
             # the actual capability rather than inferring from topology.
-            # PyMongo async API: collection.watch() is now a coroutine that
-            # returns the async context manager — needs an extra `await`.
-            async with await self._db.activity_logs.watch(
+            async with open_change_stream(
+                self._db.activity_logs,
                 pipeline=[{"$match": {"operationType": "insert"}}],
                 max_await_time_ms=100,
             ):
@@ -266,8 +267,7 @@ class ChangeStreamWatcher:
 
                 logger.info("Opening change stream on activity_logs collection")
 
-                # See _check_replica_set comment — watch() is async-call now.
-                async with await self._db.activity_logs.watch(**watch_kwargs) as stream:
+                async with open_change_stream(self._db.activity_logs, **watch_kwargs) as stream:
                     # Reset backoff on successful connection
                     backoff = _INITIAL_BACKOFF_SECONDS
 
