@@ -52,9 +52,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       fonts-liberation \
       fonts-dejavu-core
 
-# uv bootstrap (small ~10 MB binary install, no cache needed).
-# HTTPS index — no PIP_TRUSTED_HOST; cert verification stays on.
-RUN pip install --no-cache-dir uv
+# uv bootstrap — copy the prebuilt static binary from Astral's official
+# image (same pattern as the FaithFlow backend). Pulled by the daemon, so it
+# doesn't depend on the build network reaching pypi.org — which is
+# Fastly/IPv6-hosted and unreachable from the default IPv4-only bridge. Pin
+# matches uv.lock revision 3 (needs a recent uv).
+COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /usr/local/bin/uv
 
 # Install Python deps from the locked manifest. uv sync --frozen reads
 # uv.lock and refuses to update it (build deterministic across machines).
