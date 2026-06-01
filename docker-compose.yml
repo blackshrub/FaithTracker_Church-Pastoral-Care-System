@@ -35,7 +35,10 @@ services:
     volumes:
       - ./data/dragonfly:/data
     networks:
-      - faithtracker-network
+      faithtracker-network:
+        aliases:
+          - dragonfly   # 2026-06-01: explicit alias because faithtracker-network
+                        # has `name:` override which suppresses auto-aliasing
     deploy:
       resources:
         limits:
@@ -73,7 +76,9 @@ services:
     volumes:
       - ./data/meilisearch:/meili_data
     networks:
-      - faithtracker-network
+      faithtracker-network:
+        aliases:
+          - meilisearch   # 2026-06-01: explicit alias (see dragonfly note)
     deploy:
       resources:
         limits:
@@ -109,7 +114,9 @@ services:
       - ./data/mongo:/data/db
       - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
     networks:
-      - faithtracker-network
+      faithtracker-network:
+        aliases:
+          - mongo   # 2026-06-01: explicit alias (see dragonfly note)
     # Resource limits to prevent runaway memory/CPU usage
     deploy:
       resources:
@@ -144,6 +151,8 @@ services:
       - "127.0.0.1:8001:8001"
     environment:
       - ENVIRONMENT=production
+      # Self-hosted GlitchTip — same dashboard as mobile + web
+      - SENTRY_DSN=${SENTRY_DSN:-https://26dc7f857da14a78ace4d0471c8fbce2@errors.gkbj.org/6}
       # Gateway IP of the faithtracker-network bridge — peer IP the backend
       # sees when host-side Angie proxies through the published port. Without
       # this the brute-force lockout collapses every client to Angie's IP and
@@ -215,7 +224,7 @@ services:
   # Frontend - React (served directly by host-level Angie)
   # ===================
   # DISABLED: Frontend static files are served directly from
-  # /srv/faithtracker/frontend/build by host-level Angie.
+  # /srv/gkbj-group/FaithTracker_Church-Pastoral-Care-System/frontend/build by host-level Angie.
   # To rebuild: docker compose run --rm frontend-builder
   # ===================
   frontend-builder:
@@ -227,8 +236,8 @@ services:
         VITE_BACKEND_URL: https://api.${DOMAIN}
     container_name: faithtracker-frontend-builder
     volumes:
-      - /srv/faithtracker/frontend/build:/output
-    entrypoint: ["sh", "-c", "cp -r /app/build/* /output/ && echo 'Frontend build copied to /srv/faithtracker/frontend/build'"]
+      - /srv/gkbj-group/FaithTracker_Church-Pastoral-Care-System/frontend/build:/output
+    entrypoint: ["sh", "-c", "cp -r /app/build/* /output/ && echo 'Frontend build copied to /srv/gkbj-group/FaithTracker_Church-Pastoral-Care-System/frontend/build'"]
     profiles:
       - build
 
