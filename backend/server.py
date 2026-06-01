@@ -14,6 +14,12 @@ import logging
 import os
 import secrets
 import uuid
+
+# Initialize Sentry/GlitchTip BEFORE importing Litestar or other modules
+# so the SDK can wrap ASGI internals and capture handler errors.
+from sentry_init import init_sentry  # noqa: E402
+
+init_sentry()
 from datetime import UTC, date, datetime, timedelta
 from enum import Enum
 from pathlib import Path
@@ -565,9 +571,12 @@ def global_exception_handler(request: Request, exc: Exception) -> LitestarRespon
         content = json.dumps({"detail": f"Validation failed for {request.method} {request.url.path}"})
         return LitestarResponse(content=content, status_code=HTTP_400_BAD_REQUEST, media_type="application/json")
 
-    # Handle HTTP exceptions properly - return their status code and message
+    # Handle HTTP exceptions properly - return their status code and message.
+    # default=str so non-JSON-native values in a detail (datetime, ObjectId,
+    # etc.) degrade to strings instead of raising a secondary TypeError that
+    # collapses the intended status code into an unhandled 500.
     if isinstance(exc, HTTPException):
-        content = json.dumps({"detail": exc.detail})
+        content = json.dumps({"detail": exc.detail}, default=str)
         return LitestarResponse(content=content, status_code=exc.status_code, media_type="application/json")
 
     # Log the full error for debugging
@@ -5893,7 +5902,9 @@ async def health_check() -> dict:
                 "status": "unhealthy",
                 "service": "faithtracker-api",
                 "database": "disconnected",
-                "timestamp": datetime.now(UTC),
+                # isoformat string: HTTPException details flow through the
+                # custom global_exception_handler (stdlib json), not msgspec.
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 

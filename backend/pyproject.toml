@@ -23,6 +23,8 @@ dependencies = [
     "msgspec==0.19.0",
     "watchfiles==1.1.1",
     "python-multipart==0.0.20",
+    # Error tracking — self-hosted GlitchTip at errors.gkbj.org/6
+    "sentry-sdk>=2.0.0",
 
     # MongoDB (async). Motor is deprecated 14 May 2026 — replaced by
     # PyMongo's native async API (AsyncMongoClient). Lower bound 4.13
