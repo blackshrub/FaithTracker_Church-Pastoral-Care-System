@@ -10,7 +10,8 @@
 # Exit codes: 0 healthy, 1 alert fired, 2 setup error.
 set -euo pipefail
 
-PROJECT_ROOT="/srv/FaithTracker_Church-Pastoral-Care-System"
+# Project root = parent of this script's dir (scripts/..), move-safe.
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$PROJECT_ROOT/data/logs"
 LOG_FILE="$LOG_DIR/digest-heartbeat.log"
 ENV_FILE="$PROJECT_ROOT/.env"
