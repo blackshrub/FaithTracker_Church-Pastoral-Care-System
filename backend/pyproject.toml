@@ -82,10 +82,14 @@ dependencies = [
     "jq==1.10.0",
 
     # Test deps that are imported by some maintenance scripts.
-    # Kept in runtime so test_api.sh against a live container works.
+    # Kept in runtime so test_api.sh against a live container works, and so the
+    # suite can be run inside the deployed backend container. pytest-xdist is
+    # here (not the dev group) because the prod image is built with --no-dev:
+    # without it `pytest -n auto/-n N` fails with "unrecognized arguments: -n".
     "pytest==8.4.2",
     "pytest-asyncio==1.3.0",
     "pytest-cov==6.0.0",
+    "pytest-xdist>=3.5.0",
     "Faker==37.4.1",
 ]
 
@@ -95,7 +99,8 @@ dependencies = [
 # ============================================================================
 [dependency-groups]
 dev = [
-    "pytest-xdist>=3.5.0",        # parallel pytest (-n auto)
+    # NOTE: pytest-xdist moved to the main `dependencies` so it ships in the
+    # prod image (built with --no-dev) and `pytest -n` works in-container.
     "pytest-timeout>=2.4.0",      # per-test timeout (Round-1+ test infra)
     "pytest-testmon>=2.1.0",      # incremental: only run tests touched by code changes
     "mongomock>=4.3.0",           # in-memory MongoDB for unit tests (no Docker)

@@ -61,8 +61,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /usr/local/bin/uv
 
 # Install Python deps from the locked manifest. uv sync --frozen reads
 # uv.lock and refuses to update it (build deterministic across machines).
-# --no-dev excludes the [dependency-groups.dev] group (pytest-xdist, ruff,
-# ipython, mypy, etc.) so the production image stays lean.
+# --no-dev excludes the [dependency-groups.dev] group (ruff, ipython, mypy,
+# etc.) so the production image stays lean. Note: pytest + pytest-xdist live in
+# the main `dependencies` on purpose, so the suite (incl. `pytest -n`) runs
+# inside the deployed container.
 # --no-install-project skips installing the local project as a package
 # (the backend runs as scripts, not as an installed module).
 COPY pyproject.toml uv.lock ./

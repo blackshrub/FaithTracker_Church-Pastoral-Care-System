@@ -199,15 +199,18 @@ services:
         condition: service_healthy
       meilisearch:
         condition: service_healthy
-    # Resource limits to prevent runaway memory/CPU usage
+    # Resource limits to prevent runaway memory/CPU usage.
+    # Memory raised 1G -> 4G so the prod app has headroom and the test suite
+    # can run pytest-xdist with more workers (each worker ~150-200MB) without
+    # OOM-killing (exit 137); CPU raised 2 -> 6 for test parallelism.
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 1G
+          cpus: '6'
+          memory: 4G
         reservations:
           cpus: '0.25'
-          memory: 256M
+          memory: 512M
     logging:
       driver: "json-file"
       options:
