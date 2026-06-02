@@ -85,6 +85,66 @@ ALERT_EMAIL = os.environ.get("ALERT_EMAIL", os.environ.get("SMTP_USER", ""))
 WHATSAPP_MAX_RETRIES = 3
 WHATSAPP_RETRY_DELAYS = [2, 4, 8]  # Exponential backoff in seconds
 
+# Pre-flight reconnect (the WA session can silently drop — e.g. when container
+# egress is briefly lost — leaving /send/message returning AUTHENTICATION_ERROR
+# even though the gateway container is up). Before the digest we proactively
+# check /app/status and trigger /app/reconnect so a dormant session is healed.
+WHATSAPP_RECONNECT_TIMEOUT = 25  # seconds; /app/reconnect dials WhatsApp web
+WHATSAPP_RECONNECT_SETTLE = 5  # seconds to wait after reconnect before re-checking
+
+
+async def _resolve_whatsapp_gateway_url() -> str | None:
+    """Resolve the WhatsApp gateway base URL: env var first, then DB settings."""
+    whatsapp_url = os.environ.get("WHATSAPP_GATEWAY_URL")
+    if not whatsapp_url:
+        settings = await db.settings.find_one({"type": "automation"})
+        if settings and settings.get("data"):
+            whatsapp_url = settings["data"].get("whatsappGateway")
+    return whatsapp_url
+
+
+async def ensure_whatsapp_connected() -> bool:
+    """Best-effort: make sure the gateway's WA session is live before sending.
+
+    Checks GET /app/status; if the device is not connected, triggers
+    GET /app/reconnect and re-checks. Never raises — a failure here must not
+    abort the digest, since send_whatsapp() has its own retry + alerting.
+    Returns True if the session looks connected afterwards, else False.
+    """
+    whatsapp_url = await _resolve_whatsapp_gateway_url()
+    if not whatsapp_url:
+        logger.warning("WhatsApp pre-flight skipped: gateway not configured")
+        return False
+
+    def _is_connected(payload: dict) -> bool:
+        results = (payload or {}).get("results") or {}
+        return bool(results.get("is_connected") and results.get("is_logged_in"))
+
+    try:
+        from services.http_client import get_http_client
+
+        http_client = await get_http_client()
+
+        status_resp = await http_client.get(f"{whatsapp_url}/app/status", timeout=10)
+        if status_resp.status_code == 200 and _is_connected(status_resp.json()):
+            logger.info("WhatsApp pre-flight: session already connected")
+            return True
+
+        logger.warning("WhatsApp pre-flight: session not connected — triggering /app/reconnect")
+        await http_client.get(f"{whatsapp_url}/app/reconnect", timeout=WHATSAPP_RECONNECT_TIMEOUT)
+        await asyncio.sleep(WHATSAPP_RECONNECT_SETTLE)
+
+        recheck = await http_client.get(f"{whatsapp_url}/app/status", timeout=10)
+        if recheck.status_code == 200 and _is_connected(recheck.json()):
+            logger.info("WhatsApp pre-flight: session restored via reconnect")
+            return True
+
+        logger.error("WhatsApp pre-flight: session still not connected after reconnect")
+        return False
+    except Exception as e:
+        logger.warning(f"WhatsApp pre-flight reconnect check failed (continuing anyway): {e!s}")
+        return False
+
 
 async def send_email_alert(subject: str, body: str):
     """Send email alert for critical failures"""
@@ -121,12 +181,7 @@ async def send_whatsapp(phone: str, message: str, log_context: dict):
     last_error = None
 
     # Try environment variable first, then fall back to database settings
-    whatsapp_url = os.environ.get("WHATSAPP_GATEWAY_URL")
-    if not whatsapp_url:
-        # Fall back to database settings
-        settings = await db.settings.find_one({"type": "automation"})
-        if settings and settings.get("data"):
-            whatsapp_url = settings["data"].get("whatsappGateway")
+    whatsapp_url = await _resolve_whatsapp_gateway_url()
 
     if not whatsapp_url:
         error_msg = "WhatsApp gateway not configured"
@@ -1115,6 +1170,11 @@ async def daily_reminder_job():
                 "Continuing to send WhatsApp digest with stale cache."
             )
 
+        # Pre-flight: heal a silently-dropped WA session before sending so the
+        # whole digest doesn't fail with AUTHENTICATION_ERROR. Best-effort —
+        # we still attempt the send even if reconnect doesn't confirm.
+        await ensure_whatsapp_connected()
+
         # Send WhatsApp digests
         await send_daily_digest_to_pastoral_team()
 
@@ -1191,9 +1251,15 @@ async def check_missed_digest():
     try:
         logger.info("Checking for missed daily digest...")
 
-        # Get configured digest time
+        # Get configured digest time. Fall back to 08:00 on a malformed value
+        # (mirrors reschedule_daily_digest) so a bad digestTime setting can't
+        # silently disable the missed-digest safety net.
         digest_time = await get_digest_time_from_db()
-        hour, minute = map(int, digest_time.split(":"))
+        try:
+            hour, minute = map(int, digest_time.split(":"))
+        except ValueError:
+            logger.error(f"Invalid digest time format: {digest_time}, using default 08:00")
+            hour, minute = 8, 0
 
         # Check if we're past the scheduled digest time today
         now = now_jakarta()
