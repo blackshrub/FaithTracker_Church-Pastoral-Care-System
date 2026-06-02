@@ -43,6 +43,17 @@ def _redact(value: Any, seen: set[int] | None = None) -> Any:
 
 
 def _before_send(event: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any] | None:
+    # Drop health-probe 503s. /health/scheduler intentionally raises
+    # HTTPException(503) as a liveness signal when the digest looks stale;
+    # that's by-design probe output, not an application error.
+    exc_info = _hint.get("exc_info")
+    if exc_info and len(exc_info) >= 2:
+        status = getattr(exc_info[1], "status_code", None)
+        if status == 503:
+            url = (event.get("request") or {}).get("url") or event.get("transaction") or ""
+            if "/health" in url:
+                return None
+
     # Drop transient connection errors — they're noise vs real bugs.
     exc = event.get("exception", {}).get("values", [])
     for v in exc:
