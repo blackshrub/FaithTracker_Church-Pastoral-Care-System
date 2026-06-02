@@ -56,6 +56,27 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(autouse=True)
+def _reset_shared_http_client():
+    """Reset the process-wide shared httpx client between tests.
+
+    services.http_client caches a singleton AsyncClient bound to the event
+    loop it was created on. pytest-asyncio runs each test on a fresh
+    function-scoped loop, so a client leaked from an earlier test is bound to
+    a now-closed loop and raises "Event loop is closed" when the next test
+    reuses it. Clearing the singleton forces lazy re-creation on the current
+    loop (and lets tests that patch httpx.AsyncClient install their mock).
+    """
+    try:
+        import services.http_client as _hc
+    except Exception:
+        yield
+        return
+    _hc._client = None
+    yield
+    _hc._client = None
+
+
 @pytest.fixture
 async def test_db_client():
     """MongoDB client for tests (function-scoped for pytest-asyncio compatibility)"""

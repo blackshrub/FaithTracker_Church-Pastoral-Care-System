@@ -19,6 +19,29 @@ from scheduler import acquire_job_lock, generate_daily_digest_for_campus, releas
 from scheduler import db as scheduler_db
 
 
+@pytest.fixture(autouse=True)
+async def _bind_scheduler_to_test_db(test_db, monkeypatch):
+    """Make scheduler use the per-test database, on the current event loop.
+
+    ``scheduler.db`` and the Redis client are module-level singletons created
+    at import time and bound to the import-time event loop. pytest-asyncio runs
+    each test on a fresh function-scoped loop, so reusing them raises
+    "Cannot use AsyncMongoClient in different event loop". Rebinding
+    ``scheduler.db`` to the function-scoped ``test_db`` (created on this loop)
+    fixes that and points reads/writes at the cleaned test database.
+
+    We also pin ``get_redis_client`` to ``None`` so lock tests deterministically
+    exercise the Mongo fallback (the Redis primary has the same cross-loop
+    binding problem and shares the live Dragonfly instance, which must not be
+    flushed by tests). A unique index on ``lock_id`` gives the Mongo fallback
+    the same single-winner atomicity Redis SET NX provides in production.
+    """
+    monkeypatch.setattr("scheduler.db", test_db)
+    monkeypatch.setattr("scheduler.get_redis_client", lambda: None)
+    await test_db.job_locks.create_index("lock_id", unique=True)
+    yield
+
+
 @pytest.mark.asyncio
 async def test_job_lock_acquisition(test_db):
     """Test that only one worker can acquire a job lock"""

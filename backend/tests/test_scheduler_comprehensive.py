@@ -250,109 +250,117 @@ class TestSafeParseDate:
 
 
 class TestAcquireJobLock:
-    """Tests for acquire_job_lock() distributed locking"""
+    """Tests for acquire_job_lock() distributed locking.
+
+    Production acquires a Redis ``SET NX`` lock first and falls back to a
+    token-based Mongo ``find_one_and_update`` when Redis is unavailable. These
+    unit tests pin ``get_redis_client()`` to ``None`` so they deterministically
+    exercise the Mongo fallback without needing a live Redis, and they mock
+    ``find_one_and_update`` (the call the current implementation actually makes).
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_successful_acquisition_via_upsert(self):
-        """When update_one returns an upserted_id, lock is acquired"""
+        """A fresh lock (upsert) echoes back our token -> acquired."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(matched=0, upserted_id="new_id"))
 
-        with patch("scheduler.db", mock_db):
-            result = await acquire_job_lock("test_job", ttl_seconds=60)
-            assert result is True
+        async def fake_fnu(query, update, **kwargs):
+            # Mongo with return_document=AFTER returns the doc we just wrote,
+            # including the random token acquire_job_lock() generated.
+            return update["$set"]
+
+        mock_db.job_locks.find_one_and_update = fake_fnu
+
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            assert await acquire_job_lock("test_job", ttl_seconds=60) is True
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_successful_acquisition_via_match(self):
-        """When update_one matches an expired lock, lock is acquired"""
+        """Re-acquiring an expired lock (matched) also returns our token."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(matched=1, upserted_id=None))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
 
-        with patch("scheduler.db", mock_db):
-            result = await acquire_job_lock("test_job", ttl_seconds=60)
-            assert result is True
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            assert await acquire_job_lock("test_job", ttl_seconds=60) is True
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_already_locked_duplicate_key(self):
-        """When update_one raises E11000 duplicate key, returns False"""
+        """A live lock makes the upsert raise E11000 -> returns False."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(side_effect=Exception("E11000 duplicate key error"))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=Exception("E11000 duplicate key error"))
 
-        with patch("scheduler.db", mock_db):
-            result = await acquire_job_lock("test_job", ttl_seconds=60)
-            assert result is False
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            assert await acquire_job_lock("test_job", ttl_seconds=60) is False
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_already_locked_no_match_no_upsert(self):
-        """When update_one matches nothing and no upsert, returns False"""
+        """Another worker's token in the returned doc -> returns False."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(matched=0, upserted_id=None))
+        mock_db.job_locks.find_one_and_update = AsyncMock(return_value={"token": "another-worker-token"})
 
-        with patch("scheduler.db", mock_db):
-            result = await acquire_job_lock("test_job", ttl_seconds=60)
-            assert result is False
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            assert await acquire_job_lock("test_job", ttl_seconds=60) is False
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_unexpected_error_returns_false(self):
-        """Non-duplicate-key errors should return False and log error"""
+        """Non-duplicate-key errors should return False and log error."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(side_effect=Exception("Connection reset by peer"))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=Exception("Connection reset by peer"))
 
-        with patch("scheduler.db", mock_db):
-            result = await acquire_job_lock("test_job", ttl_seconds=60)
-            assert result is False
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            assert await acquire_job_lock("test_job", ttl_seconds=60) is False
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_lock_id_contains_job_name_and_date(self):
-        """Lock ID should be formatted as job_lock_{name}_{date}"""
+        """Lock ID should be formatted as job_lock_{name}_{date}."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
 
-        with patch("scheduler.db", mock_db):
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
             await acquire_job_lock("my_job", ttl_seconds=60)
 
-        # Inspect the query passed to update_one
-        call_args = mock_db.job_locks.update_one.call_args
-        query = call_args[0][0]  # First positional arg is the filter
-        expected_prefix = f"job_lock_my_job_{today_jakarta().isoformat()}"
-        assert query["lock_id"] == expected_prefix
+        # First positional arg to find_one_and_update is the filter.
+        query = mock_db.job_locks.find_one_and_update.call_args[0][0]
+        expected = f"job_lock_my_job_{today_jakarta().isoformat()}"
+        assert query["lock_id"] == expected
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_ttl_sets_correct_expiry(self):
-        """The expires_at field should be approximately now + ttl_seconds"""
+        """The expires_at field should be approximately now + ttl_seconds."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
 
-        with patch("scheduler.db", mock_db):
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
             await acquire_job_lock("ttl_test", ttl_seconds=300)
 
-        call_args = mock_db.job_locks.update_one.call_args
-        update_doc = call_args[0][1]  # Second positional arg is the update
+        # Second positional arg is the update document.
+        update_doc = mock_db.job_locks.find_one_and_update.call_args[0][1]
         expires_at = update_doc["$set"]["expires_at"]
-        now = datetime.now(UTC)
-
-        # Should be roughly 300 seconds from now (allow 5 sec tolerance)
-        diff = abs((expires_at - now).total_seconds())
+        diff = abs((expires_at - datetime.now(UTC)).total_seconds())
         assert diff < 305
 
 
 class TestReleaseJobLock:
-    """Tests for release_job_lock()"""
+    """Tests for release_job_lock() (Mongo fallback path)."""
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_release_calls_delete(self):
-        """Releasing should call delete_one with the correct lock_id"""
+        """Releasing a held lock should delete it by lock_id + token."""
         mock_db = make_mock_db()
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
+        mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch("scheduler.db", mock_db):
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            # Must acquire first so we own the token release checks for.
+            assert await acquire_job_lock("test_job", ttl_seconds=60) is True
             await release_job_lock("test_job")
 
         mock_db.job_locks.delete_one.assert_called_once()
@@ -363,66 +371,63 @@ class TestReleaseJobLock:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_release_nonexistent_does_not_raise(self):
-        """Releasing a non-existent lock should not raise"""
+        """Releasing a lock we never acquired is a no-op, not an error."""
         mock_db = make_mock_db()
-        # delete_one on a non-existent doc just returns with deleted_count=0
         mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch("scheduler.db", mock_db):
-            await release_job_lock("nonexistent_job")
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            await release_job_lock("never_acquired_job")
+
+        # We never held the token, so nothing should be deleted.
+        mock_db.job_locks.delete_one.assert_not_called()
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_release_handles_db_error(self):
-        """Release should not propagate DB errors"""
+        """Release should not propagate DB errors."""
         mock_db = make_mock_db()
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
         mock_db.job_locks.delete_one = AsyncMock(side_effect=Exception("DB down"))
 
-        with patch("scheduler.db", mock_db):
-            # Should not raise
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            assert await acquire_job_lock("error_job", ttl_seconds=60) is True
+            # Should not raise even though delete_one fails.
             await release_job_lock("error_job")
 
 
 class TestConcurrentLockAcquisition:
-    """Tests for concurrent lock behavior in multi-worker scenarios"""
+    """Tests for concurrent lock behavior in multi-worker scenarios."""
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_first_caller_wins_rest_get_duplicate_key(self):
-        """
-        Simulate concurrency: first call succeeds (upsert), subsequent calls
-        get duplicate key errors.
-        """
+        """First acquire wins via upsert; the rest hit E11000 duplicate key."""
         call_count = 0
 
-        async def simulated_update_one(*args, **kwargs):
+        async def simulated_fnu(query, update, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return make_update_result(upserted_id="winner")
+                return update["$set"]
             raise Exception("E11000 duplicate key error collection")
 
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = simulated_update_one
+        mock_db.job_locks.find_one_and_update = simulated_fnu
 
-        with patch("scheduler.db", mock_db):
-            results = []
-            for _ in range(4):
-                r = await acquire_job_lock("concurrent_test", ttl_seconds=60)
-                results.append(r)
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
+            results = [await acquire_job_lock("concurrent_test", ttl_seconds=60) for _ in range(4)]
 
-        successful = sum(1 for r in results if r is True)
-        assert successful == 1
+        assert sum(1 for r in results if r is True) == 1
 
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_sequential_acquire_release_cycle(self):
-        """Multiple sequential acquire-release cycles should all succeed"""
+        """Multiple sequential acquire-release cycles should all succeed."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
         mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch("scheduler.db", mock_db):
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
             for _ in range(5):
                 assert await acquire_job_lock("cycle_test", ttl_seconds=60) is True
                 await release_job_lock("cycle_test")
@@ -430,12 +435,12 @@ class TestConcurrentLockAcquisition:
     @pytest.mark.asyncio
     @pytest.mark.unit
     async def test_lock_cleanup_after_exception(self):
-        """Lock should be released even if the job raises an exception"""
+        """Lock should be released even if the job raises an exception."""
         mock_db = make_mock_db()
-        mock_db.job_locks.update_one = AsyncMock(return_value=make_update_result(upserted_id="id1"))
+        mock_db.job_locks.find_one_and_update = AsyncMock(side_effect=lambda query, update, **kw: update["$set"])
         mock_db.job_locks.delete_one = AsyncMock()
 
-        with patch("scheduler.db", mock_db):
+        with patch("scheduler.db", mock_db), patch("scheduler.get_redis_client", return_value=None):
             assert await acquire_job_lock("exc_test", ttl_seconds=60) is True
 
             try:

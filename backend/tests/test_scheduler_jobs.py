@@ -752,10 +752,12 @@ class TestDailyReminderJob:
             patch("scheduler.acquire_job_lock", new_callable=AsyncMock, return_value=True),
             patch("scheduler.release_job_lock", new_callable=AsyncMock) as mock_release,
             patch("scheduler.refresh_all_dashboard_caches", new_callable=AsyncMock) as mock_refresh,
+            patch("scheduler.ensure_whatsapp_connected", new_callable=AsyncMock) as mock_preflight,
             patch("scheduler.send_daily_digest_to_pastoral_team", new_callable=AsyncMock) as mock_digest,
         ):
             await daily_reminder_job()
             mock_refresh.assert_called_once()
+            mock_preflight.assert_called_once()
             mock_digest.assert_called_once()
             mock_release.assert_called_once_with("daily_reminder")
 
@@ -982,8 +984,10 @@ class TestCheckMissedReconciliation:
     async def test_handles_naive_datetime_from_mongodb(self):
         """Should handle MongoDB naive datetime (assumes UTC)."""
         mock_db = make_mock_db()
-        # MongoDB may return naive datetime objects
-        naive_dt = datetime.now() - timedelta(hours=30)
+        # MongoDB stores/returns naive datetimes in UTC. Build a naive *UTC*
+        # timestamp 30h ago (not datetime.now(), which is local Jakarta time and
+        # would be misread as UTC, shrinking the gap to ~23h on a WIB host).
+        naive_dt = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=30)
         configs = [
             {
                 "campus_id": "c1",
