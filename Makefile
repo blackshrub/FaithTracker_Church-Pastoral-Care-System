@@ -53,6 +53,12 @@ RED := \033[31m
 NC := \033[0m
 BOLD := \033[1m
 
+# The frontend is a static Vite build served directly by the host Angie web
+# server from $(FRONTEND_DIR)/build/ — it is NOT a Docker Compose service.
+# "Deploying" the frontend just means rebuilding that bundle in place; Angie
+# picks up the new files immediately, no container or reload required.
+FRONTEND_DIR := frontend
+
 #===============================================================================
 # HELP
 #===============================================================================
@@ -73,7 +79,7 @@ help: ## Show this help message
 	@echo "  $(GREEN)make build$(NC)           Build with cache (fast)"
 	@echo "  $(GREEN)make rebuild$(NC)         Build without cache (fresh)"
 	@echo "  $(GREEN)make rebuild-backend$(NC) Rebuild backend only (no cache)"
-	@echo "  $(GREEN)make rebuild-frontend$(NC) Rebuild frontend only (no cache)"
+	@echo "  $(GREEN)make rebuild-frontend$(NC) Build static frontend bundle (Angie-served)"
 	@echo ""
 	@echo "$(BOLD)Angie Web Server (Host-level):$(NC)"
 	@echo "  $(GREEN)make angie-install$(NC)   Install Angie and Certbot"
@@ -89,9 +95,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(BOLD)Individual Services:$(NC)"
 	@echo "  $(GREEN)make restart-backend$(NC)  Restart backend only"
-	@echo "  $(GREEN)make restart-frontend$(NC) Restart frontend only"
+	@echo "  $(GREEN)make restart-frontend$(NC) Rebuild static frontend (no container)"
 	@echo "  $(GREEN)make logs-backend$(NC)     View backend logs"
-	@echo "  $(GREEN)make logs-frontend$(NC)    View frontend logs"
+	@echo "  $(GREEN)make logs-frontend$(NC)    View Angie access logs (frontend)"
 	@echo "  $(GREEN)make logs-mongo$(NC)       View MongoDB logs"
 	@echo ""
 	@echo "$(BOLD)Database & Backups:$(NC)"
@@ -164,10 +170,10 @@ rebuild-backend: ## Rebuild backend without cache
 	docker compose build --no-cache backend
 	@echo "$(YELLOW)Run 'make restart-backend' to apply changes$(NC)"
 
-rebuild-frontend: ## Rebuild frontend without cache
-	@echo "$(GREEN)Rebuilding frontend (no cache)...$(NC)"
-	docker compose build --no-cache frontend
-	@echo "$(YELLOW)Run 'make restart-frontend' to apply changes$(NC)"
+rebuild-frontend: ## Build static frontend bundle (Vite -> frontend/build/, served by Angie)
+	@echo "$(GREEN)Building frontend (Vite static bundle)...$(NC)"
+	cd $(FRONTEND_DIR) && yarn install --frozen-lockfile && yarn build
+	@echo "$(GREEN)Frontend built to $(FRONTEND_DIR)/build/ — served live by Angie.$(NC)"
 
 #===============================================================================
 # UV / PYTHON DEPENDENCY MANAGEMENT (backend/pyproject.toml + uv.lock)
@@ -320,16 +326,16 @@ restart-backend: ## Restart backend only
 	docker compose restart backend
 	@echo "$(GREEN)Backend restarted.$(NC)"
 
-restart-frontend: ## Restart frontend only
-	@echo "$(YELLOW)Restarting frontend...$(NC)"
-	docker compose restart frontend
-	@echo "$(GREEN)Frontend restarted.$(NC)"
+restart-frontend: ## Re-deploy the static frontend (no container to restart)
+	@echo "$(YELLOW)Frontend is a static bundle served by Angie — rebuilding it...$(NC)"
+	$(MAKE) rebuild-frontend
 
 logs-backend: ## View backend logs
 	docker compose logs -f --tail=100 backend
 
-logs-frontend: ## View frontend logs
-	docker compose logs -f --tail=100 frontend
+logs-frontend: ## View frontend access logs (served by host Angie, not Docker)
+	@echo "$(YELLOW)Frontend is served by host Angie; showing Angie access logs.$(NC)"
+	$(MAKE) angie-access-logs
 
 logs-mongo: ## View MongoDB logs
 	docker compose logs -f --tail=100 mongo
@@ -413,6 +419,8 @@ deploy: ## Full deployment: rebuild and restart all
 	@echo ""
 	docker compose up -d
 	@echo ""
+	$(MAKE) rebuild-frontend
+	@echo ""
 	@sleep 5
 	$(MAKE) health
 	@echo ""
@@ -424,16 +432,16 @@ deploy-backend: ## Deploy backend only (rebuild + restart)
 	docker compose up -d backend
 	@echo "$(GREEN)Backend deployed.$(NC)"
 
-deploy-frontend: ## Deploy frontend only (rebuild + restart)
+deploy-frontend: ## Deploy frontend only (rebuild static bundle; Angie serves it live)
 	@echo "$(GREEN)Deploying frontend...$(NC)"
 	$(MAKE) rebuild-frontend
-	docker compose up -d frontend
-	@echo "$(GREEN)Frontend deployed.$(NC)"
+	@echo "$(GREEN)Frontend deployed — live via Angie at $(FRONTEND_DIR)/build/.$(NC)"
 
-quick-deploy: ## Quick deploy: build with cache and restart
+quick-deploy: ## Quick deploy: build with cache and restart (backend services + frontend bundle)
 	@echo "$(GREEN)$(BOLD)Quick deployment (with cache)...$(NC)"
 	$(MAKE) build
 	docker compose up -d
+	$(MAKE) rebuild-frontend
 	@echo "$(GREEN)Quick deploy complete.$(NC)"
 
 #===============================================================================
