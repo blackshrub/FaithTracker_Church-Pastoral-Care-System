@@ -16,15 +16,9 @@
  */
 
 import { useCallback, type ReactNode } from 'react';
-import { Link, useNavigate, type LinkProps } from 'react-router-dom';
+import { Link, type LinkProps } from 'react-router-dom';
 
 import { usePrefetch } from '@/hooks/usePrefetch';
-
-/**
- * Check if View Transitions API is supported
- */
-const supportsViewTransitions =
-  typeof document !== 'undefined' && 'startViewTransition' in document;
 
 /**
  * Live check for hover-capable input. Used for onMouseEnter, NOT onFocus —
@@ -75,7 +69,6 @@ export function LinkWithPrefetch({
   className,
   ...props
 }: LinkWithPrefetchProps) {
-  const navigate = useNavigate();
   const { prefetchMember, prefetchDashboard, prefetchMembersList, cancelPrefetch } = usePrefetch();
 
   const doPrefetch = useCallback(() => {
@@ -116,46 +109,21 @@ export function LinkWithPrefetch({
     cancelPrefetch();
   }, [cancelPrefetch]);
 
-  /**
-   * Handle click with View Transitions API
-   * Creates smooth morphing animation between pages
-   */
-  const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      // Only use View Transitions for same-origin navigation
-      if (!useViewTransition || !supportsViewTransitions) {
-        return; // Let Link handle normally
-      }
-
-      // Prevent default link behavior
-      e.preventDefault();
-
-      // Start view transition with proper async handling
-      // The transition captures the current state, then we navigate
-      const transition = (document as any).startViewTransition(async () => {
-        // Navigate and wait for it to complete
-        navigate(to);
-        // Give React time to update the DOM
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      // Handle transition errors gracefully
-      transition.finished.catch(() => {
-        // Transition interrupted - navigation still happens, no action needed
-      });
-    },
-    [to, useViewTransition, navigate]
-  );
-
+  // View Transitions are delegated to React Router's `viewTransition` prop.
+  // The data router coordinates the transition snapshot with React's commit
+  // (flushSync + startViewTransition internally), so the DOM is fully updated
+  // before the animation runs. Hand-rolling startViewTransition() around an
+  // async navigate() raced React's async commit and threw "Failed to execute
+  // 'removeChild'" when the reconciler unmounted nodes the transition had moved.
   return (
     <Link
       to={to}
+      viewTransition={useViewTransition}
       className={className}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocus}
       onBlur={handleMouseLeave}
-      onClick={handleClick}
       {...props}
     >
       {children}

@@ -14,8 +14,13 @@
  * - Returns transition state for loading indicators
  */
 
-import { useCallback, useState } from 'react';
-import { useNavigate as useRouterNavigate, type NavigateOptions } from 'react-router-dom';
+import { useCallback } from 'react';
+import { flushSync } from 'react-dom';
+import {
+  useNavigate as useRouterNavigate,
+  useNavigation,
+  type NavigateOptions,
+} from 'react-router-dom';
 
 /**
  * Check if View Transitions API is supported
@@ -34,73 +39,50 @@ function prefersReducedMotion(): boolean {
 }
 
 export interface UseViewTransitionReturn {
-  navigate: (to: string, options?: NavigateOptions) => ViewTransition | undefined;
-  goBack: () => ViewTransition | undefined;
+  navigate: (to: string, options?: NavigateOptions) => void;
+  goBack: () => void;
   isTransitioning: boolean;
   supportsViewTransitions: boolean;
 }
 
 /**
- * Hook for navigation with View Transitions
+ * Hook for navigation with View Transitions.
+ *
+ * Delegates to React Router's `viewTransition` navigation option rather than
+ * wrapping `startViewTransition()` by hand. The data router coordinates the
+ * transition snapshot with React's commit (flushSync internally) so the new
+ * DOM is in place before the animation runs. The previous hand-rolled version
+ * called `routerNavigate` inside the transition callback, which raced React 19's
+ * async commit and threw "Failed to execute 'removeChild' on 'Node'".
  */
 export function useViewTransition(): UseViewTransitionReturn {
   const routerNavigate = useRouterNavigate();
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const navigation = useNavigation();
 
   /**
    * Navigate with View Transition animation
    */
   const navigate = useCallback(
-    (to: string, options: NavigateOptions = {}): ViewTransition | undefined => {
-      // Skip transitions if not supported or user prefers reduced motion
-      if (!supportsViewTransitions || prefersReducedMotion()) {
-        routerNavigate(to, options);
-        return;
-      }
-
-      setIsTransitioning(true);
-
-      // Start view transition
-      const transition = document.startViewTransition(() => {
-        routerNavigate(to, options);
-      });
-
-      // Clean up after transition completes
-      transition.finished.finally(() => {
-        setIsTransitioning(false);
-      });
-
-      return transition;
+    (to: string, options: NavigateOptions = {}): void => {
+      const animate = supportsViewTransitions && !prefersReducedMotion();
+      routerNavigate(to, { ...options, viewTransition: animate });
     },
     [routerNavigate]
   );
 
   /**
-   * Navigate back with View Transition
+   * Navigate back. The delta form of navigate() takes no options, so the
+   * transition is only applied to forward navigations that pass a path.
    */
-  const goBack = useCallback((): ViewTransition | undefined => {
-    if (!supportsViewTransitions || prefersReducedMotion()) {
-      routerNavigate(-1);
-      return;
-    }
-
-    setIsTransitioning(true);
-
-    const transition = document.startViewTransition(() => {
-      routerNavigate(-1);
-    });
-
-    transition.finished.finally(() => {
-      setIsTransitioning(false);
-    });
-
-    return transition;
+  const goBack = useCallback((): void => {
+    routerNavigate(-1);
   }, [routerNavigate]);
 
   return {
     navigate,
     goBack,
-    isTransitioning,
+    // Reflects the router's in-flight navigation state (data router).
+    isTransitioning: navigation.state !== 'idle',
     supportsViewTransitions,
   };
 }
@@ -115,7 +97,13 @@ export function withViewTransition(updateCallback: () => void): ViewTransition |
     return undefined;
   }
 
-  return document.startViewTransition(updateCallback);
+  // flushSync forces any React state update in the callback to commit
+  // synchronously, so the new DOM exists before the transition snapshots it.
+  // Without it, React 19's async commit lands mid-transition and can throw
+  // "Failed to execute 'removeChild' on 'Node'".
+  return document.startViewTransition(() => {
+    flushSync(updateCallback);
+  });
 }
 
 export default useViewTransition;
